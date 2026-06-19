@@ -1,0 +1,581 @@
+--- v10
++++ v11
+@@ -37,4 +37,5 @@
+     string    status;        // "EXECUTED" atau "REJECTED"
+     string    reject_reason; // Alasan jika ditolak, "N/A" jika dieksekusi
++    string    exit_type;     // Alasan exit (STOP_LOSS, TAKE_PROFIT, ACTIVE_300_USD, ACTIVE_3_BOS, MANUAL_CLOSE, dll)
+ };
+ 
+@@ -215,5 +216,6 @@
+                       datetime entry_time, datetime exit_time,
+                       double lot_size, ulong magic, string tf,
+-                      double spread_cost = 0, double commission = 0, double swap = 0, string session = "")
++                      double spread_cost = 0, double commission = 0, double swap = 0, string session = "",
++                      string exit_type = "")
+ {
+     for (int i = 0; i < g_TradeCount; i++)
+@@ -250,4 +252,5 @@
+     g_BacktestTrades[g_TradeCount].status       = "EXECUTED";
+     g_BacktestTrades[g_TradeCount].reject_reason = "N/A";
++    g_BacktestTrades[g_TradeCount].exit_type    = exit_type;
+     
+     g_TradeCount = newSize;
+@@ -287,4 +290,5 @@
+     g_BacktestTrades[g_TradeCount].status        = "REJECTED";
+     g_BacktestTrades[g_TradeCount].reject_reason = reason;
++    g_BacktestTrades[g_TradeCount].exit_type     = "";
+     
+     g_TradeCount = newSize;
+@@ -359,5 +363,5 @@
+                         entry_time, exit_time,
+                         lot_size, MagicNumber_M15, "M15",
+-                        0, 0, 0, GetCurrentSession());  // Assume no spread/commission/swap for open trades at capture time
++                        0, 0, 0, GetCurrentSession(), "OPEN");  // Assume no spread/commission/swap for open trades at capture time
+     }
+ }
+@@ -390,5 +394,5 @@
+               "Session", "Session_IsDST",
+               "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
+-              "Status", "Reject_Reason");
++              "Status", "Reject_Reason", "ExitType");
+ 
+     // Data rows
+@@ -418,5 +422,6 @@
+                   g_BacktestTrades[i].timeframe,
+                   g_BacktestTrades[i].status,
+-                  g_BacktestTrades[i].reject_reason);
++                  g_BacktestTrades[i].reject_reason,
++                  g_BacktestTrades[i].exit_type);
+     }
+     
+@@ -1660,4 +1665,5 @@
+ // Waktu bar terakhir diproses
+ datetime lastBarTime_M15 = 0;
++datetime lastTrailingBarTime_M15 = 0;
+ static bool bosBullishJustLogged_M15 = false;
+ 
+@@ -1744,4 +1750,8 @@
+ input int MaxHoldHours_M15 = 24; // Maximum hold time, force close after this (hours)
+ 
++// --- Trailing Stop Parameters M15 ---
++input bool EnableTrailingStop_M15   = true;  // Aktifkan Trailing Stop M15
++input bool EnableTrailingLogs_M15   = false; // Aktifkan log verbose Trailing Stop M15 (per tick)
++
+ //+------------------------------------------------------------------+
+ //| H4 EMA FILTER - Input Parameters                                 |
+@@ -1849,4 +1859,6 @@
+     string    type;
+     string    session;
++    int       trailing_step; // Langkah trailing stop aktif (0 = belum aktif, 1, 2, 3)
++    string    exit_type;     // Alasan exit (ACTIVE_300_USD, ACTIVE_3_BOS, dll)
+ };
+ 
+@@ -2027,10 +2039,45 @@
+ void ApplyTrailingStop_M15()
+ {
++    // Cek apakah ini candle baru di M15
++    datetime currentBarTime = iTime(_Symbol, PERIOD_M15, 0);
++    if(currentBarTime == lastTrailingBarTime_M15)
++    {
++        return; // Hanya eksekusi 1 kali pada penutupan/pembukaan bar M15
++    }
++
++    // Periode internal untuk ATR (menggunakan standar 14 bar) untuk ekspansi TP
++    const int atrPeriod = 14;
++    
++    // Ambil rates M15 terupdate
++    MqlRates rates[];
++    ArraySetAsSeries(rates, true);
++    int copied = CopyRates(_Symbol, PERIOD_M15, 0, atrPeriod + 2, rates);
++    if(copied < atrPeriod + 2)
++    {
++        if(EnableTrailingLogs_M15)
++            Print("⚠️ [DYNAMIC TRAILING M15] Gagal menyalin data rates, jumlah tersalin kurang dari kebutuhan.");
++        return;
++    }
++
++    // Hitung rata-rata ATR dari lilin yang sudah closed (indeks 1 s/d atrPeriod) untuk ekspansi TP
++    double sumTR = 0;
++    for(int i = 1; i <= atrPeriod; i++)
++    {
++        double high = rates[i].high;
++        double low = rates[i].low;
++        double prevClose = rates[i+1].close;
++        double tr = MathMax(high - low, MathMax(MathAbs(high - prevClose), MathAbs(low - prevClose)));
++        sumTR += tr;
++    }
++    double avgATR = sumTR / (double)atrPeriod;
++
+     double currentBid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+     double currentAsk = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
++
+     for(int i = PositionsTotal()-1; i >= 0; i--)
+     {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket <= 0) continue;
++        
+         // Pastikan posisi milik EA ini
+         if(PositionGetInteger(POSITION_MAGIC) != MagicNumber_M15 || 
+@@ -2038,148 +2085,129 @@
+             continue;
+ 
++        // Skip posisi yang baru saja dibuka pada candle berjalan (menjaga SL awal tetap utuh)
++        datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
++        if(positionOpenTime >= currentBarTime)
++        {
++            continue;
++        }
++
+         double positionOpen = PositionGetDouble(POSITION_PRICE_OPEN);
+         double sl = PositionGetDouble(POSITION_SL);
++        double tp = PositionGetDouble(POSITION_TP);
+         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+ 
+         if(posType == POSITION_TYPE_BUY)
+         {
+-            double profitPoints = (currentBid - positionOpen) / _Point;
+-            // 🔍 LOG DETAIL UNTUK BUY TRAILING M15
+-            PrintFormat("📊 [TRAILING BUY M15] Time=%s | Bid=%.5f | Entry=%.5f | SL=%.5f | TP=%.5f | Profit=%.1f poin | Status: %s",
+-                        TimeToString(TimeCurrent(), TIME_MINUTES),
+-                        currentBid,
+-                        positionOpen,
+-                        sl,
+-                        PositionGetDouble(POSITION_TP),
+-                        profitPoints,
+-                        !trailingActivatedBuy_M15 ? "Step 0" :
+-                        trailingActivatedBuy_M15 == 1 ? "Step 1 Aktif" :
+-                        trailingActivatedBuy_M15 == 2 ? "Step 2 Aktif" : "Step 3 Aktif");
+-
+-            // --- TAHAP 1: Aktifkan saat profit >= 800 poin ---
+-            if(profitPoints >= 800 && !trailingActivatedBuy_M15)
+-            {
+-                double newSL = positionOpen; // Set SL ke harga entry + 500 poin
+-                double newTP = positionOpen  + 3000 * _Point;
+-                PrintFormat("✅ [TRAILING STEP 1 M15] BUY: Profit %.1f poin >= 800 | Akan set SL=%.5f, TP=%.5f",
+-                            profitPoints, newSL, newTP);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 1 M15] BUY: SL & TP berhasil diatur.");
+-                    trailingActivatedBuy_M15 = true;
++            // 1. Perhitungan SL Tetap 3000 Poin (Bisa Naik & Turun)
++            double trailingDistance = 3000 * _Point;
++            double targetSL = NormalizeDouble(currentBid - trailingDistance, _Digits);
++            
++            // Batas maksimal SL: maksimal 3000 pips (3000 poin) di bawah harga entry (positionOpen)
++            double minSL = NormalizeDouble(positionOpen - 3000 * _Point, _Digits);
++            // Dan jangan sampai lebih dekat dari 150 poin ke harga Bid saat ini (agar tidak invalid stop)
++            double maxSL = NormalizeDouble(currentBid - 150 * _Point, _Digits);
++            
++            targetSL = MathMax(minSL, MathMin(maxSL, targetSL));
++
++            // 2. Perhitungan TP Dinamis (TP awal 3500 poin, melebar ke atas saat didekati, tidak boleh menyempit)
++            double targetTP = tp;
++            if(targetTP == 0)
++            {
++                targetTP = NormalizeDouble(positionOpen + 3500 * _Point, _Digits);
++            }
++            
++            // Cek apakah harga sudah mendekati TP (jarak <= 1000 poin)
++            if(targetTP - currentBid <= 1000 * _Point)
++            {
++                // Jika mendekati, perluas TP ke atas (tambahkan ekspansi dinamis berdasarkan ATR atau minimal 2000 poin)
++                double tpExpansion = MathMax(2000 * _Point, avgATR * 3.0);
++                targetTP = NormalizeDouble(currentBid + tpExpansion, _Digits);
++            }
++            
++            // Pastikan TP hanya boleh bertambah besar (ke atas) dan tidak boleh menyempit (turun)
++            if(tp > 0)
++            {
++                targetTP = MathMax(tp, targetTP);
++            }
++
++            // Modifikasi posisi jika target SL atau TP berbeda cukup signifikan (misal >= 10 poin)
++            if(MathAbs(targetSL - sl) >= 10 * _Point || MathAbs(targetTP - tp) >= 10 * _Point)
++            {
++                if(trade.PositionModify(ticket, targetSL, targetTP))
++                {
++                    PrintFormat("🚀 [BAR DYNAMIC MODIFY BUY M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
++                                ticket, targetSL, minSL, targetTP, tp);
+                 }
+                 else
+                 {
+-                    Print("❌ [TRAILING STEP 1 M15] Gagal modify posisi BUY: ", GetLastError());
+-                }
+-            }
+-            // --- TAHAP 2: Aktifkan saat profit >= 2500 poin ---
+-            else if(profitPoints >= 2500 && trailingActivatedBuy_M15 == true && sl <= positionOpen + DefaultSL_Buy_M15 * _Point)
+-            {
+-                double newSL = positionOpen +  2000 * _Point;
+-                double newTP = positionOpen + (DefaultTP_Buy_M15 + 4500) * _Point;
+-                PrintFormat("✅ [TRAILING STEP 2 M15] BUY: Profit %.1f poin >= 2500 | Akan set SL=%.5f",
+-                            profitPoints, newSL);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 2 M15] BUY: SL & TP dinaikkan.");
+-                    trailingActivatedBuy_M15 = 2;
+-                }
+-                else
+-                {
+-                    Print("❌ [TRAILING STEP 2 M15] Gagal modify posisi BUY: ", GetLastError());
+-                }
+-            }
+-            // --- TAHAP 3: Aktifkan saat profit >= 3000 poin ---
+-            else if(profitPoints >= 4000 && trailingActivatedBuy_M15 == 2 && sl <= positionOpen + (DefaultSL_Buy_M15 + 500) * _Point)
+-            {
+-                double newSL = positionOpen +  3000 * _Point;
+-                double newTP = positionOpen + 6000 * _Point;
+-                PrintFormat("✅ [TRAILING STEP 3 M15] BUY: Profit %.1f poin >= 3000 | Akan set SL=%.5f",
+-                            profitPoints, newSL);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 3 M15] BUY: SL & TP dinaikkan ke level tertinggi.");
+-                    trailingActivatedBuy_M15 = 3;
+-                }
+-                else
+-                {
+-                    Print("❌ [TRAILING STEP 3 M15] Gagal modify posisi BUY: ", GetLastError());
+-                }
++                    PrintFormat("❌ [BAR DYNAMIC MODIFY BUY M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
++                }
++            }
++            
++            if(EnableTrailingLogs_M15)
++            {
++                PrintFormat("📊 [TRAILING BUY M15] Ticket=%I64u | Bid=%.5f | SL=%.5f -> TargetSL=%.5f | TP=%.5f -> TargetTP=%.5f",
++                            ticket, currentBid, sl, targetSL, tp, targetTP);
+             }
+         }
+         else if(posType == POSITION_TYPE_SELL)
+         {
+-            double profitPoints = (positionOpen - currentAsk) / _Point;
+-            // 🔍 LOG DETAIL UNTUK SELL TRAILING M15
+-            PrintFormat("📊 [TRAILING SELL M15] Time=%s | Ask=%.5f | Entry=%.5f | SL=%.5f | TP=%.5f | Profit=%.1f poin | Status: %s",
+-                        TimeToString(TimeCurrent(), TIME_MINUTES),
+-                        currentAsk,
+-                        positionOpen,
+-                        sl,
+-                        PositionGetDouble(POSITION_TP),
+-                        profitPoints,
+-                        !trailingActivatedSell_M15 ? "Step 0" :
+-                        trailingActivatedSell_M15 == 1 ? "Step 1 Aktif" :
+-                        trailingActivatedSell_M15 == 2 ? "Step 2 Aktif" : "Step 3 Aktif");
+-
+-            // --- TAHAP 1: Aktifkan saat profit >= 800 poin ---
+-            if(profitPoints >= 800 && !trailingActivatedSell_M15)
+-            {
+-                double newSL = positionOpen - 500 * _Point; // Set SL ke harga entry + 500 poin
+-                double newTP = positionOpen - (DefaultTP_Sell_M15 + 1000) * _Point;
+-                PrintFormat("✅ [TRAILING STEP 1 M15] SELL: Profit %.1f poin >= 800 | Akan set SL=%.5f, TP=%.5f",
+-                            profitPoints, newSL, newTP);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 1 M15] SELL: SL & TP berhasil diatur.");
+-                    trailingActivatedSell_M15 = true;
++            // 1. Perhitungan SL Tetap 3000 Poin (Bisa Naik & Turun)
++            double trailingDistance = 3000 * _Point;
++            double targetSL = NormalizeDouble(currentAsk + trailingDistance, _Digits);
++            
++            // Batas maksimal SL: maksimal 3000 pips (3000 poin) di atas harga entry (positionOpen)
++            double minSL = NormalizeDouble(positionOpen + 3000 * _Point, _Digits);
++            // Dan jangan sampai lebih dekat dari 150 poin ke harga Ask saat ini
++            double maxSL = NormalizeDouble(currentAsk + 150 * _Point, _Digits);
++            
++            targetSL = MathMin(minSL, MathMax(maxSL, targetSL));
++
++            // 2. Perhitungan TP Dinamis (TP awal 3500 poin, melebar ke bawah saat didekati, tidak boleh menyempit)
++            double targetTP = tp;
++            if(targetTP == 0)
++            {
++                targetTP = NormalizeDouble(positionOpen - 3500 * _Point, _Digits);
++            }
++            
++            // Cek apakah harga sudah mendekati TP (jarak <= 1000 poin)
++            if(currentAsk - targetTP <= 1000 * _Point)
++            {
++                // Jika mendekati, perluas TP ke bawah (kurangi ekspansi dinamis berdasarkan ATR atau minimal 2000 poin)
++                double tpExpansion = MathMax(2000 * _Point, avgATR * 3.0);
++                targetTP = NormalizeDouble(currentAsk - tpExpansion, _Digits);
++            }
++            
++            // Pastikan TP hanya boleh bertambah besar (ke bawah) dan tidak boleh menyempit (naik)
++            if(tp > 0)
++            {
++                targetTP = MathMin(tp, targetTP);
++            }
++
++            if(MathAbs(targetSL - sl) >= 10 * _Point || MathAbs(targetTP - tp) >= 10 * _Point)
++            {
++                if(trade.PositionModify(ticket, targetSL, targetTP))
++                {
++                    PrintFormat("🚀 [BAR DYNAMIC MODIFY SELL M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
++                                ticket, targetSL, minSL, targetTP, tp);
+                 }
+                 else
+                 {
+-                    Print("❌ [TRAILING STEP 1 M15] Gagal modify posisi SELL: ", GetLastError());
+-                }
+-            }
+-            // --- TAHAP 2: Aktifkan saat profit >= 1800 poin ---
+-            else if(profitPoints >= 2000 && trailingActivatedSell_M15 == true && sl >= positionOpen - DefaultSL_Sell_M15 * _Point)
+-            {
+-                double newSL = positionOpen - (DefaultSL_Sell_M15 + 1500) * _Point;
+-                double newTP = positionOpen - (DefaultTP_Sell_M15 + 2500) * _Point;
+-                PrintFormat("✅ [TRAILING STEP 2 M15] SELL: Profit %.1f poin >= 1800 | Akan set SL=%.5f",
+-                            profitPoints, newSL);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 2 M15] SELL: SL & TP diturunkan.");
+-                    trailingActivatedSell_M15 = 2;
+-                }
+-                else
+-                {
+-                    Print("❌ [TRAILING STEP 2 M15] Gagal modify posisi SELL: ", GetLastError());
+-                }
+-            }
+-            // --- TAHAP 3: Aktifkan saat profit >= 2500 poin ---
+-            else if(profitPoints >= 2500 && trailingActivatedSell_M15 == 2 && sl >= positionOpen - (DefaultSL_Sell_M15 + 500) * _Point)
+-            {
+-                double newSL = positionOpen - (DefaultSL_Sell_M15 + 1000) * _Point;
+-                double newTP = positionOpen - (DefaultTP_Sell_M15 + 1000) * _Point;
+-                PrintFormat("✅ [TRAILING STEP 3 M15] SELL: Profit %.1f poin >= 2500 | Akan set SL=%.5f",
+-                            profitPoints, newSL);
+-                if(trade.PositionModify(ticket, newSL, newTP))
+-                {
+-                    Print("[TRAILING STEP 3 M15] SELL: SL & TP diturunkan lebih jauh.");
+-                    trailingActivatedSell_M15 = 3;
+-                }
+-                else
+-                {
+-                    Print("❌ [TRAILING STEP 3 M15] Gagal modify posisi SELL: ", GetLastError());
+-                }
++                    PrintFormat("❌ [BAR DYNAMIC MODIFY SELL M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
++                }
++            }
++            
++            if(EnableTrailingLogs_M15)
++            {
++                PrintFormat("📊 [TRAILING SELL M15] Ticket=%I64u | Ask=%.5f | SL=%.5f -> TargetSL=%.5f | TP=%.5f -> TargetTP=%.5f",
++                            ticket, currentAsk, sl, targetSL, tp, targetTP);
+             }
+         }
+     }
++
++    // Set waktu pemrosesan terakhir agar tidak dieksekusi lagi pada candle yang sama
++    lastTrailingBarTime_M15 = currentBarTime;
+ }
+ 
+-//+------------------------------------------------------------------+
+-//| Reset trailing flags saat tidak ada posisi M15                   |
+-//+------------------------------------------------------------------+
+ void CheckTrailingReset_M15()
+ {
+@@ -2205,16 +2233,16 @@
+     }
+     
+-    //--- Reset buy flags hanya jika status berubah dari ada menjadi tidak ada ---
++    //--- Reset legacy global buy flags hanya jika status berubah dari ada menjadi tidak ada ---
+     if(lastHasBuyPosition_M15 && !hasBuyPosition_M15) 
+     {
+         trailingActivatedBuy_M15 = false;
+-        Print("[TRAILING RESET M15] Buy flags reset");
+-    }
+-    
+-    //--- Reset sell flags hanya jika status berubah dari ada menjadi tidak ada ---
++        Print("[TRAILING RESET M15] Legacy Buy flags reset");
++    }
++    
++    //--- Reset legacy global sell flags hanya jika status berubah dari ada menjadi tidak ada ---
+     if(lastHasSellPosition_M15 && !hasSellPosition_M15) 
+     {
+         trailingActivatedSell_M15 = false;
+-        Print("[TRAILING RESET M15] Sell flags reset");
++        Print("[TRAILING RESET M15] Legacy Sell flags reset");
+     }
+     
+@@ -2228,4 +2256,59 @@
+     if (tradeRec.ticket == 0) return;
+     
++    // Check if the position is still open to evaluate active exit rules
++    if (PositionSelectByTicket(tradeRec.ticket))
++    {
++        double positionProfit = PositionGetDouble(POSITION_PROFIT);
++        datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
++        
++        bool shouldClose = false;
++        string closeReason = "";
++        
++        // 1. Exit Rule: Profit >= 300 USD
++        if (positionProfit >= 300.0)
++        {
++            shouldClose = true;
++            closeReason = StringFormat("Profit >= 300 USD (Running: %.2f USD)", positionProfit);
++            tradeRec.exit_type = "ACTIVE_300_USD";
++        }
++        
++        // 2. Exit Rule: 3 BOS confirmed since position open
++        if (!shouldClose)
++        {
++            int bosCount = 0;
++            for(int j = 0; j < g_LLHHBOSCount; j++)
++            {
++                if(g_LLHHBOSData[j].timeframe == "M15" && 
++                   g_LLHHBOSData[j].type == "BoS" && 
++                   g_LLHHBOSData[j].time > positionOpenTime)
++                {
++                    bosCount++;
++                }
++            }
++            
++            if (bosCount >= 3)
++            {
++                shouldClose = true;
++                closeReason = StringFormat("Telah terjadi %d BoS terkonfirmasi sejak entry", bosCount);
++                tradeRec.exit_type = "ACTIVE_3_BOS";
++            }
++        }
++        
++        if (shouldClose)
++        {
++            PrintFormat("🚨 [ACTIVE EXIT TRIGGERED] Ticket %I64u: Menutup posisi secara aktif karena %s", 
++                        tradeRec.ticket, closeReason);
++            if (trade.PositionClose(tradeRec.ticket))
++            {
++                PrintFormat("✅ [ACTIVE EXIT SUCCESS] Ticket %I64u ditutup aktif.", tradeRec.ticket);
++            }
++            else
++            {
++                PrintFormat("❌ [ACTIVE EXIT FAILED] Gagal menutup aktif ticket %I64u: %d", 
++                            tradeRec.ticket, GetLastError());
++            }
++        }
++    }
++    
+     // 🔍 DIAGNOSTIC: Log setiap check
+     // PrintFormat("🔍 [CHECK] Ticket: %I64u | Type: %s | Entry Price: %.5f", 
+@@ -2247,4 +2330,5 @@
+         PrintFormat("   Finding deals... Total deals in history: %d", totalDeals);
+         
++        string exitType = "UNKNOWN";
+         for(int i = totalDeals-1; i >= 0; i--)
+         {
+@@ -2256,6 +2340,24 @@
+                 exitTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+                 found = true;
+-                PrintFormat("   ✅ Found deal for Ticket %I64u: Exit Price=%.5f, Profit=%.2f", 
+-                            tradeRec.ticket, exitPrice, profit);
++                
++                long dealReason = HistoryDealGetInteger(dealTicket, DEAL_REASON);
++                if (dealReason == DEAL_REASON_SL)
++                    exitType = "STOP_LOSS";
++                else if (dealReason == DEAL_REASON_TP)
++                    exitType = "TAKE_PROFIT";
++                else if (dealReason == DEAL_REASON_EXPERT)
++                {
++                    if (tradeRec.exit_type != "")
++                        exitType = tradeRec.exit_type;
++                    else
++                        exitType = "EXPERT_CLOSE";
++                }
++                else if (dealReason == DEAL_REASON_CLIENT)
++                    exitType = "MANUAL_CLOSE";
++                else
++                    exitType = "REASON_" + IntegerToString(dealReason);
++                
++                PrintFormat("   ✅ Found deal for Ticket %I64u: Exit Price=%.5f, Profit=%.2f, Reason=%s (%d)", 
++                            tradeRec.ticket, exitPrice, profit, exitType, dealReason);
+                 break;
+             }
+@@ -2264,5 +2366,5 @@
+         if(found)
+         {
+-            PrintFormat("💰 [%s CLOSED M15] Ticket: %I64u | Entry: %.5f | Exit: %.5f | Profit: %.2f | Duration: %s",
++            PrintFormat("💰 [%s CLOSED M15] Ticket: %I64u | Entry: %.5f | Exit: %.5f | Profit: %.2f | Duration: %s | Exit Type: %s",
+                         tradeRec.type,
+                         tradeRec.ticket,
+@@ -2270,5 +2372,6 @@
+                         exitPrice,
+                         profit,
+-                        TimeToString(exitTime - tradeRec.entry_time, TIME_MINUTES));
++                        TimeToString(exitTime - tradeRec.entry_time, TIME_MINUTES),
++                        exitType);
+             
+             // 💾 Simpan trade ke array untuk export CSV/DB
+@@ -2313,8 +2416,9 @@
+                              tradeRec.entry_time, exitTime,
+                              lotSize, MagicNumber_M15, "M15",
+-                             spreadCost, commission, swapVal, entrySession);
++                             spreadCost, commission, swapVal, entrySession, exitType);
+                         
+             // Reset trade record
+             tradeRec.ticket = 0;
++            tradeRec.exit_type = "";
+         }
+         else
+@@ -3897,4 +4001,5 @@
+                     currentBuyTrade_M15.type = "BUY";
+                     currentBuyTrade_M15.session = GetCurrentSession();
++                    currentBuyTrade_M15.trailing_step = 0;
+                     
+                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
+@@ -4105,4 +4210,5 @@
+                     currentSellTrade_M15.type = "SELL";
+                     currentSellTrade_M15.session = GetCurrentSession();
++                    currentSellTrade_M15.trailing_step = 0;
+                     
+                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
+@@ -5429,5 +5535,24 @@
+     if(Period() == PERIOD_M15)
+     {
+-        //--- Ambil Data Harga M15 ---
++        // --- 1. Check Trade Closures (Real-time on every tick) ---
++        CheckTradeClosure_M15(currentBuyTrade_M15);
++        CheckTradeClosure_M15(currentSellTrade_M15);
++        
++        for(int i = 0; i < 10; i++)
++        {
++            if(activeBuyTrades_M15[i].ticket > 0)
++                CheckTradeClosure_M15(activeBuyTrades_M15[i]);
++            if(activeSellTrades_M15[i].ticket > 0)
++                CheckTradeClosure_M15(activeSellTrades_M15[i]);
++        }
++
++        // --- 2. Apply Trailing Stop (Real-time on every tick) ---
++        if(EnableTrailingStop_M15)
++        {
++            ApplyTrailingStop_M15();
++            CheckTrailingReset_M15();
++        }
++
++        //--- Ambil Data Harga M15 (Bar-limited logic below) ---
+         MqlRates rates_M15[];
+         ArraySetAsSeries(rates_M15, true);
+@@ -5457,29 +5582,4 @@
+         }
+ 
+-        // 🔧 FIX: Check closure untuk single struct (backward compatibility)
+-        CheckTradeClosure_M15(currentBuyTrade_M15);
+-        CheckTradeClosure_M15(currentSellTrade_M15);
+-        
+-        // 🔧 FIX: Loop melalui SEMUA slots array (bukan counter) - selalu cek 3 entries
+-        // PrintFormat("🔍 [ARRAY CHECK] Checking %d BUY trades in array", activeBuyCount_M15);
+-        for(int i = 0; i < 10; i++)
+-        {
+-            if(activeBuyTrades_M15[i].ticket > 0)
+-            {
+-                // PrintFormat("   Slot [%d]: Ticket=%I64u", i, activeBuyTrades_M15[i].ticket);
+-                CheckTradeClosure_M15(activeBuyTrades_M15[i]);
+-            }
+-        }
+-        
+-        // PrintFormat("🔍 [ARRAY CHECK] Checking %d SELL trades in array", activeSellCount_M15);
+-        for(int i = 0; i < 10; i++)
+-        {
+-            if(activeSellTrades_M15[i].ticket > 0)
+-            {
+-                // PrintFormat("   Slot [%d]: Ticket=%I64u", i, activeSellTrades_M15[i].ticket);
+-                CheckTradeClosure_M15(activeSellTrades_M15[i]);
+-            }
+-        }
+-        
+         DetectAndDraw_M15(rates_M15, /*backfillMode=*/false);
+     }

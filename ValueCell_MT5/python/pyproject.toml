@@ -1,0 +1,117 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "valuecell-mt5"
+version = "0.1.0"
+description = "Multi-Agent Trading System for MetaTrader 5 - Forked from ValueCell"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Core Framework (from ValueCell)
+    "pytz>=2023.3",
+    "python-dateutil>=2.8.2",
+    "fastapi>=0.104.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.24.0",
+    "requests>=2.32.5",
+    "sqlalchemy>=2.0.43",
+    "markdown>=3.9",
+    "loguru>=0.7.3",
+    "aiofiles>=24.1.0",
+    
+    # Multi-Agent Framework
+    "langgraph>=0.2.0",
+    "langchain>=0.1.0",
+    "langchain-anthropic>=0.1.0",
+    "agno[openai, google, lancedb, ollama]>=2.0,<3.0",  # Keep for LanceDB
+    
+    # LLM Providers
+    "anthropic>=0.18.0",
+    "openai>=1.12.0",
+    
+    # Vector Database
+    "lancedb>=0.5.0",
+    
+    # Relational Database (Neon PostgreSQL)
+    "psycopg2-binary>=2.9.9",
+    "asyncpg>=0.29.0",
+    
+    # MT5 Integration
+    "MetaTrader5>=5.0.45",
+    
+    # ML & Data Processing
+    "catboost>=1.2.2",
+    "scikit-learn>=1.4.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.3",
+    
+    # News & Sentiment (MVP)
+    "python-dotenv>=1.0.0",
+    
+    # Notifications
+    "python-telegram-bot>=20.7",
+    
+    # File Monitoring (Track 2 - optional)
+    "watchdog>=4.0.0",
+    
+    # Utils
+    "pyyaml>=6.0.1",
+    "func-timeout>=4.3.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=1.0.0",
+    "diff-cover>=9.0.0",
+]
+
+[dependency-groups]
+dev = [
+    { include-group = "lint" },
+    { include-group = "style" },
+    { include-group = "test" },
+]
+lint = ["ruff"]
+style = ["ruff", "isort"]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=1.0.0",
+    "diff-cover>=9.0.0",
+]
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py312"
+force-exclude = true
+exclude = ["venv", "build", "dist", "node_modules", "site-packages"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.hatch.build.targets.wheel]
+include = ["valuecell"]
+exclude = [
+    "tests/**",
+    "**/tests/**",
+    "examples/**",
+    "**/examples/**",
+    "docs/**",
+    "**/docs/**",
+]
+
+[tool.pytest.ini_options]
+norecursedirs = [".venv", "venv", "build", "dist", "logs", "examples", "docs"]
+
+[tool.isort]
+profile = "black"
+skip_glob = ["tests/**", "**/tests/**", "docs/**", "**/docs/**"]

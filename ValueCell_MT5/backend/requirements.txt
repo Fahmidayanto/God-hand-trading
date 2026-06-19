@@ -1,0 +1,29 @@
+# FastAPI and server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# MT5 Integration
+MetaTrader5==5.0.45
+numpy<2  # Required for MT5 compatibility
+
+# Database (optional)
+sqlalchemy==2.0.25
+alembic==1.13.1
+
+# Utilities
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# Logging
+loguru==0.7.2
+
+# CORS and middleware
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Development
+pytest==7.4.4
+pytest-asyncio==0.23.3
+httpx==0.26.0

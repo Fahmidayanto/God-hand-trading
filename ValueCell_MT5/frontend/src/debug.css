@@ -1,0 +1,40 @@
+/* Debug CSS - Add this temporarily to see layout issues */
+
+/* Highlight all containers */
+#root {
+  border: 3px solid red !important;
+  min-height: 100vh;
+}
+
+#root > * {
+  border: 3px solid orange !important;
+}
+
+/* Show flex containers */
+[class*="flex"] {
+  outline: 2px dashed yellow !important;
+}
+
+/* Show max-width containers */
+[class*="max-w"] {
+  outline: 2px dashed cyan !important;
+}
+
+/* Show all divs with min-h-screen */
+[class*="min-h-screen"] {
+  outline: 3px solid lime !important;
+}
+
+/* Add visual indicators */
+body::before {
+  content: "Window: " attr(data-width) "px";
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  background: black;
+  color: white;
+  padding: 10px;
+  border: 2px solid white;
+  z-index: 99999;
+  font-size: 14px;
+}

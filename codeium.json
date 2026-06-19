@@ -1,0 +1,32 @@
+{
+  "mcp": {
+    "servers": {
+      "obsidian": {
+        "command": "node",
+        "args": ["./mcp-obsidian-server.js"],
+        "env": {
+          "OBSIDIAN_VAULT_PATH": "D:\\SecBrain\\TradingBrain\\TradingBrain"
+        },
+        "disabled": false,
+        "alwaysAllow": []
+      }
+    }
+  },
+  "obsidian": {
+    "vaultPath": "D:\\SecBrain\\TradingBrain\\TradingBrain",
+    "features": {
+      "readVault": true,
+      "writeVault": true,
+      "search": true
+    },
+    "excludePaths": [
+      ".obsidian",
+      ".trash",
+      "node_modules"
+    ],
+    "fileTypes": [
+      "md",
+      "txt"
+    ]
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": true,
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.python",
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.python",
+      "editor.formatOnSave": true
+    },
+    "mcp.obsidian": {
+      "enabled": true,
+      "vaultPath": "D:\\SecBrain\\TradingBrain\\TradingBrain",
+      "autoSync": true,
+      "excludePaths": [".obsidian", ".trash"]
+    },
+    "copilot.advanced": {
+      "debug.overrideModelSelection": "claude-haiku",
+      "mcp": {
+        "obsidian": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "Codeium.codeium",
+      "ms-python.python",
+      "ms-vscode.PowerShell",
+      "eamodio.gitlens",
+      "GitHub.copilot",
+      "GitHub.copilot-chat",
+      "redhat.vscode-yaml"
+    ]
+  }
+}

@@ -1,0 +1,60 @@
+﻿# MetaTrader 5 generated files
+*.ex5
+*.log
+*.tpl
+
+# Backtest results (large CSV files)
+Backtest_result/*.csv
+catboost_info/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+
+# Node modules
+node_modules/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files (sensitive!)
+.env
+.env.local
+*.env
+
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Temporary files
+*.tmp
+*.bak
+*~
+
+# Compiled files
+*.pyc
+*.pyo
+*.exe
+*.dll
+
+# Logs
+*.log
+logs/

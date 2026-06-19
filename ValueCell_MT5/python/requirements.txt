@@ -1,0 +1,56 @@
+# Core Framework (from ValueCell)
+pytz>=2023.3
+python-dateutil>=2.8.2
+fastapi>=0.104.0
+pydantic>=2.0.0
+uvicorn>=0.24.0
+requests>=2.32.5
+sqlalchemy>=2.0.43
+markdown>=3.9
+loguru>=0.7.3
+aiofiles>=24.1.0
+
+# Multi-Agent Framework
+langgraph>=0.2.0
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+agno[openai,google,lancedb,ollama]>=2.0,<3.0
+
+# LLM Providers
+anthropic>=0.18.0
+openai>=1.12.0
+
+# Vector Database
+lancedb>=0.5.0
+
+# Relational Database (Neon PostgreSQL)
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0
+
+# MT5 Integration
+MetaTrader5>=5.0.45
+
+# ML & Data Processing
+catboost>=1.2.2
+scikit-learn>=1.4.0
+pandas>=2.2.0
+numpy>=1.26.3
+
+# News & Sentiment (MVP)
+python-dotenv>=1.0.0
+
+# Notifications
+python-telegram-bot>=20.7
+
+# File Monitoring (Track 2 - optional)
+watchdog>=4.0.0
+
+# Utils
+pyyaml>=6.0.1
+func-timeout>=4.3.5
+
+# Development Tools
+ruff
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-asyncio>=1.0.0

@@ -1,0 +1,76 @@
+{
+  "current_state": "idle",
+  "state_data": {},
+  "position_data": null,
+  "last_update": "2026-06-11T14:59:56.517630",
+  "history": [
+    {
+      "timestamp": "2026-06-11T14:14:58.544255",
+      "from_state": "idle",
+      "to_state": "analyzing",
+      "reason": "Signal received from orchestrator",
+      "state_data": {
+        "timestamp": "2026-06-11T14:14:58.544255",
+        "bar_time": "2026-06-11T17:15:00"
+      }
+    },
+    {
+      "timestamp": "2026-06-11T14:14:59.316759",
+      "from_state": "analyzing",
+      "to_state": "idle",
+      "reason": "Signal rejected: Consensus: no_consensus (12%). Vote scores: BUY=0.00, SELL=0.00, HOLD=0.10. Agent signals: market_structure:HOLD. \u274c No tradeable signal.",
+      "state_data": {}
+    },
+    {
+      "timestamp": "2026-06-11T14:30:00.380970",
+      "from_state": "idle",
+      "to_state": "analyzing",
+      "reason": "Signal received from orchestrator",
+      "state_data": {
+        "timestamp": "2026-06-11T14:30:00.380970",
+        "bar_time": "2026-06-11T17:30:00"
+      }
+    },
+    {
+      "timestamp": "2026-06-11T14:30:09.643260",
+      "from_state": "analyzing",
+      "to_state": "idle",
+      "reason": "Signal rejected: Consensus: no_consensus (12%). Vote scores: BUY=0.00, SELL=0.00, HOLD=0.10. Agent signals: market_structure:HOLD. \u274c No tradeable signal.",
+      "state_data": {}
+    },
+    {
+      "timestamp": "2026-06-11T14:45:00.479188",
+      "from_state": "idle",
+      "to_state": "analyzing",
+      "reason": "Signal received from orchestrator",
+      "state_data": {
+        "timestamp": "2026-06-11T14:45:00.479188",
+        "bar_time": "2026-06-11T17:45:00"
+      }
+    },
+    {
+      "timestamp": "2026-06-11T14:45:00.645399",
+      "from_state": "analyzing",
+      "to_state": "idle",
+      "reason": "Signal rejected: Consensus: no_consensus (0%). Vote scores: BUY=0.00, SELL=0.00, HOLD=0.00. Agent signals: market_structure:HOLD. \u274c Consensus too weak (0% < 60%).",
+      "state_data": {}
+    },
+    {
+      "timestamp": "2026-06-11T14:59:56.321929",
+      "from_state": "idle",
+      "to_state": "analyzing",
+      "reason": "Signal received from orchestrator",
+      "state_data": {
+        "timestamp": "2026-06-11T14:59:56.321929",
+        "bar_time": "2026-06-11T18:00:00"
+      }
+    },
+    {
+      "timestamp": "2026-06-11T14:59:56.517630",
+      "from_state": "analyzing",
+      "to_state": "idle",
+      "reason": "Signal rejected: Consensus: no_consensus (0%). Vote scores: BUY=0.00, SELL=0.00, HOLD=0.00. Agent signals: market_structure:HOLD. \u274c Consensus too weak (0% < 60%).",
+      "state_data": {}
+    }
+  ]
+}
