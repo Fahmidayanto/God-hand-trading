@@ -148,6 +148,17 @@ void SaveLLHHBOSToArray(string type, string direction, double price,
                         datetime time, string timeframe, string status,
                         double prev_price = 0, datetime prev_time = 0)
 {
+    // ✅ DUPLICATE CHECK: Cegah duplikasi event (type + time + timeframe)
+    for (int i = 0; i < g_LLHHBOSCount; i++)
+    {
+        if (g_LLHHBOSData[i].type == type && 
+            g_LLHHBOSData[i].time == time && 
+            g_LLHHBOSData[i].timeframe == timeframe)
+        {
+            return; // Already exists, skip
+        }
+    }
+    
     int newSize = g_LLHHBOSCount + 1;
     ArrayResize(g_LLHHBOSData, newSize);
     
@@ -161,9 +172,6 @@ void SaveLLHHBOSToArray(string type, string direction, double price,
     g_LLHHBOSData[g_LLHHBOSCount].previous_time  = prev_time;
     
     g_LLHHBOSCount = newSize;
-    PrintFormat("💾 [SAVED] %s %s: %.5f @ %s | Timeframe: %s | Status: %s",
-                type, direction, price, TimeToString(time, TIME_DATE|TIME_SECONDS), 
-                timeframe, status);
 }
 
 //+------------------------------------------------------------------+
@@ -171,6 +179,17 @@ void SaveLLHHBOSToArray(string type, string direction, double price,
 //+------------------------------------------------------------------+
 void SaveAcceptedLevelToHistory(string type, double price, datetime time, string timeframe)
 {
+    // ✅ DUPLICATE CHECK: Cegah duplikasi level (type + time + timeframe)
+    for (int i = 0; i < g_AcceptedLevelHistoryCount; i++)
+    {
+        if (g_AcceptedLevelHistory[i].type == type && 
+            g_AcceptedLevelHistory[i].time == time && 
+            g_AcceptedLevelHistory[i].timeframe == timeframe)
+        {
+            return; // Already exists, skip
+        }
+    }
+    
     int newSize = g_AcceptedLevelHistoryCount + 1;
     ArrayResize(g_AcceptedLevelHistory, newSize);
     
@@ -673,6 +692,13 @@ void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
 //+------------------------------------------------------------------+
 void ExportLLHHBOSToCSV()
 {
+    // ✅ SAFETY GUARD: Jangan overwrite file jika arrays kosong
+    // Mencegah data loss saat EA start dan data belum ter-load
+    if (g_LLHHBOSCount == 0 && g_AcceptedLevelHistoryCount == 0)
+    {
+        return;
+    }
+    
     string filename = "LLHHBOSData_" + _Symbol + "_" + g_ExportDateStr + ".csv";
     
     int handle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI, ",");
@@ -2047,6 +2073,376 @@ void ResetMode2Bearish_M15()
     bearishSearchCompleted_M15 = false;
 }
 
+//+------------------------------------------------------------------+
+//| LOAD CSV TO ARRAYS - Load LLHHBOSData CSV ke memory arrays       |
+//| Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong    |
+//| Dipanggil saat EA di-attach (live trading) SEBELUM export        |
+//+------------------------------------------------------------------+
+void LoadLLHHBOSDataToArrays()
+{
+    // Cari CSV file (hari ini atau kemarin)
+    datetime currentTime = TimeCurrent();
+    MqlDateTime dt;
+    TimeToStruct(currentTime, dt);
+    
+    string todayDateStr = TimeToString(currentTime, TIME_DATE);
+    StringReplace(todayDateStr, ".", "-");
+    string csvFile = "LLHHBOSData_" + _Symbol + "_" + todayDateStr + ".csv";
+    
+    if (!FileIsExist(csvFile))
+    {
+        dt.day -= 1;
+        datetime yesterdayTime = StructToTime(dt);
+        string yesterdayDateStr = TimeToString(yesterdayTime, TIME_DATE);
+        StringReplace(yesterdayDateStr, ".", "-");
+        csvFile = "LLHHBOSData_" + _Symbol + "_" + yesterdayDateStr + ".csv";
+    }
+    
+    if (!FileIsExist(csvFile))
+    {
+        Print("ℹ️ [LOAD DATA] No LLHHBOSData CSV found to load into arrays");
+        return;
+    }
+    
+    Print("📂 [LOAD DATA] Loading history from: ", csvFile);
+    
+    int handle = FileOpen(csvFile, FILE_READ|FILE_CSV|FILE_ANSI, ",");
+    if (handle == INVALID_HANDLE)
+    {
+        Print("❌ [LOAD DATA] Failed to open CSV: ", csvFile);
+        return;
+    }
+    
+    // Skip title row (8 fields) + header row (8 fields)
+    for (int i = 0; i < 16; i++) FileReadString(handle);
+    
+    int loadedCount = 0;
+    
+    while (!FileIsEnding(handle))
+    {
+        string type = FileReadString(handle);
+        if (type == "" || FileIsEnding(handle)) break;
+        
+        string direction = FileReadString(handle);
+        string priceStr  = FileReadString(handle);
+        string timeStr   = FileReadString(handle);
+        string tf        = FileReadString(handle);
+        string status    = FileReadString(handle);
+        string prevPriceStr = FileReadString(handle);
+        string prevTimeStr  = FileReadString(handle);
+        
+        double price = StringToDouble(priceStr);
+        datetime time = StringToTime(timeStr);
+        double prevPrice = StringToDouble(prevPriceStr);
+        datetime prevTime = StringToTime(prevTimeStr);
+        
+        if (price <= 0 || time == 0) continue;
+        
+        // Load CHoCH/BoS ke g_LLHHBOSData
+        if ((type == "CHoCH" || type == "BoS") && status == "Confirmed")
+        {
+            SaveLLHHBOSToArray(type, direction, price, time, tf, status, prevPrice, prevTime);
+            loadedCount++;
+        }
+        // Load HH/LL Accepted ke g_AcceptedLevelHistory
+        else if ((type == "HH" || type == "LL") && status == "Accepted")
+        {
+            SaveAcceptedLevelToHistory(type, price, time, tf);
+            loadedCount++;
+        }
+    }
+    
+    FileClose(handle);
+    PrintFormat("✅ [LOAD DATA] Loaded %d events into arrays (CHoCH/BoS: %d, HH/LL: %d)",
+                loadedCount, g_LLHHBOSCount, g_AcceptedLevelHistoryCount);
+}
+
+//+------------------------------------------------------------------+
+//| REDRAW VISUALS FROM CSV - Baca LLHHBOSData CSV & gambar ulang    |
+//| Dipanggil saat EA di-attach (live trading) untuk redraw history   |
+//| Visual only: TIDAK mengubah state logic atau history arrays       |
+//| Line berhenti saat candle M15 close menembus level (break)        |
+//+------------------------------------------------------------------+
+void RedrawVisualsFromCSV()
+{
+    datetime currentTime = TimeCurrent();
+    MqlDateTime dt;
+    TimeToStruct(currentTime, dt);
+    
+    string todayDateStr = TimeToString(currentTime, TIME_DATE);
+    StringReplace(todayDateStr, ".", "-");
+    string csvFile = "LLHHBOSData_" + _Symbol + "_" + todayDateStr + ".csv";
+    
+    if (!FileIsExist(csvFile))
+    {
+        dt.day -= 1;
+        datetime yesterdayTime = StructToTime(dt);
+        string yesterdayDateStr = TimeToString(yesterdayTime, TIME_DATE);
+        StringReplace(yesterdayDateStr, ".", "-");
+        csvFile = "LLHHBOSData_" + _Symbol + "_" + yesterdayDateStr + ".csv";
+    }
+    
+    if (!FileIsExist(csvFile))
+    {
+        Print("ℹ️ [REDRAW] No LLHHBOSData CSV found for visual redraw");
+        return;
+    }
+    
+    Print("📂 [REDRAW] Reading visual data from: ", csvFile);
+    
+    int handle = FileOpen(csvFile, FILE_READ|FILE_CSV|FILE_ANSI, ",");
+    if (handle == INVALID_HANDLE)
+    {
+        Print("❌ [REDRAW] Failed to open CSV: ", csvFile);
+        return;
+    }
+    
+    // Load M15 candle data for break detection (~104 days of history)
+    MqlRates rates_M15[];
+    ArraySetAsSeries(rates_M15, true);
+    int copied_M15 = CopyRates(_Symbol, PERIOD_M15, 0, 10000, rates_M15);
+    int m15PeriodSec = PeriodSeconds(PERIOD_M15);
+    
+    // Skip title row (8 fields) + header row (8 fields)
+    for (int i = 0; i < 8; i++) FileReadString(handle);
+    for (int i = 0; i < 8; i++) FileReadString(handle);
+    
+    int hhCount = 0, llCount = 0, chochCount = 0, bosCount = 0;
+    
+    while (!FileIsEnding(handle))
+    {
+        string type = FileReadString(handle);
+        if (type == "" || FileIsEnding(handle)) break;
+        
+        string direction  = FileReadString(handle);
+        string priceStr   = FileReadString(handle);
+        string timeStr    = FileReadString(handle);
+        string tf         = FileReadString(handle);
+        string status     = FileReadString(handle);
+        string prevPriceStr = FileReadString(handle);
+        string prevTimeStr  = FileReadString(handle);
+        
+        double price = StringToDouble(priceStr);
+        datetime time = StringToTime(timeStr);
+        
+        if (price <= 0 || time == 0) continue;
+        
+        // Determine visual properties
+        bool isM15 = (tf == "M15");
+        string tfSuffix = isM15 ? "_M15" : "_H1";
+        
+        // Find break point: first M15 candle after event whose close penetrates the level
+        datetime lineEndTime = 0;
+        if (copied_M15 > 0)
+        {
+            for (int k = copied_M15 - 1; k >= 0; k--)
+            {
+                if (rates_M15[k].time <= time) continue;
+                
+                bool broken = false;
+                if (type == "HH" || (type == "CHoCH" && direction == "Bullish") || (type == "BoS" && direction == "Bullish"))
+                    broken = (rates_M15[k].close > price);
+                else if (type == "LL" || (type == "CHoCH" && direction == "Bearish") || (type == "BoS" && direction == "Bearish"))
+                    broken = (rates_M15[k].close < price);
+                
+                if (broken)
+                {
+                    lineEndTime = rates_M15[k].time;
+                    break;
+                }
+            }
+        }
+        
+        // No break found: extend to current time + 3 days
+        if (lineEndTime == 0)
+            lineEndTime = MathMax(currentTime, time + m15PeriodSec) + 259200;
+        
+        // Minimum 1 bar width
+        if (lineEndTime <= time)
+            lineEndTime = time + m15PeriodSec;
+        
+        // === Draw HH Accepted ===
+        if (type == "HH" && status == "Accepted")
+        {
+            color hhColor = isM15 ? clrBlue : clrOrange;
+            string lineName = "redraw_HH" + tfSuffix + "_" + IntegerToString((int)time);
+            
+            ObjectDelete(0, lineName);
+            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            ObjectSetInteger(0, lineName, OBJPROP_COLOR, hhColor);
+            ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_RIGHT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
+            hhCount++;
+        }
+        // === Draw LL Accepted ===
+        else if (type == "LL" && status == "Accepted")
+        {
+            color llColor = isM15 ? clrMagenta : clrAqua;
+            string lineName = "redraw_LL" + tfSuffix + "_" + IntegerToString((int)time);
+            
+            ObjectDelete(0, lineName);
+            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            ObjectSetInteger(0, lineName, OBJPROP_COLOR, llColor);
+            ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_RIGHT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
+            llCount++;
+        }
+        // === Draw CHoCH Confirmed ===
+        else if (type == "CHoCH" && status == "Confirmed")
+        {
+            color chochColor = (direction == "Bullish") ? clrLime : clrRed;
+            string lineName = "redraw_CHoCH" + tfSuffix + "_" + IntegerToString((int)time);
+            string labelName = lineName + "_label";
+            
+            ObjectDelete(0, lineName);
+            ObjectDelete(0, labelName);
+            
+            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            ObjectSetInteger(0, lineName, OBJPROP_COLOR, chochColor);
+            ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_RIGHT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
+            
+            ObjectCreate(0, labelName, OBJ_TEXT, 0, time, price + 8 * _Point);
+            ObjectSetInteger(0, labelName, OBJPROP_COLOR, chochColor);
+            ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, labelName, OBJPROP_TEXT, "CHoCH" + tfSuffix);
+            chochCount++;
+        }
+        // === Draw BoS Confirmed ===
+        else if (type == "BoS" && status == "Confirmed")
+        {
+            color bosColor = (direction == "Bullish") ? clrDodgerBlue : clrOrangeRed;
+            string lineName = "redraw_BoS" + tfSuffix + "_" + IntegerToString((int)time);
+            string labelName = lineName + "_label";
+            
+            ObjectDelete(0, lineName);
+            ObjectDelete(0, labelName);
+            
+            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            ObjectSetInteger(0, lineName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_RIGHT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
+            
+            ObjectCreate(0, labelName, OBJ_TEXT, 0, time, price - 10 * _Point);
+            ObjectSetInteger(0, labelName, OBJPROP_COLOR, bosColor);
+            ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, labelName, OBJPROP_TEXT, "BoS" + tfSuffix);
+            bosCount++;
+        }
+    }
+    
+    FileClose(handle);
+    
+    // === REDRAW lastAcceptedHH/LL dari state file (level kunci trading) ===
+    // Gambar garis horizontal paling tebal & jelas untuk level terakhir yang aktif
+    
+    // M15 - lastAcceptedHH
+    if (lastAcceptedHH_M15 > 0 && lastTimeHH_M15 > 0)
+    {
+        string name = "redraw_lastHH_M15";
+        ObjectDelete(0, name);
+        ObjectCreate(0, name, OBJ_TREND, 0, lastTimeHH_M15, lastAcceptedHH_M15, lastTimeHH_M15 + PeriodSeconds(PERIOD_M15), lastAcceptedHH_M15);
+        ObjectSetInteger(0, name, OBJPROP_COLOR, clrBlue);
+        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+        
+        string lblName = "redraw_lastHH_M15_label";
+        ObjectDelete(0, lblName);
+        ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeHH_M15, lastAcceptedHH_M15 + 10 * _Point);
+        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrBlue);
+        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_M15: " + DoubleToString(lastAcceptedHH_M15, _Digits));
+    }
+    
+    // M15 - lastAcceptedLL
+    if (lastAcceptedLL_M15 > 0 && lastTimeLL_M15 > 0)
+    {
+        string name = "redraw_lastLL_M15";
+        ObjectDelete(0, name);
+        ObjectCreate(0, name, OBJ_TREND, 0, lastTimeLL_M15, lastAcceptedLL_M15, lastTimeLL_M15 + PeriodSeconds(PERIOD_M15), lastAcceptedLL_M15);
+        ObjectSetInteger(0, name, OBJPROP_COLOR, clrMagenta);
+        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+        
+        string lblName = "redraw_lastLL_M15_label";
+        ObjectDelete(0, lblName);
+        ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeLL_M15, lastAcceptedLL_M15 - 10 * _Point);
+        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrMagenta);
+        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_M15: " + DoubleToString(lastAcceptedLL_M15, _Digits));
+    }
+    
+    // H1 - lastAcceptedHH
+    if (lastAcceptedHH_H1 > 0 && lastTimeHH_H1 > 0)
+    {
+        string name = "redraw_lastHH_H1";
+        ObjectDelete(0, name);
+        ObjectCreate(0, name, OBJ_TREND, 0, lastTimeHH_H1, lastAcceptedHH_H1, lastTimeHH_H1 + PeriodSeconds(PERIOD_H1), lastAcceptedHH_H1);
+        ObjectSetInteger(0, name, OBJPROP_COLOR, clrOrange);
+        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+        
+        string lblName = "redraw_lastHH_H1_label";
+        ObjectDelete(0, lblName);
+        ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeHH_H1, lastAcceptedHH_H1 + 20 * _Point);
+        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrOrange);
+        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_H1: " + DoubleToString(lastAcceptedHH_H1, _Digits));
+    }
+    
+    // H1 - lastAcceptedLL
+    if (lastAcceptedLL_H1 > 0 && lastTimeLL_H1 > 0)
+    {
+        string name = "redraw_lastLL_H1";
+        ObjectDelete(0, name);
+        ObjectCreate(0, name, OBJ_TREND, 0, lastTimeLL_H1, lastAcceptedLL_H1, lastTimeLL_H1 + PeriodSeconds(PERIOD_H1), lastAcceptedLL_H1);
+        ObjectSetInteger(0, name, OBJPROP_COLOR, clrAqua);
+        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+        
+        string lblName = "redraw_lastLL_H1_label";
+        ObjectDelete(0, lblName);
+        ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeLL_H1, lastAcceptedLL_H1 - 20 * _Point);
+        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrAqua);
+        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_H1: " + DoubleToString(lastAcceptedLL_H1, _Digits));
+    }
+    
+    ChartRedraw();
+    
+    PrintFormat("✅ [REDRAW] Visual redraw complete from CSV:");
+    PrintFormat("   📊 HH lines:  %d", hhCount);
+    PrintFormat("   📊 LL lines:  %d", llCount);
+    PrintFormat("   📊 CHoCH lines: %d", chochCount);
+    PrintFormat("   📊 BoS lines: %d", bosCount);
+    PrintFormat("   📊 lastAcceptedHH/LL: 4 (from state file)");
+    PrintFormat("   📊 Total: %d visual objects", hhCount + llCount + chochCount + bosCount + 4);
+}
+
 
 int OnInit()
 {
@@ -2093,12 +2489,27 @@ int OnInit()
     trade.SetExpertMagicNumber(MagicNumber_M15);
     Print("✅ EMA200 handle berhasil dibuat untuk M15 & H1");
 
+    // ✅ LOAD LLHHBOS DATA TO ARRAYS: Load existing CSV ke memory SEBELUM WarmUp
+    // Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong
+    // Dipanggil HANYA saat live trading (bukan backtest)
+    if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+    {
+        LoadLLHHBOSDataToArrays();
+    }
+
     // ====== NEW: langsung backfill (dengan skip logic jika state resumed) ======
     if (BackfillOnLoad_M15)
         WarmUp_M15(WarmupBars_M15);
 
     if (BackfillOnLoad_H1)
         WarmUp_H1(WarmupBars_H1);
+
+    // ✅ REDRAW VISUALS FROM CSV: Gambar ulang semua history HH/LL/CHoCH/BoS dari CSV
+    // Dipanggil HANYA saat live trading (bukan backtest)
+    if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+    {
+        RedrawVisualsFromCSV();
+    }
 
     // ✅ Setup timer untuk auto export realtime (HANYA untuk live trading, TIDAK untuk backtest)
     if (EnableAutoExportRealtime && AutoExportIntervalMinutes > 0 
@@ -2110,7 +2521,7 @@ int OnInit()
         
         Print("");
         Print("╔════════════════════════════════════════════════════════════════╗");
-        Print("║         AUTO EXPORT REALTIME - SUCCESSFULLY ACTIVATED           ║");
+        Print("║         AUTO EXPORT REALTIME - SUCCESSFULLY ACTIVATED          ║");
         Print("╚════════════════════════════════════════════════════════════════╝");
         Print("");
         PrintFormat("✅ STATUS: Timer berhasil diaktifkan!");
@@ -4481,7 +4892,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
     //--------------+
     // CHoCH Bullish M15|
     //--------------+
-   
+    
     if (!chochBullish_M15 && !isInTrendBullish_M15 &&
         (lastAcceptedHH_M15 > 0 && rates_M15[1].close > lastAcceptedHH_M15 + 50 * _Point))
         {
