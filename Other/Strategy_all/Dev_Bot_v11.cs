@@ -1286,8 +1286,8 @@ void UpdateSessionZoneTracking()
         // Tutup sesi sebelumnya (kecuali "NoSession" / belum pernah set)
         if (currentActiveSession != "" && currentActiveSession != "NoSession")
         {
-            PrintFormat("📊 [SESSION] Sesi %s berakhir | Duration: %d bars | High: %.5f | Low: %.5f",
-                       currentActiveSession, sessionBarsCount, sessionHighPrice, sessionLowPrice);
+            //PrintFormat("📊 [SESSION] Sesi %s berakhir | Duration: %d bars | High: %.5f | Low: %.5f",
+            //           currentActiveSession, sessionBarsCount, sessionHighPrice, sessionLowPrice);
 
             // currentBarTime di sini = waktu bar pertama dari sesi berikutnya = end time sesi yg ditutup.
             bool sessionWasDST = IsServerInDST(lastSessionChangeTime);
@@ -1307,9 +1307,9 @@ void UpdateSessionZoneTracking()
 
         if (session != "NoSession" && session != "Weekend")
         {
-            PrintFormat("🔔 [SESSION] Sesi %s dimulai | Open: %.5f | Time: %s",
-                       session, sessionOpenPrice,
-                       TimeToString(currentBarTime, TIME_DATE|TIME_MINUTES));
+            //PrintFormat("🔔 [SESSION] Sesi %s dimulai | Open: %.5f | Time: %s",
+            //           session, sessionOpenPrice,
+            //           TimeToString(currentBarTime, TIME_DATE|TIME_MINUTES));
         }
     }
     else
@@ -3842,7 +3842,7 @@ bool IsSessionAllowedForEntry()
         static datetime lastLogTime = 0;
         if (TimeCurrent() - lastLogTime >= 300) // Log tiap 5 menit max untuk hindari spam
         {
-            PrintFormat("❌ [SESSION REJECT] Entry ditolak: Sesi %s, jam %02d:00 (entry diblokir khusus jam ini)", currentSession, dt.hour);
+            //PrintFormat("❌ [SESSION REJECT] Entry ditolak: Sesi %s, jam %02d:00 (entry diblokir khusus jam ini)", currentSession, dt.hour);
             lastLogTime = TimeCurrent();
         }
         return false;
@@ -3969,9 +3969,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     bosBullishConfirmedFlag_M15   = false;
                     hhAfterBosConfirmedFlag_M15   = false;
                     
-                    // SAVE CHoCH DATA
-                    SaveLLHHBOSToArray("CHoCH", "Bullish", lastAcceptedHH_M15, rates_M15[i].time, "M15", "Confirmed", preChochLL_M15, 0);
-                    SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, rates_M15[i].time, "M15", "PreChoCH", 0, 0);
+                    // SAVE CHoCH DATA akan dipanggil di trigger (pakai tempHH_M15 = HH yang di-break)
                     
                     PrintFormat("✅ HH After ChoCH Confirmed on M15 = %.2f | Time: %s",lastAcceptedHH_M15,TimeToString(rates_M15[i].time));
                     PrintFormat("✅ [MODE 1 RESET M15] CHoCH Bullish dan HH After CHoCH terkonfirmasi. lastAcceptedLL direset ke PreChoCHLL=%.2f | Time: %s",
@@ -4457,9 +4455,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                             bosBearishConfirmedFlag_M15   = false;
                             llAfterBosConfirmedFlag_M15   = false;
                             
-                            // SAVE CHoCH DATA
-                            SaveLLHHBOSToArray("CHoCH", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Confirmed", preChochHH_M15, 0);
-                            SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, rates_M15[i].time, "M15", "PreChoCH", 0, 0);
+                            // SAVE CHoCH DATA akan dipanggil di trigger (pakai tempLL_M15 = LL yang di-break)
+                            // SaveLLHHBOSToArray dipindah ke blok CHoCH Bearish trigger
                             
                             PrintFormat("✅ [MODE 1 RESET M15] CHoCH Bearish dan LL After CHoCH terkonfirmasi. last Accepted HH direset ke Pre ChoCH HH=%.2f | HH Baru=%.2f @ %s", 
                             preChochHH_M15, rates_M15[i].high, TimeToString(rates_M15[i].time));
@@ -4957,6 +4954,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 timeBoSBearish_M15            = -1;
                 postChoCH_LL_M15              = -1;
                 preChochHH_M15                = -1; // Simpan HH sebelum CHoCH Bullish
+                // SAVE CHoCH BULLISH DATA - price = HH yang di-break (tempHH_M15), previousPrice = LL referensi
+                SaveLLHHBOSToArray("CHoCH", "Bullish", tempHH_M15, rates_M15[1].time, "M15", "Confirmed", preChochLL_M15, 0);
+                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, rates_M15[1].time, "M15", "PreChoCH", 0, 0);
                 ResetMode2_M15(); // Reset variabel MODE 2                   
                 Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset untuk siklus baru.");
                 UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time);
@@ -5041,6 +5041,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             time_choch_bullish_M15        = -1;
             timeBoSBullish_M15            = -1;
             preChochLL_M15                = -1; // Simpan LL sebelum CHoCH Bearish (untuk referensi MODE 2)
+            // SAVE CHoCH BEARISH DATA - price = LL yang di-break (tempLL_M15), previousPrice = HH referensi (preChochHH_M15)
+            SaveLLHHBOSToArray("CHoCH", "Bearish", tempLL_M15, rates_M15[1].time, "M15", "Confirmed", preChochHH_M15, 0);
+            SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, rates_M15[1].time, "M15", "PreChoCH", 0, 0);
             ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
             Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset");
             // Optional: Hapus visual LL lama jika diperlukan
@@ -5092,6 +5095,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             lastBoSTimeLogged_M15 = rates_M15[1].time;  // Simpan waktu terakhir yang sudah dilog
             }
         // chochBullish_M15            = false;
+        double bosBullishBreakLevel_M15 = postChoCH_HH_M15; // Capture HH yang di-break SEBELUM reset
         postChoCH_HH_M15            = -1;
         time_postChoCH_HH_M15       = 0;      // Reset waktu post-CHoCH HH
         bosBullishConfirmedFlag_M15 = true;
@@ -5100,8 +5104,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         // Di blok BoS Bullish:
         timeBoSBullish_M15 = rates_M15[1].time; // Disimpan saat BoS terpicu
         
-        // SAVE BoS DATA
-        SaveLLHHBOSToArray("BoS", "Bullish", lastAcceptedLL_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
+        // SAVE BoS DATA - price = HH yang di-break (bosBullishBreakLevel_M15), previousPrice = LL referensi
+        SaveLLHHBOSToArray("BoS", "Bullish", bosBullishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedLL_M15, 0);
         
         // ... di dalam blok kondisi BoS Bullish ...
         if (bosBullishConfirmedFlag_M15)
@@ -5293,14 +5297,15 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         Print("📉 Close < postChoCH_LL_M15: ", postChoCH_LL_M15, " → BoS Bearish Confirmed! ", TimeToString(rates_M15[1].time));
         
         lastBoSTimeLogged_M15         = rates_M15[1].time;
+        double bosBearishBreakLevel_M15 = postChoCH_LL_M15; // Capture LL yang di-break SEBELUM reset
         // chochBearish_M15              = false;
         postChoCH_LL_M15              = -1;
         time_postChoCH_LL_M15         = -1;
         bosBearishConfirmedFlag_M15   = true;
         isInTrendBearish_M15          = true;
         
-        // SAVE BoS BEARISH DATA
-        SaveLLHHBOSToArray("BoS", "Bearish", lastAcceptedLL_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
+        // SAVE BoS BEARISH DATA - price = LL yang di-break (bosBearishBreakLevel_M15), previousPrice = HH referensi
+        SaveLLHHBOSToArray("BoS", "Bearish", bosBearishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
         // Di dalam blok BoS Bearish:
         timeBoSBearish_M15 = rates_M15[1].time;  // Simpan waktu BoS       
         ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
@@ -6159,8 +6164,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                     bosBearishConfirmedFlag_H1   = false;
                     llAfterBosConfirmedFlag_H1   = false;
                     
-                    // SAVE CHoCH DATA
-                    SaveLLHHBOSToArray("CHoCH", "Bearish", lastAcceptedLL_H1, rates_H1[i].time, "H1", "Confirmed", preChochHH_H1, 0);
+                    // SAVE CHoCH DATA - price = LL yang di-break (preChochLL), BUKAN LL baru
+                    SaveLLHHBOSToArray("CHoCH", "Bearish", preChochLL_H1, time_choch_bearish_H1, "H1", "Confirmed", preChochHH_H1, 0);
                     SaveLLHHBOSToArray("HH", "Reference", preChochHH_H1, rates_H1[i].time, "H1", "PreChoCH", 0, 0);
                     
                     PrintFormat("✅ H1: [MODE 1 RESET] CHoCH Bearish dan LL After CHoCH terkonfirmasi. last Accepted HH direset ke Pre ChoCH HH=%.2f | HH Baru=%.2f @ %s", 
