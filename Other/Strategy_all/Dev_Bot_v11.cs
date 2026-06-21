@@ -6,6 +6,11 @@
 //+------------------------------------------------------------------+
 #include <Trade/Trade.mqh>  // Untuk fungsi trading
 #include <Tools/datetime.mqh>  // Untuk manipulasi waktu
+
+#import "kernel32.dll"
+bool CopyFileW(string lpExistingFileName, string lpNewFileName, bool bFailIfExists);
+#import
+
 CTrade trade;  // Objek untuk eksekusi trading
 
 //+------------------------------------------------------------------+
@@ -319,6 +324,18 @@ void RecordRejectedToBacktestTrades(string type, double price, string reason)
     g_TradeCount = newSize;
     PrintFormat("💾 [SAVED REJECT] Recorded reject signal #%d: %s | Price: %.5f | Reason: %s",
                 g_TradeCount, type, price, reason);
+}
+
+//+------------------------------------------------------------------+
+//| Helper: Cek apakah reject logs boleh dicetak                     |
+//| - Hormati input EnableRejectLogs                                 |
+//| - Auto-block saat Optimization (mencegah log spam ribuan pass)   |
+//+------------------------------------------------------------------+
+bool CanPrintRejectLogs()
+{
+    if(!EnableRejectLogs) return false;
+    if(MQLInfoInteger(MQL_OPTIMIZATION)) return false;
+    return true;
 }
 
 //+------------------------------------------------------------------+
@@ -701,7 +718,68 @@ void ExportLLHHBOSToCSV()
     
     string filename = "LLHHBOSData_" + _Symbol + "_" + g_ExportDateStr + ".csv";
     
-    int handle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI, ",");
+    // ✅ Determine mode: BACKTEST (overwrite) vs LIVE TRADING (append+dedup)
+    bool isLiveTrading = !(MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_OPTIMIZATION));
+    bool fileExists = FileIsExist(filename);
+    
+    // ✅ LIVE TRADING: Load existing events dari file untuk deduplication
+    // Key = type + time + timeframe
+    string existingKeys[];
+    int existingKeyCount = 0;
+    
+    if (isLiveTrading && fileExists)
+    {
+        int handleRead = FileOpen(filename, FILE_READ|FILE_CSV|FILE_ANSI, ",");
+        if (handleRead != INVALID_HANDLE)
+        {
+            // Skip rows until header row (starting with "Type") is found
+            for (int skipI = 0; skipI < 100; skipI++)
+            {
+                string hdr = FileReadString(handleRead);
+                if (hdr == "Type")
+                {
+                    for (int j = 0; j < 7; j++) FileReadString(handleRead);
+                    break;
+                }
+                if (FileIsEnding(handleRead)) break;
+            }
+            
+            // Read all existing event keys
+            while (!FileIsEnding(handleRead))
+            {
+                string evType = FileReadString(handleRead);
+                if (evType == "" || FileIsEnding(handleRead)) break;
+                
+                string evDir   = FileReadString(handleRead);
+                string evPrice = FileReadString(handleRead);
+                string evTime  = FileReadString(handleRead);
+                string evTF    = FileReadString(handleRead);
+                // Skip sisa kolom: status, prevPrice, prevTime
+                FileReadString(handleRead);
+                FileReadString(handleRead);
+                FileReadString(handleRead);
+                
+                if (evType != "" && evTime != "" && evTF != "")
+                {
+                    string key = evType + "|" + evTime + "|" + evTF;
+                    ArrayResize(existingKeys, existingKeyCount + 1);
+                    existingKeys[existingKeyCount] = key;
+                    existingKeyCount++;
+                }
+            }
+            FileClose(handleRead);
+            Print("📂 Loaded ", existingKeyCount, " existing event keys from ", filename);
+        }
+    }
+    
+    // ✅ Open file: BACKTEST = FILE_WRITE (overwrite), LIVE + file exists = FILE_READ|FILE_WRITE (append)
+    int fileMode = FILE_WRITE|FILE_CSV|FILE_ANSI;
+    if (isLiveTrading && fileExists)
+    {
+        fileMode = FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI;
+    }
+    
+    int handle = FileOpen(filename, fileMode, ",");
     if (handle == INVALID_HANDLE)
     {
         return;
@@ -771,13 +849,48 @@ void ExportLLHHBOSToCSV()
     }
     
     // ===== Step 3: Write to CSV =====
-    FileWrite(handle, "=== Market Structure Events (Sorted by Time) ===", "", "", "", "", "", "", "");
-    FileWrite(handle, "Type", "Direction/Action", "Price", "Time", "Timeframe", 
-              "Status", "PreviousPrice", "PreviousTime");
+    // Write header only for BACKTEST or new file (LIVE)
+    if (!fileExists || !isLiveTrading)
+    {
+        FileWrite(handle, "=== Market Structure Events (Sorted by Time) ===", "", "", "", "", "", "");
+        FileWrite(handle, "Type", "Direction/Action", "Price", "Time", "Timeframe", 
+                  "Status", "PreviousPrice", "PreviousTime");
+    }
+    else
+    {
+        // LIVE TRADING + file exists: Seek ke akhir file untuk append
+        FileSeek(handle, 0, SEEK_END);
+    }
     
-    // Write sorted events
+    // Write sorted events dengan deduplication (LIVE TRADING)
+    int newEventsAdded = 0;
+    
     for (int i = 0; i < g_UnifiedEventCount; i++)
     {
+        // Dedup check: hanya untuk LIVE TRADING
+        bool isDuplicate = false;
+        if (isLiveTrading)
+        {
+            string currentKey = g_UnifiedEvents[i].type + "|" + 
+                                TimeToString(g_UnifiedEvents[i].time, TIME_DATE|TIME_SECONDS) + "|" + 
+                                g_UnifiedEvents[i].timeframe;
+            
+            for (int j = 0; j < existingKeyCount; j++)
+            {
+                if (existingKeys[j] == currentKey)
+                {
+                    isDuplicate = true;
+                    break;
+                }
+            }
+        }
+        
+        // Skip duplicate event (hanya untuk LIVE TRADING)
+        if (isDuplicate)
+        {
+            continue;
+        }
+        
         FileWrite(handle,
                   g_UnifiedEvents[i].type,
                   g_UnifiedEvents[i].direction,
@@ -787,15 +900,17 @@ void ExportLLHHBOSToCSV()
                   g_UnifiedEvents[i].status,
                   (g_UnifiedEvents[i].previousPrice > 0) ? DoubleToString(g_UnifiedEvents[i].previousPrice, _Digits) : "",
                   g_UnifiedEvents[i].previousTime);
-    }
-    
-    if (g_UnifiedEventCount == 0)  
-    {
-        FileClose(handle);
-        return;
+        
+        newEventsAdded++;
     }
     
     FileClose(handle);
+    
+    if (isLiveTrading)
+    {
+        Print("✅ APPEND MODE: Added ", newEventsAdded, " new events to ", filename,
+              " (Skipped ", (g_UnifiedEventCount - newEventsAdded), " duplicates)");
+    }
 }
 
 //+------------------------------------------------------------------+
@@ -895,6 +1010,7 @@ input color SessionSydneyColor = clrGreen;     // Warna Sydney Session
 input bool EnableAutoExportRealtime = false;   // ✅ Aktifkan auto export berkala (live trading)
 input int  AutoExportIntervalMinutes = 60;     // Interval export (menit) - default 60 menit
 input bool EnableAutoExportLogs = false;       // Tampilkan log detail auto export
+input string BacktestResultPath = "D:\\Project\\Project MT5\\Backtest_result";  // Path folder backtest result
 
 //+------------------------------------------------------------------+
 //| AUTO EXPORT REALTIME - Global Variables untuk Tracking           |
@@ -1611,14 +1727,18 @@ void ResetMode2Bearish_H1()
     bearishSearchCompleted_H1 = false;
 }
 
-void UpdateAcceptedLevelVisuals_H1(double level, string type, datetime time) 
+void UpdateAcceptedLevelVisuals_H1(double level, string type, datetime time)
 {
     // Simpan ke history sebelum menggambar visual
     if (level != -1)
     {
         SaveAcceptedLevelToHistory(type, level, time, "H1");
     }
-    
+
+    // ✅ SKIP semua gambar line H1 bila DisableDrawLines_H1 aktif
+    if (DisableDrawLines_H1)
+        return;
+
     string lineName  = "line_lastAccepted" + type + "_H1";
     string labelName = "label_lastAccepted" + type + "_H1";
     color lineColor  = (type == "HH") ? clrOrange : clrAqua;
@@ -1961,6 +2081,10 @@ input int  WarmupBars_M15     = 200;    // jumlah bar history untuk backfill
 input bool BackfillOnLoad_H1 = true;   // langsung scan & gambar dari history saat attach
 input int  WarmupBars_H1    = 200;    // jumlah bar history untuk backfill
 
+input bool DisableDrawLines_H1 = true; // ✅ Nonaktifkan semua gambar line/zone H1 (logic tetap jalan)
+
+input bool EnableRejectLogs = false; // ✅ Aktifkan log HH/LL yang direject untuk tracking backtest. Auto-disabled saat Optimization.
+
 bool g_BackfillMode_H1 = false; // true saat proses backfill (gambar saja, tanpa entry)
 
 
@@ -2074,6 +2198,39 @@ void ResetMode2Bearish_M15()
 }
 
 //+------------------------------------------------------------------+
+//| SYNC BACKTEST CSV - Copy backtest CSV ke MQL5 sandbox              |
+//| Memastikan EA live trading punya full history dari backtest        |
+//| Menggunakan WinAPI CopyFileW (butuh "Allow DLL Imports")           |
+//+------------------------------------------------------------------+
+void SyncBacktestCSV()
+{
+    bool isLiveTrading = !(MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_OPTIMIZATION));
+    if (!isLiveTrading) return;
+    if (BacktestResultPath == "") return;
+    
+    string todayDateStr = TimeToString(TimeCurrent(), TIME_DATE);
+    StringReplace(todayDateStr, ".", "-");
+    string csvFilename = "LLHHBOSData_" + _Symbol + "_" + todayDateStr + ".csv";
+    
+    string srcPath = BacktestResultPath + "\\" + csvFilename;
+    string dstPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + csvFilename;
+    
+    // Copy file dari backtest result ke MQL5 sandbox (overwrite)
+    if (CopyFileW(srcPath, dstPath, false))
+    {
+        Print("✅ [SYNC CSV] Backtest data synced to sandbox: ", csvFilename);
+    }
+    else
+    {
+        int err = GetLastError();
+        if (err == 2) // ERROR_FILE_NOT_FOUND
+            Print("ℹ️ [SYNC CSV] No backtest file found at: ", srcPath);
+        else
+            Print("❌ [SYNC CSV] Failed to copy (error ", err, "): ", srcPath);
+    }
+}
+
+//+------------------------------------------------------------------+
 //| LOAD CSV TO ARRAYS - Load LLHHBOSData CSV ke memory arrays       |
 //| Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong    |
 //| Dipanggil saat EA di-attach (live trading) SEBELUM export        |
@@ -2113,8 +2270,17 @@ void LoadLLHHBOSDataToArrays()
         return;
     }
     
-    // Skip title row (8 fields) + header row (8 fields)
-    for (int i = 0; i < 16; i++) FileReadString(handle);
+    // Skip rows until header row (starting with "Type") is found
+    for (int skipI = 0; skipI < 100; skipI++)
+    {
+        string hdr = FileReadString(handle);
+        if (hdr == "Type")
+        {
+            for (int j = 0; j < 7; j++) FileReadString(handle);
+            break;
+        }
+        if (FileIsEnding(handle)) break;
+    }
     
     int loadedCount = 0;
     
@@ -2163,6 +2329,41 @@ void LoadLLHHBOSDataToArrays()
 //| Visual only: TIDAK mengubah state logic atau history arrays       |
 //| Line berhenti saat candle M15 close menembus level (break)        |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| Helper: cek apakah suatu level sudah di-supersede (ditembus break) |
+//| MQL5 tidak support array assignment, jadi array dilewatkan by-ref  |
+//+------------------------------------------------------------------+
+bool IsLevelSuperseded(double &breakArr[], int breakCnt, double price, double tolerance)
+{
+    for (int b = 0; b < breakCnt; b++)
+    {
+        if (MathAbs(breakArr[b] - price) <= tolerance)
+            return true;
+    }
+    return false;
+}
+
+//+------------------------------------------------------------------+
+//| Helper: cari formation time dari HH/LL array berdasarkan price      |
+//| Return: time formation jika ketemu (price match), 0 jika tidak     |
+//| Digunakan untuk CHoCH/BoS line start point (kiri = HH/LL formation)|
+//+------------------------------------------------------------------+
+datetime FindFormationTime(double &formPriceArr[], datetime &formTimeArr[], int formCnt, double price, double tolerance, datetime eventTime)
+{
+    // Cari HH/LL formation dengan harga yang sama, dan time < eventTime (formation harus sebelum break)
+    datetime found = 0;
+    for (int i = 0; i < formCnt; i++)
+    {
+        if (MathAbs(formPriceArr[i] - price) <= tolerance && formTimeArr[i] < eventTime)
+        {
+            // Ambil formation yang PALING DEKAT dengan eventTime (terakhir sebelum break)
+            if (formTimeArr[i] > found)
+                found = formTimeArr[i];
+        }
+    }
+    return found;
+}
+
 void RedrawVisualsFromCSV()
 {
     datetime currentTime = TimeCurrent();
@@ -2197,17 +2398,122 @@ void RedrawVisualsFromCSV()
         return;
     }
     
+    // ===== PASS 1: Kumpulkan harga break (CHoCH/BoS Confirmed) per arah + timeframe =====
+    // Tujuan: HH/LL yang levelnya sudah ditembus CHoCH/BoS di-skip dari gambar
+    // karena break event lebih signifikan daripada swing formation.
+    // Aturan market structure:
+    //   - CHoCH/BoS Bullish break HH → HH di-supersede
+    //   - CHoCH/BoS Bearish break LL → LL di-supersede
+    
+    double breakUpM15[],   breakDownM15[];   // breakUp = Bullish (break HH), breakDown = Bearish (break LL)
+    double breakUpH1[],    breakDownH1[];
+    int    breakUpCntM15=0, breakDownCntM15=0;
+    int    breakUpCntH1=0,  breakDownCntH1=0;
+    
+    // Collection HH/LL formation time per price (untuk CHoCH/BoS line start point)
+    // CHoCH/BoS Bullish cari HH formation time, CHoCH/BoS Bearish cari LL formation time
+    double hhFormPriceM15[],  hhFormPriceH1[];
+    datetime hhFormTimeM15[], hhFormTimeH1[];
+    double llFormPriceM15[],  llFormPriceH1[];
+    datetime llFormTimeM15[], llFormTimeH1[];
+    int hhFormCntM15=0, hhFormCntH1=0;
+    int llFormCntM15=0, llFormCntH1=0;
+    
+    // Skip rows until header row (starting with "Type") is found
+    for (int skipI = 0; skipI < 100; skipI++)
+    {
+        string hdr = FileReadString(handle);
+        if (hdr == "Type")
+        {
+            for (int j = 0; j < 7; j++) FileReadString(handle);
+            break;
+        }
+        if (FileIsEnding(handle)) break;
+    }
+    
+    while (!FileIsEnding(handle))
+    {
+        string p1_type   = FileReadString(handle);
+        if (p1_type == "" || FileIsEnding(handle)) break;
+        
+        string p1_dir    = FileReadString(handle);
+        string p1_priceS = FileReadString(handle);
+        string p1_timeS  = FileReadString(handle);  // BACA time (bukan skip)
+        string p1_tf     = FileReadString(handle);
+        string p1_stat   = FileReadString(handle);
+        string p1_pP     = FileReadString(handle);  // prevPrice
+        string p1_pT     = FileReadString(handle);  // prevTime
+        
+        double   p1_price = StringToDouble(p1_priceS);
+        datetime p1_time  = StringToTime(p1_timeS);
+        bool     isM15tf  = (p1_tf == "M15");
+        
+        // Collect break levels (CHoCH/BoS Confirmed) untuk supersede filter
+        if ((p1_type == "CHoCH" || p1_type == "BoS") && p1_stat == "Confirmed")
+        {
+            if (p1_price <= 0) continue;
+            
+            bool isUp = (p1_dir == "Bullish");
+            
+            if      (isM15tf &&  isUp) { ArrayResize(breakUpM15,   breakUpCntM15+1);   breakUpM15[breakUpCntM15]   = p1_price; breakUpCntM15++; }
+            else if (isM15tf && !isUp) { ArrayResize(breakDownM15, breakDownCntM15+1); breakDownM15[breakDownCntM15] = p1_price; breakDownCntM15++; }
+            else if (!isM15tf &&  isUp){ ArrayResize(breakUpH1,    breakUpCntH1+1);    breakUpH1[breakUpCntH1]    = p1_price; breakUpCntH1++; }
+            else                        { ArrayResize(breakDownH1,  breakDownCntH1+1);  breakDownH1[breakDownCntH1]  = p1_price; breakDownCntH1++; }
+        }
+        // Collect HH/LL formation times untuk CHoCH/BoS line start point
+        else if ((p1_type == "HH" || p1_type == "LL") && p1_stat == "Accepted")
+        {
+            if (p1_price <= 0 || p1_time == 0) continue;
+            
+            bool isHH = (p1_type == "HH");
+            
+            if (isHH)
+            {
+                if (isM15tf) { ArrayResize(hhFormPriceM15, hhFormCntM15+1); hhFormPriceM15[hhFormCntM15] = p1_price; ArrayResize(hhFormTimeM15, hhFormCntM15+1); hhFormTimeM15[hhFormCntM15] = p1_time; hhFormCntM15++; }
+                else        { ArrayResize(hhFormPriceH1,  hhFormCntH1+1);  hhFormPriceH1[hhFormCntH1]  = p1_price; ArrayResize(hhFormTimeH1,  hhFormCntH1+1);  hhFormTimeH1[hhFormCntH1]  = p1_time; hhFormCntH1++; }
+            }
+            else
+            {
+                if (isM15tf) { ArrayResize(llFormPriceM15, llFormCntM15+1); llFormPriceM15[llFormCntM15] = p1_price; ArrayResize(llFormTimeM15, llFormCntM15+1); llFormTimeM15[llFormCntM15] = p1_time; llFormCntM15++; }
+                else        { ArrayResize(llFormPriceH1,  llFormCntH1+1);  llFormPriceH1[llFormCntH1]  = p1_price; ArrayResize(llFormTimeH1,  llFormCntH1+1);  llFormTimeH1[llFormCntH1]  = p1_time; llFormCntH1++; }
+            }
+        }
+    }
+    FileClose(handle);
+    
+    PrintFormat("📊 [REDRAW] Pass 1 - Break levels M15 up:%d down:%d | H1 up:%d down:%d",
+                breakUpCntM15, breakDownCntM15, breakUpCntH1, breakDownCntH1);
+    PrintFormat("📊 [REDRAW] Pass 1 - Formation times M15 HH:%d LL:%d | H1 HH:%d LL:%d",
+                hhFormCntM15, llFormCntM15, hhFormCntH1, llFormCntH1);
+    
+    // ===== PASS 2: Baca ulang + gambar dengan filter overlap =====
+    handle = FileOpen(csvFile, FILE_READ|FILE_CSV|FILE_ANSI, ",");
+    if (handle == INVALID_HANDLE)
+    {
+        Print("❌ [REDRAW] Failed to reopen CSV: ", csvFile);
+        return;
+    }
+    
     // Load M15 candle data for break detection (~104 days of history)
     MqlRates rates_M15[];
     ArraySetAsSeries(rates_M15, true);
     int copied_M15 = CopyRates(_Symbol, PERIOD_M15, 0, 10000, rates_M15);
     int m15PeriodSec = PeriodSeconds(PERIOD_M15);
     
-    // Skip title row (8 fields) + header row (8 fields)
-    for (int i = 0; i < 8; i++) FileReadString(handle);
-    for (int i = 0; i < 8; i++) FileReadString(handle);
+    // Skip rows until header row (starting with "Type") is found
+    for (int skipI = 0; skipI < 100; skipI++)
+    {
+        string hdr = FileReadString(handle);
+        if (hdr == "Type")
+        {
+            for (int j = 0; j < 7; j++) FileReadString(handle);
+            break;
+        }
+        if (FileIsEnding(handle)) break;
+    }
     
     int hhCount = 0, llCount = 0, chochCount = 0, bosCount = 0;
+    int hhSuperseded = 0, llSuperseded = 0;
     
     while (!FileIsEnding(handle))
     {
@@ -2230,6 +2536,10 @@ void RedrawVisualsFromCSV()
         // Determine visual properties
         bool isM15 = (tf == "M15");
         string tfSuffix = isM15 ? "_M15" : "_H1";
+
+        // ✅ Skip draw H1 bila DisableDrawLines_H1 aktif (M15 tetap digambar)
+        if (DisableDrawLines_H1 && !isM15)
+            continue;
         
         // Find break point: first M15 candle after event whose close penetrates the level
         datetime lineEndTime = 0;
@@ -2253,6 +2563,14 @@ void RedrawVisualsFromCSV()
             }
         }
         
+        // 🔧 CHoCH/BoS: break sudah terjadi SAAT event, jadi jangan cari break point lanjutan.
+        // Paksa extend ke currentTime + buffer supaya garis terlihat (sebelumnya cuma 1 bar = invisible).
+        // HH/LL tetap pakai lineEndTime dari break detection di atas.
+        if (type == "CHoCH" || type == "BoS")
+        {
+            lineEndTime = 0;  // reset, biarkan logic di bawah yang extend
+        }
+        
         // No break found: extend to current time + 3 days
         if (lineEndTime == 0)
             lineEndTime = MathMax(currentTime, time + m15PeriodSec) + 259200;
@@ -2264,6 +2582,19 @@ void RedrawVisualsFromCSV()
         // === Draw HH Accepted ===
         if (type == "HH" && status == "Accepted")
         {
+            // 🔧 FILTER OVERLAP: Skip HH yang sudah ditembus CHoCH/BoS Bullish di level sama
+            // Break event (CHoCH/BoS Bullish) lebih signifikan → HH formation di-hide
+            double levelTolerance = 5 * _Point;  // toleransi floating point
+            bool isHhSuperseded = isM15
+                ? IsLevelSuperseded(breakUpM15, breakUpCntM15, price, levelTolerance)
+                : IsLevelSuperseded(breakUpH1,  breakUpCntH1,  price, levelTolerance);
+            
+            if (isHhSuperseded)
+            {
+                hhSuperseded++;  // counter untuk log
+                continue;
+            }
+            
             color hhColor = isM15 ? clrBlue : clrOrange;
             string lineName = "redraw_HH" + tfSuffix + "_" + IntegerToString((int)time);
             
@@ -2280,6 +2611,19 @@ void RedrawVisualsFromCSV()
         // === Draw LL Accepted ===
         else if (type == "LL" && status == "Accepted")
         {
+            // 🔧 FILTER OVERLAP: Skip LL yang sudah ditembus CHoCH/BoS Bearish di level sama
+            // Break event (CHoCH/BoS Bearish) lebih signifikan → LL formation di-hide
+            double levelTolerance = 5 * _Point;  // toleransi floating point
+            bool isLlSuperseded = isM15
+                ? IsLevelSuperseded(breakDownM15, breakDownCntM15, price, levelTolerance)
+                : IsLevelSuperseded(breakDownH1,  breakDownCntH1,  price, levelTolerance);
+            
+            if (isLlSuperseded)
+            {
+                llSuperseded++;  // counter untuk log
+                continue;
+            }
+            
             color llColor = isM15 ? clrMagenta : clrAqua;
             string lineName = "redraw_LL" + tfSuffix + "_" + IntegerToString((int)time);
             
@@ -2294,16 +2638,42 @@ void RedrawVisualsFromCSV()
             llCount++;
         }
         // === Draw CHoCH Confirmed ===
+        // 🔧 Line dari HH/LL formation (kiri) ke break candle (kanan), bukan extend ke kanan
         else if (type == "CHoCH" && status == "Confirmed")
         {
             color chochColor = (direction == "Bullish") ? clrLime : clrRed;
             string lineName = "redraw_CHoCH" + tfSuffix + "_" + IntegerToString((int)time);
             string labelName = lineName + "_label";
             
+            // Cari formation time: CHoCH Bullish cari HH, CHoCH Bearish cari LL
+            double levelTolerance = 5 * _Point;
+            datetime lineStartTime = 0;
+            if (direction == "Bullish")
+            {
+                lineStartTime = isM15
+                    ? FindFormationTime(hhFormPriceM15, hhFormTimeM15, hhFormCntM15, price, levelTolerance, time)
+                    : FindFormationTime(hhFormPriceH1,  hhFormTimeH1,  hhFormCntH1,  price, levelTolerance, time);
+            }
+            else
+            {
+                lineStartTime = isM15
+                    ? FindFormationTime(llFormPriceM15, llFormTimeM15, llFormCntM15, price, levelTolerance, time)
+                    : FindFormationTime(llFormPriceH1,  llFormTimeH1,  llFormCntH1,  price, levelTolerance, time);
+            }
+            
+            // Fallback: jika formation time tidak ketemu, estimasi mundur 24 bar dari break
+            if (lineStartTime == 0)
+                lineStartTime = time - 24 * m15PeriodSec;
+            
+            // Minimum 1 bar width
+            if (lineStartTime >= time)
+                lineStartTime = time - m15PeriodSec;
+            
             ObjectDelete(0, lineName);
             ObjectDelete(0, labelName);
             
-            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            // Line: dari formation (kiri) ke break candle (kanan)
+            ObjectCreate(0, lineName, OBJ_TREND, 0, lineStartTime, price, time, price);
             ObjectSetInteger(0, lineName, OBJPROP_COLOR, chochColor);
             ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_SOLID);
@@ -2311,23 +2681,51 @@ void RedrawVisualsFromCSV()
             ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
             ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
             
-            ObjectCreate(0, labelName, OBJ_TEXT, 0, time, price + 8 * _Point);
+            // Label: di tengah garis (antara formation dan break)
+            datetime labelTimeMid = (lineStartTime + time) / 2;
+            ObjectCreate(0, labelName, OBJ_TEXT, 0, labelTimeMid, price + 8 * _Point);
             ObjectSetInteger(0, labelName, OBJPROP_COLOR, chochColor);
             ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 9);
             ObjectSetString(0, labelName, OBJPROP_TEXT, "CHoCH" + tfSuffix);
             chochCount++;
         }
         // === Draw BoS Confirmed ===
+        // 🔧 Line dari HH/LL formation (kiri) ke break candle (kanan), bukan extend ke kanan
         else if (type == "BoS" && status == "Confirmed")
         {
             color bosColor = (direction == "Bullish") ? clrDodgerBlue : clrOrangeRed;
             string lineName = "redraw_BoS" + tfSuffix + "_" + IntegerToString((int)time);
             string labelName = lineName + "_label";
             
+            // Cari formation time: BoS Bullish cari HH, BoS Bearish cari LL
+            double levelTolerance = 5 * _Point;
+            datetime lineStartTime = 0;
+            if (direction == "Bullish")
+            {
+                lineStartTime = isM15
+                    ? FindFormationTime(hhFormPriceM15, hhFormTimeM15, hhFormCntM15, price, levelTolerance, time)
+                    : FindFormationTime(hhFormPriceH1,  hhFormTimeH1,  hhFormCntH1,  price, levelTolerance, time);
+            }
+            else
+            {
+                lineStartTime = isM15
+                    ? FindFormationTime(llFormPriceM15, llFormTimeM15, llFormCntM15, price, levelTolerance, time)
+                    : FindFormationTime(llFormPriceH1,  llFormTimeH1,  llFormCntH1,  price, levelTolerance, time);
+            }
+            
+            // Fallback: jika formation time tidak ketemu, estimasi mundur 24 bar dari break
+            if (lineStartTime == 0)
+                lineStartTime = time - 24 * m15PeriodSec;
+            
+            // Minimum 1 bar width
+            if (lineStartTime >= time)
+                lineStartTime = time - m15PeriodSec;
+            
             ObjectDelete(0, lineName);
             ObjectDelete(0, labelName);
             
-            ObjectCreate(0, lineName, OBJ_TREND, 0, time, price, lineEndTime, price);
+            // Line: dari formation (kiri) ke break candle (kanan)
+            ObjectCreate(0, lineName, OBJ_TREND, 0, lineStartTime, price, time, price);
             ObjectSetInteger(0, lineName, OBJPROP_COLOR, bosColor);
             ObjectSetInteger(0, lineName, OBJPROP_WIDTH, 1);
             ObjectSetInteger(0, lineName, OBJPROP_STYLE, STYLE_SOLID);
@@ -2335,7 +2733,9 @@ void RedrawVisualsFromCSV()
             ObjectSetInteger(0, lineName, OBJPROP_RAY_LEFT, false);
             ObjectSetInteger(0, lineName, OBJPROP_BACK, true);
             
-            ObjectCreate(0, labelName, OBJ_TEXT, 0, time, price - 10 * _Point);
+            // Label: di tengah garis (antara formation dan break)
+            datetime labelTimeMid = (lineStartTime + time) / 2;
+            ObjectCreate(0, labelName, OBJ_TEXT, 0, labelTimeMid, price - 10 * _Point);
             ObjectSetInteger(0, labelName, OBJPROP_COLOR, bosColor);
             ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 9);
             ObjectSetString(0, labelName, OBJPROP_TEXT, "BoS" + tfSuffix);
@@ -2391,7 +2791,7 @@ void RedrawVisualsFromCSV()
     }
     
     // H1 - lastAcceptedHH
-    if (lastAcceptedHH_H1 > 0 && lastTimeHH_H1 > 0)
+    if (!DisableDrawLines_H1 && lastAcceptedHH_H1 > 0 && lastTimeHH_H1 > 0)
     {
         string name = "redraw_lastHH_H1";
         ObjectDelete(0, name);
@@ -2402,7 +2802,7 @@ void RedrawVisualsFromCSV()
         ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
         ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
         ObjectSetInteger(0, name, OBJPROP_BACK, true);
-        
+
         string lblName = "redraw_lastHH_H1_label";
         ObjectDelete(0, lblName);
         ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeHH_H1, lastAcceptedHH_H1 + 20 * _Point);
@@ -2410,9 +2810,9 @@ void RedrawVisualsFromCSV()
         ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
         ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_H1: " + DoubleToString(lastAcceptedHH_H1, _Digits));
     }
-    
+
     // H1 - lastAcceptedLL
-    if (lastAcceptedLL_H1 > 0 && lastTimeLL_H1 > 0)
+    if (!DisableDrawLines_H1 && lastAcceptedLL_H1 > 0 && lastTimeLL_H1 > 0)
     {
         string name = "redraw_lastLL_H1";
         ObjectDelete(0, name);
@@ -2423,7 +2823,7 @@ void RedrawVisualsFromCSV()
         ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
         ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
         ObjectSetInteger(0, name, OBJPROP_BACK, true);
-        
+
         string lblName = "redraw_lastLL_H1_label";
         ObjectDelete(0, lblName);
         ObjectCreate(0, lblName, OBJ_TEXT, 0, lastTimeLL_H1, lastAcceptedLL_H1 - 20 * _Point);
@@ -2435,8 +2835,8 @@ void RedrawVisualsFromCSV()
     ChartRedraw();
     
     PrintFormat("✅ [REDRAW] Visual redraw complete from CSV:");
-    PrintFormat("   📊 HH lines:  %d", hhCount);
-    PrintFormat("   📊 LL lines:  %d", llCount);
+    PrintFormat("   📊 HH lines:  %d (superseded: %d)", hhCount, hhSuperseded);
+    PrintFormat("   📊 LL lines:  %d (superseded: %d)", llCount, llSuperseded);
     PrintFormat("   📊 CHoCH lines: %d", chochCount);
     PrintFormat("   📊 BoS lines: %d", bosCount);
     PrintFormat("   📊 lastAcceptedHH/LL: 4 (from state file)");
@@ -2489,6 +2889,12 @@ int OnInit()
     trade.SetExpertMagicNumber(MagicNumber_M15);
     Print("✅ EMA200 handle berhasil dibuat untuk M15 & H1");
 
+    // ✅ SYNC BACKTEST CSV: Copy backtest history ke MQL5 sandbox SEBELUM load
+    if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+    {
+        SyncBacktestCSV();
+    }
+    
     // ✅ LOAD LLHHBOS DATA TO ARRAYS: Load existing CSV ke memory SEBELUM WarmUp
     // Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong
     // Dipanggil HANYA saat live trading (bukan backtest)
@@ -3982,8 +4388,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //------------------------------------------------+
                 else if (rates_M15[i].high < lastAcceptedHH_M15) 
                 {
-                    /* PrintFormat("❌ [MODE 1.1 REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari CHoCH+HH last Accepted HH %.2f | Time: %s",
-                            rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 1.1 REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari CHoCH+HH last Accepted HH %.2f | Time: %s",
+                            rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                 }
             }
@@ -4050,8 +4456,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
                 if (bosBullishConfirmedFlag_M15 && hhAfterBosConfirmedFlag_M15 && rates_M15[i].high < lastAcceptedHH_M15)
                     {
-                        /* PrintFormat("❌ [MODE 2.1 REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari BoS + HH %.2f | Time: %s",
-                        rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time)); */
+                        if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 2.1 REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari BoS + HH %.2f | Time: %s",
+                        rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
                         if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                     }
 
@@ -4074,8 +4480,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             {
                 if (rates_M15[i].high != lastLoggedDeniedHH_M15 || TimeCurrent() - lastLoggedDeniedHHLogTime_M15 > deniedLogIntervalSeconds_M15)
                 {
-                    /* PrintFormat("❌ [REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari postCHoCH_HH %.2f | Time: %s",
-                            rates_M15[i].high, postChoCH_HH_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] HH %.2f DITOLAK karena < Lebih rendah dari postCHoCH_HH %.2f | Time: %s",
+                            rates_M15[i].high, postChoCH_HH_M15, TimeToString(rates_M15[i].time));
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                     lastLoggedDeniedHH_M15        = rates_M15[i].high;
                     lastLoggedDeniedHHBarTime_M15 = rates_M15[i].time;
@@ -4211,8 +4617,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     // Setelah pencarian selesai
                     if (rates_M15[i].high < absoluteHighestHH_M15)
                     {
-                        /* PrintFormat("❌ [MODE 2 BEARISH M15 - POST SEARCH REJECTED] HH %.2f DITOLAK karena < HH Tertinggi Absolut (%.2f) setelah pencarian selesai | Time: %s",
-                                    rates_M15[i].high, absoluteHighestHH_M15, TimeToString(rates_M15[i].time)); */
+                        if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 2 BEARISH M15 - POST SEARCH REJECTED] HH %.2f DITOLAK karena < HH Tertinggi Absolut (%.2f) setelah pencarian selesai | Time: %s",
+                                    rates_M15[i].high, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);            
                     }
                     else if (rates_M15[i].high > absoluteHighestHH_M15)
@@ -4271,8 +4677,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 else
                 {
                     // Tolak HH yang lebih rendah
-                    /* PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED] HH %.2f DITOLAK karena <= HH terakhir (%.2f) | Time: %s",
-                                rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED] HH %.2f DITOLAK karena <= HH terakhir (%.2f) | Time: %s",
+                                rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                 }
                 continue;
@@ -4347,8 +4753,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 // --- 4. Keputusan berdasarkan kriteria M15 ---
                 if (hhRejected_M15)
                 {
-                    /* PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED by Abs High] HH %.2f DITOLAK karena %s (%.2f) | Time: %s",
-                                rates_M15[i].high, rejectReason_M15, absoluteHighestHH_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED by Abs High] HH %.2f DITOLAK karena %s (%.2f) | Time: %s",
+                                rates_M15[i].high, rejectReason_M15, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                     string boxNameRejected_M15 = "zone_hh_M15_" + IntegerToString((int)rates_M15[i].time);
                     if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
                 }
@@ -4372,8 +4778,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 }
                 else if (rates_M15[i].high > lastAcceptedHH_M15)
                 {
-                    /* PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED by LH] HH %.2f DITOLAK karena lebih tinggi dari LH terakhir (%.2f) | Time: %s",
-                                rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 3 BEARISH M15 - REJECTED by LH] HH %.2f DITOLAK karena lebih tinggi dari LH terakhir (%.2f) | Time: %s",
+                                rates_M15[i].high, lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
                     string boxNameRejected_M15 = "zone_hh_M15_" + IntegerToString((int)rates_M15[i].time);
                     if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
                 }
@@ -4419,8 +4825,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //----------------------------------------------------------------------+
             if (bosBullishConfirmedFlag_M15 && !hhAfterBosConfirmedFlag_M15 && rates_M15[i].time > timeBoSBullish_M15)
             {
-                /* PrintFormat("❌ [WAITING FOR HH M15 - REJECTED] LL %.2f DITOLAK karena terbentuk SETELAH BoS dikonfirmasi dalam fase 'Waiting for HH' | Time: %s | Status: bosBullish=true, hhAfterBos=false, LL time > BoS time",
-                            rates_M15[i].low, TimeToString(rates_M15[i].time)); */
+                if(CanPrintRejectLogs()) PrintFormat("❌ [WAITING FOR HH M15 - REJECTED] LL %.2f DITOLAK karena terbentuk SETELAH BoS dikonfirmasi dalam fase 'Waiting for HH' | Time: %s | Status: bosBullish=true, hhAfterBos=false, LL time > BoS time",
+                            rates_M15[i].low, TimeToString(rates_M15[i].time));
                 if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                 continue; // Skip pemrosesan lebih lanjut untuk LL ini
             }
@@ -4478,8 +4884,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         }
                     else if (rates_M15[i].low > lastAcceptedLL_M15) 
                         {
-                            /* PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
-                                    rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time)); */
+                            if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
+                                    rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                             if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                         }
                 }
@@ -4488,8 +4894,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     if (rates_M15[i].low > preChochLL_M15)
                     {
-                        /* PrintFormat("❌ [REJECTED M15] LL %.2f > preChochLL %.2f | Time: %s",
-                                    rates_M15[i].low, preChochLL_M15, TimeToString(rates_M15[i].time)); */
+                        if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] LL %.2f > preChochLL %.2f | Time: %s",
+                                    rates_M15[i].low, preChochLL_M15, TimeToString(rates_M15[i].time));
                         ObjectDelete(0, boxName_M15);
                         continue;
                     }
@@ -4570,8 +4976,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 }
                 else if (rates_M15[i].low > lastAcceptedLL_M15) 
                 {
-                    /* PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari BoS+LL last Accepted LL %.2f | Time: %s",
-                            rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari BoS+LL last Accepted LL %.2f | Time: %s",
+                            rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                 }
             }  
@@ -4603,7 +5009,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 else
                 {
                     // ❌ Tolak LL yang lebih tinggi
-                    /* Print("❌ [MODE 1 REJECTED M15] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_M15); */
+                    if(CanPrintRejectLogs()) Print("❌ [MODE 1 REJECTED M15] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_M15);
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                     lastLoggedDeniedLL_M15 = rates_M15[i].low;
                 }
@@ -4618,7 +5024,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 if (lastAcceptedLL_M15 == -1 || rates_M15[i].low < lastAcceptedLL_M15) 
                 {
                     // ❌ Tolak LL yang lebih tinggi
-                    /* Print("❌ [MODE 1 REJECTED M15] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_M15); */
+                    if(CanPrintRejectLogs()) Print("❌ [MODE 1 REJECTED M15] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_M15);
                     if (ObjectFind(0, boxName_M15) >= 0) ObjectDelete(0, boxName_M15);
                     lastLoggedDeniedLL_M15 = rates_M15[i].low;
                 }
@@ -4723,8 +5129,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     // Untuk memenuhi permintaan "TOLAK", kita tolak.
                     if (rates_M15[i].low > absoluteLowestLL_M15)
                     {
-                         /* PrintFormat("❌ [MODE 2 M15 - POST SEARCH REJECTED] LL %.2f DITOLAK karena > LL Terendah Absolut (%.2f) setelah pencarian selesai | Time: %s",
-                                     rates_M15[i].low, absoluteLowestLL_M15, TimeToString(rates_M15[i].time)); */
+                         if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 2 M15 - POST SEARCH REJECTED] LL %.2f DITOLAK karena > LL Terendah Absolut (%.2f) setelah pencarian selesai | Time: %s",
+                                     rates_M15[i].low, absoluteLowestLL_M15, TimeToString(rates_M15[i].time));
                          string boxNameRejected_M15 = "zone_ll_M15_" + IntegerToString((int)rates_M15[i].time);
                          if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
                     }
@@ -4828,8 +5234,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 if (llRejected_M15)
                 {
                     // ❌ LL baru ditolak karena melanggar aturan LL terendah absolut
-                    /* PrintFormat("❌ [MODE 3 M15 - REJECTED by Abs Low] LL %.2f DITOLAK karena %s (%.2f) | Time: %s",
-                                rates_M15[i].low, rejectReason_M15, lowestLLSinceLastHHAfterBos_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 3 M15 - REJECTED by Abs Low] LL %.2f DITOLAK karena %s (%.2f) | Time: %s",
+                                rates_M15[i].low, rejectReason_M15, lowestLLSinceLastHHAfterBos_M15, TimeToString(rates_M15[i].time));
                     string boxNameRejected_M15 = "zone_ll_M15_" + IntegerToString((int)rates_M15[i].time);
                     if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
                 }
@@ -4863,8 +5269,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // ❌ Lower Low (LL) ditemukan: LL baru lebih rendah dari HL terakhir (lastAcceptedLL_M15)
                     // Ini menunjukkan potensi kelemahan tren bullish atau koreksi.
-                    /* PrintFormat("❌ [MODE 3 M15 - REJECTED by HL] LL %.2f DITOLAK karena lebih rendah dari HL terakhir (%.2f) | Time: %s",
-                                rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ [MODE 3 M15 - REJECTED by HL] LL %.2f DITOLAK karena lebih rendah dari HL terakhir (%.2f) | Time: %s",
+                                rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                     string boxNameRejected_M15 = "zone_ll_M15_" + IntegerToString((int)rates_M15[i].time);
                     if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
                 }
@@ -5762,11 +6168,14 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             datetime startTime_H1 = rates_H1[i].time;
             datetime endTime_H1   = startTime_H1 + PeriodSeconds() * ZoneLength_H1;
             string   boxName_H1   = "H1_zone_hh_" + IntegerToString((int)rates_H1[i].time);
-            
-            ObjectDelete(0, boxName_H1);
-            ObjectCreate(0, boxName_H1, OBJ_RECTANGLE, 0, startTime_H1, rates_H1[i].high, endTime_H1, rates_H1[i].high + 3 * _Point);
-            ObjectSetInteger(0, boxName_H1, OBJPROP_COLOR, clrRed);
-            ObjectSetInteger(0, boxName_H1, OBJPROP_BACK, true);
+
+            if (!DisableDrawLines_H1)
+            {
+                ObjectDelete(0, boxName_H1);
+                ObjectCreate(0, boxName_H1, OBJ_RECTANGLE, 0, startTime_H1, rates_H1[i].high, endTime_H1, rates_H1[i].high + 3 * _Point);
+                ObjectSetInteger(0, boxName_H1, OBJPROP_COLOR, clrRed);
+                ObjectSetInteger(0, boxName_H1, OBJPROP_BACK, true);
+            }
             
             // --- MODE MENUJU TREND BULLISH H1 ---
             // --- CHoCH Bullish Confirmed, terbentuk HH valid sebagai target BoS Bullish H1 ---
@@ -5797,8 +6206,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else if (rates_H1[i].high < lastAcceptedHH_H1) 
                 {
-                    /* PrintFormat("❌ H1: [MODE 1.1 REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari CHoCH+HH last Accepted HH %.2f | Time: %s",
-                            rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 1.1 REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari CHoCH+HH last Accepted HH %.2f | Time: %s",
+                            rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                 }
             }
@@ -5857,8 +6266,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
 
             if (bosBullishConfirmedFlag_H1 && hhAfterBosConfirmedFlag_H1 && rates_H1[i].high < lastAcceptedHH_H1)
             {
-                /* PrintFormat("❌ H1: [MODE 2.1 REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari BoS + HH %.2f | Time: %s",
-                        rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time)); */
+                if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 2.1 REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari BoS + HH %.2f | Time: %s",
+                        rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time));
                 if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
             }
 
@@ -5874,8 +6283,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             {
                 if (rates_H1[i].high != lastLoggedDeniedHH_H1 || TimeCurrent() - lastLoggedDeniedHHLogTime_H1 > deniedLogIntervalSeconds_H1)
                 {
-                    /* PrintFormat("❌ H1: [REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari postCHoCH_HH %.2f | Time: %s",
-                            rates_H1[i].high, postChoCH_HH_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [REJECTED] HH %.2f DITOLAK karena < Lebih rendah dari postCHoCH_HH %.2f | Time: %s",
+                            rates_H1[i].high, postChoCH_HH_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                     lastLoggedDeniedHH_H1        = rates_H1[i].high;
                     lastLoggedDeniedHHBarTime_H1 = rates_H1[i].time;
@@ -5963,8 +6372,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 {
                     if (rates_H1[i].high < absoluteHighestHH_H1)
                     {
-                        /* PrintFormat("❌ H1: [MODE 2 BEARISH - POST SEARCH REJECTED] HH %.2f DITOLAK karena < HH Tertinggi Absolut (%.2f) setelah pencarian selesai | Time: %s",
-                                    rates_H1[i].high, absoluteHighestHH_H1, TimeToString(rates_H1[i].time)); */
+                        if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 2 BEARISH - POST SEARCH REJECTED] HH %.2f DITOLAK karena < HH Tertinggi Absolut (%.2f) setelah pencarian selesai | Time: %s",
+                                    rates_H1[i].high, absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
                         if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);            
                     }
                     else if (rates_H1[i].high > absoluteHighestHH_H1)
@@ -6013,8 +6422,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else
                 {
-                    /* PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED] HH %.2f DITOLAK karena <= HH terakhir (%.2f) | Time: %s",
-                                rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED] HH %.2f DITOLAK karena <= HH terakhir (%.2f) | Time: %s",
+                                rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                 }
                 continue;
@@ -6073,8 +6482,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
 
                 if (hhRejected_H1)
                 {
-                    /* PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED by Abs High] HH %.2f DITOLAK karena %s (%.2f) | Time: %s",
-                                rates_H1[i].high, rejectReason_H1, absoluteHighestHH_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED by Abs High] HH %.2f DITOLAK karena %s (%.2f) | Time: %s",
+                                rates_H1[i].high, rejectReason_H1, absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
                     string boxNameRejected = "H1_zone_hh_" + IntegerToString((int)rates_H1[i].time);
                     if (ObjectFind(0, boxNameRejected) >= 0) ObjectDelete(0, boxNameRejected);
                 }
@@ -6097,8 +6506,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else if (rates_H1[i].high > lastAcceptedHH_H1)
                 {
-                    /* PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED by LH] HH %.2f DITOLAK karena lebih tinggi dari LH terakhir (%.2f) | Time: %s",
-                                rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 3 BEARISH - REJECTED by LH] HH %.2f DITOLAK karena lebih tinggi dari LH terakhir (%.2f) | Time: %s",
+                                rates_H1[i].high, lastAcceptedHH_H1, TimeToString(rates_H1[i].time));
                     string boxNameRejected = "H1_zone_hh_" + IntegerToString((int)rates_H1[i].time);
                     if (ObjectFind(0, boxNameRejected) >= 0) ObjectDelete(0, boxNameRejected);
                 }
@@ -6130,10 +6539,13 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             datetime startTime_H1 = rates_H1[i].time;
             datetime endTime_H1   = startTime_H1 + PeriodSeconds() * ZoneLength_H1;
             string   boxName_H1   = "H1_zone_ll_" + IntegerToString((int)rates_H1[i].time);
-            
-            ObjectCreate(0, boxName_H1, OBJ_RECTANGLE, 0, startTime_H1, rates_H1[i].low - 3 * _Point, endTime_H1, rates_H1[i].low);
-            ObjectSetInteger(0, boxName_H1, OBJPROP_COLOR, clrGreen);
-            ObjectSetInteger(0, boxName_H1, OBJPROP_BACK, true);
+
+            if (!DisableDrawLines_H1)
+            {
+                ObjectCreate(0, boxName_H1, OBJ_RECTANGLE, 0, startTime_H1, rates_H1[i].low - 3 * _Point, endTime_H1, rates_H1[i].low);
+                ObjectSetInteger(0, boxName_H1, OBJPROP_COLOR, clrGreen);
+                ObjectSetInteger(0, boxName_H1, OBJPROP_BACK, true);
+            }
             
             //----------------------------------------------------------------------+
             // ⚠️ [NO MAN'S LAND REJECTION] Tolak LL saat menunggu HH setelah BoS H1  |
@@ -6142,8 +6554,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             //----------------------------------------------------------------------+
             if (bosBullishConfirmedFlag_H1 && !hhAfterBosConfirmedFlag_H1 && rates_H1[i].time > timeBoSBullish_H1)
             {
-                /* PrintFormat("❌ H1: [WAITING FOR HH - REJECTED] LL %.2f DITOLAK karena terbentuk SETELAH BoS dikonfirmasi dalam fase 'Waiting for HH' | Time: %s | Status: bosBullish=true, hhAfterBos=false, LL time > BoS time",
-                            rates_H1[i].low, TimeToString(rates_H1[i].time)); */
+                if(CanPrintRejectLogs()) PrintFormat("❌ H1: [WAITING FOR HH - REJECTED] LL %.2f DITOLAK karena terbentuk SETELAH BoS dikonfirmasi dalam fase 'Waiting for HH' | Time: %s | Status: bosBullish=true, hhAfterBos=false, LL time > BoS time",
+                            rates_H1[i].low, TimeToString(rates_H1[i].time));
                 if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                 continue; // Skip pemrosesan lebih lanjut untuk LL ini
             }
@@ -6187,8 +6599,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else if (rates_H1[i].low > lastAcceptedLL_H1) 
                 {
-                    /* PrintFormat("❌ H1: [REJECTED] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
-                            rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [REJECTED] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
+                            rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                 }
             }
@@ -6197,8 +6609,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             {
                 if (rates_H1[i].low > preChochLL_H1)
                 {
-                    /* PrintFormat("❌ H1: [REJECTED] LL %.2f > preChochLL %.2f | Time: %s",
-                                rates_H1[i].low, preChochLL_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [REJECTED] LL %.2f > preChochLL %.2f | Time: %s",
+                                rates_H1[i].low, preChochLL_H1, TimeToString(rates_H1[i].time));
                     ObjectDelete(0, boxName_H1);
                     continue;
                 }
@@ -6253,8 +6665,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else if (rates_H1[i].low > lastAcceptedLL_H1) 
                 {
-                    /* PrintFormat("❌ H1: [REJECTED] LL %.2f DITOLAK karena > Lebih Tinggi dari BoS+LL last Accepted LL %.2f | Time: %s",
-                            rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [REJECTED] LL %.2f DITOLAK karena > Lebih Tinggi dari BoS+LL last Accepted LL %.2f | Time: %s",
+                            rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                 }
             }  
@@ -6275,7 +6687,7 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else
                 {
-                    /* Print("❌ H1: [MODE 1 REJECTED] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_H1); */
+                    if(CanPrintRejectLogs()) Print("❌ H1: [MODE 1 REJECTED] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_H1);
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                     lastLoggedDeniedLL_H1 = rates_H1[i].low;
                 }
@@ -6286,7 +6698,7 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
             {
                 if (lastAcceptedLL_H1 == -1 || rates_H1[i].low < lastAcceptedLL_H1) 
                 {
-                    /* Print("❌ H1: [MODE 1 REJECTED] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_H1); */
+                    if(CanPrintRejectLogs()) Print("❌ H1: [MODE 1 REJECTED] LL lebih tinggi dari PreChoCh LL: = ", lastAcceptedLL_H1);
                     if (ObjectFind(0, boxName_H1) >= 0) ObjectDelete(0, boxName_H1);
                     lastLoggedDeniedLL_H1 = rates_H1[i].low;
                 }
@@ -6352,8 +6764,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 {
                     if (rates_H1[i].low > absoluteLowestLL_H1)
                     {
-                         /* PrintFormat("❌ H1: [MODE 2 - POST SEARCH REJECTED] LL %.2f DITOLAK karena > LL Terendah Absolut (%.2f) setelah pencarian selesai | Time: %s",
-                                     rates_H1[i].low, absoluteLowestLL_H1, TimeToString(rates_H1[i].time)); */
+                         if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 2 - POST SEARCH REJECTED] LL %.2f DITOLAK karena > LL Terendah Absolut (%.2f) setelah pencarian selesai | Time: %s",
+                                     rates_H1[i].low, absoluteLowestLL_H1, TimeToString(rates_H1[i].time));
                          string boxNameRejected = "H1_zone_ll_" + IntegerToString((int)rates_H1[i].time);
                          if (ObjectFind(0, boxNameRejected) >= 0) ObjectDelete(0, boxNameRejected);
                     }
@@ -6433,8 +6845,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 
                 if (llRejected_H1)
                 {
-                    /* PrintFormat("❌ H1: [MODE 3 - REJECTED by Abs Low] LL %.2f DITOLAK karena %s (%.2f) | Time: %s",
-                                rates_H1[i].low, rejectReason_H1, lowestLLSinceLastHHAfterBos_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 3 - REJECTED by Abs Low] LL %.2f DITOLAK karena %s (%.2f) | Time: %s",
+                                rates_H1[i].low, rejectReason_H1, lowestLLSinceLastHHAfterBos_H1, TimeToString(rates_H1[i].time));
                     string boxNameRejected = "H1_zone_ll_" + IntegerToString((int)rates_H1[i].time);
                     if (ObjectFind(0, boxNameRejected) >= 0) ObjectDelete(0, boxNameRejected);
                 }
@@ -6460,8 +6872,8 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 }
                 else if (rates_H1[i].low < lastAcceptedLL_H1)
                 {
-                    /* PrintFormat("❌ H1: [MODE 3 - REJECTED by HL] LL %.2f DITOLAK karena lebih rendah dari HL terakhir (%.2f) | Time: %s",
-                                rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time)); */
+                    if(CanPrintRejectLogs()) PrintFormat("❌ H1: [MODE 3 - REJECTED by HL] LL %.2f DITOLAK karena lebih rendah dari HL terakhir (%.2f) | Time: %s",
+                                rates_H1[i].low, lastAcceptedLL_H1, TimeToString(rates_H1[i].time));
                     string boxNameRejected = "H1_zone_ll_" + IntegerToString((int)rates_H1[i].time);
                     if (ObjectFind(0, boxNameRejected) >= 0) ObjectDelete(0, boxNameRejected);
                 }
@@ -6491,25 +6903,28 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
         
         // Gambar garis CHoCH dari HH sebelum break ke candle H1
         string chochName_H1 = "H1_CHoCH_Bull_" + IntegerToString((int)tempHHTime_H1);
-        ObjectDelete(0, chochName_H1);
-        ObjectCreate(0, chochName_H1, OBJ_TREND, 0, tempHHTime_H1, tempHH_H1, rates_H1[1].time, tempHH_H1);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_COLOR, clrGold);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_WIDTH, 1);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_STYLE, STYLE_SOLID);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_BACK, true);
-        
-        // Label CHoCH di tengah garis H1
-        string   chochLabel_H1 = chochName_H1 + "_label";
-        int      shift1_H1     = iBarShift(_Symbol, PERIOD_H1, tempHHTime_H1, false);
-        int      shift2_H1     = iBarShift(_Symbol, PERIOD_H1, rates_H1[1].time, false);
-        int      midShift_H1   = (shift1_H1 + shift2_H1) / 2;
-        datetime midTime_H1    = iTime(_Symbol, PERIOD_H1, midShift_H1);
-        ObjectDelete(0, chochLabel_H1);
-        ObjectCreate(0, chochLabel_H1, OBJ_TEXT, 0, midTime_H1, tempHH_H1 + 6 * _Point);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_COLOR, clrGold);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_FONTSIZE, 10);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
-        ObjectSetString(0, chochLabel_H1, OBJPROP_TEXT, "H1_CHoCH");
+        if (!DisableDrawLines_H1)
+        {
+            ObjectDelete(0, chochName_H1);
+            ObjectCreate(0, chochName_H1, OBJ_TREND, 0, tempHHTime_H1, tempHH_H1, rates_H1[1].time, tempHH_H1);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_COLOR, clrGold);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_BACK, true);
+
+            // Label CHoCH di tengah garis H1
+            string   chochLabel_H1 = chochName_H1 + "_label";
+            int      shift1_H1     = iBarShift(_Symbol, PERIOD_H1, tempHHTime_H1, false);
+            int      shift2_H1     = iBarShift(_Symbol, PERIOD_H1, rates_H1[1].time, false);
+            int      midShift_H1   = (shift1_H1 + shift2_H1) / 2;
+            datetime midTime_H1    = iTime(_Symbol, PERIOD_H1, midShift_H1);
+            ObjectDelete(0, chochLabel_H1);
+            ObjectCreate(0, chochLabel_H1, OBJ_TEXT, 0, midTime_H1, tempHH_H1 + 6 * _Point);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_COLOR, clrGold);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_FONTSIZE, 10);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+            ObjectSetString(0, chochLabel_H1, OBJPROP_TEXT, "H1_CHoCH");
+        }
         
         chochBullish_H1              = true;
         hhAfterChochConfirmedFlag_H1 = false;
@@ -6552,22 +6967,25 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
         
         // Gambar garis CHoCH Bearish H1
         string chochName_H1 = "H1_CHoCH_Bear_" + IntegerToString((int)tempLLTime_H1);
-        ObjectDelete(0, chochName_H1);
-        ObjectCreate(0, chochName_H1, OBJ_TREND, 0, tempLLTime_H1, tempLL_H1, rates_H1[1].time, tempLL_H1);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_COLOR, clrOrangeRed);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_WIDTH, 1);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_STYLE, STYLE_SOLID);
-        ObjectSetInteger(0, chochName_H1, OBJPROP_BACK, true);
-        
-        // Label CHoCH Bearish H1
-        string   chochLabel_H1 = chochName_H1 + "_label";
-        datetime midTime_H1 = (tempLLTime_H1 + rates_H1[1].time) / 2;
-        ObjectDelete(0, chochLabel_H1);
-        ObjectCreate(0, chochLabel_H1, OBJ_TEXT, 0, midTime_H1, tempLL_H1 - 6 * _Point);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_COLOR, clrOrangeRed);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_FONTSIZE, 10);
-        ObjectSetInteger(0, chochLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
-        ObjectSetString(0, chochLabel_H1, OBJPROP_TEXT, "H1_CHoCH");
+        if (!DisableDrawLines_H1)
+        {
+            ObjectDelete(0, chochName_H1);
+            ObjectCreate(0, chochName_H1, OBJ_TREND, 0, tempLLTime_H1, tempLL_H1, rates_H1[1].time, tempLL_H1);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_COLOR, clrOrangeRed);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, chochName_H1, OBJPROP_BACK, true);
+
+            // Label CHoCH Bearish H1
+            string   chochLabel_H1 = chochName_H1 + "_label";
+            datetime midTime_H1 = (tempLLTime_H1 + rates_H1[1].time) / 2;
+            ObjectDelete(0, chochLabel_H1);
+            ObjectCreate(0, chochLabel_H1, OBJ_TEXT, 0, midTime_H1, tempLL_H1 - 6 * _Point);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_COLOR, clrOrangeRed);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_FONTSIZE, 10);
+            ObjectSetInteger(0, chochLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+            ObjectSetString(0, chochLabel_H1, OBJPROP_TEXT, "H1_CHoCH");
+        }
         
         // Reset Flag dan Variabel terkait tren H1
         chochBearish_H1              = true;
@@ -6603,25 +7021,28 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
     {
         string bosLineName_H1  = "H1_BoS_Bull_" + IntegerToString((int)time_postChoCH_HH_H1);
         string bosLabelName_H1 = bosLineName_H1 + "_label";
-        
+
         // Gambar garis dari postChoCH_HH ke candle dan label di tengah H1
         string bosName_H1 = "H1_BoS_Bull_" + IntegerToString((int)time_postChoCH_HH_H1);
-        ObjectDelete(0, bosName_H1);
-        ObjectCreate(0, bosName_H1, OBJ_TREND, 0, time_postChoCH_HH_H1, postChoCH_HH_H1, rates_H1[1].time, postChoCH_HH_H1);
-        ObjectSetInteger(0, bosName_H1, OBJPROP_COLOR, clrDeepSkyBlue);
-        ObjectSetInteger(0, bosName_H1, OBJPROP_WIDTH, 1);
-        ObjectSetInteger(0, bosName_H1, OBJPROP_STYLE, STYLE_SOLID);
-        ObjectSetInteger(0, bosName_H1, OBJPROP_BACK, true);
-        
-        // Label BoS di tengah garis H1
-        string   bosLabel_H1 = bosName_H1 + "_label";
-        datetime midTime_H1  = (time_postChoCH_HH_H1 + rates_H1[1].time) / 2;
-        ObjectDelete(0, bosLabel_H1);
-        ObjectCreate(0, bosLabel_H1, OBJ_TEXT, 0, midTime_H1, postChoCH_HH_H1 - 7 * _Point);
-        ObjectSetInteger(0, bosLabel_H1, OBJPROP_COLOR, clrDeepSkyBlue);
-        ObjectSetInteger(0, bosLabel_H1, OBJPROP_FONTSIZE, 10);
-        ObjectSetInteger(0, bosLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
-        ObjectSetString(0, bosLabel_H1, OBJPROP_TEXT, "H1_BoS");
+        if (!DisableDrawLines_H1)
+        {
+            ObjectDelete(0, bosName_H1);
+            ObjectCreate(0, bosName_H1, OBJ_TREND, 0, time_postChoCH_HH_H1, postChoCH_HH_H1, rates_H1[1].time, postChoCH_HH_H1);
+            ObjectSetInteger(0, bosName_H1, OBJPROP_COLOR, clrDeepSkyBlue);
+            ObjectSetInteger(0, bosName_H1, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, bosName_H1, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, bosName_H1, OBJPROP_BACK, true);
+
+            // Label BoS di tengah garis H1
+            string   bosLabel_H1 = bosName_H1 + "_label";
+            datetime midTime_H1  = (time_postChoCH_HH_H1 + rates_H1[1].time) / 2;
+            ObjectDelete(0, bosLabel_H1);
+            ObjectCreate(0, bosLabel_H1, OBJ_TEXT, 0, midTime_H1, postChoCH_HH_H1 - 7 * _Point);
+            ObjectSetInteger(0, bosLabel_H1, OBJPROP_COLOR, clrDeepSkyBlue);
+            ObjectSetInteger(0, bosLabel_H1, OBJPROP_FONTSIZE, 10);
+            ObjectSetInteger(0, bosLabel_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER);
+            ObjectSetString(0, bosLabel_H1, OBJPROP_TEXT, "H1_BoS");
+        }
         
         if (!bosBullishJustLogged_H1)
         {
@@ -6666,21 +7087,24 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
         string bosLabelName_H1 = bosLineName_H1 + "_label";
 
         // Gambar garis dari postChoCH_LL ke candle dan label di tengah H1
-        ObjectDelete(0, bosLineName_H1);
-        ObjectCreate(0, bosLineName_H1, OBJ_TREND, 0, time_postChoCH_LL_H1, postChoCH_LL_H1, rates_H1[1].time, postChoCH_LL_H1);
-        ObjectSetInteger(0, bosLineName_H1, OBJPROP_COLOR, clrOrange);
-        ObjectSetInteger(0, bosLineName_H1, OBJPROP_WIDTH, 1);
-        ObjectSetInteger(0, bosLineName_H1, OBJPROP_STYLE, STYLE_SOLID);
-        ObjectSetInteger(0, bosLineName_H1, OBJPROP_BACK, true);
+        if (!DisableDrawLines_H1)
+        {
+            ObjectDelete(0, bosLineName_H1);
+            ObjectCreate(0, bosLineName_H1, OBJ_TREND, 0, time_postChoCH_LL_H1, postChoCH_LL_H1, rates_H1[1].time, postChoCH_LL_H1);
+            ObjectSetInteger(0, bosLineName_H1, OBJPROP_COLOR, clrOrange);
+            ObjectSetInteger(0, bosLineName_H1, OBJPROP_WIDTH, 1);
+            ObjectSetInteger(0, bosLineName_H1, OBJPROP_STYLE, STYLE_SOLID);
+            ObjectSetInteger(0, bosLineName_H1, OBJPROP_BACK, true);
 
-        // Label BoS Bearish H1
-        datetime midTime_H1  = (time_postChoCH_LL_H1 + rates_H1[1].time) / 2;
-        ObjectDelete(0, bosLabelName_H1);
-        ObjectCreate(0, bosLabelName_H1, OBJ_TEXT, 0, midTime_H1, postChoCH_LL_H1 + 7 * _Point);
-        ObjectSetInteger(0, bosLabelName_H1, OBJPROP_COLOR, clrOrange);
-        ObjectSetInteger(0, bosLabelName_H1, OBJPROP_FONTSIZE, 10);
-        ObjectSetInteger(0, bosLabelName_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
-        ObjectSetString(0, bosLabelName_H1, OBJPROP_TEXT, "H1_BoS");
+            // Label BoS Bearish H1
+            datetime midTime_H1  = (time_postChoCH_LL_H1 + rates_H1[1].time) / 2;
+            ObjectDelete(0, bosLabelName_H1);
+            ObjectCreate(0, bosLabelName_H1, OBJ_TEXT, 0, midTime_H1, postChoCH_LL_H1 + 7 * _Point);
+            ObjectSetInteger(0, bosLabelName_H1, OBJPROP_COLOR, clrOrange);
+            ObjectSetInteger(0, bosLabelName_H1, OBJPROP_FONTSIZE, 10);
+            ObjectSetInteger(0, bosLabelName_H1, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+            ObjectSetString(0, bosLabelName_H1, OBJPROP_TEXT, "H1_BoS");
+        }
 
         // Logging dan update flag H1
         Print("🔥🔥🔥 H1: === ⚡⚡⚡ [BoS BEARISH TRIGGERED] ⚡⚡⚡ === 🔥🔥🔥");
