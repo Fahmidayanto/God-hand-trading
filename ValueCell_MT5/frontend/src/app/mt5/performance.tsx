@@ -2,6 +2,22 @@ import { useEffect, useState } from "react";
 import Particles from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import type { Engine } from "@tsparticles/engine";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Trophy,
+  Activity,
+  Gauge,
+  Scale,
+  Calendar,
+  CalendarDays,
+  Layers,
+  RotateCcw,
+  DollarSign,
+  ArrowDownRight,
+} from "lucide-react";
 import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 import {
@@ -32,15 +48,6 @@ ChartJS.register(
   Filler
 );
 
-interface MonthlyData {
-  month: string;
-  trades: number;
-  win_rate: number;
-  pnl: number;
-  return_pct: number;
-  max_dd: number;
-}
-
 interface MonthlyPNLData {
   month: string;
   year: number;
@@ -57,22 +64,14 @@ interface MonthlyPNLData {
 }
 
 export default function PerformancePage() {
-  const [stats, setStats] = useState({
-    total_return: 0,
-    win_rate: 0,
-    profit_factor: 0,
-    sharpe_ratio: 0,
-    avg_win: 0,
-    avg_loss: 0,
-    max_drawdown: 0,
-  });
-  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
   const [monthlyPNL, setMonthlyPNL] = useState<MonthlyPNLData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [initialBalance, setInitialBalance] = useState<number>(1000);
-  const [finalEquity, setFinalEquity] = useState<number>(initialBalance);
+  const [summary, setSummary] = useState<{
+    max_drawdown: number; profit_factor: number; win_rate: number;
+  }>({ max_drawdown: 0, profit_factor: 0, win_rate: 0 });
 
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine);
@@ -85,9 +84,6 @@ export default function PerformancePage() {
     return () => clearInterval(interval);
   }, [selectedYear, selectedMonth]);
 
-  // Note: finalEquity is now set directly from the API response in loadPerformanceData()
-  // The API correctly calculates cumulative equity across all years/months
-
   const loadAvailableYears = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -95,7 +91,6 @@ export default function PerformancePage() {
       if (response.ok) {
         const data = await response.json();
         setAvailableYears(data.years || []);
-        // Don't auto-select year - let user see all data first
       }
     } catch (error) {
       console.error("Error loading available years:", error);
@@ -105,102 +100,77 @@ export default function PerformancePage() {
   const loadPerformanceData = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-      
-      // Build query parameters for backtest data
       const params = new URLSearchParams();
       if (selectedYear) params.append('year', selectedYear.toString());
       if (selectedMonth) params.append('month', selectedMonth.toString());
       const queryString = params.toString() ? '?' + params.toString() : '';
-      
-      // Fetch stats from backtest analytics
-      const statsResponse = await fetch(
-        `${apiUrl}/performance/backtest/stats${queryString}`
+
+      // Summary metrics from Backtest_Summary CSVs (real drawdown / profit factor)
+      const summaryResponse = await fetch(
+        `${apiUrl}/performance/backtest/summary${queryString}`
       );
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats({
-          total_return: statsData.return_pct ?? 0,
-          win_rate: statsData.win_rate ?? 0,
-          profit_factor: statsData.profit_factor ?? 0,
-          sharpe_ratio: statsData.sharpe_ratio ?? 0,
-          avg_win: statsData.avg_win ?? 0,
-          avg_loss: statsData.avg_loss ?? 0,
-          max_drawdown: statsData.max_drawdown ?? 0,
+      if (summaryResponse.ok) {
+        const s = await summaryResponse.json();
+        setSummary({
+          max_drawdown: s.max_drawdown ?? 0,
+          profit_factor: s.profit_factor ?? 0,
+          win_rate: s.win_rate ?? 0,
         });
-        // Set final equity from API response (which has correct cumulative value)
-        setFinalEquity(statsData.final_equity ?? initialBalance);
       }
 
-      // Fetch monthly data with filters
-      const monthlyResponse = await fetch(
-        `${apiUrl}/performance/backtest/monthly${queryString}`
-      );
-      if (monthlyResponse.ok) {
-        const monthlyList = await monthlyResponse.json();
-        if (Array.isArray(monthlyList) && monthlyList.length > 0) {
-          setMonthlyData(monthlyList);
-        } else {
-          setMonthlyData([]);
-        }
-      }
-
-      // Fetch monthly P&L data from CSV with year/month filters
       const monthlyPNLResponse = await fetch(
         `${apiUrl}/performance/monthly-pnl${queryString}`
       );
       if (monthlyPNLResponse.ok) {
-        const monthlyPNLData = await monthlyPNLResponse.json();
-        if (monthlyPNLData.data && Array.isArray(monthlyPNLData.data)) {
-          setMonthlyPNL(monthlyPNLData.data);
-        } else {
-          setMonthlyPNL([]);
-        }
+        const res = await monthlyPNLResponse.json();
+        setMonthlyPNL(res.data && Array.isArray(res.data) ? res.data : []);
       }
     } catch (error) {
       console.error("Error loading performance data:", error);
-      // Keep default values on error (already set in state)
     }
   };
+
+  // ponytail: all derived from monthlyPNL — no dead /backtest/* endpoints needed
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  const formatMonthLabel = (monthStr: string) => {
-    const parts = monthStr.split('.');
-    if (parts.length === 2) {
-      const monthNum = parseInt(parts[1], 10);
-      return monthNames[monthNum - 1] || monthStr;
-    }
-    return monthStr;
+
+  // Cumulative equity curve from monthlyPNL
+  const equityCurve: number[] = [];
+  let cumPnl = 0;
+  for (const m of monthlyPNL) {
+    cumPnl += m.net_profit ?? 0;
+    equityCurve.push(initialBalance + cumPnl);
+  }
+  const finalEquity = equityCurve.length > 0 ? equityCurve[equityCurve.length - 1] : initialBalance;
+
+  // Stats derived from monthlyPNL
+  const totalTrades = monthlyPNL.reduce((s, m) => s + (m.executed_trades ?? 0), 0);
+  const totalWinTrades = monthlyPNL.reduce((s, m) => s + (m.winning_trades ?? 0), 0);
+  const totalLoseTrades = monthlyPNL.reduce((s, m) => s + (m.losing_trades ?? 0), 0);
+  const totalProfit = monthlyPNL.reduce((s, m) => s + (m.profit ?? 0), 0);
+  const totalLoss = Math.abs(monthlyPNL.reduce((s, m) => s + (m.loss ?? 0), 0));
+  const avgWin = totalWinTrades > 0 ? totalProfit / totalWinTrades : 0;
+  const avgLoss = totalLoseTrades > 0 ? totalLoss / totalLoseTrades : 0;
+
+  const stats = {
+    total_return: initialBalance > 0 ? ((finalEquity - initialBalance) / initialBalance) * 100 : 0,
+    win_rate: totalTrades > 0 ? (totalWinTrades / totalTrades) * 100 : 0,
+    // ponytail: PF and drawdown from Backtest_Summary CSV (real), sharpe needs daily equity
+    profit_factor: summary.profit_factor,
+    sharpe_ratio: 0,
+    avg_win: avgWin,
+    avg_loss: avgLoss,
+    max_drawdown: summary.max_drawdown,
   };
 
-  const getChartLabels = () => {
-    if (selectedYear && !selectedMonth) {
-      return monthlyData.length > 0 ? monthlyData.map(m => formatMonthLabel(m.month ?? '')) : [];
-    }
-    return monthlyData.length > 0 ? monthlyData.map(m => m.month ?? 'N/A') : [];
-  };
-
-  const getPNLChartLabels = () => {
-    if (selectedYear && !selectedMonth) {
-      return monthlyPNL.length > 0 ? monthlyPNL.map(m => {
-        if (m.month_num) {
-          return monthNames[m.month_num - 1] || m.month_label;
-        }
-        return formatMonthLabel(m.month ?? '');
-      }) : [];
-    }
-    return monthlyPNL.length > 0 ? monthlyPNL.map(m => m.month_label ?? `${m.month ?? 'N/A'}-${m.year ?? ''}`) : [];
-  };
+  const chartLabels = monthlyPNL.map(m => m.month_label ?? `${monthNames[(m.month_num ?? 1) - 1] ?? ''} ${m.year ?? ''}`);
 
   const equityData = {
-    labels: getChartLabels(),
+    labels: chartLabels,
     datasets: [
       {
         label: "Equity",
-        data: monthlyData.length > 0 ? monthlyData.map((m) => {
-          // pnl is cumulative profit, so equity = initial + pnl
-          return initialBalance + (m.pnl ?? 0);
-        }) : [],
+        data: equityCurve,
         borderColor: "#10b981",
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         borderWidth: 3,
@@ -214,10 +184,7 @@ export default function PerformancePage() {
     labels: ["Wins", "Losses"],
     datasets: [
       {
-        data: monthlyData.length > 0 ? [
-          monthlyData.reduce((sum, m) => sum + ((m.trades ?? 0) * ((m.win_rate ?? 0) / 100)), 0),
-          monthlyData.reduce((sum, m) => sum + ((m.trades ?? 0) * (1 - ((m.win_rate ?? 0) / 100))), 0)
-        ] : [0, 0],
+        data: [totalWinTrades, totalLoseTrades],
         backgroundColor: ["#10b981", "#ef4444"],
         borderWidth: 0,
       },
@@ -225,14 +192,14 @@ export default function PerformancePage() {
   };
 
   const monthlyReturnsData = {
-    labels: getChartLabels(),
+    labels: chartLabels,
     datasets: [
       {
         label: "Monthly Return %",
-        data:
-          monthlyData.length > 0
-            ? monthlyData.map((m) => m.return_pct ?? 0)
-            : [],
+        data: monthlyPNL.map(m => {
+          const equity = m.net_profit ?? 0;
+          return initialBalance > 0 ? (equity / initialBalance) * 100 : 0;
+        }),
         backgroundColor: "#3b82f6",
         borderRadius: 8,
       },
@@ -240,11 +207,21 @@ export default function PerformancePage() {
   };
 
   const drawdownData = {
-    labels: getChartLabels(),
+    labels: chartLabels,
     datasets: [
       {
         label: "Drawdown %",
-        data: monthlyData.length > 0 ? monthlyData.map(m => m.max_dd ?? 0) : [],
+        data: (() => {
+          let peakEq = initialBalance, cum = 0;
+          const drawdowns: number[] = [];
+          for (const m of monthlyPNL) {
+            cum += m.net_profit ?? 0;
+            const eq = initialBalance + cum;
+            peakEq = Math.max(peakEq, eq);
+            drawdowns.push(peakEq > 0 ? ((eq - peakEq) / peakEq) * 100 : 0);
+          }
+          return drawdowns;
+        })(),
         borderColor: "#ef4444",
         backgroundColor: "rgba(239, 68, 68, 0.1)",
         borderWidth: 2,
@@ -255,18 +232,18 @@ export default function PerformancePage() {
   };
 
   const monthlyProfitLossData = {
-    labels: getPNLChartLabels(),
+    labels: chartLabels,
     datasets: [
       {
         label: "Profit",
-        data: monthlyPNL.length > 0 ? monthlyPNL.map(m => (m.profit ?? 0) > 0 ? (m.profit ?? 0) : 0) : [],
+        data: monthlyPNL.map(m => Math.max(0, m.profit ?? 0)),
         backgroundColor: "#10b981",
         borderRadius: 6,
         borderSkipped: false,
       },
       {
         label: "Loss",
-        data: monthlyPNL.length > 0 ? monthlyPNL.map(m => (m.loss ?? 0) < 0 ? (m.loss ?? 0) : 0) : [],
+        data: monthlyPNL.map(m => Math.min(0, m.loss ?? 0)),
         backgroundColor: "#ef4444",
         borderRadius: 6,
         borderSkipped: false,
@@ -294,29 +271,13 @@ export default function PerformancePage() {
       },
       x: {
         grid: { color: "rgba(100, 116, 139, 0.1)" },
-        ticks: { 
+        ticks: {
           color: "#94a3b8",
           font: { size: 11 },
           maxRotation: 0,
           minRotation: 0,
-          autoSkip: false,
-          callback: function(value: any, index: number) {
-            const labels = getChartLabels();
-            // All Years view: show range labels (0-12, 12-24, 24-36, etc.)
-            if (!selectedYear) {
-              if (index % 12 === 0) {
-                const start = index;
-                const end = index + 12;
-                return `${start}-${end}`;
-              }
-              return '';
-            }
-            // Year selected view: show month names
-            if (labels[index]) {
-              return labels[index];
-            }
-            return '';
-          },
+          autoSkip: true,
+          maxTicksLimit: 24,
         },
       },
     },
@@ -408,95 +369,158 @@ export default function PerformancePage() {
 
         {/* Filter Controls */}
         <div className="mb-6">
-          <div className="flex gap-4 items-end mb-3">
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold">
-                Year
-              </label>
-              <select
-                value={selectedYear ?? ''}
-                onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-4 py-2 bg-[var(--glass-secondary)] border border-[rgba(100,116,139,0.3)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--neon-blue)] transition-colors"
-              >
-                <option value="">All Years</option>
-                {availableYears.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
+          <div className="glass-card !p-5 !mb-0 relative overflow-hidden">
+            {/* Decorative gradient glow */}
+            <div
+              className="absolute -top-24 -right-24 w-64 h-64 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(59,130,246,0.18) 0%, transparent 70%)",
+              }}
+            />
+            <div
+              className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)",
+              }}
+            />
+
+            <div className="relative flex flex-wrap gap-4 items-end">
+              {/* Year */}
+              <div className="flex flex-col gap-2 min-w-[160px] flex-1">
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-semibold">
+                  <Calendar className="w-3.5 h-3.5 text-[var(--neon-cyan)]" />
+                  Year
+                </label>
+                <div className="relative group">
+                  <select
+                    value={selectedYear ?? ''}
+                    onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full appearance-none pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-medium focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 cursor-pointer"
+                  >
+                    <option value="">All Years</option>
+                    {availableYears.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[rgba(6,182,212,0.18)] to-[rgba(59,130,246,0.18)] border border-[rgba(6,182,212,0.3)]">
+                      <CalendarDays className="w-4 h-4 text-[var(--neon-cyan)]" />
+                    </div>
+                  </div>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-blue)] transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Month */}
+              <div className="flex flex-col gap-2 min-w-[160px] flex-1">
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-semibold">
+                  <Layers className="w-3.5 h-3.5 text-[var(--neon-purple)]" />
+                  Month
+                </label>
+                <div className="relative group">
+                  <select
+                    value={selectedMonth ?? ''}
+                    onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full appearance-none pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-medium focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 cursor-pointer"
+                  >
+                    <option value="">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[rgba(139,92,246,0.18)] to-[rgba(59,130,246,0.18)] border border-[rgba(139,92,246,0.3)]">
+                      <CalendarDays className="w-4 h-4 text-[var(--neon-purple)]" />
+                    </div>
+                  </div>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-blue)] transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {/* Initial Balance */}
+              <div className="flex flex-col gap-2 min-w-[180px] flex-1">
+                <label className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-semibold">
+                  <Wallet className="w-3.5 h-3.5 text-[var(--neon-emerald)]" />
+                  Initial Balance
+                </label>
+                <div className="relative group">
+                  <input
+                    type="number"
+                    value={initialBalance}
+                    onChange={(e) => setInitialBalance(Math.max(1, parseInt(e.target.value) || 1000))}
+                    className="w-full appearance-none pl-11 pr-12 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 mono"
+                    min="1"
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
+                    <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[rgba(16,185,129,0.18)] to-[rgba(6,182,212,0.18)] border border-[rgba(16,185,129,0.3)]">
+                      <DollarSign className="w-4 h-4 text-[var(--neon-emerald)]" />
+                    </div>
+                  </div>
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-xs font-semibold text-[var(--text-tertiary)] uppercase">
+                    USD
+                  </span>
+                </div>
+              </div>
+
+              {/* Clear Filters */}
+              {(selectedYear || selectedMonth) && (
+                <button
+                  onClick={() => {
+                    setSelectedYear(null);
+                    setSelectedMonth(null);
+                  }}
+                  className="px-4 py-2.5 bg-gradient-to-r from-[rgba(239,68,68,0.12)] to-[rgba(139,92,246,0.12)] border border-[rgba(239,68,68,0.35)] rounded-xl text-[var(--text-primary)] text-sm font-semibold hover:from-[rgba(239,68,68,0.22)] hover:to-[rgba(139,92,246,0.22)] hover:border-[var(--neon-ruby)] hover:shadow-[0_0_20px_rgba(239,68,68,0.25)] transition-all duration-200 flex items-center gap-2 self-end"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>Reset</span>
+                </button>
+              )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold">
-                Month
-              </label>
-              <select
-                value={selectedMonth ?? ''}
-                onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)}
-                className="px-4 py-2 bg-[var(--glass-secondary)] border border-[rgba(100,116,139,0.3)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--neon-blue)] transition-colors"
-              >
-                <option value="">All Months</option>
-                <option value="1">January</option>
-                <option value="2">February</option>
-                <option value="3">March</option>
-                <option value="4">April</option>
-                <option value="5">May</option>
-                <option value="6">June</option>
-                <option value="7">July</option>
-                <option value="8">August</option>
-                <option value="9">September</option>
-                <option value="10">October</option>
-                <option value="11">November</option>
-                <option value="12">December</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <label className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold">
-                Initial Balance ($)
-              </label>
-              <input
-                type="number"
-                value={initialBalance}
-                onChange={(e) => setInitialBalance(Math.max(1, parseInt(e.target.value) || 1000))}
-                className="px-4 py-2 bg-[var(--glass-secondary)] border border-[rgba(100,116,139,0.3)] rounded-lg text-[var(--text-primary)] focus:outline-none focus:border-[var(--neon-blue)] transition-colors"
-                min="1"
-              />
-            </div>
-
+            {/* Filter Status */}
             {(selectedYear || selectedMonth) && (
-              <button
-                onClick={() => {
-                  setSelectedYear(null);
-                  setSelectedMonth(null);
-                }}
-                className="px-4 py-2 bg-[var(--glass-secondary)] border border-[rgba(100,116,139,0.3)] rounded-lg text-[var(--text-primary)] hover:bg-[rgba(59,130,246,0.2)] hover:border-[var(--neon-blue)] transition-colors flex items-center gap-2"
-              >
-                <span>🔄</span>
-                <span>Clear Filters</span>
-              </button>
+              <div className="relative mt-4 pt-4 border-t border-[rgba(100,116,139,0.15)] flex items-center gap-2 text-sm">
+                <span className="text-[var(--text-tertiary)]">Showing data for:</span>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[rgba(59,130,246,0.12)] border border-[rgba(59,130,246,0.3)] text-[var(--neon-cyan)] font-semibold text-xs">
+                  <Activity className="w-3.5 h-3.5" />
+                  {selectedMonth && selectedYear ?
+                    `${['','January','February','March','April','May','June','July','August','September','October','November','December'][selectedMonth]} ${selectedYear}` :
+                    selectedYear ? `Year ${selectedYear}` :
+                    selectedMonth ? `${['','January','February','March','April','May','June','July','August','September','October','November','December'][selectedMonth]}` : 'All Data'
+                  }
+                </span>
+              </div>
             )}
           </div>
-
-          {/* Filter Status */}
-          {(selectedYear || selectedMonth) && (
-            <div className="text-sm text-[var(--text-tertiary)]">
-              📊 Showing data for: {' '}
-              <span className="text-[var(--neon-cyan)] font-semibold">
-                {selectedMonth && selectedYear ? 
-                  `${['','January','February','March','April','May','June','July','August','September','October','November','December'][selectedMonth]} ${selectedYear}` :
-                  selectedYear ? `Year ${selectedYear}` :
-                  selectedMonth ? `Month ${selectedMonth}` : 'All Data'
-                }
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Equity Summary */}
         <div className="grid grid-cols-3 gap-5 mb-6">
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-cyan)] before:to-[var(--neon-blue)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(6,182,212,0.15)] to-[rgba(59,130,246,0.15)] border border-[rgba(6,182,212,0.25)]">
+              <Wallet className="w-5 h-5 text-[var(--neon-cyan)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Starting Balance
             </div>
@@ -507,6 +531,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-green)] before:to-[var(--neon-cyan)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(16,185,129,0.15)] to-[rgba(6,182,212,0.15)] border border-[rgba(16,185,129,0.25)]">
+              <TrendingUp className="w-5 h-5 text-[var(--neon-emerald)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Final Equity
             </div>
@@ -517,6 +544,13 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-purple)] before:to-[var(--neon-green)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(139,92,246,0.15)] to-[rgba(16,185,129,0.15)] border border-[rgba(139,92,246,0.25)]">
+              {finalEquity >= initialBalance ? (
+                <Trophy className="w-5 h-5 text-[var(--neon-purple)]" />
+              ) : (
+                <ArrowDownRight className="w-5 h-5 text-[var(--neon-ruby)]" />
+              )}
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Total Gain
             </div>
@@ -530,6 +564,9 @@ export default function PerformancePage() {
         {/* Performance Stats */}
         <div className="grid grid-cols-4 gap-5 mb-6">
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
+              <TrendingUp className="w-5 h-5 text-[var(--neon-blue)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Total Return
             </div>
@@ -540,6 +577,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
+              <Target className="w-5 h-5 text-[var(--neon-blue)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Win Rate
             </div>
@@ -550,6 +590,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
+              <Scale className="w-5 h-5 text-[var(--neon-blue)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Profit Factor
             </div>
@@ -562,6 +605,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
+            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
+              <Gauge className="w-5 h-5 text-[var(--neon-blue)]" />
+            </div>
             <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
               Sharpe Ratio
             </div>
@@ -657,7 +703,9 @@ export default function PerformancePage() {
         {/* Key Metrics */}
         <div className="grid grid-cols-3 gap-5 mb-6">
           <div className="glass-card !p-5 !mb-0 text-center">
-            <div className="text-5xl mb-3">🎯</div>
+            <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[rgba(16,185,129,0.18)] to-[rgba(6,182,212,0.18)] border border-[rgba(16,185,129,0.3)]">
+              <TrendingUp className="w-7 h-7 text-[var(--neon-emerald)]" />
+            </div>
             <div className="text-sm text-[var(--text-tertiary)] mb-2">
               Average Win
             </div>
@@ -667,7 +715,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 text-center">
-            <div className="text-5xl mb-3">⚠️</div>
+            <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[rgba(239,68,68,0.18)] to-[rgba(139,92,246,0.18)] border border-[rgba(239,68,68,0.3)]">
+              <TrendingDown className="w-7 h-7 text-[var(--neon-ruby)]" />
+            </div>
             <div className="text-sm text-[var(--text-tertiary)] mb-2">
               Average Loss
             </div>
@@ -677,7 +727,9 @@ export default function PerformancePage() {
           </div>
 
           <div className="glass-card !p-5 !mb-0 text-center">
-            <div className="text-5xl mb-3">📊</div>
+            <div className="flex items-center justify-center w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[rgba(239,68,68,0.18)] to-[rgba(251,191,36,0.18)] border border-[rgba(251,191,36,0.3)]">
+              <Activity className="w-7 h-7 text-[var(--neon-amber)]" />
+            </div>
             <div className="text-sm text-[var(--text-tertiary)] mb-2">
               Max Drawdown
             </div>

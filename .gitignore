@@ -58,3 +58,28 @@ desktop.ini
 # Logs
 *.log
 logs/
+# Added by code-review-graph
+.code-review-graph/
+
+# AI agent / skills / IDE tooling configs (local only)
+.agents/
+.claude/
+.gemini/
+.qoder/
+.kiro/skills/
+.mcp.json
+mcp.json
+.opencode.json
+CLAUDE.md
+
+# Windows reserved-name junk (accidental redirects to NUL)
+nul
+*/nul
+
+# Market structure state snapshots (runtime output)
+**/MarketStructure_State*.txt
+
+# Local screenshots & archives
+screenshot_*.png
+*.zip
+

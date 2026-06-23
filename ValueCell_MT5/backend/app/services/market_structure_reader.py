@@ -17,11 +17,24 @@ logger = logging.getLogger(__name__)
 class MarketStructureReader:
     """Reads market structure state from LLHHBOSData CSV (auto-updated by MT5)."""
 
-    def __init__(self):
+    # Broker timezone offset from UTC (default 3 = GMT+3, matching MT5_BROKER_TIMEZONE_OFFSET)
+    BROKER_OFFSET_HOURS: int = 3
+
+    def __init__(self, broker_offset_hours: int | None = None):
         backend_dir = Path(__file__).parent.parent.parent
         project_root = backend_dir.parent
         self.backtest_dir = project_root.parent / "Backtest_result"
         logger.info(f"[MarketStructureReader] Backtest dir: {self.backtest_dir}")
+
+        # Allow caller to override broker offset; fall back to config if available
+        if broker_offset_hours is not None:
+            self.BROKER_OFFSET_HOURS = broker_offset_hours
+        else:
+            try:
+                from app.config import get_settings
+                self.BROKER_OFFSET_HOURS = get_settings().MT5_BROKER_TIMEZONE_OFFSET
+            except Exception:
+                pass  # use class default
 
     # ------------------------------------------------------------------
     # Public API
@@ -149,7 +162,7 @@ class MarketStructureReader:
     # ------------------------------------------------------------------
 
     def _get_latest_csv(self) -> Optional[Path]:
-        """Find the latest LLHHBOSData CSV file."""
+        """Find the latest LLHHBOSData CSV file by date in filename."""
         try:
             if not self.backtest_dir.exists():
                 logger.warning(f"[MarketStructureReader] Dir not found: {self.backtest_dir}")
@@ -158,8 +171,12 @@ class MarketStructureReader:
             if not csv_files:
                 logger.warning("[MarketStructureReader] No LLHHBOSData CSV files found")
                 return None
-            latest = max(csv_files, key=lambda p: p.stat().st_mtime)
-            logger.info(f"[MarketStructureReader] Using file: {latest.name}")
+            import re
+            def extract_date(path: Path) -> str:
+                match = re.search(r'(\d{4}-\d{2}-\d{2})', path.stem)
+                return match.group(1) if match else '0000-00-00'
+            latest = max(csv_files, key=extract_date)
+            logger.info(f"[MarketStructureReader] Using file: {latest.name} (date: {extract_date(latest)})")
             return latest
         except Exception as e:
             logger.error(f"[MarketStructureReader] Error finding CSV: {e}")
@@ -189,6 +206,9 @@ class MarketStructureReader:
 
             reader = csv.DictReader(lines[header_idx:])
             seen: set = set()
+            # Track the earliest HH/LL event per (price, timeframe) so we can keep only
+            # the OLDEST (first) touch of each level (avoids duplicate overlapping lines).
+            hhll_earliest: Dict[tuple, int] = {}  # key -> index in events list
 
             for row in reader:
                 event_type = row.get("Type", "").strip()
@@ -206,9 +226,12 @@ class MarketStructureReader:
                 if status not in ("Accepted", "Confirmed"):
                     continue
 
-                # Parse time as UTC
+                # Parse time: CSV stores broker/server time (TimeCurrent()).
+                # Convert to true UTC by subtracting the broker offset.
                 try:
-                    event_time = datetime.strptime(time_str, "%Y.%m.%d %H:%M:%S").replace(
+                    from datetime import timedelta
+                    event_time_naive = datetime.strptime(time_str, "%Y.%m.%d %H:%M:%S")
+                    event_time = (event_time_naive - timedelta(hours=self.BROKER_OFFSET_HOURS)).replace(
                         tzinfo=timezone.utc
                     )
                 except ValueError:
@@ -220,11 +243,20 @@ class MarketStructureReader:
                 except (ValueError, TypeError):
                     continue
 
-                # Dedup key: include timeframe
-                key = (event_type, price, int(event_time.timestamp()), timeframe)
-                if key in seen:
-                    continue
-                seen.add(key)
+                # Dedup logic:
+                # - BoS/CHoCH: dedup by (type, price, timestamp, timeframe) — each break is unique
+                # - HH/LL: dedup by (price, timeframe) ONLY — same level touched multiple times
+                #   should only draw ONE line. Rows are later sorted oldest → newest, so for
+                #   HH/LL we OVERWRITE earlier rows in `hhll_latest` to keep the NEWEST touch.
+                is_hh_ll = event_type in ("HH", "LL")
+                if is_hh_ll:
+                    # Handled by hhll_latest dict after the loop
+                    pass
+                else:
+                    dedup_key = (event_type, price, int(event_time.timestamp()), timeframe)
+                    if dedup_key in seen:
+                        continue
+                    seen.add(dedup_key)
 
                 # Parse previous price (useful for HH/LL chain)
                 prev_price = 0.0
@@ -254,6 +286,20 @@ class MarketStructureReader:
                         "prev_price": prev_price,
                     }
                 )
+                # For HH/LL, record earliest index per (price, timeframe) — oldest wins
+                if is_hh_ll:
+                    hhll_key = (price, timeframe)
+                    if hhll_key not in hhll_earliest:
+                        hhll_earliest[hhll_key] = len(events) - 1
+
+            # For HH/LL, keep only the earliest occurrence per (price, timeframe).
+            # All non-HH/LL events are kept as-is.
+            if hhll_earliest:
+                keep_indices = set(hhll_earliest.values())
+                events = [
+                    e for i, e in enumerate(events)
+                    if e["type"] not in ("HH", "LL") or i in keep_indices
+                ]
 
             # Sort oldest → newest
             events.sort(key=lambda e: e["time"])

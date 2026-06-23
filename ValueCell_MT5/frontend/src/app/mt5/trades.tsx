@@ -44,12 +44,16 @@ export default function TradesPage() {
   const [showEMA200, setShowEMA200] = useState(true);
   const [activeTimeframe, setActiveTimeframe] = useState("M15"); // Timeframe state
   const [chartCandles, setChartCandles] = useState<Array<{time: number, open: number, high: number, low: number, close: number}>>([]);
+  // CHART TIMEZONE DEFAULT = UTC.
+  // When the page first opens, UTC is always selected (per requirement).
+  // The user can manually switch to 'broker' or 'local'; once switched, that
+  // choice is preserved across data refreshes. UTC stays default until then.
   const [chartTimezone, setChartTimezone] = useState<{broker_offset_hours: number, display_mode: string, candle_times_are_utc: boolean}>({
     broker_offset_hours: 3,
-    display_mode: 'broker', // Default to Broker Time instead of UTC
+    display_mode: 'utc', // Default to UTC on every page open
     candle_times_are_utc: true
   });
-  
+
   // Track if user has manually changed timezone (don't override if true)
   const userChangedTimezone = useRef(false);
   
@@ -111,11 +115,11 @@ export default function TradesPage() {
     chartTimezoneRef.current = chartTimezone;
   }, [chartTimezone]);
   
-  // Load market structure lines (2 weeks lookback to include BoS/CHoCH)
-  const { data: structureLines } = useMarketStructureLines(336); // 14 days = 336 hours
+  // Load market structure lines (180 days lookback to cover Jan-Jun 2026 chart range)
+  const { data: structureLines } = useMarketStructureLines(4320); // 180 days = 4320 hours
 
-  // Load session zones (previous day's Asia open through the live session)
-  const { data: sessionZonesData } = useSessionZones(2);
+  // Load session zones (180 days lookback, aligned with chart range)
+  const { data: sessionZonesData } = useSessionZones(180);
 
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine);
@@ -130,8 +134,7 @@ export default function TradesPage() {
       console.log('✅ Initializing chart...');
       try {
         const chart = createChart(chartContainerRef.current, {
-          width: chartContainerRef.current.clientWidth,
-          height: 500,
+          autoSize: true, // Auto-fit chart to container size via ResizeObserver
           layout: {
             background: { color: "rgba(17, 24, 39, 0.3)" },
             textColor: "#cbd5e1",
@@ -162,9 +165,9 @@ export default function TradesPage() {
             borderColor: "rgba(100, 116, 139, 0.3)",
             timeVisible: true,
             secondsVisible: false,
-            rightOffset: 0,
-            barSpacing: 6,
-            minBarSpacing: 3,
+            rightOffset: 5,
+            barSpacing: 8,
+            minBarSpacing: 4,
             fixLeftEdge: false,
             fixRightEdge: false,
             lockVisibleTimeRangeOnResize: false,
@@ -226,6 +229,11 @@ export default function TradesPage() {
           console.warn("Could not attach session zones primitive:", e);
         }
         
+        // Re-render structure labels whenever the user pans/zooms the chart
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+          renderStructureLabelsOverlay(structureLabelsRef.current);
+        });
+
         console.log('✅ Chart initialized successfully');
         console.log('chartRef.current:', !!chartRef.current);
         console.log('candlestickSeriesRef.current:', !!candlestickSeriesRef.current);
@@ -269,22 +277,12 @@ export default function TradesPage() {
   const loadChartData = async (forceRefresh = false) => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-      console.log('Fetching chart data from:', `${apiUrl}/trading/chart/data`);
-      
-      // Calculate candle count based on timeframe to show approximately 10 days of data
-      const candleCountMap: { [key: string]: number } = {
-        M15: 960,  // 10 days × 24 hours × 4 candles/hour
-        M30: 480,  // 10 days × 24 hours × 2 candles/hour
-        H1: 240,   // 10 days × 24 hours
-        H4: 60,    // 10 days × 6 candles/day
-        D1: 30,    // 30 days
-      };
-      
-      const count = candleCountMap[activeTimeframe] || 960;
-      
-      const response = await fetch(
-        `${apiUrl}/trading/chart/data?symbol=XAUUSD&timeframe=${activeTimeframe}&count=${count}&ema=200`
-      );
+
+      // ponytail: chart reads CSV from Backtest_result (Jan 2026+), full 6 months
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2026-01-01`;
+      console.log('Fetching chart data from:', chartUrl);
+
+      const response = await fetch(chartUrl);
       
       console.log('Chart API response status:', response.status, response.ok);
       
@@ -353,12 +351,28 @@ export default function TradesPage() {
             candlestickSeriesRef.current.setData(processedCandles);
             setChartCandles(processedCandles);
             
-            // Store timezone info from API (only if user hasn't manually changed it)
-            if (data.timezone && !userChangedTimezone.current) {
-              setChartTimezone(data.timezone);
-              console.log('🌍 Chart timezone config from API:', data.timezone);
-            } else if (userChangedTimezone.current) {
-              console.log('🚫 Skipping timezone update from API (user manually changed it)');
+            // Store timezone info from API.
+            // IMPORTANT: `display_mode` defaults to 'utc' and is NOT overridden by the
+            // backend config on first load — UTC must be the default when the page opens.
+            // We only pull `broker_offset_hours` (needed when user switches to broker mode).
+            // If the user has manually picked a mode, we keep their choice entirely.
+            if (data.timezone) {
+              if (userChangedTimezone.current) {
+                // Keep user's manually chosen mode, just refresh broker offset
+                setChartTimezone(prev => ({
+                  ...prev,
+                  broker_offset_hours: data.timezone.broker_offset_hours ?? prev.broker_offset_hours,
+                }));
+                console.log('🚫 Skipping display_mode override (user manually changed it); refreshed broker offset only');
+              } else {
+                // Default path: force UTC as the display mode, only adopt broker offset from API
+                setChartTimezone(prev => ({
+                  ...prev,
+                  broker_offset_hours: data.timezone.broker_offset_hours ?? prev.broker_offset_hours,
+                  display_mode: 'utc',
+                }));
+                console.log('🌍 Defaulting chart display_mode to UTC (broker offset from API:', data.timezone.broker_offset_hours, ')');
+              }
             }
           // Provide candle times so session bands snap to real bars (gold has a
           // midnight market gap, so some session boundaries have no candle).
@@ -407,6 +421,64 @@ export default function TradesPage() {
 
   // Guard to prevent concurrent executions
   const overlayGuardRef = useRef(false);
+
+  // Store the latest labels so they can be re-rendered when the user pans/zooms
+  const structureLabelsRef = useRef<Array<{
+    time: number;
+    price: number;
+    color: string;
+    text: string;
+    isResistance: boolean;
+  }>>([]);
+
+  // Render structure labels as HTML overlay on the chart container.
+  // lightweight-charts v5 has no setMarkers, so we position <span> elements
+  // using series.priceToCoordinate() and series.timeToCoordinate().
+  const renderStructureLabelsOverlay = (
+    labels: Array<{
+      time: number;
+      price: number;
+      color: string;
+      text: string;
+      isResistance: boolean;
+    }>,
+  ) => {
+    structureLabelsRef.current = labels;
+    const overlayEl = document.getElementById('structure-labels-overlay');
+    if (!overlayEl || !chartRef.current || !candlestickSeriesRef.current) return;
+
+    overlayEl.innerHTML = '';
+    const series = candlestickSeriesRef.current;
+
+    for (const lbl of labels) {
+      // timeToCoordinate is on the timeScale, not on the series
+      const x = chartRef.current.timeScale().timeToCoordinate(lbl.time as any);
+      const y = series.priceToCoordinate(lbl.price);
+      if (x === null || y === null) continue;
+
+      const span = document.createElement('span');
+      span.textContent = lbl.text;
+      span.style.position = 'absolute';
+      // Translate to center horizontally and offset vertically from the line
+      span.style.transform = 'translateX(-50%)';
+      // Resistance labels above the line, support labels below
+      span.style.top = lbl.isResistance
+        ? `${Math.max(2, (y as number) - 18)}px`
+        : `${(y as number) + 4}px`;
+      span.style.left = `${x as number}px`;
+      span.style.color = lbl.color;
+      span.style.fontSize = '10px';
+      span.style.fontWeight = '600';
+      span.style.fontFamily = 'monospace';
+      span.style.background = 'rgba(17, 24, 39, 0.85)';
+      span.style.padding = '1px 5px';
+      span.style.borderRadius = '3px';
+      span.style.border = `1px solid ${lbl.color}`;
+      span.style.whiteSpace = 'nowrap';
+      span.style.pointerEvents = 'none';
+      overlayEl.appendChild(span);
+    }
+  };
 
   const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
     if (!chartRef.current || !showStructure || !structureLines) return;
@@ -466,7 +538,21 @@ export default function TradesPage() {
     }
 
     // Helper function to create horizontal line from timestamp
-    // Creates line from event timestamp, or from first visible candle if event is older
+    // lineType:
+    //   'HH'  - Higher High: starts at formation, stops when candle.high > price
+    //   'LL'  - Lower Low:   starts at formation, stops when candle.low < price
+    //   'BOS_CHOCH' - BoS/CHoCH: starts at level formation time, ends at break event time
+    //                  (line goes from LEFT → the break candle, not beyond)
+    // Collect label info here; will be rendered as HTML overlay on candlestick series
+    // (setMarkers does not exist in lightweight-charts v5)
+    const structureLabels: Array<{
+      time: number;
+      price: number;
+      color: string;
+      text: string;
+      isResistance: boolean;
+    }> = [];
+
     const createHorizontalLine = (
       price: number,
       timestamp: number,
@@ -474,7 +560,8 @@ export default function TradesPage() {
       lineWidth: number,
       lineStyle: number,
       label: string,
-      lineType?: 'HH' | 'LL' // HH = Higher High (stops when high > price), LL = Lower Low (stops when low < price)
+      lineType?: 'HH' | 'LL' | 'BOS_CHOCH',
+      levelFormationTime?: number, // For BoS/CHoCH: when the broken level was first formed (seconds)
     ) => {
       try {
         // Get visible time range from chart
@@ -483,52 +570,81 @@ export default function TradesPage() {
         
         // CRITICAL: Check if timestamp is in milliseconds or seconds
         const isMilliseconds = timestamp > 10000000000;
-        const startTimeSeconds = isMilliseconds ? Math.floor(timestamp / 1000) : timestamp;
+        const eventTimeSeconds = isMilliseconds ? Math.floor(timestamp / 1000) : timestamp;
         
-        // Use last visible candle time instead of "now" so line stops at last candle
-        let endTimeSeconds = Math.floor(Date.now() / 1000);
-        let firstVisibleTime = startTimeSeconds;
+        // Determine start and end time based on line type
+        let startTimeSeconds: number;
+        let endTimeSeconds: number;
         
-        if (visibleRange) {
-          firstVisibleTime = typeof visibleRange.from === 'number' 
-            ? visibleRange.from 
-            : visibleRange.from as number;
+        if (lineType === 'BOS_CHOCH') {
+          // BoS/CHoCH: line from level formation → break event
+          // startTime = when the level was first formed (from HH/LL data)
+          // endTime = the break event time
+          startTimeSeconds = levelFormationTime ?? eventTimeSeconds;
+          endTimeSeconds = eventTimeSeconds;
           
-          const lastVisibleTime = typeof visibleRange.to === 'number'
-            ? visibleRange.to
-            : visibleRange.to as number;
-          
-          endTimeSeconds = lastVisibleTime;
-          
-          console.log(`Line at ${price}: Event=${startTimeSeconds}, Visible=[${firstVisibleTime}, ${lastVisibleTime}]`);
-          console.log(`  Event date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
-          console.log(`  First visible: ${new Date(firstVisibleTime * 1000).toISOString()}`);
-          console.log(`  Last visible: ${new Date(lastVisibleTime * 1000).toISOString()}`);
-          
-          // SOLUTION: If event is before visible range, clip to first visible candle
-          // This way the line still shows (starting from left edge of chart)
-          if (startTimeSeconds < firstVisibleTime) {
-            console.log(`  ⚠️ Event is before visible range, clipping to first visible candle`);
-          } else if (startTimeSeconds >= firstVisibleTime && startTimeSeconds <= lastVisibleTime) {
-            console.log(`  ✅ Event is WITHIN visible range - line will start from event time`);
-          } else {
-            console.log(`  ⚠️ Event is after visible range (future?) - using event time anyway`);
+          console.log(`📏 BoS/CHoCH line at ${price}: formation=${startTimeSeconds}, break=${endTimeSeconds}`);
+          console.log(`  Formation date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
+          console.log(`  Break date:     ${new Date(endTimeSeconds * 1000).toISOString()}`);
+        } else {
+          // HH/LL or generic line: starts at event time, extends right
+          startTimeSeconds = eventTimeSeconds;
+          // Use last visible candle time instead of "now" so line stops at last candle
+          endTimeSeconds = Math.floor(Date.now() / 1000);
+        }
+        
+        // For HH/LL/generic: use visible range for end time clipping
+        if (lineType !== 'BOS_CHOCH') {
+          let firstVisibleTime = startTimeSeconds;
+          if (visibleRange) {
+            firstVisibleTime = typeof visibleRange.from === 'number' 
+              ? visibleRange.from 
+              : visibleRange.from as number;
+            
+            const lastVisibleTime = typeof visibleRange.to === 'number'
+              ? visibleRange.to
+              : visibleRange.to as number;
+            
+            endTimeSeconds = lastVisibleTime;
+            
+            console.log(`Line at ${price}: Event=${startTimeSeconds}, Visible=[${firstVisibleTime}, ${lastVisibleTime}]`);
+            console.log(`  Event date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
+            console.log(`  First visible: ${new Date(firstVisibleTime * 1000).toISOString()}`);
+            console.log(`  Last visible: ${new Date(lastVisibleTime * 1000).toISOString()}`);
+            
+            // If event is before visible range, clip to first visible candle
+            if (startTimeSeconds < firstVisibleTime) {
+              console.log(`  ⚠️ Event is before visible range, clipping to first visible candle`);
+            } else if (startTimeSeconds >= firstVisibleTime && startTimeSeconds <= lastVisibleTime) {
+              console.log(`  ✅ Event is WITHIN visible range - line will start from event time`);
+            } else {
+              console.log(`  ⚠️ Event is after visible range (future?) - using event time anyway`);
+            }
           }
         }
         
         // Find the breaking candle for HH/LL lines
         // HH: stops when a candle's high > HH price (bullish break)
         // LL: stops when a candle's low < LL price (bearish break)
+        // If NOT broken, limit line to 15 candles after formation (short tail)
         if (lineType === 'HH' || lineType === 'LL') {
           const candles = candlesToUse;
+          let candlesAfterStart = 0;
           for (const candle of candles) {
             if (candle.time > startTimeSeconds) {
+              candlesAfterStart++;
               const breaks = lineType === 'HH' 
                 ? candle.high > price 
                 : candle.low < price;
               if (breaks) {
                 endTimeSeconds = candle.time;
                 console.log(`  🛑 ${lineType} broken at ${candle.time} (price: ${lineType === 'HH' ? candle.high : candle.low}), line stops here`);
+                break;
+              }
+              // Not broken yet — cap at 15 candles after formation
+              if (candlesAfterStart >= 20) {
+                endTimeSeconds = candle.time;
+                console.log(`  📏 ${lineType} not broken, capping line at 20 candles (${endTimeSeconds})`);
                 break;
               }
             }
@@ -612,17 +728,43 @@ export default function TradesPage() {
           lineStyle,
           priceLineVisible: false,
           lastValueVisible: false, // Remove right-side price badges to prevent overlap with candles
-          title: label,            // Label shown on left side only
+          // No title — label is placed in the middle of the line via marker instead
         };
         
-        // Create line data from event time (or clipped to first visible) to breaking candle or end of range
-        const lineData = [
+        // Create line data from event time to end
+        const lineData: Array<{ time: number; value: number }> = [
           { time: actualStartTime, value: price }, // Start point
-          { time: endTimeSeconds, value: price },   // End point (breaking candle or last visible)
         ];
+        lineData.push({ time: endTimeSeconds, value: price }); // End point
 
         const lineSeries = chartRef.current!.addSeries(LineSeries, lineOptions);
         lineSeries.setData(lineData);
+
+        // Collect label info for HTML overlay in the middle of the line
+        // setMarkers does not exist in lightweight-charts v5, so we render
+        // labels as absolutely-positioned HTML spans on the chart container.
+        if (label && candlesToUse.length > 0) {
+          const rawMidTime = Math.floor((actualStartTime + endTimeSeconds) / 2);
+          // Find the candle closest to the midpoint (clamped between start/end)
+          let nearestCandleTime = actualStartTime;
+          let nearestDist = Infinity;
+          for (const candle of candlesToUse) {
+            if (candle.time < actualStartTime || candle.time > endTimeSeconds) continue;
+            const dist = Math.abs(candle.time - rawMidTime);
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              nearestCandleTime = candle.time;
+            }
+          }
+          structureLabels.push({
+            time: nearestCandleTime,
+            price,
+            color,
+            text: label,
+            isResistance: lineType !== 'LL',
+          });
+        }
+
         structureSeriesRef.current.push(lineSeries);
         
         console.log(`  ✅ Line created from ${actualStartTime} to ${endTimeSeconds}`);
@@ -633,51 +775,133 @@ export default function TradesPage() {
       }
     };
 
+    // Helper: find when a price level was first formed in HH/LL data.
+    // IMPORTANT: We look up the BoS/CHoCH's OWN price (the level that the line is
+    // drawn at), NOT PreviousPrice. The BoS line is drawn at `bos.price`, so its
+    // formation time must be when that exact level first appeared in HH/LL data.
+    // - BoS/CHoCH Bullish at price X → the level is an HH (higher high) → search HH points
+    // - BoS/CHoCH Bearish at price X → the level is an LL (lower low)  → search LL points
+    // We keep the OLDEST (earliest) occurrence (first time that level was formed).
+    const findLevelFormationTime = (
+      levelPrice: number,
+      direction: string, // 'BULLISH' or 'BEARISH'
+    ): number | undefined => {
+      // Bullish BoS/CHoCH forms an HH level, so look in HH points
+      // Bearish BoS/CHoCH forms an LL level, so look in LL points
+      const isBullish = direction === 'BULLISH';
+      const levelPoints = isBullish
+        ? (structureLines.hh_points ?? [])
+        : (structureLines.ll_points ?? []);
+
+      // Find the matching price level (allow small tolerance for floating point)
+      const tolerance = 0.05;
+      let matchTime: number | undefined;
+
+      for (const point of levelPoints) {
+        if (Math.abs(point.price - levelPrice) < tolerance) {
+          const pointTimeSec = point.timestamp > 10000000000
+            ? Math.floor(point.timestamp / 1000)
+            : point.timestamp;
+          // Keep the oldest (earliest) formation time
+          if (matchTime === undefined || pointTimeSec < matchTime) {
+            matchTime = pointTimeSec;
+          }
+        }
+      }
+
+      if (matchTime !== undefined) {
+        console.log(`  🔍 Level ${levelPrice.toFixed(2)} formed at ${matchTime} (${new Date(matchTime * 1000).toISOString()}) [searched ${isBullish ? 'HH' : 'LL'} points]`);
+      } else {
+        console.log(`  ⚠️ Could not find formation time for level ${levelPrice.toFixed(2)} in ${isBullish ? 'HH' : 'LL'} points`);
+      }
+
+      return matchTime;
+    };
+
     // Add BoS lines
     let bosAdded = 0;
     structureLines.bos_lines?.forEach((bos, index) => {
-      console.log(`Adding BoS #${index + 1}:`, { price: bos.price, time: bos.time, timestamp: bos.timestamp });
+      console.log(`Adding BoS #${index + 1}:`, { price: bos.price, time: bos.time, timestamp: bos.timestamp, prevPrice: bos.previous_price });
       const color = bos.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       // timestamp is already in milliseconds from backend
       const eventTime = bos.timestamp;
+      // Find when this BoS's OWN level was first formed (line is drawn at bos.price,
+      // so its start must be when bos.price first appeared as HH/LL)
+      const formationTime = bos.price
+        ? findLevelFormationTime(bos.price, bos.direction)
+        : undefined;
       if (createHorizontalLine(
         bos.price,
         eventTime,
         color,
         2,
         LineStyle.Solid,
-        `BoS ${bos.price.toFixed(2)}`
+        `BoS ${bos.price.toFixed(2)}`,
+        'BOS_CHOCH',
+        formationTime
       )) {
         bosAdded++;
-        console.log(`✅ BoS #${index + 1} added at ${eventTime}ms (${bos.time})`);
+        console.log(`✅ BoS #${index + 1} added: formation→${formationTime ?? '?'} to break→${eventTime}`);
       }
     });
 
     // Add CHoCH lines
     let chochAdded = 0;
     structureLines.choch_lines?.forEach((choch, index) => {
-      console.log(`Adding CHoCH #${index + 1}:`, { price: choch.price, time: choch.time, timestamp: choch.timestamp });
+      console.log(`Adding CHoCH #${index + 1}:`, { price: choch.price, time: choch.time, timestamp: choch.timestamp, prevPrice: choch.previous_price });
       const eventTime = choch.timestamp;
+      const formationTime = choch.price
+        ? findLevelFormationTime(choch.price, choch.direction)
+        : undefined;
+      const color = choch.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       if (createHorizontalLine(
         choch.price,
         eventTime,
-        '#a855f7',
+        color,
         2,
         LineStyle.Dashed,
-        `CHoCH ${choch.price.toFixed(2)}`
+        `CHoCH ${choch.price.toFixed(2)}`,
+        'BOS_CHOCH',
+        formationTime
       )) {
         chochAdded++;
-        console.log(`✅ CHoCH #${index + 1} added at ${eventTime}ms (${choch.time})`);
+        console.log(`✅ CHoCH #${index + 1} added: formation→${formationTime ?? '?'} to break→${eventTime}`);
       }
     });
 
     // Add HH lines (with H1 vs M15 differentiation)
+    // Deduplication (Opsi A): hide HH/LL if their price matches any BoS/CHoCH price,
+    // because the BoS/CHoCH line already represents that level (more recent event).
+    const bosChochPrices = new Set<number>();
+    const PRICE_TOLERANCE = 0.05;
+    const allBos = structureLines.bos_lines ?? [];
+    const allChoch = structureLines.choch_lines ?? [];
+    [...allBos, ...allChoch].forEach((evt) => {
+      if (evt.price != null) {
+        bosChochPrices.add(Math.round(evt.price / PRICE_TOLERANCE));
+      }
+    });
+    const priceMatchesBosChoch = (price: number): boolean => {
+      if (bosChochPrices.size === 0) return false;
+      const key = Math.round(price / PRICE_TOLERANCE);
+      // Check exact bucket + neighbors to handle floating point near boundaries
+      return bosChochPrices.has(key) ||
+             bosChochPrices.has(key - 1) ||
+             bosChochPrices.has(key + 1);
+    };
+    let hhSkippedByDup = 0;
+
     let hhAdded = 0;
     console.log('\n🔵 Processing HH points...');
     if (!structureLines.hh_points || structureLines.hh_points.length === 0) {
       console.warn('⚠️ No HH points available!');
     } else {
       structureLines.hh_points.forEach((hh, index) => {
+        if (priceMatchesBosChoch(hh.price)) {
+          hhSkippedByDup++;
+          console.log(`  ⏭️ HH #${index + 1} (${hh.price}) skipped: matches a BoS/CHoCH price (dedup)`);
+          return;
+        }
         const isH1 = hh.timeframe === 'H1';
         const color = isH1 ? '#1e40af' : '#60a5fa'; // Dark blue for H1, Light blue for M15
         const lineWidth = isH1 ? 2 : 1.5;
@@ -711,12 +935,18 @@ export default function TradesPage() {
     }
 
     // Add LL lines (with H1 vs M15 differentiation)
+    let llSkippedByDup = 0;
     let llAdded = 0;
     console.log('\n🟠 Processing LL points...');
     if (!structureLines.ll_points || structureLines.ll_points.length === 0) {
       console.warn('⚠️ No LL points available!');
     } else {
       structureLines.ll_points.forEach((ll, index) => {
+        if (priceMatchesBosChoch(ll.price)) {
+          llSkippedByDup++;
+          console.log(`  ⏭️ LL #${index + 1} (${ll.price}) skipped: matches a BoS/CHoCH price (dedup)`);
+          return;
+        }
         const isH1 = ll.timeframe === 'H1';
         const color = isH1 ? '#c2410c' : '#fb923c'; // Dark orange for H1, Light orange for M15
         const lineWidth = isH1 ? 2 : 1.5;
@@ -749,6 +979,9 @@ export default function TradesPage() {
       });
     }
 
+    // Render all collected labels as HTML overlay on the chart container
+    renderStructureLabelsOverlay(structureLabels);
+
     console.log('\n✅ ===== OVERLAY COMPLETE =====');
     console.log('Lines added:', {
       bos: bosAdded,
@@ -756,6 +989,7 @@ export default function TradesPage() {
       hh: hhAdded,
       ll: llAdded,
       total: bosAdded + chochAdded + hhAdded + llAdded,
+      skippedByDup: { hh: hhSkippedByDup, ll: llSkippedByDup },
     });
     console.log('Total line series:', structureSeriesRef.current.length);
     
@@ -1191,9 +1425,15 @@ export default function TradesPage() {
           </div>
           <div 
             ref={chartContainerRef} 
-            className="w-full rounded-xl overflow-hidden" 
-            style={{ height: "500px" }}
-          />
+            className="w-full rounded-xl overflow-hidden relative" 
+            style={{ height: "700px" }}
+          >
+            <div 
+              id="structure-labels-overlay"
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              style={{ zIndex: 10 }}
+            />
+          </div>
         </div>
 
         {/* Trades Table */}

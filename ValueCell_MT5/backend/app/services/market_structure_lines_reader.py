@@ -14,18 +14,34 @@ logger = logging.getLogger(__name__)
 
 class MarketStructureLinesReader:
     """Reads market structure points (BoS, CHoCH, HH, LL) for chart overlay"""
-    
-    def __init__(self):
+
+    # Broker timezone offset from UTC (default 3 = GMT+3, matching MT5_BROKER_TIMEZONE_OFFSET)
+    BROKER_OFFSET_HOURS: int = 3
+
+    def __init__(self, broker_offset_hours: int | None = None):
         # Path to Backtest_result/LLHHBOSData_XAUUSD_*.csv
         backend_dir = Path(__file__).parent.parent.parent
         project_root = backend_dir.parent
         self.backtest_dir = project_root.parent / "Backtest_result"
-        
-        logger.info(f"[MarketStructureLinesReader] Backtest dir: {self.backtest_dir}")
+
+        # Allow caller to override broker offset; fall back to config if available
+        if broker_offset_hours is not None:
+            self.BROKER_OFFSET_HOURS = broker_offset_hours
+        else:
+            try:
+                from app.config import get_settings
+                self.BROKER_OFFSET_HOURS = get_settings().MT5_BROKER_TIMEZONE_OFFSET
+            except Exception:
+                pass  # use class default
+
+        logger.info(f"[MarketStructureLinesReader] Backtest dir: {self.backtest_dir}, broker offset: GMT+{self.BROKER_OFFSET_HOURS}")
     
     def get_latest_csv_file(self) -> Optional[Path]:
         """
-        Find the latest LLHHBOSData CSV file
+        Find the latest LLHHBOSData CSV file by date in filename.
+        
+        Filename format: LLHHBOSData_XAUUSD_YYYY-MM-DD.csv
+        Selects the file with the most recent date in its name (not mtime).
         
         Returns:
             Path to the latest CSV file or None
@@ -42,9 +58,16 @@ class MarketStructureLinesReader:
                 logger.warning("[MarketStructureLinesReader] No LLHHBOSData CSV files found")
                 return None
             
-            # Get the latest file by modification time
-            latest_file = max(csv_files, key=lambda p: p.stat().st_mtime)
-            logger.info(f"[MarketStructureLinesReader] Using file: {latest_file.name}")
+            # Sort by date extracted from filename (LLHHBOSData_XAUUSD_YYYY-MM-DD.csv)
+            # This is more reliable than modification time, which can change
+            # when files are copied/synced without reflecting actual data recency.
+            import re
+            def extract_date(path: Path) -> str:
+                match = re.search(r'(\d{4}-\d{2}-\d{2})', path.stem)
+                return match.group(1) if match else '0000-00-00'
+            
+            latest_file = max(csv_files, key=extract_date)
+            logger.info(f"[MarketStructureLinesReader] Using file: {latest_file.name} (date: {extract_date(latest_file)})")
             
             return latest_file
         
@@ -112,26 +135,25 @@ class MarketStructureLinesReader:
                     time_str = row.get('Time', '')
                     timeframe = row.get('Timeframe', 'M15')
                     status = row.get('Status', '')
+                    prev_price_str = row.get('PreviousPrice', '').strip()
                     
                     # Skip if no valid data
                     if not event_type or not time_str or not price_str:
                         continue
                     
-                    # Parse time WITHOUT timezone conversion
-                    # CSV stores time in broker/local timezone
-                    # We need to treat this as UTC to avoid timezone shift
+                    # Parse time: CSV stores broker/server time (TimeCurrent()).
+                    # Convert to true UTC by subtracting the broker offset.
                     try:
-                        # Parse as naive datetime
+                        # Parse as naive datetime (broker time)
                         event_time_naive = datetime.strptime(time_str, '%Y.%m.%d %H:%M:%S')
-                        # Treat it as UTC (no timezone conversion)
-                        # This prevents Python from applying local timezone offset
+                        # Subtract broker offset to get true UTC, then mark as UTC
                         from datetime import timezone
-                        event_time = event_time_naive.replace(tzinfo=timezone.utc)
+                        event_time = (event_time_naive - timedelta(hours=self.BROKER_OFFSET_HOURS)).replace(tzinfo=timezone.utc)
                     except:
                         try:
                             event_time_naive = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
                             from datetime import timezone
-                            event_time = event_time_naive.replace(tzinfo=timezone.utc)
+                            event_time = (event_time_naive - timedelta(hours=self.BROKER_OFFSET_HOURS)).replace(tzinfo=timezone.utc)
                         except:
                             continue
                     
@@ -152,6 +174,14 @@ class MarketStructureLinesReader:
                     is_bearish = 'BEAR' in direction.upper() or 'DOWN' in direction.upper()
                     
                     # Create point data
+                    # Parse previous price (level that was broken for BoS/CHoCH)
+                    previous_price = 0.0
+                    if prev_price_str and prev_price_str != '':
+                        try:
+                            previous_price = float(prev_price_str)
+                        except:
+                            previous_price = 0.0
+                    
                     point = {
                         'time': event_time.isoformat(),
                         'timestamp': int(event_time.timestamp() * 1000),  # milliseconds
@@ -160,6 +190,7 @@ class MarketStructureLinesReader:
                         'direction': 'BULLISH' if is_bullish else ('BEARISH' if is_bearish else 'NEUTRAL'),
                         'timeframe': timeframe,
                         'status': status,
+                        'previous_price': previous_price,
                     }
                     
                     # Categorize by type
@@ -186,23 +217,28 @@ class MarketStructureLinesReader:
             hh_points.sort(key=lambda x: x['timestamp'])
             ll_points.sort(key=lambda x: x['timestamp'])
             
-            # Remove duplicates (same price, time, AND timeframe)
-            def deduplicate(points):
+            # Remove duplicates:
+            # - BoS/CHoCH: dedup by (price, timestamp, timeframe) — each break is unique
+            # - HH/LL: dedup by (price, timeframe) ONLY — same level touched multiple times
+            #   should only draw ONE line. Points are sorted oldest → newest, and we use
+            #   a set so the FIRST (earliest) occurrence is kept.
+            def deduplicate(points, by_price_timeframe_only=False):
                 seen = set()
                 unique = []
                 for point in points:
-                    # Include timeframe in key so M15 and H1 events at same
-                    # price/time are kept as separate structure levels
-                    key = (point['price'], point['timestamp'], point.get('timeframe', ''))
+                    if by_price_timeframe_only:
+                        key = (point['price'], point.get('timeframe', ''))
+                    else:
+                        key = (point['price'], point['timestamp'], point.get('timeframe', ''))
                     if key not in seen:
                         seen.add(key)
-                        unique.append(point)
+                        unique.append(point)  # first = oldest
                 return unique
-            
+
             bos_lines = deduplicate(bos_lines)
             choch_lines = deduplicate(choch_lines)
-            hh_points = deduplicate(hh_points)
-            ll_points = deduplicate(ll_points)
+            hh_points = deduplicate(hh_points, by_price_timeframe_only=True)
+            ll_points = deduplicate(ll_points, by_price_timeframe_only=True)
             
             logger.info(f"After deduplication: BoS={len(bos_lines)}, CHoCH={len(choch_lines)}, HH={len(hh_points)}, LL={len(ll_points)}")
             

@@ -709,32 +709,53 @@ async def get_backtest_monthly(
 
 
 @router.get("/backtest/available-years")
-async def get_backtest_available_years():
+async def get_backtest_available_years(symbol: str = Query("XAUUSD")):
     """
-    Get list of available years from backtest analytics JSON files.
+    Get list of available years from backtest CSV files.
+
+    Reads the actual ``Backtest_Results_{symbol}_*.csv`` files in the
+    ``Backtest_result`` folder (the ``analytics_*.json`` files are no longer
+    generated, so we derive the years directly from the CSVs).
     """
     try:
-        from pathlib import Path
-        
-        # Resolve path to Backtest_result folder (6 levels up from performance.py)
-        current_file = Path(__file__).resolve()
-        backtest_dir = current_file.parent.parent.parent.parent.parent.parent / "Backtest_result"
-        
-        years = []
-        for y in range(2020, 2027):
-            filepath = backtest_dir / f"analytics_{y}.json"
-            if filepath.exists():
-                years.append(y)
-        
+        from app.services.performance_service import list_available_years
+
+        years = list_available_years(symbol)
+        latest_year = max(years) if years else None
+
         return {
             "years": sorted(years),
-            "latest_year": max(years) if years else None,
-            "backtest_dir": str(backtest_dir),
-            "dir_exists": backtest_dir.exists()
+            "latest_year": latest_year,
         }
-    
+
     except Exception as e:
         logger.error(f"Available years error: {e}", exc_info=True)
         return {"years": [], "error": str(e)}
+
+
+@router.get("/backtest/summary")
+async def get_backtest_summary(
+    symbol: str = Query("XAUUSD"),
+    year: int = Query(None, description="Filter by year"),
+):
+    """
+    Real backtest metrics from Backtest_Summary_{symbol}_*.csv files.
+
+    Returns max_drawdown, profit_factor, win_rate, total_trades — sourced
+    from the actual summary CSVs written by the backtest engine.
+    """
+    try:
+        from app.services.performance_service import get_backtest_summary_from_csv
+
+        data = get_backtest_summary_from_csv(symbol, year)
+        if not data:
+            return {"max_drawdown": 0, "profit_factor": 0, "win_rate": 0,
+                    "total_trades": 0, "winning_trades": 0, "losing_trades": 0,
+                    "total_profit": 0, "per_year": {}}
+        return data
+
+    except Exception as e:
+        logger.error(f"Backtest summary error: {e}", exc_info=True)
+        return {"error": str(e)}
 
 

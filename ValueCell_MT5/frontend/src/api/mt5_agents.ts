@@ -51,6 +51,8 @@ export interface MarketStructurePoint {
   direction: string;
   timeframe: string;
   status?: string;
+  // For BoS/CHoCH: the price level that was broken (used to find formation time)
+  previous_price?: number;
 }
 
 export interface MarketStructureLines {

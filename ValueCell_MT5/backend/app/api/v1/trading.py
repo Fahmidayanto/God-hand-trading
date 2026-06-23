@@ -214,7 +214,7 @@ def _generate_session_zones(start_dt, end_dt):
 async def get_chart_data(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
     timeframe: str = Query("M15", description="Timeframe"),
-    count: int = Query(100, ge=1, le=1000, description="Number of candles"),
+    count: int = Query(100, ge=1, le=6000, description="Number of candles"),
     mt5: MT5Manager = Depends(get_mt5_manager),
 ):
     """
@@ -292,11 +292,90 @@ async def get_chart_data(
         )
 
 
-@router.get("/candles", response_model=List[CandleData])
+@router.get("/chart/backtest-data")
+async def get_backtest_chart_data(
+    symbol: str = Query("XAUUSD"),
+    timeframe: str = Query("M15"),
+    from_date: str = Query("2026-01-01", description="Start date YYYY-MM-DD"),
+):
+    """
+    Chart candles from Backtest_result CSV files instead of live MT5.
+
+    Reads MarketData_{symbol}_{timeframe}_*.csv, filters by from_date,
+    and returns the same shape as /chart/data so the frontend needs zero
+    changes beyond switching the fetch URL.
+
+    Ponytail: EMA200 is already in the CSV column — no recalculation.
+    Max 20000 rows returned (6 months of M15 ≈ 17000 bars).
+    """
+    import csv
+    from pathlib import Path
+    from datetime import datetime, timezone
+
+    try:
+        project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
+        backtest_dir = project_root / "Backtest_result"
+
+        csv_file = backtest_dir / f"MarketData_{symbol}_{timeframe}_*.csv"
+        matches = sorted(backtest_dir.glob(f"MarketData_{symbol}_{timeframe}_*.csv"))
+        if not matches:
+            raise HTTPException(status_code=404, detail=f"No MarketData CSV for {symbol} {timeframe}")
+
+        from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+        formatted_candles = []
+        for path in matches:
+            with open(path, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    try:
+                        dt = datetime.strptime(row["Time"].strip(), "%Y.%m.%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        if dt < from_dt:
+                            continue
+                        ts = int(dt.timestamp())
+                        candle = {
+                            "time": ts,
+                            "open": float(row["Open"]),
+                            "high": float(row["High"]),
+                            "low": float(row["Low"]),
+                            "close": float(row["Close"]),
+                        }
+                        ema = row.get("EMA200", "").strip()
+                        if ema:
+                            candle["ema200"] = round(float(ema), 2)
+                        formatted_candles.append(candle)
+                    except (ValueError, KeyError):
+                        continue
+            if len(formatted_candles) >= 20000:
+                break
+
+        # Trim to 20000 cap
+        formatted_candles = formatted_candles[:20000]
+
+        if not formatted_candles:
+            raise HTTPException(status_code=404, detail=f"No candles from {from_date}")
+
+        return {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "candles": formatted_candles,
+            "ema_periods": {"ema200": 200},
+            "timezone": {
+                "broker_offset_hours": 0,
+                "display_mode": "utc",
+                "candle_times_are_utc": True,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Backtest chart data error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 async def get_candles(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
     timeframe: str = Query("M15", description="Timeframe"),
-    count: int = Query(100, ge=1, le=1000, description="Number of candles"),
+    count: int = Query(100, ge=1, le=6000, description="Number of candles"),
     mt5: MT5Manager = Depends(get_mt5_manager),
 ):
     """
@@ -599,7 +678,7 @@ async def get_trade_history(
 @router.get("/session-zones")
 async def get_session_zones(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
-    days: int = Query(7, ge=1, le=30, description="Number of days to fetch"),
+    days: int = Query(7, ge=1, le=180, description="Number of days to fetch"),
 ):
     """
     Get trading session zones for the chart shadow bands.
@@ -633,7 +712,7 @@ async def get_session_zones(
         )
 
         return {
-            "zones": all_zones[:200],
+            "zones": all_zones[:600],
             "total_zones": len(all_zones),
         }
 

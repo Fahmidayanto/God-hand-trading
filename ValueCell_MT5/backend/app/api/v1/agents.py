@@ -254,7 +254,7 @@ async def get_market_structure_lines(hours_back: int = 48):
     These can be overlaid on the price chart to visualize market structure.
     
     Args:
-        hours_back: Number of hours to look back (default 48, max 168)
+        hours_back: Number of hours to look back (default 48, max 4320)
         
     Returns:
         Dictionary containing:
@@ -286,8 +286,8 @@ async def get_market_structure_lines(hours_back: int = 48):
         # Validate hours_back
         if hours_back < 1:
             hours_back = 48
-        if hours_back > 168:  # Max 1 week
-            hours_back = 168
+        if hours_back > 4320:  # Max 180 days (covers Jan-Jun chart range)
+            hours_back = 4320
         
         reader = MarketStructureLinesReader()
         lines = reader.get_market_structure_lines(hours_back=hours_back)

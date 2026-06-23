@@ -607,22 +607,9 @@ def get_monthly_pnl_from_csv(symbol: str = "XAUUSD", year: Optional[int] = None,
 
 
 def list_available_backtest_files(symbol: str = "XAUUSD") -> List[Dict]:
-    """
-    List available backtest result files.
-    
-    Returns:
-        [
-            {
-                "filename": "Backtest_Results_XAUUSD_2025-12-30.csv",
-                "date": "2025-12-30",
-                "path": "/path/to/file"
-            },
-            ...
-        ]
-    """
-    import os
+    """List available backtest result files."""
     from pathlib import Path
-    
+
     try:
         project_root = Path(__file__).parent.parent.parent.parent.parent
         backtest_dir = project_root / "Backtest_result"
@@ -690,7 +677,94 @@ def list_available_years(symbol: str = "XAUUSD") -> List[int]:
                 continue
         
         return sorted(list(years))
-    
+
     except Exception as e:
         logger.error(f"Error listing available years: {e}")
         return []
+
+
+def get_backtest_summary_from_csv(symbol: str = "XAUUSD", year: Optional[int] = None) -> Dict:
+    """
+    Read real performance metrics from Backtest_Summary_{symbol}_*.csv files.
+
+    Returns aggregated or per-year summary:
+        {
+            "max_drawdown": float,       # largest across matched files
+            "profit_factor": float,      # profit-weighted across matched files
+            "win_rate": float,
+            "total_trades": int,
+            "winning_trades": int,
+            "losing_trades": int,
+            "total_profit": float,
+            "per_year": { 2020: {...}, ... }   # only when year is None
+        }
+    """
+    import csv
+    from pathlib import Path
+
+    try:
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        backtest_dir = project_root / "Backtest_result"
+
+        if not backtest_dir.exists():
+            return {}
+
+        matching = sorted(backtest_dir.glob(f"Backtest_Summary_{symbol}_*.csv"))
+        if not matching:
+            return {}
+
+        per_year: Dict[int, Dict] = {}
+        for f in matching:
+            parts = f.stem.split('_')
+            if len(parts) < 4:
+                continue
+            file_year = int(parts[-1].split('-')[0])
+            if year and file_year != year:
+                continue
+            with open(f, 'r', encoding='utf-8') as fh:
+                reader = csv.DictReader(fh)
+                for row in reader:
+                    try:
+                        per_year[file_year] = {
+                            "total_trades": int(float(row.get("TotalTrades", 0) or 0)),
+                            "winning_trades": int(float(row.get("WinningTrades", 0) or 0)),
+                            "losing_trades": int(float(row.get("LosingTrades", 0) or 0)),
+                            "win_rate": float(row.get("WinRate", 0) or 0),
+                            "total_profit": float(row.get("TotalProfit", 0) or 0),
+                            "max_drawdown": float(row.get("MaxDrawdown", 0) or 0),
+                            "profit_factor": float(row.get("ProfitFactor", 0) or 0),
+                        }
+                    except (ValueError, TypeError):
+                        continue
+
+        if not per_year:
+            return {}
+
+        # Aggregate: profit-weighted PF, largest drawdown
+        total_profit = sum(d["total_profit"] for d in per_year.values())
+        total_trades = sum(d["total_trades"] for d in per_year.values())
+        winning_trades = sum(d["winning_trades"] for d in per_year.values())
+        losing_trades = sum(d["losing_trades"] for d in per_year.values())
+        max_drawdown = max((d["max_drawdown"] for d in per_year.values()), default=0.0)
+
+        # ponytail: profit-weighted PF — sum(profit*pf)/sum(profit), falls back to mean
+        pf_num = sum(d["profit_factor"] * d["total_profit"] for d in per_year.values() if d["total_profit"] > 0)
+        pf_den = sum(d["total_profit"] for d in per_year.values() if d["total_profit"] > 0)
+        profit_factor = (pf_num / pf_den) if pf_den > 0 else (
+            sum(d["profit_factor"] for d in per_year.values()) / len(per_year)
+        )
+
+        return {
+            "max_drawdown": round(max_drawdown, 2),
+            "profit_factor": round(profit_factor, 2),
+            "win_rate": round((winning_trades / total_trades * 100) if total_trades > 0 else 0, 2),
+            "total_trades": total_trades,
+            "winning_trades": winning_trades,
+            "losing_trades": losing_trades,
+            "total_profit": round(total_profit, 2),
+            "per_year": per_year if year is None else None,
+        }
+
+    except Exception as e:
+        logger.error(f"Error reading backtest summary CSV: {e}", exc_info=True)
+        return {}
