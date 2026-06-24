@@ -2300,6 +2300,24 @@ void SyncLastSessionCSV()
         {
             PrintFormat("   ✅ Synced state: %s", fileState);
         }
+
+        // ponytail: was missing — MarketData & SessionZone not synced on restart-resume,
+        // so after a restart the sandbox kept stale-date files.
+        string tfs[] = {"M15", "H1", "H4"};
+        for (int t = 0; t < 3; t++)
+        {
+            string fileMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + prevDateStr + ".csv";
+            string srcMD = BacktestResultPath + "\\" + fileMD;
+            string dstMD = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + fileMD;
+            if (CopyFileW(srcMD, dstMD, false))
+                PrintFormat("   ✅ Synced MarketData: %s", fileMD);
+        }
+
+        string fileSZ = "SessionZone_" + _Symbol + "_" + prevDateStr + ".csv";
+        string srcSZ = BacktestResultPath + "\\" + fileSZ;
+        string dstSZ = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + fileSZ;
+        if (CopyFileW(srcSZ, dstSZ, false))
+            PrintFormat("   ✅ Synced SessionZone: %s", fileSZ);
     }
     else
     {
@@ -2399,6 +2417,38 @@ void ReverseSyncCSV()
         {
             int err = GetLastError();
             Print("❌ [REVERSE SYNC] Failed MarketStructure_State: error ", err);
+        }
+    }
+
+    // ponytail: was missing — MarketData & SessionZone never synced back to Backtest_result,
+    // so the folder kept stale dates while sandbox advanced.
+    string tfs[] = {"M15", "H1", "H4"};
+    for (int t = 0; t < 3; t++)
+    {
+        string mdFilename = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + g_ExportDateStr + ".csv";
+        string srcMD = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + mdFilename;
+        string dstMD = BacktestResultPath + "\\" + mdFilename;
+        if (FileIsExist(mdFilename))
+        {
+            if (!CopyFileW(srcMD, dstMD, false))
+            {
+                int err = GetLastError();
+                if (err != 2)
+                    PrintFormat("❌ [REVERSE SYNC] Failed MarketData %s: error %d", tfs[t], err);
+            }
+        }
+    }
+
+    string szFilename = "SessionZone_" + _Symbol + "_" + g_ExportDateStr + ".csv";
+    string srcSZ = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + szFilename;
+    string dstSZ = BacktestResultPath + "\\" + szFilename;
+    if (FileIsExist(szFilename))
+    {
+        if (!CopyFileW(srcSZ, dstSZ, false))
+        {
+            int err = GetLastError();
+            if (err != 2)
+                Print("❌ [REVERSE SYNC] Failed SessionZone: error ", err);
         }
     }
 }
@@ -3403,9 +3453,9 @@ void SetExportDate()
                 }
             }
 
-            // ponytail: rename SessionZoneData
-            string oldSZ = "SessionZoneData_" + _Symbol + "_" + prevDateStr + ".csv";
-            string newSZ = "SessionZoneData_" + _Symbol + "_" + todayDateStr + ".csv";
+            // ponytail: rename SessionZone (prefix "SessionZone_" — match ExportSessionZoneToCSV)
+            string oldSZ = "SessionZone_" + _Symbol + "_" + prevDateStr + ".csv";
+            string newSZ = "SessionZone_" + _Symbol + "_" + todayDateStr + ".csv";
             if (FileIsExist(oldSZ))
             {
                 if (RenameFileViaCopy(oldSZ, newSZ))
@@ -3472,6 +3522,28 @@ void SetExportDate()
                     {
                         DeleteFileW(BacktestResultPath + "\\" + oldStateFile);
                     }
+                }
+
+                // ponytail: was missing — MarketData & SessionZone not rolled at midnight,
+                // causing stale-date files (e.g. 06-19) to persist while sibling files advanced.
+                string tfs[] = {"M15", "H1", "H4"};
+                for (int t = 0; t < 3; t++)
+                {
+                    string oldMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + g_ExportDateStr + ".csv";
+                    string newMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + newDateStr + ".csv";
+                    if (FileIsExist(oldMD))
+                    {
+                        if (RenameFileViaCopy(oldMD, newMD))
+                            DeleteFileW(BacktestResultPath + "\\" + oldMD);
+                    }
+                }
+
+                string oldSZFile = "SessionZone_" + _Symbol + "_" + g_ExportDateStr + ".csv";
+                string newSZFile = "SessionZone_" + _Symbol + "_" + newDateStr + ".csv";
+                if (FileIsExist(oldSZFile))
+                {
+                    if (RenameFileViaCopy(oldSZFile, newSZFile))
+                        DeleteFileW(BacktestResultPath + "\\" + oldSZFile);
                 }
             }
         }
