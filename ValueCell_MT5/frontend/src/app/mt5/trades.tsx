@@ -189,8 +189,8 @@ export default function TradesPage() {
     chartTimezoneRef.current = chartTimezone;
   }, [chartTimezone]);
   
-  // Load market structure lines (180 days lookback to cover Jan-Jun 2026 chart range)
-  const { data: structureLines } = useMarketStructureLines(4320); // 180 days = 4320 hours
+  // Load market structure lines (2020-01-01 to now, from all CSV files)
+  const { data: structureLines } = useMarketStructureLines("2020-01-01");
 
   // Load session zones - sync with chart data mode
   const { data: sessionZonesData } = useSessionZones(chartFromDate);
@@ -248,8 +248,8 @@ export default function TradesPage() {
         const idx = candles.findIndex((c: ChartCandle) => c.time >= centerTimestamp);
         if (idx >= 0) {
           timeScale.setVisibleLogicalRange({
-            from: Math.max(0, idx - 20) as any,
-            to: Math.min(candles.length - 1, idx + 80) as any,
+            from: idx as any,
+            to: Math.min(candles.length - 1, idx + 287) as any,
           });
         }
       }

@@ -246,15 +246,16 @@ async def get_market_structure():
 
 
 @router.get("/market-structure-lines")
-async def get_market_structure_lines(hours_back: int = 48):
+async def get_market_structure_lines(from_date: str = "2020-01-01", to_date: str = ""):
     """
     Get market structure lines for chart visualization.
     
-    Returns BoS, CHoCH, HH, and LL points for the specified time range.
+    Returns BoS, CHoCH, HH, and LL points for the specified date range.
     These can be overlaid on the price chart to visualize market structure.
     
     Args:
-        hours_back: Number of hours to look back (default 48, max 4320)
+        from_date: Start date (ISO format, default "2020-01-01")
+        to_date: End date (ISO format, default "" = now)
         
     Returns:
         Dictionary containing:
@@ -265,16 +266,7 @@ async def get_market_structure_lines(hours_back: int = 48):
         
     Example Response:
         {
-            "bos_lines": [
-                {
-                    "time": "2026-06-12T10:30:00",
-                    "timestamp": 1749728400000,
-                    "price": 4667.22,
-                    "type": "BOS",
-                    "direction": "BEARISH",
-                    "timeframe": "M15"
-                }
-            ],
+            "bos_lines": [...],
             "choch_lines": [...],
             "hh_points": [...],
             "ll_points": [...]
@@ -283,18 +275,12 @@ async def get_market_structure_lines(hours_back: int = 48):
     try:
         from app.services.market_structure_lines_reader import MarketStructureLinesReader
         
-        # Validate hours_back
-        if hours_back < 1:
-            hours_back = 48
-        if hours_back > 4320:  # Max 180 days (covers Jan-Jun chart range)
-            hours_back = 4320
-        
         reader = MarketStructureLinesReader()
-        lines = reader.get_market_structure_lines(hours_back=hours_back)
+        lines = reader.get_market_structure_lines(from_date=from_date, to_date=to_date)
         
         logger.info(
             f"[API] Returning {lines['total_points']} structure points "
-            f"for last {hours_back}h"
+            f"({from_date} to {to_date or 'now'})"
         )
         
         return JSONResponse(content=lines)

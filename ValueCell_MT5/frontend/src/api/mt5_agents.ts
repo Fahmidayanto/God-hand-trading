@@ -89,12 +89,16 @@ export const useMarketStructure = () => {
   });
 };
 
-export const useMarketStructureLines = (hoursBack: number = 48) => {
+export const useMarketStructureLines = (fromDate?: string, toDate?: string) => {
+  const params = new URLSearchParams();
+  if (fromDate) params.set("from_date", fromDate);
+  if (toDate) params.set("to_date", toDate);
+  const queryString = params.toString();
   return useQuery({
-    queryKey: ["agents", "market-structure-lines", hoursBack],
-    queryFn: () => apiClient.get<MarketStructureLines>(`/agents/market-structure-lines?hours_back=${hoursBack}`),
-    refetchInterval: 30000, // Refresh every 30 seconds
-    staleTime: 60000, // Don't refetch if data is less than 1 minute stale
+    queryKey: ["agents", "market-structure-lines", fromDate ?? "2020-01-01"],
+    queryFn: () => apiClient.get<MarketStructureLines>(`/agents/market-structure-lines?${queryString}`),
+    refetchInterval: 900000, // Refresh every 15 minutes
+    staleTime: 900000, // Don't refetch within 15 minutes
   });
 };
 
