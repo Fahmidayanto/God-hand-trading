@@ -54,14 +54,26 @@ export default function TradesPage() {
     candle_times_are_utc: true
   });
 
+  const [activeYear, setActiveYear] = useState<string>("2026");
+  // DISABLED: year/month dropdown
+  // const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+  // const [availableMonths, setAvailableMonths] = useState<Array<{label: string, value: number}>>([]);
+  // const [selectedMonth, setSelectedMonth] = useState<string>("");
+  // const monthsInitialized = useRef(false);
+
   // Track if user has manually changed timezone (don't override if true)
   const userChangedTimezone = useRef(false);
   
   // Helper function to format time based on timezone mode
   // This is separate so it can be called with fresh timezone values
+  const indonesianMonths = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
   const formatChartTime = (time: number, displayMode: string, brokerOffset: number): string => {
     const date = new Date(time * 1000);
-    let month: string, day: string, hours: string, minutes: string;
+    let day: string, month: string, year: number, hours: string, minutes: string;
     
     console.log('🕐 formatChartTime called:', {
       time,
@@ -72,27 +84,30 @@ export default function TradesPage() {
     });
     
     if (displayMode === 'utc') {
-      month = String(date.getUTCMonth() + 1).padStart(2, '0');
       day = String(date.getUTCDate()).padStart(2, '0');
+      month = indonesianMonths[date.getUTCMonth()];
+      year = date.getUTCFullYear();
       hours = String(date.getUTCHours()).padStart(2, '0');
       minutes = String(date.getUTCMinutes()).padStart(2, '0');
-      console.log('  → UTC format:', `${month}/${day} ${hours}:${minutes}`);
+      console.log('  → UTC format:', `${day} ${month} ${year} ${hours}:${minutes}`);
     } else if (displayMode === 'broker') {
       const brokerTime = new Date((time + brokerOffset * 3600) * 1000);
-      month = String(brokerTime.getUTCMonth() + 1).padStart(2, '0');
       day = String(brokerTime.getUTCDate()).padStart(2, '0');
+      month = indonesianMonths[brokerTime.getUTCMonth()];
+      year = brokerTime.getUTCFullYear();
       hours = String(brokerTime.getUTCHours()).padStart(2, '0');
       minutes = String(brokerTime.getUTCMinutes()).padStart(2, '0');
-      console.log('  → Broker format:', `${month}/${day} ${hours}:${minutes}`, `(offset: +${brokerOffset}h)`);
+      console.log('  → Broker format:', `${day} ${month} ${year} ${hours}:${minutes}`, `(offset: +${brokerOffset}h)`);
     } else { // local
-      month = String(date.getMonth() + 1).padStart(2, '0');
       day = String(date.getDate()).padStart(2, '0');
+      month = indonesianMonths[date.getMonth()];
+      year = date.getFullYear();
       hours = String(date.getHours()).padStart(2, '0');
       minutes = String(date.getMinutes()).padStart(2, '0');
-      console.log('  → Local format:', `${month}/${day} ${hours}:${minutes}`);
+      console.log('  → Local format:', `${day} ${month} ${year} ${hours}:${minutes}`);
     }
     
-    return `${month}/${day} ${hours}:${minutes}`;
+    return `${day} ${month} ${year} ${hours}:${minutes}`;
   };
   
 
@@ -118,8 +133,8 @@ export default function TradesPage() {
   // Load market structure lines (180 days lookback to cover Jan-Jun 2026 chart range)
   const { data: structureLines } = useMarketStructureLines(4320); // 180 days = 4320 hours
 
-  // Load session zones (180 days lookback, aligned with chart range)
-  const { data: sessionZonesData } = useSessionZones(180);
+  // Load session zones (from 2020-01-01 to match chart data range)
+  const { data: sessionZonesData } = useSessionZones("2020-01-01");
 
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine);
@@ -272,14 +287,40 @@ export default function TradesPage() {
       }
     }, 5000);
     return () => clearInterval(chartInterval);
-  }, [activeTimeframe]); // Re-run when timeframe changes
+  }, [activeTimeframe, activeYear]);
+
+  // DISABLED: months generation from candle data
+  // useEffect(() => {
+  //   if (chartCandles.length === 0 || monthsInitialized.current) return;
+  //   monthsInitialized.current = true;
+  //
+  //   const times = chartCandles.map(c => c.time);
+  //   const minTime = Math.min(...times);
+  //   const maxTime = Math.max(...times);
+  //
+  //   const months: Array<{label: string, value: number}> = [];
+  //   const minDate = new Date(minTime * 1000);
+  //   const maxDate = new Date(maxTime * 1000);
+  //   const cursor = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), 1));
+  //   const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  //
+  //   while (cursor <= maxDate) {
+  //     const y = cursor.getUTCFullYear();
+  //     const m = cursor.getUTCMonth();
+  //     const start = Math.floor(Date.UTC(y, m, 1) / 1000);
+  //     months.push({ label: names[m], value: start });
+  //     cursor.setUTCMonth(m + 1);
+  //   }
+  //
+  //   setAvailableMonths(months);
+  //   setSelectedMonth(prev => prev === "" && months.length > 0 ? String(months[0].value) : prev);
+  // }, [chartCandles]);
 
   const loadChartData = async (forceRefresh = false) => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
-      // ponytail: chart reads CSV from Backtest_result (Jan 2026+), full 6 months
-      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2026-01-01`;
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01`;
       console.log('Fetching chart data from:', chartUrl);
 
       const response = await fetch(chartUrl);
@@ -576,51 +617,65 @@ export default function TradesPage() {
         let startTimeSeconds: number;
         let endTimeSeconds: number;
         
+        // Period map used to size the BoS/CHoCH fallback segment when no
+        // formation time is found in HH/LL data. Declared here so both
+        // branches (BOS_CHOCH and HH/LL) can reference it.
+        const timeframePeriods: {[key: string]: number} = {
+          'M15': 900,   // 15 minutes
+          'M30': 1800,  // 30 minutes
+          'H1': 3600,   // 1 hour
+          'H4': 14400,  // 4 hours
+          'D1': 86400,  // 1 day
+        };
+
+        // Latest actual candle time in the loaded data. We use this (not
+        // the right edge of the visible range) as the end time for HH/LL
+        // lines so they never bleed into the empty area past the last bar.
+        // `rightOffset: 5` on the chart means the visible range extends
+        // ~5 bars past the last candle, which was the previous source of
+        // the "line pokes through the last candle and keeps going" bug.
+        const lastCandleTime: number | null = candlesToUse.length > 0
+          ? candlesToUse[candlesToUse.length - 1].time
+          : null;
+        
         if (lineType === 'BOS_CHOCH') {
           // BoS/CHoCH: line from level formation → break event
           // startTime = when the level was first formed (from HH/LL data)
           // endTime = the break event time
-          startTimeSeconds = levelFormationTime ?? eventTimeSeconds;
+          const timeframePeriod = timeframePeriods[activeTimeframe] ?? 900;
+          const formationFallback = Math.max(0, eventTimeSeconds - timeframePeriod);
+          startTimeSeconds = levelFormationTime ?? formationFallback;
           endTimeSeconds = eventTimeSeconds;
-          
+
+          // ponytail: was missing — backend `timestamp` is the candle CLOSE when
+          // BoS is CONFIRMED (often 1+ bars after the wick that actually crossed the
+          // level). Without a break scan, the line overshoots past the real break
+          // candle and bleeds into empty space. Mirror the HH/LL break detection:
+          // find the first candle after formation whose high (bullish) / low (bearish)
+          // crosses `price`, and clamp endTime to that candle.
+          const dirUp = color === '#10b981'; // bullish confirm color
+          for (const candle of candlesToUse) {
+            if (candle.time <= startTimeSeconds) continue;
+            if (candle.time > endTimeSeconds) break;
+            const crossed = dirUp ? candle.high > price : candle.low < price;
+            if (crossed) {
+              endTimeSeconds = candle.time;
+              console.log(`  🛑 BoS/CHoCH at ${price} broken by candle ${candle.time} (line clamped to break candle)`);
+              break;
+            }
+          }
+
           console.log(`📏 BoS/CHoCH line at ${price}: formation=${startTimeSeconds}, break=${endTimeSeconds}`);
           console.log(`  Formation date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
           console.log(`  Break date:     ${new Date(endTimeSeconds * 1000).toISOString()}`);
         } else {
-          // HH/LL or generic line: starts at event time, extends right
+          // HH/LL: line starts at the level's formation event and stops at
+          // the LAST ACTUAL CANDLE (not `Date.now()` and not the right
+          // edge of the visible range). This matches the comment intent of
+          // "stops at last candle" and prevents the line from bleeding into
+          // the empty area past the last bar.
           startTimeSeconds = eventTimeSeconds;
-          // Use last visible candle time instead of "now" so line stops at last candle
-          endTimeSeconds = Math.floor(Date.now() / 1000);
-        }
-        
-        // For HH/LL/generic: use visible range for end time clipping
-        if (lineType !== 'BOS_CHOCH') {
-          let firstVisibleTime = startTimeSeconds;
-          if (visibleRange) {
-            firstVisibleTime = typeof visibleRange.from === 'number' 
-              ? visibleRange.from 
-              : visibleRange.from as number;
-            
-            const lastVisibleTime = typeof visibleRange.to === 'number'
-              ? visibleRange.to
-              : visibleRange.to as number;
-            
-            endTimeSeconds = lastVisibleTime;
-            
-            console.log(`Line at ${price}: Event=${startTimeSeconds}, Visible=[${firstVisibleTime}, ${lastVisibleTime}]`);
-            console.log(`  Event date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
-            console.log(`  First visible: ${new Date(firstVisibleTime * 1000).toISOString()}`);
-            console.log(`  Last visible: ${new Date(lastVisibleTime * 1000).toISOString()}`);
-            
-            // If event is before visible range, clip to first visible candle
-            if (startTimeSeconds < firstVisibleTime) {
-              console.log(`  ⚠️ Event is before visible range, clipping to first visible candle`);
-            } else if (startTimeSeconds >= firstVisibleTime && startTimeSeconds <= lastVisibleTime) {
-              console.log(`  ✅ Event is WITHIN visible range - line will start from event time`);
-            } else {
-              console.log(`  ⚠️ Event is after visible range (future?) - using event time anyway`);
-            }
-          }
+          endTimeSeconds = lastCandleTime ?? eventTimeSeconds;
         }
         
         // Find the breaking candle for HH/LL lines
@@ -653,14 +708,8 @@ export default function TradesPage() {
         
         // Always start line from the actual candle OPEN time (not close time)
         // CSV timestamp is candle CLOSE time, so we need to subtract 1 period
-        // M15 = 15 min = 900 seconds, H1 = 3600 seconds, H4 = 14400 seconds
-        const timeframePeriods: {[key: string]: number} = {
-          'M15': 900,   // 15 minutes
-          'M30': 1800,  // 30 minutes
-          'H1': 3600,   // 1 hour
-          'H4': 14400,  // 4 hours
-          'D1': 86400,  // 1 day
-        };
+        // (period map is already declared above so it can be used by the
+        // BoS/CHoCH fallback as well)
         
         console.log(`\n🔍 Finding start time for ${lineType || 'line'} at price ${price}`);
         console.log(`  CSV timestamp: ${startTimeSeconds} (${new Date(startTimeSeconds * 1000).toISOString()})`);
@@ -721,6 +770,17 @@ export default function TradesPage() {
         
         const actualStartTime = candleOpenTime;
         console.log(`  📍 FINAL start time: ${actualStartTime} (${new Date(actualStartTime * 1000).toISOString()})\n`);
+        
+        // Safety check: lightweight-charts requires time data in ascending
+        // order. If the matched start candle ended up AFTER the end time
+        // (e.g. formation time from a different timeframe, or stale data
+        // where the break was detected before the formation HH/LL), the
+        // line would render incorrectly or throw. Skip drawing in that
+        // case rather than producing a misleading visual.
+        if (actualStartTime >= endTimeSeconds) {
+          console.warn(`  ⚠️ Skipping line at ${price}: start ${actualStartTime} >= end ${endTimeSeconds}`);
+          return false;
+        }
         
         const lineOptions = {
           color,
@@ -1061,7 +1121,16 @@ export default function TradesPage() {
   // Update session-zone shadows when data or toggle changes
   useEffect(() => {
     const primitive = sessionZonesPrimitiveRef.current;
-    if (!primitive) return;
+    if (!primitive) {
+      console.warn('⚠️ Session zones primitive not initialized');
+      return;
+    }
+
+    console.log('🕒 [SESSION DEBUG] Updating session zones:', {
+      showSessions,
+      totalZones: sessionZonesData?.total_zones,
+      zonesReceived: sessionZonesData?.zones?.length,
+    });
 
     primitive.setVisible(showSessions);
 
@@ -1074,7 +1143,15 @@ export default function TradesPage() {
         session: z.session,
         open: z.status === "OPEN",
       }));
+    
+    console.log('🕒 [SESSION DEBUG] Boxes prepared:', {
+      totalBoxes: boxes.length,
+      firstBox: boxes[0],
+      lastBox: boxes[boxes.length - 1],
+    });
+    
     primitive.setBoxes(boxes);
+    console.log('✅ Session zones updated successfully');
   }, [sessionZonesData, showSessions]);
 
   // Toggle EMA 200 visibility
@@ -1133,6 +1210,69 @@ export default function TradesPage() {
       loadChartData(true); // forceRefresh on timeframe change
     }
   };
+
+  // DISABLED: year dropdown handler
+  // const changeYear = (year: string) => {
+  //   setActiveYear(year);
+  //   monthsInitialized.current = false;
+  //   if (chartRef.current && candlestickSeriesRef.current) {
+  //     loadChartData(true, year);
+  //   }
+  // };
+
+  // DISABLED: month scroll handler
+  // const jumpToMonth = (unixStart: number) => {
+  //   if (!chartRef.current) return;
+  //   const ts = chartRef.current.timeScale();
+  //   const vr = ts.getVisibleRange();
+  //   if (!vr) return;
+  //   const w = (vr.to as number) - (vr.from as number);
+  //   ts.setVisibleRange({ from: unixStart as any, to: (unixStart + w) as any });
+  // };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
+      if (!chartRef.current) return;
+      const ts = chartRef.current.timeScale();
+      if (e.key === "ArrowLeft" && !e.shiftKey) {
+        e.preventDefault();
+        const lr = ts.getVisibleLogicalRange();
+        if (!lr) return;
+        const w = lr.to - lr.from;
+        ts.setVisibleLogicalRange({ from: lr.from - w, to: lr.to - w });
+      } else if (e.key === "ArrowRight" && !e.shiftKey) {
+        e.preventDefault();
+        const lr = ts.getVisibleLogicalRange();
+        if (!lr) return;
+        const w = lr.to - lr.from;
+        ts.setVisibleLogicalRange({ from: lr.from + w, to: lr.to + w });
+      } else if (e.key === "ArrowLeft" && e.shiftKey) {
+        e.preventDefault();
+        const vr = ts.getVisibleRange();
+        if (!vr) return;
+        const from = vr.from as number;
+        const w = (vr.to as number) - from;
+        const d = new Date(from * 1000);
+        d.setUTCMonth(d.getUTCMonth() - 1);
+        const newFrom = Math.floor(d.getTime() / 1000);
+        ts.setVisibleRange({ from: newFrom as any, to: (newFrom + w) as any });
+      } else if (e.key === "ArrowRight" && e.shiftKey) {
+        e.preventDefault();
+        const vr = ts.getVisibleRange();
+        if (!vr) return;
+        const from = vr.from as number;
+        const w = (vr.to as number) - from;
+        const d = new Date(from * 1000);
+        d.setUTCMonth(d.getUTCMonth() + 1);
+        const newFrom = Math.floor(d.getTime() / 1000);
+        ts.setVisibleRange({ from: newFrom as any, to: (newFrom + w) as any });
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const filteredTrades = trades.filter((trade) => {
     if (activeFilter === "all") return true;
@@ -1406,6 +1546,8 @@ export default function TradesPage() {
                 <option value="broker">🏦 Broker Time</option>
                 <option value="local">🖥️ Local Time</option>
               </select>
+
+              {/* DISABLED: year & month dropdown */}
               
               {/* Timeframe buttons */}
               {["M15", "M30", "H1", "H4", "D1"].map((tf) => (

@@ -306,9 +306,10 @@ async def get_backtest_chart_data(
     changes beyond switching the fetch URL.
 
     Ponytail: EMA200 is already in the CSV column — no recalculation.
-    Max 20000 rows returned (6 months of M15 ≈ 17000 bars).
+    Max 30000 rows returned (10 months of M15).
     """
     import csv
+    import re
     from pathlib import Path
     from datetime import datetime, timezone
 
@@ -322,9 +323,14 @@ async def get_backtest_chart_data(
             raise HTTPException(status_code=404, detail=f"No MarketData CSV for {symbol} {timeframe}")
 
         from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        from_year = from_dt.year
 
         formatted_candles = []
         for path in matches:
+            # Skip files whose year is before the requested year
+            file_year = re.search(r"_(\d{4})-\d{2}-\d{2}\.csv$", path.name)
+            if file_year and int(file_year.group(1)) < from_year:
+                continue
             with open(path, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
@@ -346,11 +352,15 @@ async def get_backtest_chart_data(
                         formatted_candles.append(candle)
                     except (ValueError, KeyError):
                         continue
-            if len(formatted_candles) >= 20000:
+            if len(formatted_candles) >= 1000000000000000:
                 break
 
-        # Trim to 20000 cap
-        formatted_candles = formatted_candles[:20000]
+        # Sort + dedup by time (CSV files overlap in time range)
+        formatted_candles.sort(key=lambda c: c["time"])
+        seen = set()
+        formatted_candles = [c for c in formatted_candles if not (c["time"] in seen or seen.add(c["time"]))]
+        # Trim to 30000 cap
+        formatted_candles = formatted_candles[:1000000000000000]
 
         if not formatted_candles:
             raise HTTPException(status_code=404, detail=f"No candles from {from_date}")
@@ -678,28 +688,44 @@ async def get_trade_history(
 @router.get("/session-zones")
 async def get_session_zones(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
-    days: int = Query(7, ge=1, le=180, description="Number of days to fetch"),
+    days: int = Query(7, ge=1, le=3000, description="Number of days to fetch (used if from_date not provided)"),
+    from_date: str = Query(None, description="Start date YYYY-MM-DD (overrides days parameter)"),
 ):
     """
     Get trading session zones for the chart shadow bands.
 
     Sessions are generated deterministically from the MT5 session schedule
-    (mirrors the EA), so the sequence is continuous from `days` ago up to the
-    live, still-running session. Times are aligned to the candle epoch (server
-    wall-clock interpreted as UTC).
+    (mirrors the EA), so the sequence is continuous from `from_date` (or `days` ago)
+    up to the live, still-running session. Times are aligned to the candle epoch
+    (server wall-clock interpreted as UTC).
 
     Args:
         symbol: Trading symbol (e.g., XAUUSD)
-        days: Number of days to look back (1-30)
+        days: Number of days to look back (1-3000, used if from_date not provided)
+        from_date: Start date in YYYY-MM-DD format (e.g., "2020-01-01")
 
     Returns:
         List of session zones with start/end time, session type and status.
     """
     try:
-        from datetime import timedelta
+        from datetime import timedelta, datetime
 
         server_now = _server_now()
-        start_dt = server_now - timedelta(days=days)
+        
+        # Use from_date if provided, otherwise fallback to days parameter
+        if from_date:
+            try:
+                # Parse as naive datetime (no timezone) to match _server_now() behavior
+                start_dt = datetime.strptime(from_date, "%Y-%m-%d")
+                logger.info(f"Using from_date: {from_date} -> {start_dt}")
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid from_date format. Use YYYY-MM-DD (e.g., 2020-01-01)",
+                )
+        else:
+            start_dt = server_now - timedelta(days=days)
+            logger.info(f"Using days lookback: {days} -> {start_dt}")
 
         all_zones = _generate_session_zones(start_dt, server_now)
 
@@ -712,10 +738,12 @@ async def get_session_zones(
         )
 
         return {
-            "zones": all_zones[:600],
+            "zones": all_zones[:10000],  # Increased limit for multi-year data
             "total_zones": len(all_zones),
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Session zones fetch error: {e}", exc_info=True)
         raise HTTPException(

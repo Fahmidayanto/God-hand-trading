@@ -110,6 +110,25 @@ class SessionZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
     if (!chart || !this.source.visible || this.source.boxes.length === 0) return;
 
     const timeScale = chart.timeScale();
+    
+    // OPTIMIZATION: Get visible time range and only render boxes that overlap
+    const visibleRange = timeScale.getVisibleRange();
+    if (!visibleRange) return;
+    
+    const visibleFrom = (visibleRange.from as number);
+    const visibleTo = (visibleRange.to as number);
+    
+    // Filter boxes to only those that overlap with visible range
+    const visibleBoxes = this.source.boxes.filter(box => {
+      // Box is visible if it overlaps with [visibleFrom, visibleTo]
+      return box.end >= visibleFrom && box.start <= visibleTo;
+    });
+    
+    console.log('🎨 [SESSION RENDER] Drawing session zones:', {
+      totalBoxes: this.source.boxes.length,
+      visibleBoxes: visibleBoxes.length,
+      visibleRange: { from: visibleFrom, to: visibleTo },
+    });
 
     target.useBitmapCoordinateSpace((scope) => {
       const ctx = scope.context;
@@ -118,7 +137,7 @@ class SessionZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
       const height = scope.bitmapSize.height;
       const width = scope.bitmapSize.width;
 
-      for (const box of this.source.boxes) {
+      for (const box of visibleBoxes) {
         // Snap band edges to real candles so market gaps (e.g. gold's midnight
         // break) don't push edges to the wrong place when a boundary has no bar.
         let startTime = box.start;

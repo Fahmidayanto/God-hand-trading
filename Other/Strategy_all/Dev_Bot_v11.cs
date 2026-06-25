@@ -749,7 +749,7 @@ void ExportLLHHBOSToCSV()
             while (!FileIsEnding(handleRead))
             {
                 string evType = FileReadString(handleRead);
-                if (evType == "" || FileIsEnding(handleRead)) break;
+                if (evType == "" || FileIsEnding(handleRead)) continue; // ponytail: blank line? skip, NOT break
                 
                 string evDir   = FileReadString(handleRead);
                 string evPrice = FileReadString(handleRead);
@@ -2515,7 +2515,7 @@ void LoadLLHHBOSDataToArrays()
     while (!FileIsEnding(handle))
     {
         string type = FileReadString(handle);
-        if (type == "" || FileIsEnding(handle)) break;
+        if (type == "" || FileIsEnding(handle)) continue; // ponytail: blank line? skip, NOT break
         
         string direction = FileReadString(handle);
         string priceStr  = FileReadString(handle);
@@ -2667,7 +2667,7 @@ void RedrawVisualsFromCSV()
     while (!FileIsEnding(handle))
     {
         string p1_type   = FileReadString(handle);
-        if (p1_type == "" || FileIsEnding(handle)) break;
+        if (p1_type == "" || FileIsEnding(handle)) continue; // ponytail: blank line? skip, NOT break — don't lose events after blanks
         
         string p1_dir    = FileReadString(handle);
         string p1_priceS = FileReadString(handle);
@@ -2759,7 +2759,7 @@ void RedrawVisualsFromCSV()
     while (!FileIsEnding(handle))
     {
         string type = FileReadString(handle);
-        if (type == "" || FileIsEnding(handle)) break;
+        if (type == "" || FileIsEnding(handle)) continue; // ponytail: blank line? skip, NOT break
         
         string direction  = FileReadString(handle);
         string priceStr   = FileReadString(handle);
@@ -3031,104 +3031,140 @@ void RedrawVisualsFromCSV()
     if (lastAcceptedHH_M15 > 0)
     {
         double levelTol = 5 * _Point;
-        datetime foundTime = FindFormationTime(hhFormPriceM15, hhFormTimeM15, hhFormCntM15, lastAcceptedHH_M15, levelTol, noTimeLimit);
-        if (foundTime == 0) foundTime = lastTimeHH_M15; // fallback ke state file
-        if (foundTime == 0) foundTime = TimeCurrent(); // fallback terakhir
+        bool isHhSuperseded = IsLevelSuperseded(breakUpM15, breakUpCntM15, lastAcceptedHH_M15, levelTol);
+        if (!isHhSuperseded)
+        {
+            datetime foundTime = FindFormationTime(hhFormPriceM15, hhFormTimeM15, hhFormCntM15, lastAcceptedHH_M15, levelTol, noTimeLimit);
+            if (foundTime == 0) foundTime = lastTimeHH_M15; // fallback ke state file
+            if (foundTime == 0) foundTime = TimeCurrent(); // fallback terakhir
 
-        string name = "redraw_lastHH_M15";
-        ObjectDelete(0, name);
-        ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedHH_M15, foundTime + PeriodSeconds(PERIOD_M15), lastAcceptedHH_M15);
-        ObjectSetInteger(0, name, OBJPROP_COLOR, clrBlue);
-        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
-        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
-        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
-        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
-        ObjectSetInteger(0, name, OBJPROP_BACK, true);
-        
-        string lblName = "redraw_lastHH_M15_label";
-        ObjectDelete(0, lblName);
-        ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedHH_M15 + 10 * _Point);
-        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrBlue);
-        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
-        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_M15: " + DoubleToString(lastAcceptedHH_M15, _Digits));
+            string name = "redraw_lastHH_M15";
+            ObjectDelete(0, name);
+            ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedHH_M15, foundTime + PeriodSeconds(PERIOD_M15), lastAcceptedHH_M15);
+            ObjectSetInteger(0, name, OBJPROP_COLOR, clrBlue);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+            ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true);
+            
+            string lblName = "redraw_lastHH_M15_label";
+            ObjectDelete(0, lblName);
+            ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedHH_M15 + 10 * _Point);
+            ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrBlue);
+            ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_M15: " + DoubleToString(lastAcceptedHH_M15, _Digits));
+        }
+        else
+        {
+            ObjectDelete(0, "redraw_lastHH_M15");
+            ObjectDelete(0, "redraw_lastHH_M15_label");
+        }
     }
     
     // M15 - lastAcceptedLL
     if (lastAcceptedLL_M15 > 0)
     {
         double levelTol = 5 * _Point;
-        datetime foundTime = FindFormationTime(llFormPriceM15, llFormTimeM15, llFormCntM15, lastAcceptedLL_M15, levelTol, noTimeLimit);
-        if (foundTime == 0) foundTime = lastTimeLL_M15; // fallback ke state file
-        if (foundTime == 0) foundTime = TimeCurrent(); // fallback terakhir
+        bool isLlSuperseded = IsLevelSuperseded(breakDownM15, breakDownCntM15, lastAcceptedLL_M15, levelTol);
+        if (!isLlSuperseded)
+        {
+            datetime foundTime = FindFormationTime(llFormPriceM15, llFormTimeM15, llFormCntM15, lastAcceptedLL_M15, levelTol, noTimeLimit);
+            if (foundTime == 0) foundTime = lastTimeLL_M15; // fallback ke state file
+            if (foundTime == 0) foundTime = TimeCurrent(); // fallback terakhir
 
-        string name = "redraw_lastLL_M15";
-        ObjectDelete(0, name);
-        ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedLL_M15, foundTime + PeriodSeconds(PERIOD_M15), lastAcceptedLL_M15);
-        ObjectSetInteger(0, name, OBJPROP_COLOR, clrMagenta);
-        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
-        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
-        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
-        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
-        ObjectSetInteger(0, name, OBJPROP_BACK, true);
-        
-        string lblName = "redraw_lastLL_M15_label";
-        ObjectDelete(0, lblName);
-        ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedLL_M15 - 10 * _Point);
-        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrMagenta);
-        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
-        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_M15: " + DoubleToString(lastAcceptedLL_M15, _Digits));
+            string name = "redraw_lastLL_M15";
+            ObjectDelete(0, name);
+            ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedLL_M15, foundTime + PeriodSeconds(PERIOD_M15), lastAcceptedLL_M15);
+            ObjectSetInteger(0, name, OBJPROP_COLOR, clrMagenta);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+            ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true);
+            
+            string lblName = "redraw_lastLL_M15_label";
+            ObjectDelete(0, lblName);
+            ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedLL_M15 - 10 * _Point);
+            ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrMagenta);
+            ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_M15: " + DoubleToString(lastAcceptedLL_M15, _Digits));
+        }
+        else
+        {
+            ObjectDelete(0, "redraw_lastLL_M15");
+            ObjectDelete(0, "redraw_lastLL_M15_label");
+        }
     }
     
     // H1 - lastAcceptedHH
     if (EnableDrawLines_H1 && lastAcceptedHH_H1 > 0)
     {
         double levelTol = 5 * _Point;
-        datetime foundTime = FindFormationTime(hhFormPriceH1, hhFormTimeH1, hhFormCntH1, lastAcceptedHH_H1, levelTol, noTimeLimit);
-        if (foundTime == 0) foundTime = lastTimeHH_H1;
-        if (foundTime == 0) foundTime = TimeCurrent();
+        bool isHhSuperseded = IsLevelSuperseded(breakUpH1, breakUpCntH1, lastAcceptedHH_H1, levelTol);
+        if (!isHhSuperseded)
+        {
+            datetime foundTime = FindFormationTime(hhFormPriceH1, hhFormTimeH1, hhFormCntH1, lastAcceptedHH_H1, levelTol, noTimeLimit);
+            if (foundTime == 0) foundTime = lastTimeHH_H1;
+            if (foundTime == 0) foundTime = TimeCurrent();
 
-        string name = "redraw_lastHH_H1";
-        ObjectDelete(0, name);
-        ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedHH_H1, foundTime + PeriodSeconds(PERIOD_H1), lastAcceptedHH_H1);
-        ObjectSetInteger(0, name, OBJPROP_COLOR, clrOrange);
-        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
-        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
-        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
-        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
-        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+            string name = "redraw_lastHH_H1";
+            ObjectDelete(0, name);
+            ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedHH_H1, foundTime + PeriodSeconds(PERIOD_H1), lastAcceptedHH_H1);
+            ObjectSetInteger(0, name, OBJPROP_COLOR, clrOrange);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+            ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true);
 
-        string lblName = "redraw_lastHH_H1_label";
-        ObjectDelete(0, lblName);
-        ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedHH_H1 + 20 * _Point);
-        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrOrange);
-        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
-        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_H1: " + DoubleToString(lastAcceptedHH_H1, _Digits));
+            string lblName = "redraw_lastHH_H1_label";
+            ObjectDelete(0, lblName);
+            ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedHH_H1 + 20 * _Point);
+            ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrOrange);
+            ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedHH_H1: " + DoubleToString(lastAcceptedHH_H1, _Digits));
+        }
+        else
+        {
+            ObjectDelete(0, "redraw_lastHH_H1");
+            ObjectDelete(0, "redraw_lastHH_H1_label");
+        }
     }
 
     // H1 - lastAcceptedLL
     if (EnableDrawLines_H1 && lastAcceptedLL_H1 > 0)
     {
         double levelTol = 5 * _Point;
-        datetime foundTime = FindFormationTime(llFormPriceH1, llFormTimeH1, llFormCntH1, lastAcceptedLL_H1, levelTol, noTimeLimit);
-        if (foundTime == 0) foundTime = lastTimeLL_H1;
-        if (foundTime == 0) foundTime = TimeCurrent();
+        bool isLlSuperseded = IsLevelSuperseded(breakDownH1, breakDownCntH1, lastAcceptedLL_H1, levelTol);
+        if (!isLlSuperseded)
+        {
+            datetime foundTime = FindFormationTime(llFormPriceH1, llFormTimeH1, llFormCntH1, lastAcceptedLL_H1, levelTol, noTimeLimit);
+            if (foundTime == 0) foundTime = lastTimeLL_H1;
+            if (foundTime == 0) foundTime = TimeCurrent();
 
-        string name = "redraw_lastLL_H1";
-        ObjectDelete(0, name);
-        ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedLL_H1, foundTime + PeriodSeconds(PERIOD_H1), lastAcceptedLL_H1);
-        ObjectSetInteger(0, name, OBJPROP_COLOR, clrAqua);
-        ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
-        ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
-        ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
-        ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
-        ObjectSetInteger(0, name, OBJPROP_BACK, true);
+            string name = "redraw_lastLL_H1";
+            ObjectDelete(0, name);
+            ObjectCreate(0, name, OBJ_TREND, 0, foundTime, lastAcceptedLL_H1, foundTime + PeriodSeconds(PERIOD_H1), lastAcceptedLL_H1);
+            ObjectSetInteger(0, name, OBJPROP_COLOR, clrAqua);
+            ObjectSetInteger(0, name, OBJPROP_WIDTH, 2);
+            ObjectSetInteger(0, name, OBJPROP_STYLE, STYLE_DASHDOT);
+            ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, true);
+            ObjectSetInteger(0, name, OBJPROP_RAY_LEFT, false);
+            ObjectSetInteger(0, name, OBJPROP_BACK, true);
 
-        string lblName = "redraw_lastLL_H1_label";
-        ObjectDelete(0, lblName);
-        ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedLL_H1 - 20 * _Point);
-        ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrAqua);
-        ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
-        ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_H1: " + DoubleToString(lastAcceptedLL_H1, _Digits));
+            string lblName = "redraw_lastLL_H1_label";
+            ObjectDelete(0, lblName);
+            ObjectCreate(0, lblName, OBJ_TEXT, 0, foundTime, lastAcceptedLL_H1 - 20 * _Point);
+            ObjectSetInteger(0, lblName, OBJPROP_COLOR, clrAqua);
+            ObjectSetInteger(0, lblName, OBJPROP_FONTSIZE, 9);
+            ObjectSetString(0, lblName, OBJPROP_TEXT, "lastAcceptedLL_H1: " + DoubleToString(lastAcceptedLL_H1, _Digits));
+        }
+        else
+        {
+            ObjectDelete(0, "redraw_lastLL_H1");
+            ObjectDelete(0, "redraw_lastLL_H1_label");
+        }
     }
     
     ChartRedraw();
@@ -3218,8 +3254,9 @@ int OnInit()
     if (BackfillOnLoad_M15)
         WarmUp_M15(WarmupBars_M15);
 
-    if (BackfillOnLoad_H1)
-        WarmUp_H1(WarmupBars_H1);
+    // ⚠️ H1 LOGIC DISABLED: Only EMA 200 H1 remains active for filtering
+    // if (BackfillOnLoad_H1)
+    //     WarmUp_H1(WarmupBars_H1);
 
     // ✅ BUG #3 FIX: Flush memory array (termasuk BoS continuation backfill dari WarmUp) ke CSV
     // WAJIB sebelum RedrawVisualsFromCSV() karena Redraw membaca dari CSV di disk, bukan memory.
@@ -3240,8 +3277,9 @@ int OnInit()
         // 1) Hapus lastAccepted lines (dibuat oleh UpdateAcceptedLevelVisuals_M15/H1 saat WarmUp)
         ObjectDelete(0, "line_lastAcceptedHH_M15"); ObjectDelete(0, "label_lastAcceptedHH_M15");
         ObjectDelete(0, "line_lastAcceptedLL_M15"); ObjectDelete(0, "label_lastAcceptedLL_M15");
-        ObjectDelete(0, "line_lastAcceptedHH_H1");  ObjectDelete(0, "label_lastAcceptedHH_H1");
-        ObjectDelete(0, "line_lastAcceptedLL_H1");  ObjectDelete(0, "label_lastAcceptedLL_H1");
+        // ⚠️ H1 LOGIC DISABLED: H1 object cleanup commented out
+        // ObjectDelete(0, "line_lastAcceptedHH_H1");  ObjectDelete(0, "label_lastAcceptedHH_H1");
+        // ObjectDelete(0, "line_lastAcceptedLL_H1");  ObjectDelete(0, "label_lastAcceptedLL_H1");
         // 2) Hapus BoS backfill lines (dibuat oleh BUG #3 BF block saat WarmUp)
         //    Nama: BoS_Bear_M15_BF_*, BoS_Bull_M15_BF_*, H1_BoS_Bear_BF_*, H1_BoS_Bull_BF_*
         //    Redraw akan membuat versi redraw_BoS_* dari CSV yang sama.
@@ -3667,6 +3705,8 @@ bool LoadMarketStructureState()
         else if (key == "M15_llAfterBos") llAfterBosConfirmedFlag_M15 = (value == "true");
         else if (key == "M15_postChoCH_HH") postChoCH_HH_M15 = StringToDouble(value);
         else if (key == "M15_time_postChoCH_HH") time_postChoCH_HH_M15 = StringToTime(value);
+        else if (key == "M15_absoluteHighestHH") absoluteHighestHH_M15 = StringToDouble(value);
+        else if (key == "M15_timeAbsoluteHighestHH") timeAbsoluteHighestHH_M15 = StringToTime(value);
         else if (key == "M15_postChoCH_LL") postChoCH_LL_M15 = StringToDouble(value);
         else if (key == "M15_time_postChoCH_LL") time_postChoCH_LL_M15 = StringToTime(value);
         else if (key == "M15_entryCountBuy") entryCountBuy_M15 = (int)StringToInteger(value);
@@ -3691,6 +3731,8 @@ bool LoadMarketStructureState()
         else if (key == "H1_llAfterBos") llAfterBosConfirmedFlag_H1 = (value == "true");
         else if (key == "H1_postChoCH_HH") postChoCH_HH_H1 = StringToDouble(value);
         else if (key == "H1_time_postChoCH_HH") time_postChoCH_HH_H1 = StringToTime(value);
+        else if (key == "H1_absoluteHighestHH") absoluteHighestHH_H1 = StringToDouble(value);
+        else if (key == "H1_timeAbsoluteHighestHH") timeAbsoluteHighestHH_H1 = StringToTime(value);
         else if (key == "H1_postChoCH_LL") postChoCH_LL_H1 = StringToDouble(value);
         else if (key == "H1_time_postChoCH_LL") time_postChoCH_LL_H1 = StringToTime(value);
         else if (key == "H1_lastBarTime") g_LastProcessedBarTime_H1 = StringToTime(value);
@@ -3763,6 +3805,8 @@ void SaveMarketStructureState()
     FileWrite(handle, "M15_llAfterBos=" + (llAfterBosConfirmedFlag_M15 ? "true" : "false"));
     FileWrite(handle, "M15_postChoCH_HH=" + DoubleToString(postChoCH_HH_M15, _Digits));
     FileWrite(handle, "M15_time_postChoCH_HH=" + TimeToString(time_postChoCH_HH_M15, TIME_DATE|TIME_SECONDS));
+    FileWrite(handle, "M15_absoluteHighestHH=" + DoubleToString(absoluteHighestHH_M15, _Digits));
+    FileWrite(handle, "M15_timeAbsoluteHighestHH=" + TimeToString(timeAbsoluteHighestHH_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_postChoCH_LL=" + DoubleToString(postChoCH_LL_M15, _Digits));
     FileWrite(handle, "M15_time_postChoCH_LL=" + TimeToString(time_postChoCH_LL_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_entryCountBuy=" + IntegerToString(entryCountBuy_M15));
@@ -3787,6 +3831,8 @@ void SaveMarketStructureState()
     FileWrite(handle, "H1_llAfterBos=" + (llAfterBosConfirmedFlag_H1 ? "true" : "false"));
     FileWrite(handle, "H1_postChoCH_HH=" + DoubleToString(postChoCH_HH_H1, _Digits));
     FileWrite(handle, "H1_time_postChoCH_HH=" + TimeToString(time_postChoCH_HH_H1, TIME_DATE|TIME_SECONDS));
+    FileWrite(handle, "H1_absoluteHighestHH=" + DoubleToString(absoluteHighestHH_H1, _Digits));
+    FileWrite(handle, "H1_timeAbsoluteHighestHH=" + TimeToString(timeAbsoluteHighestHH_H1, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "H1_postChoCH_LL=" + DoubleToString(postChoCH_LL_H1, _Digits));
     FileWrite(handle, "H1_time_postChoCH_LL=" + TimeToString(time_postChoCH_LL_H1, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "H1_lastBarTime=" + TimeToString(lastBarTime_H1, TIME_DATE|TIME_SECONDS));
@@ -5111,7 +5157,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 // --- 2. Lacak HH tertinggi absolut sejak LL terakhir setelah BoS M15 ---|
                 //--------------------------------------------------------------------+
 
-                if (rates_M15[i].time > time_lastAcceptedLLTime_M15)  // Asumsikan waktu LL terakhir disimpan di variabel ini
+                if (rates_M15[i].time > lastTimeLL_M15)  // Gunakan lastTimeLL_M15 yang sudah disimpan di state
                 {
                     if (absoluteHighestHH_M15 == -1 || rates_M15[i].high > absoluteHighestHH_M15)
                     {
@@ -5122,12 +5168,12 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         if (previousHH == -1)
                         {
                             PrintFormat("📈 [MODE 3 BEARISH M15] Inisialisasi HH tertinggi sejak LL terakhir (%s): %.2f @ %s",
-                                        TimeToString(time_lastAcceptedLLTime_M15), absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
+                                        TimeToString(lastTimeLL_M15), absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         }
                         else
                         {
                             PrintFormat("📈 [MODE 3 BEARISH M15] Update HH tertinggi sejak LL terakhir (%s): %.2f -> %.2f @ %s",
-                                        TimeToString(time_lastAcceptedLLTime_M15), previousHH, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
+                                        TimeToString(lastTimeLL_M15), previousHH, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         }
                     }
                 }
@@ -5140,7 +5186,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 // 3a. Periksa terhadap HH tertinggi absolut M15|
                 // Penolakan HH lebih rendah dari absolut HH M15|
                 //------------------------------------------+
-                if (absoluteHighestHH_M15 != -1 && rates_M15[i].time > time_lastAcceptedLLTime_M15)
+                if (absoluteHighestHH_M15 != -1 && rates_M15[i].time > lastTimeLL_M15)
                 {
                     if (rates_M15[i].high < absoluteHighestHH_M15)
                     {
@@ -5385,14 +5431,22 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 if (rates_M15[i].low < lastAcceptedLL_M15) // <-- Pembaruan utama dalam tren bullish
                 {
                     lastAcceptedLL_M15 = rates_M15[i].low;
+                    lastTimeLL_M15 = rates_M15[i].time; // Update time LL terakhir
                     PrintFormat("✅ [MODE 2.2 M15]Update last Accepted LL After Bos: %s | Time: %s", DoubleToString(lastAcceptedLL_M15, _Digits), TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time); // Update visual setelah semua kondisi
                     llAfterBosConfirmedFlag_M15 = true;          // Tandai HH setelah BoS bullish terkonfirmasi
                     //timeLLAfterBosConfirmed_M15 = TimeCurrent(); // Simpan waktu konfirmasi
                     postChoCH_LL_M15            = rates_M15[i].low;  // Update postChoCH_LL
                     time_postChoCH_LL_M15       = rates_M15[i].time; // Update time postChoCH_LL
+                    
+                    // ✅ Reset absoluteHighestHH untuk mulai tracking HH tertinggi sejak LL baru ini
+                    // Ini penting untuk MODE 3 BEARISH Part 2: setiap LL baru = tracking HH baru dimulai
+                    absoluteHighestHH_M15 = -1;
+                    timeAbsoluteHighestHH_M15 = 0;
+                    
                     PrintFormat("✅ Post CHoCH LL M15: %s | Time: %s", DoubleToString(postChoCH_LL_M15, _Digits), TimeToString(rates_M15[i].time));
                     PrintFormat("✅ LL After BoS Confirmed M15: %s | Time: %s", DoubleToString(lastAcceptedLL_M15, _Digits), TimeToString(rates_M15[i].time));
+                    PrintFormat("🔄 [LL After BoS M15] Reset absoluteHighestHH_M15 untuk tracking HH sejak LL baru @ %s", TimeToString(rates_M15[i].time));
                     //highestLLSinceLastHHAfterBos_M15 = -1; // Reset LL tertinggi sejak HH terakhir setelah BoS
                     //time_lastLLAfterBos_M15 = rates_M15[i].time; // Simpan waktu LL terakhir setelah BoS
                     //PrintFormat("🔄 [LL After BoS Confirmed M15] Reset pencarian HH tertinggi. Waktu referensi LL: %s",
@@ -5947,7 +6001,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         
         // SAVE BoS DATA - price = HH yang di-break (bosBullishBreakLevel_M15), previousPrice = LL referensi
         SaveLLHHBOSToArray("BoS", "Bullish", bosBullishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedLL_M15, 0);
-        
+        // Bersihkan HH line — level udah ke-sweep oleh BoS Bullish M15
+        ObjectDelete(0, "line_lastAcceptedHH_M15");
+        ObjectDelete(0, "label_lastAcceptedHH_M15");
+
         // ... di dalam blok kondisi BoS Bullish ...
         if (bosBullishConfirmedFlag_M15)
         {
@@ -6099,6 +6156,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason);
             }
         }
+        // ✅ FULL FIX: LL udah ke-sweep oleh BoS Bullish M15 — reset supaya visual & state bersih
+        lastAcceptedLL_M15 = -1;
     } 
 
     // ------------+
@@ -6147,9 +6206,18 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         
         // SAVE BoS BEARISH DATA - price = LL yang di-break (bosBearishBreakLevel_M15), previousPrice = HH referensi
         SaveLLHHBOSToArray("BoS", "Bearish", bosBearishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
+        // Bersihkan LL line — level udah ke-sweep oleh BoS Bearish M15
+        ObjectDelete(0, "line_lastAcceptedLL_M15");
+        ObjectDelete(0, "label_lastAcceptedLL_M15");
         // Di dalam blok BoS Bearish:
         timeBoSBearish_M15 = rates_M15[1].time;  // Simpan waktu BoS       
-        ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
+        // ⚠️ JANGAN reset absoluteHighestHH_M15 di sini! Nilai ini masih dibutuhkan untuk MODE 3 BEARISH Part 2
+        // ResetMode2Bearish_M15(); // DIHAPUS: Reset akan menghapus absoluteHighestHH_M15 yang masih dibutuhkan
+        
+        // Reset hanya flag pencarian MODE 2 yang tidak dibutuhkan lagi:
+        absoluteHighFound_M15 = false;
+        bearishSearchCompleted_M15 = false;
+        
         // ... di dalam blok kondisi BoS Bullish ...
         if (bosBearishConfirmedFlag_M15)
         {
@@ -6309,6 +6377,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 RecordRejectedToBacktestTrades("SELL", estimatedEntry, rejectReason);
             }
         }
+        // 💾 [FIX] Retain lastAcceptedHH_M15 untuk Mode 3 Bearish (validasi Lower High)
+        // Visual cleanup untuk HH line dilakukan di UpdateAcceptedLevelVisuals_M15() saat HH baru ditemukan
+        PrintFormat("💾 [BoS BEARISH M15] Retain lastAcceptedHH_M15 untuk Mode 3: %.5f", lastAcceptedHH_M15);
 
     }
 
@@ -6905,7 +6976,7 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                     continue;
                 }
 
-                if (rates_H1[i].time > time_lastAcceptedLLTime_H1)
+                if (rates_H1[i].time > lastTimeLL_H1)
                 {
                     if (absoluteHighestHH_H1 == -1 || rates_H1[i].high > absoluteHighestHH_H1)
                     {
@@ -6916,12 +6987,12 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                         if (previousHH == -1)
                         {
                             PrintFormat("📈 H1: [MODE 3 BEARISH] Inisialisasi HH tertinggi sejak LL terakhir (%s): %.2f @ %s",
-                                        TimeToString(time_lastAcceptedLLTime_H1), absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
+                                        TimeToString(lastTimeLL_H1), absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
                         }
                         else
                         {
                             PrintFormat("📈 H1: [MODE 3 BEARISH] Update HH tertinggi sejak LL terakhir (%s): %.2f -> %.2f @ %s",
-                                        TimeToString(time_lastAcceptedLLTime_H1), previousHH, absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
+                                        TimeToString(lastTimeLL_H1), previousHH, absoluteHighestHH_H1, TimeToString(rates_H1[i].time));
                         }
                     }
                 }
@@ -6929,7 +7000,7 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
                 bool   hhRejected_H1   = false;
                 string rejectReason_H1 = "";
 
-                if (absoluteHighestHH_H1 != -1 && rates_H1[i].time > time_lastAcceptedLLTime_H1)
+                if (absoluteHighestHH_H1 != -1 && rates_H1[i].time > lastTimeLL_H1)
                 {
                     if (rates_H1[i].high < absoluteHighestHH_H1)
                     {
@@ -7550,6 +7621,12 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
         
         // SAVE BoS DATA
         SaveLLHHBOSToArray("BoS", "Bullish", lastAcceptedLL_H1, rates_H1[1].time, "H1", "Confirmed", lastAcceptedHH_H1, 0);
+        // Bersihkan HH line — level udah ke-sweep oleh BoS Bullish H1
+        if (EnableDrawLines_H1)
+        {
+            ObjectDelete(0, "line_lastAcceptedHH_H1");
+            ObjectDelete(0, "label_lastAcceptedHH_H1");
+        }
         
         if (bosBullishConfirmedFlag_H1)
         {
@@ -7608,6 +7685,12 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
         
         // SAVE BoS BEARISH DATA
         SaveLLHHBOSToArray("BoS", "Bearish", lastAcceptedLL_H1, rates_H1[1].time, "H1", "Confirmed", lastAcceptedHH_H1, 0);
+        // Bersihkan LL line — level udah ke-sweep oleh BoS Bearish H1
+        if (EnableDrawLines_H1)
+        {
+            ObjectDelete(0, "line_lastAcceptedLL_H1");
+            ObjectDelete(0, "label_lastAcceptedLL_H1");
+        }
         timeBoSBearish_H1 = rates_H1[1].time;
         ResetMode2Bearish_H1();
         
@@ -7830,7 +7913,8 @@ void OnTick()
             Print("❌ Gagal ambil nilai EMA200 untuk H1");
         }
 
-        DetectAndDraw_H1(rates_H1, /*backfillMode=*/false);
+        // ⚠️ H1 LOGIC DISABLED: DetectAndDraw_H1 is commented out, only EMA 200 H1 remains active
+        // DetectAndDraw_H1(rates_H1, /*backfillMode=*/false);
     }
 }
 

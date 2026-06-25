@@ -142,18 +142,18 @@ class MarketStructureLinesReader:
                         continue
                     
                     # Parse time: CSV stores broker/server time (TimeCurrent()).
-                    # Convert to true UTC by subtracting the broker offset.
+                    # Treat as UTC directly to match chart candles (backtest-data endpoint
+                    # also treats broker time as UTC). Keeping them in the same time space
+                    # ensures structure lines align with candle positions.
                     try:
-                        # Parse as naive datetime (broker time)
                         event_time_naive = datetime.strptime(time_str, '%Y.%m.%d %H:%M:%S')
-                        # Subtract broker offset to get true UTC, then mark as UTC
                         from datetime import timezone
-                        event_time = (event_time_naive - timedelta(hours=self.BROKER_OFFSET_HOURS)).replace(tzinfo=timezone.utc)
+                        event_time = event_time_naive.replace(tzinfo=timezone.utc)
                     except:
                         try:
                             event_time_naive = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
                             from datetime import timezone
-                            event_time = (event_time_naive - timedelta(hours=self.BROKER_OFFSET_HOURS)).replace(tzinfo=timezone.utc)
+                            event_time = event_time_naive.replace(tzinfo=timezone.utc)
                         except:
                             continue
                     

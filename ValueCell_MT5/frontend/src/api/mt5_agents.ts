@@ -117,13 +117,20 @@ export interface SessionZonesResponse {
   total_zones: number;
 }
 
-export const useSessionZones = (days: number = 2, symbol: string = "XAUUSD") => {
+export const useSessionZones = (
+  daysOrFromDate: number | string = 2,
+  symbol: string = "XAUUSD"
+) => {
+  // Determine if parameter is a date string (YYYY-MM-DD) or number of days
+  const isDateString = typeof daysOrFromDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(daysOrFromDate);
+  
+  const queryString = isDateString
+    ? `/trading/session-zones?symbol=${symbol}&from_date=${daysOrFromDate}`
+    : `/trading/session-zones?symbol=${symbol}&days=${daysOrFromDate}`;
+
   return useQuery({
-    queryKey: ["trading", "session-zones", symbol, days],
-    queryFn: () =>
-      apiClient.get<SessionZonesResponse>(
-        `/trading/session-zones?symbol=${symbol}&days=${days}`,
-      ),
+    queryKey: ["trading", "session-zones", symbol, daysOrFromDate],
+    queryFn: () => apiClient.get<SessionZonesResponse>(queryString),
     refetchInterval: 30000, // Refresh every 30 seconds to extend the live session
   });
 };
