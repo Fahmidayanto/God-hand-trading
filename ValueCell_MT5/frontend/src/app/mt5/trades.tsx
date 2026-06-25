@@ -652,7 +652,8 @@ export default function TradesPage() {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        for (const line of lines) {
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
           if (!line.trim()) continue;
           const msg = JSON.parse(line);
 
@@ -669,6 +670,10 @@ export default function TradesPage() {
             setDataMode('recent');
             setLoadProgress({ visible: false, percent: 0, step: '', total: 0 });
             return;
+          }
+
+          if (i % 20 === 19) {
+            await new Promise(r => setTimeout(r, 0));
           }
         }
       }
