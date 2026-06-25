@@ -10,11 +10,15 @@ import {
 import Particles from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import type { Engine } from "@tsparticles/engine";
-import { useMarketStructureLines, useSessionZones } from "@/api/mt5_agents";
+import { useMarketStructureLines, useSessionZones, useBacktestTrades, type BacktestTrade } from "@/api/mt5_agents";
 import {
   SessionZonesPrimitive,
   type SessionZoneBox,
 } from "@/components/valuecell/charts/session-zones-primitive";
+import {
+  TradesOverlayPrimitive,
+  type TradeOverlayEntry,
+} from "@/components/valuecell/charts/trades-overlay-primitive";
 import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 
@@ -51,8 +55,15 @@ export default function TradesPage() {
   const [showStructure, setShowStructure] = useState(true);
   const [showSessions, setShowSessions] = useState(true);
   const [showEMA200, setShowEMA200] = useState(true);
+  const [showTrades, setShowTrades] = useState(false);
   const [activeTimeframe, setActiveTimeframe] = useState("M15"); // Timeframe state
   const [chartCandles, setChartCandles] = useState<ChartCandle[]>([]);
+  const [loadProgress, setLoadProgress] = useState<{
+    visible: boolean;
+    percent: number;
+    step: string;
+    total: number;
+  }>({ visible: false, percent: 0, step: '', total: 0 });
   
   // Data loading mode state
   const [dataMode, setDataMode] = useState<'recent' | 'full' | 'loading'>('recent');
@@ -150,6 +161,9 @@ export default function TradesPage() {
   const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const structureSeriesRef = useRef<ISeriesApi<"Line">[]>([]); // Line series for structure
   const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
+  const tradeSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
+  const tradesPrimitiveRef = useRef<TradesOverlayPrimitive | null>(null);
+  const overlayTradeGuardRef = useRef(false);
   
   // Ref to always get the latest timezone state in formatter
   const chartTimezoneRef = useRef(chartTimezone);
@@ -194,6 +208,9 @@ export default function TradesPage() {
 
   // Load session zones - sync with chart data mode
   const { data: sessionZonesData } = useSessionZones(chartFromDate);
+
+  // Load backtest trades for Entry/SL/TP overlay
+  const { data: backtestTradesData } = useBacktestTrades();
 
   const processCandles = (candles: any[]): ChartCandle[] =>
     candles.map((candle: any) => ({
@@ -587,97 +604,102 @@ export default function TradesPage() {
   
   // Load full history function with caching
   const loadFullHistory = async () => {
-    console.log('📅 Loading full history from 2020-01-01...');
+    setLoadProgress({ visible: true, percent: 0, step: 'Counting rows...', total: 0 });
 
     const cacheKey = activeTimeframe;
     const cachedData = candleCacheRef.current[cacheKey];
     if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
-      console.log('⚡ Full history already cached, reusing memory data');
-      // Preserve viewport + bar spacing before data swap
       const ts = chartRef.current?.timeScale();
       const prevRange = ts?.getVisibleRange();
       const prevBarSpacing = ts?.options()?.barSpacing;
-      console.log('📅 loadFullHistory CACHED', { prevRange, prevBarSpacing });
       setChartFromDate(cachedData.fromDate);
       updateLoadedCandles(cachedData.candles, cachedData.totalCount);
       setDataMode('full');
       if (showStructure && structureLines) {
         overlayMarketStructure(cachedData.candles, true);
       }
-      // Restore viewport + bar spacing before browser paint (setTimeout, not rAF)
       if (prevRange && ts) {
         setTimeout(() => {
-          console.log('📅 RESTORE prevRange (setTimeout 0)', prevRange);
           ts.setVisibleRange(prevRange);
-          if (prevBarSpacing != null) {
-            console.log('📅 RESTORE prevBarSpacing', prevBarSpacing);
-            ts.applyOptions({ barSpacing: prevBarSpacing });
-          }
+          if (prevBarSpacing != null) ts.applyOptions({ barSpacing: prevBarSpacing });
         }, 0);
       }
       fullDataDisplayedRef.current[cacheKey] = true;
+      setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
       return;
     }
 
     setDataMode('loading');
     setChartFromDate('2020-01-01');
-    
+
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01&mode=full`;
-      
-      console.log('🔄 Fetching full history for caching:', chartUrl);
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data-stream?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01&mode=full`;
+
       const response = await fetch(chartUrl);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('✅ Full history received:', {
-          candles: data.candles?.length,
-          mode: data.mode,
-        });
-        
-        if (data.candles && data.candles.length > 0) {
-          // Process and CACHE all candles
-          const processedCandles = processCandles(data.candles);
-          
-          // Store in cache
-          cacheFullHistory(cacheKey, processedCandles);
-          
-          console.log('💾 Full history cached:', {
-            timeframe: cacheKey,
-            totalCandles: processedCandles.length,
-            dateRange: `${candleCacheRef.current[cacheKey].fromDate} to ${candleCacheRef.current[cacheKey].toDate}`,
-          });
-          
-          // Display all candles on chart — preserve viewport + bar spacing
-          const ts = chartRef.current?.timeScale();
-          const prevRange = ts?.getVisibleRange();
-          const prevBarSpacing = ts?.options()?.barSpacing;
-          if (candlestickSeriesRef.current) {
-            updateLoadedCandles(processedCandles);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let completeData: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const msg = JSON.parse(line);
+
+          if (msg.type === 'progress') {
+            setLoadProgress({
+              visible: true,
+              percent: msg.percent,
+              step: msg.step,
+              total: msg.total_estimated ?? 0,
+            });
+          } else if (msg.type === 'complete') {
+            completeData = msg.data;
+          } else if (msg.type === 'error') {
+            console.error('Backend error:', msg.message);
+            setDataMode('recent');
+            setLoadProgress({ visible: false, percent: 0, step: '', total: 0 });
+            return;
           }
-          // Restore viewport + bar spacing before browser paint (setTimeout, not rAF)
-          if (prevRange && ts) {
-            setTimeout(() => {
-              ts.setVisibleRange(prevRange);
-              if (prevBarSpacing != null) {
-                ts.applyOptions({ barSpacing: prevBarSpacing });
-              }
-            }, 0);
-          }
-          
-          setDataMode('full');
-          // Defer heavy overlay to next frame — candles render first, browser stays responsive
-          if (showStructure && structureLines) {
-            requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
-          }
-          fullDataDisplayedRef.current[cacheKey] = true;
-          console.log('✅ Full history loaded and cached successfully');
         }
       }
+
+      if (!completeData) throw new Error('No complete event received');
+      const { candles } = completeData;
+
+      if (candles && candles.length > 0) {
+        const processedCandles = processCandles(candles);
+        cacheFullHistory(cacheKey, processedCandles);
+        const ts = chartRef.current?.timeScale();
+        const prevRange = ts?.getVisibleRange();
+        const prevBarSpacing = ts?.options()?.barSpacing;
+        if (candlestickSeriesRef.current) updateLoadedCandles(processedCandles);
+        if (prevRange && ts) {
+          setTimeout(() => {
+            ts.setVisibleRange(prevRange);
+            if (prevBarSpacing != null) ts.applyOptions({ barSpacing: prevBarSpacing });
+          }, 0);
+        }
+        setDataMode('full');
+        if (showStructure && structureLines) {
+          requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+        }
+        fullDataDisplayedRef.current[cacheKey] = true;
+      }
     } catch (error) {
-      console.error('❌ Load full history error:', error);
+      console.error('Stream error:', error);
       setDataMode('recent');
+    } finally {
+      setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
     }
   };
   
@@ -859,6 +881,141 @@ export default function TradesPage() {
       span.style.pointerEvents = 'none';
       overlayEl.appendChild(span);
     }
+  };
+
+  const renderTradesLabels = (trades: BacktestTrade[]) => {
+    const overlayEl = document.getElementById('trades-labels-overlay');
+    if (!overlayEl || !chartRef.current || !candlestickSeriesRef.current) return;
+    overlayEl.innerHTML = '';
+    const series = candlestickSeriesRef.current;
+    const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
+
+    for (const trade of trades) {
+      const endTs = trade.exit_time_ts ?? lastCandle;
+      if (!endTs) continue;
+      const midTime = Math.floor((trade.entry_time_ts + endTs) / 2) as any;
+      const labels = [
+        { price: trade.entry_price, color: '#3b82f6', text: `Entry ${trade.entry_price}` },
+      ];
+      if (trade.sl !== null) labels.push({ price: trade.sl, color: '#ef4444', text: `SL ${trade.sl}` });
+      if (trade.tp !== null) labels.push({ price: trade.tp, color: '#22c55e', text: `TP ${trade.tp}` });
+
+      for (const lbl of labels) {
+        const x = chartRef.current.timeScale().timeToCoordinate(midTime);
+        const y = series.priceToCoordinate(lbl.price);
+        if (x === null || y === null) continue;
+        const span = document.createElement('span');
+        span.textContent = lbl.text;
+        span.style.position = 'absolute';
+        span.style.transform = 'translateX(-50%)';
+        span.style.top = `${(y as number) - 10}px`;
+        span.style.left = `${x as number}px`;
+        span.style.color = lbl.color;
+        span.style.fontSize = '10px';
+        span.style.fontWeight = '600';
+        span.style.fontFamily = 'monospace';
+        span.style.background = 'rgba(17, 24, 39, 0.85)';
+        span.style.padding = '1px 5px';
+        span.style.borderRadius = '3px';
+        span.style.border = `1px solid ${lbl.color}`;
+        span.style.whiteSpace = 'nowrap';
+        span.style.pointerEvents = 'none';
+        overlayEl.appendChild(span);
+      }
+    }
+  };
+
+  const overlayTradeEntries = () => {
+    if (overlayTradeGuardRef.current) return;
+    overlayTradeGuardRef.current = true;
+    tradeSeriesRef.current.forEach(series => {
+      try { chartRef.current?.removeSeries(series); } catch (e) {}
+    });
+    tradeSeriesRef.current = [];
+    if (tradesPrimitiveRef.current && candlestickSeriesRef.current) {
+      try { candlestickSeriesRef.current.detachPrimitive(tradesPrimitiveRef.current); } catch (e) {}
+    }
+    tradesPrimitiveRef.current = null;
+    const tradesEl = document.getElementById('trades-labels-overlay');
+    if (tradesEl) tradesEl.innerHTML = '';
+
+    if (!showTrades || !backtestTradesData || !chartRef.current || !candlestickSeriesRef.current) {
+      overlayTradeGuardRef.current = false;
+      return;
+    }
+
+    const trades = backtestTradesData.trades ?? [];
+    if (trades.length === 0) {
+      overlayTradeGuardRef.current = false;
+      return;
+    }
+
+    const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
+
+    const createSeriesForTrade = (trade: BacktestTrade) => {
+      const startTs = trade.entry_time_ts;
+      const endTs = trade.exit_time_ts ?? lastCandle;
+      if (!startTs || !endTs) return;
+      const startTime = startTs as any;
+      const endTime = endTs as any;
+
+      const entrySeries = chartRef.current!.addSeries(LineSeries, {
+        color: '#3b82f6', lineWidth: 2, lineStyle: LineStyle.Dashed,
+        priceLineVisible: false, lastValueVisible: false,
+      });
+      entrySeries.setData([{ time: startTime, value: trade.entry_price }, { time: endTime, value: trade.entry_price }]);
+      tradeSeriesRef.current.push(entrySeries);
+
+      if (trade.tp !== null) {
+        const tpSeries = chartRef.current!.addSeries(LineSeries, {
+          color: '#22c55e', lineWidth: 1, lineStyle: LineStyle.Dashed,
+          priceLineVisible: false, lastValueVisible: false,
+        });
+        tpSeries.setData([{ time: startTime, value: trade.tp }, { time: endTime, value: trade.tp }]);
+        tradeSeriesRef.current.push(tpSeries);
+      }
+
+      if (trade.sl !== null) {
+        const slSeries = chartRef.current!.addSeries(LineSeries, {
+          color: '#ef4444', lineWidth: 1, lineStyle: LineStyle.Dashed,
+          priceLineVisible: false, lastValueVisible: false,
+        });
+        slSeries.setData([{ time: startTime, value: trade.sl }, { time: endTime, value: trade.sl }]);
+        tradeSeriesRef.current.push(slSeries);
+      }
+    };
+
+    const finishOverlay = () => {
+      const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
+      candlestickSeriesRef.current!.attachPrimitive(primitive);
+      const entries: TradeOverlayEntry[] = trades.map(t => ({
+        type: t.type, entry_price: t.entry_price, sl: t.sl, tp: t.tp,
+        profit: t.profit, entry_time_ts: t.entry_time_ts, exit_time_ts: t.exit_time_ts,
+      }));
+      primitive.setTrades(entries);
+      primitive.setLastCandleTime(lastCandle as number | null);
+      tradesPrimitiveRef.current = primitive;
+      renderTradesLabels(trades);
+      overlayTradeGuardRef.current = false;
+    };
+
+    const BATCH = 30;
+    let idx = 0;
+
+    const nextBatch = () => {
+      if (!chartRef.current || !showTrades) {
+        tradeSeriesRef.current.forEach(s => { try { chartRef.current?.removeSeries(s); } catch (e) {} });
+        tradeSeriesRef.current = [];
+        overlayTradeGuardRef.current = false;
+        return;
+      }
+      const end = Math.min(idx + BATCH, trades.length);
+      for (; idx < end; idx++) createSeriesForTrade(trades[idx]);
+      if (idx < trades.length) requestAnimationFrame(nextBatch);
+      else finishOverlay();
+    };
+
+    requestAnimationFrame(nextBatch);
   };
 
   const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
@@ -1403,6 +1560,11 @@ export default function TradesPage() {
     }
   }, [showEMA200]);
 
+  // Toggle trade entries overlay
+  useEffect(() => {
+    overlayTradeEntries();
+  }, [showTrades, backtestTradesData]);
+
   const loadTradeHistory = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -1741,9 +1903,28 @@ export default function TradesPage() {
                 <span>📈</span>
                 <span>EMA 200</span>
               </button>
+
+              {/* Trades Entry/SL/TP Toggle */}
+              <button
+                onClick={() => setShowTrades(!showTrades)}
+                className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 ${
+                  showTrades
+                    ? "!border-[#3b82f6] !text-[#3b82f6] shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                    : ""
+                }`}
+                title="Toggle Trade Entry/SL/TP Overlay"
+              >
+                <span>📊</span>
+                <span>Trades</span>
+                {backtestTradesData && (
+                  <span className="text-xs opacity-70">
+                    ({backtestTradesData.total_trades})
+                  </span>
+                )}
+              </button>
               
               {/* Load Full History Button - show whenever full history not yet cached */}
-              {!fullHistoryLoadedRef.current[activeTimeframe] && dataMode !== 'loading' && (
+              {!fullHistoryLoadedRef.current[activeTimeframe] && dataMode !== 'loading' && !loadProgress.visible && (
                 <button
                   onClick={loadFullHistory}
                   disabled={isJumping}
@@ -1959,6 +2140,11 @@ export default function TradesPage() {
               className="absolute inset-0 pointer-events-none overflow-hidden"
               style={{ zIndex: 10 }}
             />
+            <div 
+              id="trades-labels-overlay"
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              style={{ zIndex: 11 }}
+            />
           </div>
         </div>
 
@@ -2094,6 +2280,32 @@ export default function TradesPage() {
           </div>
         </div>
         </div>
+
+        {/* Progress popup for Load Full History */}
+        {loadProgress.visible && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
+              <div className="text-center mb-4">
+                <div className="text-purple-300 font-semibold text-sm mb-2">
+                  📅 Loading Full History
+                </div>
+                <div className="text-3xl font-bold text-white mb-1">
+                  {loadProgress.percent}%
+                </div>
+                <div className="text-xs text-gray-400">{loadProgress.step}</div>
+                <div className="text-[10px] text-gray-500 mt-1">
+                  {loadProgress.total.toLocaleString()} total rows
+                </div>
+              </div>
+              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300"
+                  style={{ width: `${loadProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Footer - Sticky to bottom */}
         <div>

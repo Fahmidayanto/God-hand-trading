@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.mt5_manager import MT5Manager
 from app.dependencies import get_mt5_manager
@@ -425,6 +426,30 @@ async def get_backtest_chart_data(
     except Exception as e:
         logger.error(f"Backtest chart data error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chart/backtest-data-stream")
+async def get_backtest_chart_data_stream(
+    symbol: str = Query("XAUUSD"),
+    timeframe: str = Query("M15"),
+    from_date: str = Query("2020-01-01", description="Start date YYYY-MM-DD"),
+    mode: str = Query("full", description="Loading mode: 'full' (from 2020)"),
+):
+    """
+    Stream candle data with real-time progress via NDJSON.
+    Used by the frontend "Load Full History" button to show a progress bar.
+    """
+    from app.services.market_data_streamer import MarketDataStreamer
+
+    streamer = MarketDataStreamer()
+
+    async def generate():
+        async for line in streamer.stream(symbol, timeframe, from_date, mode):
+            yield line + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
+
+
 async def get_candles(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
     timeframe: str = Query("M15", description="Timeframe"),
@@ -471,6 +496,37 @@ async def get_candles(
         raise
     except Exception as e:
         logger.error(f"Candles fetch error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.get("/backtest-trades")
+async def get_backtest_trades():
+    """
+    Get backtest trade entries with SL/TP for chart overlay.
+
+    Reads all Backtest_Results_XAUUSD_*.csv files, returns executed
+    trades with entry/SL/TP prices and times for the chart overlay.
+
+    Returns:
+        Dictionary containing:
+        - trades: List of trade objects with type, prices, times
+        - total_trades: Count
+        - last_updated: ISO timestamp
+    """
+    try:
+        from app.services.backtest_trades_reader import BacktestTradesReader
+
+        reader = BacktestTradesReader()
+        data = reader.get_all_trades()
+
+        logger.info(f"[API] Returning {data['total_trades']} backtest trades")
+        return JSONResponse(content=data)
+
+    except Exception as e:
+        logger.error(f"Backtest trades error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
