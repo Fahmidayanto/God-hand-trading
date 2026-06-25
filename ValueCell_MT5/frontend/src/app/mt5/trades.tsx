@@ -704,6 +704,7 @@ export default function TradesPage() {
       console.error('Stream error:', error);
       setDataMode('recent');
     } finally {
+      latestProgressRef.current = { percent: 100, step: '', total: 0 };
       setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
     }
   };
@@ -1578,7 +1579,7 @@ export default function TradesPage() {
       setLoadProgress(prev => {
         const l = latestProgressRef.current;
         return l.percent !== prev.percent || l.step !== prev.step
-          ? { ...prev, visible: true, ...l }
+          ? { ...prev, ...l }
           : prev;
       });
       rafId = requestAnimationFrame(sync);
