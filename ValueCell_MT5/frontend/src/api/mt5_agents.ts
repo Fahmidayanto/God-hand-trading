@@ -94,6 +94,7 @@ export const useMarketStructureLines = (hoursBack: number = 48) => {
     queryKey: ["agents", "market-structure-lines", hoursBack],
     queryFn: () => apiClient.get<MarketStructureLines>(`/agents/market-structure-lines?hours_back=${hoursBack}`),
     refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 60000, // Don't refetch if data is less than 1 minute stale
   });
 };
 

@@ -124,12 +124,6 @@ class SessionZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
       return box.end >= visibleFrom && box.start <= visibleTo;
     });
     
-    console.log('🎨 [SESSION RENDER] Drawing session zones:', {
-      totalBoxes: this.source.boxes.length,
-      visibleBoxes: visibleBoxes.length,
-      visibleRange: { from: visibleFrom, to: visibleTo },
-    });
-
     target.useBitmapCoordinateSpace((scope) => {
       const ctx = scope.context;
       const hpr = scope.horizontalPixelRatio;
@@ -292,9 +286,10 @@ export class SessionZonesPrimitive implements ISeriesPrimitive<Time> {
     this.requestUpdate?.();
   }
 
-  /** Provide the candle times so band edges can snap to real bars (handles market gaps). */
+  /** Provide the candle times so band edges can snap to real bars (handles market gaps).
+   *  Data is already pre-sorted from API — skip redundant sort on every jump. */
   setCandleTimes(times: number[]): void {
-    this.candleTimes = [...times].sort((a, b) => a - b);
+    this.candleTimes = times;
     this.requestUpdate?.();
   }
 

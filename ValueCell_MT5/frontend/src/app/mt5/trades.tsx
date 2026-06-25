@@ -30,6 +30,15 @@ interface Trade {
   open_time: string;
 }
 
+type ChartCandle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  ema200?: number;
+};
+
 export default function TradesPage() {
   const [stats, setStats] = useState({
     total_trades: 0,
@@ -43,7 +52,42 @@ export default function TradesPage() {
   const [showSessions, setShowSessions] = useState(true);
   const [showEMA200, setShowEMA200] = useState(true);
   const [activeTimeframe, setActiveTimeframe] = useState("M15"); // Timeframe state
-  const [chartCandles, setChartCandles] = useState<Array<{time: number, open: number, high: number, low: number, close: number}>>([]);
+  const [chartCandles, setChartCandles] = useState<ChartCandle[]>([]);
+  
+  // Data loading mode state
+  const [dataMode, setDataMode] = useState<'recent' | 'full' | 'loading'>('recent');
+  const [chartFromDate, setChartFromDate] = useState(() => {
+    // Default: 6 months ago
+    const date = new Date();
+    date.setMonth(date.getMonth() - 6);
+    return date.toISOString().split('T')[0];
+  });
+  const [candlesCount, setCandlesCount] = useState(0);
+  
+  // Year/Month Jump Navigation state
+  const [selectedYear, setSelectedYear] = useState("2026");
+  const [selectedMonth, setSelectedMonth] = useState("06");
+  const [isJumping, setIsJumping] = useState(false);
+  
+  // Available years (2020-2026)
+  const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+  
+  // Available months
+  const availableMonths = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+  
   // CHART TIMEZONE DEFAULT = UTC.
   // When the page first opens, UTC is always selected (per requirement).
   // The user can manually switch to 'broker' or 'local'; once switched, that
@@ -75,21 +119,12 @@ export default function TradesPage() {
     const date = new Date(time * 1000);
     let day: string, month: string, year: number, hours: string, minutes: string;
     
-    console.log('🕐 formatChartTime called:', {
-      time,
-      displayMode,
-      brokerOffset,
-      utcTime: date.toUTCString(),
-      localTime: date.toString()
-    });
-    
     if (displayMode === 'utc') {
       day = String(date.getUTCDate()).padStart(2, '0');
       month = indonesianMonths[date.getUTCMonth()];
       year = date.getUTCFullYear();
       hours = String(date.getUTCHours()).padStart(2, '0');
       minutes = String(date.getUTCMinutes()).padStart(2, '0');
-      console.log('  → UTC format:', `${day} ${month} ${year} ${hours}:${minutes}`);
     } else if (displayMode === 'broker') {
       const brokerTime = new Date((time + brokerOffset * 3600) * 1000);
       day = String(brokerTime.getUTCDate()).padStart(2, '0');
@@ -97,14 +132,12 @@ export default function TradesPage() {
       year = brokerTime.getUTCFullYear();
       hours = String(brokerTime.getUTCHours()).padStart(2, '0');
       minutes = String(brokerTime.getUTCMinutes()).padStart(2, '0');
-      console.log('  → Broker format:', `${day} ${month} ${year} ${hours}:${minutes}`, `(offset: +${brokerOffset}h)`);
     } else { // local
       day = String(date.getDate()).padStart(2, '0');
       month = indonesianMonths[date.getMonth()];
       year = date.getFullYear();
       hours = String(date.getHours()).padStart(2, '0');
       minutes = String(date.getMinutes()).padStart(2, '0');
-      console.log('  → Local format:', `${day} ${month} ${year} ${hours}:${minutes}`);
     }
     
     return `${day} ${month} ${year} ${hours}:${minutes}`;
@@ -121,6 +154,32 @@ export default function TradesPage() {
   // Ref to always get the latest timezone state in formatter
   const chartTimezoneRef = useRef(chartTimezone);
   
+  // ========================
+  // CLIENT-SIDE CACHE SYSTEM
+  // ========================
+  // Cache full candle data in memory for instant navigation
+  // Key format: "{timeframe}" (e.g., "M15", "H1")
+  // This eliminates the need to fetch from API on every month jump
+  const candleCacheRef = useRef<{
+    [key: string]: {
+      candles: ChartCandle[];
+      loadedAt: number; // timestamp when cached
+      fromDate: string; // e.g., "2020-01-01"
+      toDate: string;   // e.g., "2026-06-25"
+      totalCount: number;
+    }
+  }>({});
+  
+  // Flag to track if full history has been loaded for current timeframe
+  const fullHistoryLoadedRef = useRef<{[key: string]: boolean}>({});
+  
+  // Track if full cached data is currently DISPLAYED on chart (not just cached).
+  // Prevents redundant setData + overlay rebuild on year/month jumps within same timeframe.
+  const fullDataDisplayedRef = useRef<{[key: string]: boolean}>({});
+  
+  // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
+  const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  
   // Update ref whenever chartTimezone changes
   useEffect(() => {
     console.log('📍 chartTimezone state changed:', {
@@ -133,8 +192,83 @@ export default function TradesPage() {
   // Load market structure lines (180 days lookback to cover Jan-Jun 2026 chart range)
   const { data: structureLines } = useMarketStructureLines(4320); // 180 days = 4320 hours
 
-  // Load session zones (from 2020-01-01 to match chart data range)
-  const { data: sessionZonesData } = useSessionZones("2020-01-01");
+  // Load session zones - sync with chart data mode
+  const { data: sessionZonesData } = useSessionZones(chartFromDate);
+
+  const processCandles = (candles: any[]): ChartCandle[] =>
+    candles.map((candle: any) => ({
+      time: candle.time as number,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      ema200: candle.ema200,
+    }));
+
+  const updateEma200Series = (candles: ChartCandle[]) => {
+    if (!ema200SeriesRef.current) return;
+
+    const ema200Data = candles
+      .filter((candle) => candle.ema200 != null)
+      .map((candle) => ({
+        time: candle.time as number,
+        value: candle.ema200 as number,
+      }));
+
+    ema200SeriesRef.current.setData(ema200Data as any);
+  };
+
+  const updateLoadedCandles = (candles: ChartCandle[], count = candles.length) => {
+    candlestickSeriesRef.current?.setData(candles as any);
+    setChartCandles(candles);
+    setCandlesCount(count);
+    updateEma200Series(candles);
+    sessionZonesPrimitiveRef.current?.setCandleTimes(candles.map((candle) => candle.time));
+  };
+
+  const cacheFullHistory = (timeframe: string, candles: ChartCandle[]) => {
+    candleCacheRef.current[timeframe] = {
+      candles,
+      loadedAt: Date.now(),
+      fromDate: '2020-01-01',
+      toDate: new Date(candles[candles.length - 1].time * 1000).toISOString().split('T')[0],
+      totalCount: candles.length,
+    };
+    fullHistoryLoadedRef.current[timeframe] = true;
+  };
+
+  const focusChartOnDate = (centerDate: string, delayMs = 50, candles?: ChartCandle[]) => {
+    const centerTimestamp = Date.parse(`${centerDate}T00:00:00Z`) / 1000;
+
+    const doScroll = () => {
+      const timeScale = chartRef.current?.timeScale();
+      if (!timeScale) return;
+
+      if (candles && candles.length > 0) {
+        const idx = candles.findIndex((c: ChartCandle) => c.time >= centerTimestamp);
+        if (idx >= 0) {
+          timeScale.setVisibleLogicalRange({
+            from: Math.max(0, idx - 20) as any,
+            to: Math.min(candles.length - 1, idx + 80) as any,
+          });
+        }
+      }
+
+      renderStructureLabelsOverlay(structureLabelsRef.current);
+    };
+
+    if (delayMs === 0) {
+      requestAnimationFrame(doScroll);
+    } else {
+      setTimeout(() => requestAnimationFrame(doScroll), delayMs);
+    }
+  };
+
+  const getWindowStartDate = (centerDate: string) => {
+    const windowStart = new Date(`${centerDate}T00:00:00Z`);
+    windowStart.setUTCMonth(windowStart.getUTCMonth() - 3);
+    return windowStart.toISOString().split('T')[0];
+  };
 
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine);
@@ -187,7 +321,7 @@ export default function TradesPage() {
             fixRightEdge: false,
             lockVisibleTimeRangeOnResize: false,
             rightBarStaysOnScroll: true,
-            shiftVisibleRangeOnNewBar: true,
+            shiftVisibleRangeOnNewBar: false, // CRITICAL: Disable auto-scroll when data updates
           },
           localization: {
             locale: 'en-US',
@@ -244,9 +378,14 @@ export default function TradesPage() {
           console.warn("Could not attach session zones primitive:", e);
         }
         
-        // Re-render structure labels whenever the user pans/zooms the chart
+        // Re-render structure labels with 50ms debounce when user pans/zooms
+        // Prevents DOM churn at 60fps (innerHTML='' + createElement per label per frame)
         chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-          renderStructureLabelsOverlay(structureLabelsRef.current);
+          if (scrollLabelDebounceRef.current) clearTimeout(scrollLabelDebounceRef.current);
+          scrollLabelDebounceRef.current = setTimeout(
+            () => renderStructureLabelsOverlay(structureLabelsRef.current),
+            50
+          );
         });
 
         console.log('✅ Chart initialized successfully');
@@ -280,14 +419,28 @@ export default function TradesPage() {
   }, []);
 
   useEffect(() => {
-    // Auto-refresh chart data every 5 seconds
+    // Auto-refresh chart data every 30 seconds (increased from 5s for performance)
+    // ONLY refresh in recent mode AND only if user hasn't jumped to specific date
+    // Disable auto-refresh when exploring historical data to prevent unwanted scrolling
     const chartInterval = setInterval(() => {
-      if (chartRef.current && candlestickSeriesRef.current) {
-        loadChartData(false);
+      if (chartRef.current && candlestickSeriesRef.current && dataMode === 'recent' && !isJumping) {
+        // Only auto-refresh if we're truly in recent mode (last 6 months)
+        // Don't refresh if user is exploring historical data via jump
+        const recentThreshold = new Date();
+        recentThreshold.setMonth(recentThreshold.getMonth() - 6);
+        
+        // Check if chartFromDate is within recent range
+        const chartDate = new Date(chartFromDate);
+        if (chartDate >= recentThreshold) {
+          console.log('🔄 Auto-refresh chart data (recent mode only)');
+          loadChartData(false, 'recent');
+        } else {
+          console.log('⏸️ Skipping auto-refresh (user is viewing historical data)');
+        }
       }
-    }, 5000);
+    }, 30000); // 30 seconds instead of 5 seconds
     return () => clearInterval(chartInterval);
-  }, [activeTimeframe, activeYear]);
+  }, [activeTimeframe, activeYear, dataMode, chartFromDate, isJumping]);
 
   // DISABLED: months generation from candle data
   // useEffect(() => {
@@ -316,12 +469,17 @@ export default function TradesPage() {
   //   setSelectedMonth(prev => prev === "" && months.length > 0 ? String(months[0].value) : prev);
   // }, [chartCandles]);
 
-  const loadChartData = async (forceRefresh = false) => {
+  const loadChartData = async (forceRefresh = false, loadMode?: 'recent' | 'full', timeframeOverride?: string) => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      
+      // Determine mode and from_date
+      const mode = loadMode || dataMode;
+      const fromDate = mode === 'full' ? '2020-01-01' : chartFromDate;
+      const timeframe = timeframeOverride || activeTimeframe;
 
-      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01`;
-      console.log('Fetching chart data from:', chartUrl);
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${timeframe}&from_date=${fromDate}&mode=${mode}`;
+      console.log('🔄 Fetching chart data:', { mode, fromDate, url: chartUrl });
 
       const response = await fetch(chartUrl);
       
@@ -329,13 +487,17 @@ export default function TradesPage() {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('📉 [EMA DEBUG] API returned error:', response.status, errorText);
+        console.error('📉 [API ERROR]:', response.status, errorText);
       }
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Chart API data received:', data.candles?.length, 'candles');
-        console.log('📉 [EMA DEBUG] ema_periods from API:', data.ema_periods);
+        console.log('✅ Chart API data received:', {
+          mode: data.mode,
+          from_date: data.from_date,
+          candles: data.candles?.length,
+          candlesCount: data.candles_count,
+        });
         
         if (data.candles && candlestickSeriesRef.current) {
           // Debug: Log first candle to check timestamp
@@ -343,54 +505,44 @@ export default function TradesPage() {
             const firstCandle = data.candles[0];
             const lastCandle = data.candles[data.candles.length - 1];
             
-            console.log('📊 First candle timestamp:', firstCandle.time);
-            console.log('📊 First candle as Date:', new Date(firstCandle.time * 1000).toISOString());
-            console.log('📊 First candle as UTC:', new Date(firstCandle.time * 1000).toUTCString());
-            console.log('📊 First candle as Local:', new Date(firstCandle.time * 1000).toString());
-            
-            console.log('📊 Last candle timestamp:', lastCandle.time);
-            console.log('📊 Last candle as Date:', new Date(lastCandle.time * 1000).toISOString());
-            console.log('📊 Last candle as UTC:', new Date(lastCandle.time * 1000).toUTCString());
-
-            // EMA 200 detailed debug
-            const ema200Values = data.candles.filter((c: any) => c.ema200 != null);
-            const ema200Nulls = data.candles.filter((c: any) => c.ema200 == null);
-            console.log('📉 [EMA DEBUG] Candles with ema200:', ema200Values.length);
-            console.log('📉 [EMA DEBUG] Candles without ema200:', ema200Nulls.length);
-            if (ema200Values.length > 0) {
-              console.log('📉 [EMA DEBUG] First ema200 value:', {
-                time: ema200Values[0].time,
-                ema200: ema200Values[0].ema200,
-                date: new Date(ema200Values[0].time * 1000).toISOString(),
-              });
-              console.log('📉 [EMA DEBUG] Last ema200 value:', {
-                time: ema200Values[ema200Values.length - 1].time,
-                ema200: ema200Values[ema200Values.length - 1].ema200,
-                date: new Date(ema200Values[ema200Values.length - 1].time * 1000).toISOString(),
-              });
-            } else {
-              console.warn('📉 [EMA DEBUG] ⚠️ NO candles have ema200 field!');
-              console.log('📉 [EMA DEBUG] Sample candle keys:', Object.keys(data.candles[0]));
-              console.log('📉 [EMA DEBUG] Sample candle:', data.candles[0]);
-            }
+            console.log('📊 Data range:', {
+              first: new Date(firstCandle.time * 1000).toISOString(),
+              last: new Date(lastCandle.time * 1000).toISOString(),
+              total: data.candles.length,
+            });
+            console.log('📊 Data range:', {
+              first: new Date(firstCandle.time * 1000).toISOString(),
+              last: new Date(lastCandle.time * 1000).toISOString(),
+              total: data.candles.length,
+            });
           }
           
-          // CRITICAL FIX: Use ISO 8601 format that lightweight-charts expects
-          // Format must be: "yyyy-mm-ddThh:mm:ss" or just use Unix timestamp
-          // Let's go back to Unix timestamp but with proper timezone handling
-          const processedCandles = data.candles.map((candle: any) => ({
-            time: candle.time as number, // Use Unix timestamp (seconds) as-is
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-          }));
+          const processedCandles = processCandles(data.candles);
           
-           console.log('✅ Processed candles with Unix timestamp');
-           console.log('Sample candle:', processedCandles[0]);
-           
-            candlestickSeriesRef.current.setData(processedCandles);
-            setChartCandles(processedCandles);
+          console.log('✅ Processed candles:', processedCandles.length);
+          
+          // CRITICAL FIX: Preserve viewport position when updating data
+          // Save current visible range before setData
+          const timeScale = chartRef.current?.timeScale();
+          const currentVisibleRange = timeScale?.getVisibleRange();
+          
+          updateLoadedCandles(processedCandles, data.candles_count || processedCandles.length);
+          if (mode === 'full' && processedCandles.length > 0) {
+            cacheFullHistory(timeframe, processedCandles);
+          }
+          
+          // Restore viewport position after setData (prevents auto-scroll)
+          if (currentVisibleRange && timeScale && !forceRefresh) {
+            setTimeout(() => {
+              timeScale.setVisibleRange(currentVisibleRange);
+              console.log('🔒 Viewport position preserved');
+            }, 0);
+          }
+          
+          // Update mode state if loading was triggered
+          if (loadMode) {
+            setDataMode(loadMode);
+          }
             
             // Store timezone info from API.
             // IMPORTANT: `display_mode` defaults to 'utc' and is NOT overridden by the
@@ -415,39 +567,11 @@ export default function TradesPage() {
                 console.log('🌍 Defaulting chart display_mode to UTC (broker offset from API:', data.timezone.broker_offset_hours, ')');
               }
             }
-          // Provide candle times so session bands snap to real bars (gold has a
-          // midnight market gap, so some session boundaries have no candle).
-          sessionZonesPrimitiveRef.current?.setCandleTimes(
-            processedCandles.map((c: { time: number }) => c.time),
-          );
-
-          // Update EMA 200 line series from candle data
-          if (ema200SeriesRef.current) {
-            const ema200Data = data.candles
-              .filter((candle: any) => candle.ema200 != null)
-              .map((candle: any) => ({
-                time: candle.time as number,
-                value: candle.ema200 as number,
-              }));
-            console.log('📉 [EMA DEBUG] EMA 200 series ref exists:', !!ema200SeriesRef.current);
-            console.log('📉 [EMA DEBUG] EMA 200 data points to set:', ema200Data.length);
-            if (ema200Data.length > 0) {
-              console.log('📉 [EMA DEBUG] First EMA 200 point:', ema200Data[0]);
-              console.log('📉 [EMA DEBUG] Last EMA 200 point:', ema200Data[ema200Data.length - 1]);
-              ema200SeriesRef.current.setData(ema200Data as any);
-              console.log(`✅ EMA 200 setData called: ${ema200Data.length} points rendered`);
-            } else {
-              console.warn('📉 [EMA DEBUG] ⚠️ No EMA 200 data points to set! Check backend response.');
-            }
-          } else {
-            console.warn('📉 [EMA DEBUG] ⚠️ ema200SeriesRef.current is NULL! Series not created.');
-          }
-
-          console.log('✅ Real chart data loaded from MT5');
+          console.log(`✅ Chart data loaded successfully (${data.mode} mode)`);
           
           // Trigger structure overlay with fresh candle data
           if (showStructure && structureLines) {
-            console.log('🔄 Triggering structure overlay after chart data load', forceRefresh ? '(force refresh)' : '');
+            console.log('🔄 Triggering structure overlay');
             overlayMarketStructure(processedCandles, forceRefresh);
           }
           
@@ -456,12 +580,228 @@ export default function TradesPage() {
       }
     } catch (error) {
       console.error("API error:", error);
-      console.warn("⚠️ Unable to load chart data from MT5");
+      console.warn("⚠️ Unable to load chart data");
+      setDataMode('recent'); // Reset to recent on error
     }
+  };
+  
+  // Load full history function with caching
+  const loadFullHistory = async () => {
+    console.log('📅 Loading full history from 2020-01-01...');
+
+    const cacheKey = activeTimeframe;
+    const cachedData = candleCacheRef.current[cacheKey];
+    if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
+      console.log('⚡ Full history already cached, reusing memory data');
+      // Preserve viewport + bar spacing before data swap
+      const ts = chartRef.current?.timeScale();
+      const prevRange = ts?.getVisibleRange();
+      const prevBarSpacing = ts?.options()?.barSpacing;
+      console.log('📅 loadFullHistory CACHED', { prevRange, prevBarSpacing });
+      setChartFromDate(cachedData.fromDate);
+      updateLoadedCandles(cachedData.candles, cachedData.totalCount);
+      setDataMode('full');
+      if (showStructure && structureLines) {
+        overlayMarketStructure(cachedData.candles, true);
+      }
+      // Restore viewport + bar spacing before browser paint (setTimeout, not rAF)
+      if (prevRange && ts) {
+        setTimeout(() => {
+          console.log('📅 RESTORE prevRange (setTimeout 0)', prevRange);
+          ts.setVisibleRange(prevRange);
+          if (prevBarSpacing != null) {
+            console.log('📅 RESTORE prevBarSpacing', prevBarSpacing);
+            ts.applyOptions({ barSpacing: prevBarSpacing });
+          }
+        }, 0);
+      }
+      fullDataDisplayedRef.current[cacheKey] = true;
+      return;
+    }
+
+    setDataMode('loading');
+    setChartFromDate('2020-01-01');
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01&mode=full`;
+      
+      console.log('🔄 Fetching full history for caching:', chartUrl);
+      const response = await fetch(chartUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Full history received:', {
+          candles: data.candles?.length,
+          mode: data.mode,
+        });
+        
+        if (data.candles && data.candles.length > 0) {
+          // Process and CACHE all candles
+          const processedCandles = processCandles(data.candles);
+          
+          // Store in cache
+          cacheFullHistory(cacheKey, processedCandles);
+          
+          console.log('💾 Full history cached:', {
+            timeframe: cacheKey,
+            totalCandles: processedCandles.length,
+            dateRange: `${candleCacheRef.current[cacheKey].fromDate} to ${candleCacheRef.current[cacheKey].toDate}`,
+          });
+          
+          // Display all candles on chart — preserve viewport + bar spacing
+          const ts = chartRef.current?.timeScale();
+          const prevRange = ts?.getVisibleRange();
+          const prevBarSpacing = ts?.options()?.barSpacing;
+          if (candlestickSeriesRef.current) {
+            updateLoadedCandles(processedCandles);
+          }
+          // Restore viewport + bar spacing before browser paint (setTimeout, not rAF)
+          if (prevRange && ts) {
+            setTimeout(() => {
+              ts.setVisibleRange(prevRange);
+              if (prevBarSpacing != null) {
+                ts.applyOptions({ barSpacing: prevBarSpacing });
+              }
+            }, 0);
+          }
+          
+          setDataMode('full');
+          // Defer heavy overlay to next frame — candles render first, browser stays responsive
+          if (showStructure && structureLines) {
+            requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+          }
+          fullDataDisplayedRef.current[cacheKey] = true;
+          console.log('✅ Full history loaded and cached successfully');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Load full history error:', error);
+      setDataMode('recent');
+    }
+  };
+  
+  // Jump to specific year/month function (refactored to use cache)
+  const jumpToDate = async (year: string, month: string) => {
+    const centerDate = `${year}-${month}-01`;
+    console.log('🎯 jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
+
+    setIsJumping(true);
+    
+    const cacheKey = activeTimeframe;
+    const cachedData = candleCacheRef.current[cacheKey];
+    console.log('🎯 cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
+
+    // Check if we have cached full history for this timeframe
+    if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
+      console.log('🎯 CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
+      console.log('💾 Cache info:', {
+        totalCandles: cachedData.totalCount,
+        dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
+      });
+      
+      try {
+        if (candlestickSeriesRef.current && chartRef.current && cachedData.candles.length > 0) {
+          if (!fullDataDisplayedRef.current[cacheKey]) {
+            // First time displaying this cached data for this timeframe
+            console.log('📊 Displaying cached data for', cacheKey, ':', {
+              totalCandles: cachedData.totalCount,
+              dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
+            });
+            updateLoadedCandles(cachedData.candles);
+            setChartFromDate(cachedData.fromDate);
+            setDataMode('full');
+            fullDataDisplayedRef.current[cacheKey] = true;
+            // Scroll first, overlay draws in next frame — prevents 1.5s freeze before scroll
+            focusChartOnDate(centerDate, 50, cachedData.candles);
+            if (showStructure && structureLines) {
+              requestAnimationFrame(() => overlayMarketStructure(cachedData.candles, true));
+            }
+          } else {
+            // Data & overlay already on chart — instant scroll
+            updateLoadedCandles(cachedData.candles);
+            focusChartOnDate(centerDate, 0, cachedData.candles);
+          }
+          console.log('🎯 jumpToDate COMPLETE (cached)');
+        }
+      } catch (error) {
+        console.error('❌ Error using cache:', error);
+      } finally {
+        setIsJumping(false);
+      }
+      return;
+    }
+    
+    // No cache available - fetch from API (fallback to original behavior)
+    console.log('⚠️ No cache available, fetching from API...');
+    setDataMode('loading');
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&center_date=${centerDate}`;
+      
+      console.log('🔄 Fetching windowed data:', chartUrl);
+      const response = await fetch(chartUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Windowed data received:', {
+          mode: data.mode,
+          center_date: data.center_date,
+          candles: data.candles?.length,
+        });
+        
+        if (data.candles && candlestickSeriesRef.current && chartRef.current) {
+          // Process candles
+          const processedCandles = processCandles(data.candles);
+          
+          updateLoadedCandles(processedCandles, data.candles_count || processedCandles.length);
+          
+          // Update session zones to match window
+          setChartFromDate(getWindowStartDate(centerDate));
+          
+          // Don't set to 'recent' - keep as 'full' to prevent auto-refresh
+          // Window mode should not trigger auto-refresh
+          setDataMode('full');
+          
+          // Scroll chart to center date
+          focusChartOnDate(centerDate, 50, processedCandles);
+          
+          // Defer overlay to next frame so scroll renders first without freeze
+          if (showStructure && structureLines) {
+            requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+          }
+          console.log(`✅ Jumped to ${centerDate} successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Jump to date error:', error);
+      setDataMode('recent');
+    } finally {
+      setIsJumping(false);
+    }
+  };
+  
+  // Handle year change - jump to January of selected year
+  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newYear = e.target.value;
+    setSelectedYear(newYear);
+    setSelectedMonth("01"); // Reset to January when year changes
+    jumpToDate(newYear, "01");
+  };
+  
+  // Handle month change - jump to selected month of current year
+  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newMonth = e.target.value;
+    setSelectedMonth(newMonth);
+    jumpToDate(selectedYear, newMonth);
   };
 
   // Guard to prevent concurrent executions
   const overlayGuardRef = useRef(false);
+
+  // Track structure lines version to skip redundant redraws on 30s refetch
+  const structureLinesVersionRef = useRef('');
 
   // Store the latest labels so they can be re-rendered when the user pans/zooms
   const structureLabelsRef = useRef<Array<{
@@ -534,10 +874,26 @@ export default function TradesPage() {
     // Use provided candles or fall back to state (for effect-triggered calls)
     const candlesToUse = candles ?? chartCandles;
 
-    console.log('📊 ===== MARKET STRUCTURE OVERLAY DEBUG =====');
-    
+    // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
+    const candleTimeMap = new Map<number, ChartCandle>();
+    const candleTimeArray: number[] = [];
+    for (let i = 0; i < candlesToUse.length; i++) {
+      const c = candlesToUse[i];
+      candleTimeMap.set(c.time, c as ChartCandle);
+      candleTimeArray.push(c.time);
+    }
+    // Binary search helper: returns index of first candle with time >= target
+    const lowerBound = (target: number): number => {
+      let lo = 0, hi = candleTimeArray.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (candleTimeArray[mid] < target) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+
     // Clear existing structure series
-    console.log('🧹 Clearing previous structure lines:', structureSeriesRef.current.length);
     structureSeriesRef.current.forEach(series => {
       try {
         chartRef.current?.removeSeries(series);
@@ -546,14 +902,6 @@ export default function TradesPage() {
       }
     });
     structureSeriesRef.current = [];
-    
-    console.log('Total points:', structureLines.total_points);
-    console.log('Structure data:', {
-      bos_count: structureLines.bos_lines?.length || 0,
-      choch_count: structureLines.choch_lines?.length || 0,
-      hh_count: structureLines.hh_points?.length || 0,
-      ll_count: structureLines.ll_points?.length || 0,
-    });
     
     // Get actual visible candle range from time scale
     const timeScale = chartRef.current!.timeScale();
@@ -647,27 +995,18 @@ export default function TradesPage() {
           startTimeSeconds = levelFormationTime ?? formationFallback;
           endTimeSeconds = eventTimeSeconds;
 
-          // ponytail: was missing — backend `timestamp` is the candle CLOSE when
-          // BoS is CONFIRMED (often 1+ bars after the wick that actually crossed the
-          // level). Without a break scan, the line overshoots past the real break
-          // candle and bleeds into empty space. Mirror the HH/LL break detection:
-          // find the first candle after formation whose high (bullish) / low (bearish)
-          // crosses `price`, and clamp endTime to that candle.
-          const dirUp = color === '#10b981'; // bullish confirm color
-          for (const candle of candlesToUse) {
-            if (candle.time <= startTimeSeconds) continue;
+          // find the first candle after formation whose high/low crosses `price`
+          const dirUp = color === '#10b981';
+          const bosStart = lowerBound(startTimeSeconds + 1);
+          for (let i = bosStart; i < candleTimeArray.length; i++) {
+            const candle = candlesToUse[i];
             if (candle.time > endTimeSeconds) break;
             const crossed = dirUp ? candle.high > price : candle.low < price;
             if (crossed) {
               endTimeSeconds = candle.time;
-              console.log(`  🛑 BoS/CHoCH at ${price} broken by candle ${candle.time} (line clamped to break candle)`);
               break;
             }
           }
-
-          console.log(`📏 BoS/CHoCH line at ${price}: formation=${startTimeSeconds}, break=${endTimeSeconds}`);
-          console.log(`  Formation date: ${new Date(startTimeSeconds * 1000).toISOString()}`);
-          console.log(`  Break date:     ${new Date(endTimeSeconds * 1000).toISOString()}`);
         } else {
           // HH/LL: line starts at the level's formation event and stops at
           // the LAST ACTUAL CANDLE (not `Date.now()` and not the right
@@ -678,107 +1017,42 @@ export default function TradesPage() {
           endTimeSeconds = lastCandleTime ?? eventTimeSeconds;
         }
         
-        // Find the breaking candle for HH/LL lines
-        // HH: stops when a candle's high > HH price (bullish break)
-        // LL: stops when a candle's low < LL price (bearish break)
-        // If NOT broken, limit line to 15 candles after formation (short tail)
+        // Find the breaking candle for HH/LL lines — cap at 20 candles after formation
         if (lineType === 'HH' || lineType === 'LL') {
-          const candles = candlesToUse;
-          let candlesAfterStart = 0;
-          for (const candle of candles) {
-            if (candle.time > startTimeSeconds) {
-              candlesAfterStart++;
-              const breaks = lineType === 'HH' 
-                ? candle.high > price 
-                : candle.low < price;
-              if (breaks) {
-                endTimeSeconds = candle.time;
-                console.log(`  🛑 ${lineType} broken at ${candle.time} (price: ${lineType === 'HH' ? candle.high : candle.low}), line stops here`);
-                break;
-              }
-              // Not broken yet — cap at 15 candles after formation
-              if (candlesAfterStart >= 20) {
-                endTimeSeconds = candle.time;
-                console.log(`  📏 ${lineType} not broken, capping line at 20 candles (${endTimeSeconds})`);
-                break;
-              }
+          const hhStart = lowerBound(startTimeSeconds + 1);
+          const endIdx = Math.min(hhStart + 20, candleTimeArray.length);
+          let broke = false;
+          for (let i = hhStart; i < endIdx; i++) {
+            const candle = candlesToUse[i];
+            if ((lineType === 'HH' ? candle.high > price : candle.low < price)) {
+              endTimeSeconds = candle.time;
+              broke = true;
+              break;
             }
+          }
+          if (!broke && endIdx > hhStart) {
+            endTimeSeconds = candlesToUse[endIdx - 1].time;
           }
         }
         
         // Always start line from the actual candle OPEN time (not close time)
         // CSV timestamp is candle CLOSE time, so we need to subtract 1 period
-        // (period map is already declared above so it can be used by the
-        // BoS/CHoCH fallback as well)
+        // Find which candle formed this HH/LL — O(1) Map lookup
+        let actualStartTime = startTimeSeconds;
+        const matchingCandle = candleTimeMap.get(startTimeSeconds);
         
-        console.log(`\n🔍 Finding start time for ${lineType || 'line'} at price ${price}`);
-        console.log(`  CSV timestamp: ${startTimeSeconds} (${new Date(startTimeSeconds * 1000).toISOString()})`);
-        console.log(`  Available candles count: ${candlesToUse.length}`);
-        
-        if (candlesToUse.length > 0) {
-          console.log(`  First candle: ${candlesToUse[0].time} (${new Date(candlesToUse[0].time * 1000).toISOString()})`);
-          console.log(`  Last candle: ${candlesToUse[candlesToUse.length - 1].time} (${new Date(candlesToUse[candlesToUse.length - 1].time * 1000).toISOString()})`);
-        }
-        
-        // Find which candle formed this HH/LL by looking at candlesToUse
-        let candleOpenTime = startTimeSeconds;
-        const matchingCandle = candlesToUse.find(c => c.time === startTimeSeconds);
-        
-        if (matchingCandle) {
-          // Found exact candle - this is the candle open time (good!)
-          candleOpenTime = startTimeSeconds;
-          console.log(`  ✅ Found EXACT matching candle at ${candleOpenTime}`);
-        } else {
-          console.log(`  ⚠️ No exact match for timestamp ${startTimeSeconds}`);
-          
-          // CSV timestamp might be candle close - try to find closest candle
-          // Look for candles around this timestamp (within 1 hour tolerance)
-          const tolerance = 3600; // 1 hour in seconds
-          const nearbyCandles = candlesToUse.filter(c => 
-            Math.abs(c.time - startTimeSeconds) < tolerance
-          );
-          
-          console.log(`  Found ${nearbyCandles.length} candles within 1 hour of event`);
-          
-          if (nearbyCandles.length > 0) {
-            // Find the closest candle BEFORE or AT the event time
-            const candlesBeforeOrAt = nearbyCandles
-              .filter(c => c.time <= startTimeSeconds)
-              .sort((a, b) => b.time - a.time); // Sort descending (most recent first)
-            
-            if (candlesBeforeOrAt.length > 0) {
-              candleOpenTime = candlesBeforeOrAt[0].time;
-              console.log(`  ✅ Using closest candle BEFORE event: ${candleOpenTime} (${new Date(candleOpenTime * 1000).toISOString()})`);
-              console.log(`     Time difference: ${startTimeSeconds - candleOpenTime} seconds (${Math.round((startTimeSeconds - candleOpenTime) / 60)} minutes)`);
-            } else {
-              // No candle before, use the first candle after
-              const candlesAfter = nearbyCandles
-                .filter(c => c.time > startTimeSeconds)
-                .sort((a, b) => a.time - b.time); // Sort ascending (earliest first)
-              
-              if (candlesAfter.length > 0) {
-                candleOpenTime = candlesAfter[0].time;
-                console.log(`  ⚠️ No candle before event, using first candle AFTER: ${candleOpenTime} (${new Date(candleOpenTime * 1000).toISOString()})`);
-              }
-            }
-          } else {
-            // No nearby candles - this shouldn't happen
-            console.error(`  ❌ No candles found near event timestamp!`);
-            candleOpenTime = startTimeSeconds;
+        if (!matchingCandle) {
+          // No exact match — binary search for nearest candle before event
+          const idx = lowerBound(startTimeSeconds);
+          if (idx > 0) {
+            actualStartTime = candleTimeArray[idx - 1];
+          } else if (idx < candleTimeArray.length) {
+            actualStartTime = candleTimeArray[idx];
           }
         }
         
-        const actualStartTime = candleOpenTime;
-        console.log(`  📍 FINAL start time: ${actualStartTime} (${new Date(actualStartTime * 1000).toISOString()})\n`);
-        
-        // Safety check: lightweight-charts requires time data in ascending
-        // order. If the matched start candle ended up AFTER the end time
-        // (e.g. formation time from a different timeframe, or stale data
-        // where the break was detected before the formation HH/LL), the
-        // line would render incorrectly or throw. Skip drawing in that
-        // case rather than producing a misleading visual.
+        // Safety check: skip if start >= end
         if (actualStartTime >= endTimeSeconds) {
-          console.warn(`  ⚠️ Skipping line at ${price}: start ${actualStartTime} >= end ${endTimeSeconds}`);
           return false;
         }
         
@@ -801,19 +1075,23 @@ export default function TradesPage() {
         lineSeries.setData(lineData);
 
         // Collect label info for HTML overlay in the middle of the line
-        // setMarkers does not exist in lightweight-charts v5, so we render
-        // labels as absolutely-positioned HTML spans on the chart container.
-        if (label && candlesToUse.length > 0) {
+        // Use binary search to find nearest candle to midpoint — avoids O(n) scan
+        if (label && candleTimeArray.length > 0) {
           const rawMidTime = Math.floor((actualStartTime + endTimeSeconds) / 2);
-          // Find the candle closest to the midpoint (clamped between start/end)
+          const midIdx = lowerBound(rawMidTime);
+          // Clamp to [actualStartTime, endTimeSeconds] range
+          const candidates: number[] = [];
+          if (midIdx > 0) candidates.push(candleTimeArray[midIdx - 1]);
+          if (midIdx < candleTimeArray.length) candidates.push(candleTimeArray[midIdx]);
+          if (midIdx + 1 < candleTimeArray.length) candidates.push(candleTimeArray[midIdx + 1]);
           let nearestCandleTime = actualStartTime;
           let nearestDist = Infinity;
-          for (const candle of candlesToUse) {
-            if (candle.time < actualStartTime || candle.time > endTimeSeconds) continue;
-            const dist = Math.abs(candle.time - rawMidTime);
+          for (const t of candidates) {
+            if (t < actualStartTime || t > endTimeSeconds) continue;
+            const dist = Math.abs(t - rawMidTime);
             if (dist < nearestDist) {
               nearestDist = dist;
-              nearestCandleTime = candle.time;
+              nearestCandleTime = t;
             }
           }
           structureLabels.push({
@@ -826,8 +1104,6 @@ export default function TradesPage() {
         }
 
         structureSeriesRef.current.push(lineSeries);
-        
-        console.log(`  ✅ Line created from ${actualStartTime} to ${endTimeSeconds}`);
         return true;
       } catch (e) {
         console.error('Error creating line:', e);
@@ -1059,64 +1335,26 @@ export default function TradesPage() {
   // Apply structure overlay when data changes or toggle state changes
   // Note: activeTimeframe changes are handled by loadChartData -> overlayMarketStructure(forceRefresh)
   useEffect(() => {
-    console.log('🔄 Structure overlay effect triggered');
-    console.log('showStructure:', showStructure);
-    console.log('structureLines available:', !!structureLines);
-    console.log('chartRef available:', !!chartRef.current);
-    console.log('candlestickSeriesRef available:', !!candlestickSeriesRef.current);
-    console.log('chartCandles length:', chartCandles.length);
-    console.log('activeTimeframe (from closure):', activeTimeframe);
-    
-    if (structureLines) {
-      console.log('📦 Structure data received:', {
-        total_points: structureLines.total_points,
-        bos: structureLines.bos_lines?.length || 0,
-        choch: structureLines.choch_lines?.length || 0,
-        hh: structureLines.hh_points?.length || 0,
-        ll: structureLines.ll_points?.length || 0,
-        time_range_hours: structureLines.time_range_hours,
-        last_updated: structureLines.last_updated,
-      });
-    }
-    
-    // CRITICAL FIX: Handle toggle OFF state
+    // Handle toggle OFF state
     if (!showStructure) {
-      // When toggle is OFF, remove all structure lines
-      console.log('🚫 Toggle is OFF - Removing all structure lines');
       structureSeriesRef.current.forEach(series => {
-        try {
-          chartRef.current?.removeSeries(series);
-          console.log('  ✅ Removed series');
-        } catch (e) {
-          console.debug('  ⚠️ Could not remove series:', e);
-        }
+        try { chartRef.current?.removeSeries(series); } catch (e) {}
       });
       structureSeriesRef.current = [];
-      console.log('  ✅ All structure lines removed');
-      return; // Exit early, don't draw lines
+      structureLinesVersionRef.current = '';
+      return;
     }
-    
-    // Toggle is ON - draw structure lines
-    // Use chartCandles state (may be stale on initial mount, but loadChartData will forceRefresh after)
-    if (showStructure && structureLines && chartRef.current && candlestickSeriesRef.current) {
-      console.log('✅ Toggle is ON - Drawing structure lines');
-      overlayMarketStructure(chartCandles.length > 0 ? chartCandles : undefined);
-    } else {
-      console.log('⏸️ Overlay skipped:', {
-        showStructure,
-        hasStructureLines: !!structureLines,
-        hasChart: !!chartRef.current,
-        hasCandlestickSeries: !!candlestickSeriesRef.current,
-        candlesCount: chartCandles.length,
-      });
-      
-      // If chart is ready but no candles yet, trigger data load
-      if (showStructure && structureLines && chartRef.current && candlestickSeriesRef.current && chartCandles.length === 0) {
-        console.log('📊��� Chart ready but no candles - triggering data load');
-        loadChartData(true);
+
+    // Only draw when structure data actually changed (hash comparison prevents
+    // redundant redraws from 30s refetch cycles with identical data)
+    if (showStructure && structureLines && chartRef.current && candlestickSeriesRef.current && chartCandles.length > 0) {
+      const hash = `${structureLines.total_points}|${structureLines.bos_lines?.length}|${structureLines.choch_lines?.length}|${structureLines.hh_points?.length}|${structureLines.ll_points?.length}`;
+      if (hash !== structureLinesVersionRef.current) {
+        structureLinesVersionRef.current = hash;
+        overlayMarketStructure(chartCandles);
       }
     }
-  }, [showStructure, structureLines, chartCandles.length]);
+  }, [showStructure, structureLines]);
 
   // Update session-zone shadows when data or toggle changes
   useEffect(() => {
@@ -1204,10 +1442,43 @@ export default function TradesPage() {
 
   const changeTimeframe = (tf: string) => {
     console.log('🔄 Changing timeframe to:', tf);
+    
+    // Check if we need to clear cache
+    const previousTimeframe = activeTimeframe;
+    const hasCachedData = !!(candleCacheRef.current[tf] && fullHistoryLoadedRef.current[tf]);
+    if (previousTimeframe !== tf) {
+      // Timeframe changed - check if new timeframe has cached data
+      if (hasCachedData) {
+        console.log(`✅ Timeframe ${tf} has cached data - will use cache`);
+        setDataMode('full'); // Mark as full since we have cached data
+      } else {
+        console.log(`⚠️ Timeframe ${tf} has no cache - need to load data`);
+        setDataMode('recent'); // Reset to recent mode for new timeframe
+        // Note: Don't clear cache for old timeframe - keep it for when user switches back
+      }
+    }
+    
     setActiveTimeframe(tf);
-    // Chart will reload automatically via useEffect
+    
+    // Reload with current mode (will use cache if available)
     if (chartRef.current && candlestickSeriesRef.current) {
-      loadChartData(true); // forceRefresh on timeframe change
+      // If we have cache for this timeframe, use it instead of API call
+      const cacheKey = tf;
+      if (hasCachedData) {
+        console.log('⚡ Using cached data for timeframe change');
+        const cachedData = candleCacheRef.current[cacheKey];
+        
+        // Display cached data immediately
+        updateLoadedCandles(cachedData.candles, cachedData.totalCount);
+        setChartFromDate(cachedData.fromDate);
+        if (showStructure && structureLines) {
+          overlayMarketStructure(cachedData.candles, true);
+        }
+        fullDataDisplayedRef.current[cacheKey] = true;
+      } else {
+        // No cache - fetch from API
+        loadChartData(true, 'recent', tf);
+      }
     }
   };
 
@@ -1467,9 +1738,122 @@ export default function TradesPage() {
                 }`}
                 title="Toggle EMA 200 Line"
               >
-                <span>📉</span>
+                <span>📈</span>
                 <span>EMA 200</span>
               </button>
+              
+              {/* Load Full History Button - show whenever full history not yet cached */}
+              {!fullHistoryLoadedRef.current[activeTimeframe] && dataMode !== 'loading' && (
+                <button
+                  onClick={loadFullHistory}
+                  disabled={isJumping}
+                  className="px-3 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 rounded-lg text-xs transition-all hover:from-purple-600/30 hover:to-blue-600/30 hover:border-purple-400/50 flex items-center gap-2 text-purple-300 hover:text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Load full historical data from 2020 and cache for instant navigation"
+                >
+                  <span>📅</span>
+                  <span>Load Full History</span>
+                  <span className="text-[10px] opacity-70">(2020-2026 • Cache for instant jumps)</span>
+                </button>
+              )}
+              
+              {/* Data Mode Indicator */}
+              {dataMode === 'loading' && (
+                <div className="px-3 py-2 bg-blue-600/10 border border-blue-500/30 rounded-lg text-xs flex items-center gap-2 text-blue-300 animate-pulse">
+                  <span className="animate-spin">⏳</span>
+                  <span>Loading full history...</span>
+                </div>
+              )}
+              
+              {dataMode === 'full' && fullHistoryLoadedRef.current[activeTimeframe] && (
+                <div className="px-3 py-2 bg-green-600/10 border border-green-500/30 rounded-lg text-xs flex items-center gap-2 text-green-300">
+                  <span>✅</span>
+                  <span>Full History Cached</span>
+                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles • Instant jumps enabled)</span>
+                </div>
+              )}
+              
+              {dataMode === 'full' && !fullHistoryLoadedRef.current[activeTimeframe] && (
+                <div className="px-3 py-2 bg-amber-600/10 border border-amber-500/30 rounded-lg text-xs flex items-center gap-2 text-amber-300">
+                  <span>📌</span>
+                  <span>Date Jump Mode</span>
+                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles • Load Full History for instant cache)</span>
+                </div>
+              )}
+              
+              {dataMode === 'recent' && candlesCount > 0 && (
+                <div className="px-3 py-2 bg-slate-600/10 border border-slate-500/20 rounded-lg text-xs flex items-center gap-2 text-slate-300">
+                  <span>⚡</span>
+                  <span>Quick Mode</span>
+                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles)</span>
+                </div>
+              )}
+              
+              {/* Divider */}
+              <div className="h-6 w-px bg-slate-700/50"></div>
+              
+              {/* Manual Refresh Button */}
+              <button
+                onClick={() => loadChartData(true, dataMode as 'recent' | 'full')}
+                disabled={dataMode === 'loading'}
+                className="px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Manually refresh chart data"
+              >
+                <span>🔄</span>
+                <span>Refresh</span>
+              </button>
+
+              {/* Reset Zoom Button */}
+              <button
+                onClick={() => {
+                  if (chartRef.current) {
+                    chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
+                    const centerDate = `${selectedYear}-${selectedMonth}-01`;
+                    focusChartOnDate(centerDate, 0, chartCandles);
+                  }
+                }}
+                className="px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2"
+                title="Reset zoom to default level"
+              >
+                <span>🔍</span>
+                <span>Reset Zoom</span>
+              </button>
+              
+              {/* Year/Month Jump Navigation - Instant Jump */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Jump to:</span>
+                
+                <select
+                  value={selectedYear}
+                  onChange={handleYearChange}
+                  disabled={isJumping}
+                  className="px-2 py-1 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded text-xs hover:bg-[var(--bg-elevated)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Select year - jumps to January of that year"
+                >
+                  {availableYears.map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+                
+                <select
+                  value={selectedMonth}
+                  onChange={handleMonthChange}
+                  disabled={isJumping}
+                  className="px-2 py-1 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded text-xs hover:bg-[var(--bg-elevated)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Select month - jumps to that month immediately"
+                >
+                  {availableMonths.map(month => (
+                    <option key={month.value} value={month.value}>{month.label}</option>
+                  ))}
+                </select>
+                
+                {/* Loading indicator shown during jump */}
+                {isJumping && (
+                  <div className="px-2 py-1 bg-blue-600/10 border border-blue-500/30 rounded text-xs flex items-center gap-1 text-blue-300">
+                    <span className="animate-spin">⏳</span>
+                    <span className="text-[10px]">Jumping...</span>
+                  </div>
+                )}
+              </div>
               
               {/* Timezone Selector */}
               <select

@@ -296,7 +296,9 @@ async def get_chart_data(
 async def get_backtest_chart_data(
     symbol: str = Query("XAUUSD"),
     timeframe: str = Query("M15"),
-    from_date: str = Query("2026-01-01", description="Start date YYYY-MM-DD"),
+    from_date: str = Query(None, description="Start date YYYY-MM-DD"),
+    mode: str = Query("recent", description="Loading mode: 'recent' (6 months) or 'full' (from 2020)"),
+    center_date: str = Query(None, description="Center date for jump navigation YYYY-MM-DD (loads ±3 months window)"),
 ):
     """
     Chart candles from Backtest_result CSV files instead of live MT5.
@@ -305,24 +307,54 @@ async def get_backtest_chart_data(
     and returns the same shape as /chart/data so the frontend needs zero
     changes beyond switching the fetch URL.
 
+    Performance optimization:
+    - 'recent' mode: Load last 6 months (~20k candles) - FAST (1-2s)
+    - 'full' mode: Load from 2020 (~150k candles) - SLOW (8-10s)
+    - 'center_date': Load ±3 months window centered on specific date - FAST (1-2s)
+
     Ponytail: EMA200 is already in the CSV column — no recalculation.
-    Max 30000 rows returned (10 months of M15).
     """
     import csv
     import re
     from pathlib import Path
-    from datetime import datetime, timezone
+    from datetime import datetime, timezone, timedelta
 
     try:
         project_root = Path(__file__).resolve().parent.parent.parent.parent.parent.parent
         backtest_dir = project_root / "Backtest_result"
 
-        csv_file = backtest_dir / f"MarketData_{symbol}_{timeframe}_*.csv"
         matches = sorted(backtest_dir.glob(f"MarketData_{symbol}_{timeframe}_*.csv"))
         if not matches:
             raise HTTPException(status_code=404, detail=f"No MarketData CSV for {symbol} {timeframe}")
 
-        from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        # Determine from_date, to_date and limit based on mode or center_date
+        if center_date:
+            # Jump navigation: Load ±3 months window centered on selected date
+            center_dt = datetime.strptime(center_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            from_dt = center_dt - timedelta(days=90)  # 3 months before
+            to_dt = center_dt + timedelta(days=90)    # 3 months after
+            limit = 20000  # ~6 months of M15 data
+            mode = "window"
+            from_date = from_dt.strftime("%Y-%m-%d")
+            logger.info(f"[WINDOW MODE] Center: {center_date}, Window: {from_dt} -> {to_dt}, limit={limit}")
+        elif mode == "full":
+            # Full history mode: Load from 2020
+            if not from_date:
+                from_date = "2020-01-01"
+            from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            to_dt = None  # No upper limit
+            limit = 200000  # ~6 years of M15 data
+            logger.info(f"[FULL MODE] Loading from {from_date}, limit={limit}")
+        else:
+            # Recent mode: Load last 6 months (default, fast)
+            if not from_date:
+                six_months_ago = datetime.now(timezone.utc) - timedelta(days=180)
+                from_date = six_months_ago.strftime("%Y-%m-%d")
+            from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            to_dt = None  # No upper limit
+            limit = 30000  # ~6 months of M15 data
+            logger.info(f"[RECENT MODE] Loading from {from_date}, limit={limit}")
+
         from_year = from_dt.year
 
         formatted_candles = []
@@ -331,13 +363,19 @@ async def get_backtest_chart_data(
             file_year = re.search(r"_(\d{4})-\d{2}-\d{2}\.csv$", path.name)
             if file_year and int(file_year.group(1)) < from_year:
                 continue
+            
             with open(path, "r", encoding="utf-8") as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     try:
                         dt = datetime.strptime(row["Time"].strip(), "%Y.%m.%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        
+                        # Filter by date range
                         if dt < from_dt:
                             continue
+                        if to_dt and dt > to_dt:
+                            continue
+                            
                         ts = int(dt.timestamp())
                         candle = {
                             "time": ts,
@@ -352,24 +390,29 @@ async def get_backtest_chart_data(
                         formatted_candles.append(candle)
                     except (ValueError, KeyError):
                         continue
-            if len(formatted_candles) >= 1000000000000000:
-                break
 
         # Sort + dedup by time (CSV files overlap in time range)
         formatted_candles.sort(key=lambda c: c["time"])
         seen = set()
         formatted_candles = [c for c in formatted_candles if not (c["time"] in seen or seen.add(c["time"]))]
-        # Trim to 30000 cap
-        formatted_candles = formatted_candles[:1000000000000000]
+        
+        # Apply limit after dedup
+        formatted_candles = formatted_candles[:limit]
 
         if not formatted_candles:
             raise HTTPException(status_code=404, detail=f"No candles from {from_date}")
+
+        logger.info(f"Returning {len(formatted_candles)} candles (mode={mode}, from={from_date})")
 
         return {
             "symbol": symbol,
             "timeframe": timeframe,
             "candles": formatted_candles,
             "ema_periods": {"ema200": 200},
+            "mode": mode,
+            "from_date": from_date,
+            "center_date": center_date,
+            "candles_count": len(formatted_candles),
             "timezone": {
                 "broker_offset_hours": 0,
                 "display_mode": "utc",
@@ -729,8 +772,8 @@ async def get_session_zones(
 
         all_zones = _generate_session_zones(start_dt, server_now)
 
-        # Sort by start time (newest first)
-        all_zones.sort(key=lambda x: x['start_time'], reverse=True)
+        # Sort by start time (oldest first) so historical data is prioritized
+        all_zones.sort(key=lambda x: x['start_time'], reverse=False)
 
         logger.info(
             f"Generated {len(all_zones)} session zones for {symbol} "
@@ -738,7 +781,7 @@ async def get_session_zones(
         )
 
         return {
-            "zones": all_zones[:10000],  # Increased limit for multi-year data
+            "zones": all_zones[:12000],  # Increased to cover 2020-2026 (11,985 zones)
             "total_zones": len(all_zones),
         }
 
