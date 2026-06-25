@@ -58,6 +58,7 @@ export default function TradesPage() {
   const [showTrades, setShowTrades] = useState(false);
   const [activeTimeframe, setActiveTimeframe] = useState("M15"); // Timeframe state
   const [chartCandles, setChartCandles] = useState<ChartCandle[]>([]);
+  const latestProgressRef = useRef({ percent: 0, step: '', total: 0 });
   const [loadProgress, setLoadProgress] = useState<{
     visible: boolean;
     percent: number;
@@ -656,12 +657,11 @@ export default function TradesPage() {
           const msg = JSON.parse(line);
 
           if (msg.type === 'progress') {
-            setLoadProgress({
-              visible: true,
+            latestProgressRef.current = {
               percent: msg.percent,
               step: msg.step,
               total: msg.total_estimated ?? 0,
-            });
+            };
           } else if (msg.type === 'complete') {
             completeData = msg.data;
           } else if (msg.type === 'error') {
@@ -1564,6 +1564,23 @@ export default function TradesPage() {
   useEffect(() => {
     overlayTradeEntries();
   }, [showTrades, backtestTradesData]);
+
+  // Sync progress ref → state at 60fps during loading (avoids React batching swallows)
+  useEffect(() => {
+    if (!loadProgress.visible) return;
+    let rafId: number;
+    const sync = () => {
+      setLoadProgress(prev => {
+        const l = latestProgressRef.current;
+        return l.percent !== prev.percent || l.step !== prev.step
+          ? { ...prev, visible: true, ...l }
+          : prev;
+      });
+      rafId = requestAnimationFrame(sync);
+    };
+    rafId = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(rafId);
+  }, [loadProgress.visible]);
 
   const loadTradeHistory = async () => {
     try {
