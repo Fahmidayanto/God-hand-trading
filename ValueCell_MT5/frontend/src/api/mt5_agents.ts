@@ -139,3 +139,32 @@ export const useSessionZones = (
     refetchInterval: 30000, // Refresh every 30 seconds to extend the live session
   });
 };
+
+// Backtest Trades (Entry/SL/TP overlay on chart)
+export interface BacktestTrade {
+  type: "BUY" | "SELL";
+  entry_price: number;
+  sl: number | null;
+  tp: number | null;
+  profit: number;
+  lot_size: number;
+  session: string;
+  entry_time: string;
+  entry_time_ts: number; // unix seconds
+  exit_time: string | null;
+  exit_time_ts: number | null; // unix seconds
+}
+
+export interface BacktestTradesResponse {
+  trades: BacktestTrade[];
+  total_trades: number;
+  last_updated: string;
+}
+
+export const useBacktestTrades = () => {
+  return useQuery({
+    queryKey: ["trading", "backtest-trades"],
+    queryFn: () => apiClient.get<BacktestTradesResponse>("/trading/backtest-trades"),
+    staleTime: 900000, // 15 min stale
+  });
+};

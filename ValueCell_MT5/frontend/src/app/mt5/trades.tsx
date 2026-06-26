@@ -162,9 +162,8 @@ export default function TradesPage() {
   const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const structureSeriesRef = useRef<ISeriesApi<"Line">[]>([]); // Line series for structure
   const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
-  const tradeSeriesRef = useRef<ISeriesApi<"Line">[]>([]);
   const tradesPrimitiveRef = useRef<TradesOverlayPrimitive | null>(null);
-  const overlayTradeGuardRef = useRef(false);
+  // ponytail: shares overlayGuardRef with structure, no separate guard needed
   
   // Ref to always get the latest timezone state in formatter
   const chartTimezoneRef = useRef(chartTimezone);
@@ -932,12 +931,8 @@ export default function TradesPage() {
   };
 
   const overlayTradeEntries = () => {
-    if (overlayTradeGuardRef.current) return;
-    overlayTradeGuardRef.current = true;
-    tradeSeriesRef.current.forEach(series => {
-      try { chartRef.current?.removeSeries(series); } catch (e) {}
-    });
-    tradeSeriesRef.current = [];
+    if (overlayGuardRef.current) return;
+    overlayGuardRef.current = true;
     if (tradesPrimitiveRef.current && candlestickSeriesRef.current) {
       try { candlestickSeriesRef.current.detachPrimitive(tradesPrimitiveRef.current); } catch (e) {}
     }
@@ -946,82 +941,30 @@ export default function TradesPage() {
     if (tradesEl) tradesEl.innerHTML = '';
 
     if (!showTrades || !backtestTradesData || !chartRef.current || !candlestickSeriesRef.current) {
-      overlayTradeGuardRef.current = false;
+      overlayGuardRef.current = false;
       return;
     }
 
     const trades = backtestTradesData.trades ?? [];
     if (trades.length === 0) {
-      overlayTradeGuardRef.current = false;
+      overlayGuardRef.current = false;
       return;
     }
 
     const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
 
-    const createSeriesForTrade = (trade: BacktestTrade) => {
-      const startTs = trade.entry_time_ts;
-      const endTs = trade.exit_time_ts ?? lastCandle;
-      if (!startTs || !endTs) return;
-      const startTime = startTs as any;
-      const endTime = endTs as any;
-
-      const entrySeries = chartRef.current!.addSeries(LineSeries, {
-        color: '#3b82f6', lineWidth: 2, lineStyle: LineStyle.Dashed,
-        priceLineVisible: false, lastValueVisible: false,
-      });
-      entrySeries.setData([{ time: startTime, value: trade.entry_price }, { time: endTime, value: trade.entry_price }]);
-      tradeSeriesRef.current.push(entrySeries);
-
-      if (trade.tp !== null) {
-        const tpSeries = chartRef.current!.addSeries(LineSeries, {
-          color: '#22c55e', lineWidth: 1, lineStyle: LineStyle.Dashed,
-          priceLineVisible: false, lastValueVisible: false,
-        });
-        tpSeries.setData([{ time: startTime, value: trade.tp }, { time: endTime, value: trade.tp }]);
-        tradeSeriesRef.current.push(tpSeries);
-      }
-
-      if (trade.sl !== null) {
-        const slSeries = chartRef.current!.addSeries(LineSeries, {
-          color: '#ef4444', lineWidth: 1, lineStyle: LineStyle.Dashed,
-          priceLineVisible: false, lastValueVisible: false,
-        });
-        slSeries.setData([{ time: startTime, value: trade.sl }, { time: endTime, value: trade.sl }]);
-        tradeSeriesRef.current.push(slSeries);
-      }
-    };
-
-    const finishOverlay = () => {
-      const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
-      candlestickSeriesRef.current!.attachPrimitive(primitive);
-      const entries: TradeOverlayEntry[] = trades.map(t => ({
-        type: t.type, entry_price: t.entry_price, sl: t.sl, tp: t.tp,
-        profit: t.profit, entry_time_ts: t.entry_time_ts, exit_time_ts: t.exit_time_ts,
-      }));
-      primitive.setTrades(entries);
-      primitive.setLastCandleTime(lastCandle as number | null);
-      tradesPrimitiveRef.current = primitive;
-      renderTradesLabels(trades);
-      overlayTradeGuardRef.current = false;
-    };
-
-    const BATCH = 30;
-    let idx = 0;
-
-    const nextBatch = () => {
-      if (!chartRef.current || !showTrades) {
-        tradeSeriesRef.current.forEach(s => { try { chartRef.current?.removeSeries(s); } catch (e) {} });
-        tradeSeriesRef.current = [];
-        overlayTradeGuardRef.current = false;
-        return;
-      }
-      const end = Math.min(idx + BATCH, trades.length);
-      for (; idx < end; idx++) createSeriesForTrade(trades[idx]);
-      if (idx < trades.length) requestAnimationFrame(nextBatch);
-      else finishOverlay();
-    };
-
-    requestAnimationFrame(nextBatch);
+    // ponytail: all lines drawn via canvas primitive, no series needed
+    const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
+    candlestickSeriesRef.current.attachPrimitive(primitive);
+    const entries: TradeOverlayEntry[] = trades.map(t => ({
+      type: t.type, entry_price: t.entry_price, sl: t.sl, tp: t.tp,
+      profit: t.profit, entry_time_ts: t.entry_time_ts, exit_time_ts: t.exit_time_ts,
+    }));
+    primitive.setTrades(entries);
+    primitive.setLastCandleTime(lastCandle as number | null);
+    tradesPrimitiveRef.current = primitive;
+    renderTradesLabels(trades);
+    overlayGuardRef.current = false;
   };
 
   const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
