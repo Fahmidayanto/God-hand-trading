@@ -83,3 +83,6 @@ nul
 screenshot_*.png
 *.zip
 
+# Markdown files
+*.md
+

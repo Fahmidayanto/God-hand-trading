@@ -4,7 +4,6 @@ import { useDashboardStats, usePerformanceStats, useSystemStatus } from "@/api/d
 import { usePositions, useTradingSignal } from "@/api/trading";
 import { useAgentConsensus, useMarketStructure } from "@/api/mt5_agents";
 import { useActivityLogs, EVENT_TYPE_ICONS, SEVERITY_CLASSES } from "@/api/activity-logs";
-import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 
 export default function MT5Dashboard() {
@@ -104,16 +103,13 @@ export default function MT5Dashboard() {
       {/* Particles Background - fixed position */}
       <div id="particles-js">
         <Particles
-          id="tsparticles"
+          id="tsparticles-dashboard"
           options={particlesOptions}
         />
       </div>
 
       {/* Animated Background Gradient - fixed position */}
       <div className="bg-animated" />
-
-      {/* Sidebar */}
-      <MT5Sidebar />
 
       {/* Main Content Container */}
       <div 

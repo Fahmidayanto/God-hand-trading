@@ -344,7 +344,7 @@ async def get_backtest_chart_data(
                 from_date = "2020-01-01"
             from_dt = datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             to_dt = None  # No upper limit
-            limit = 200000  # ~6 years of M15 data
+            limit = 250000  # ~7 years of M15 data (was 200K, bumped to cover up to Jun 2026)
             logger.info(f"[FULL MODE] Loading from {from_date}, limit={limit}")
         else:
             # Recent mode: Load last 6 months (default, fast)

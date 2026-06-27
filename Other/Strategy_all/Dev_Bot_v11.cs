@@ -3762,6 +3762,28 @@ bool LoadMarketStructureState()
     PrintFormat("   lastProcessedBarTime      = %s", TimeToString(g_LastProcessedBarTime_M15));
     Print("");
     
+    // ✅ FIX: Reset absoluteHighestHH_M15 jika resume dalam MODE 3 BEARISH
+    // MODE 3 BEARISH Part 2: BoS Bearish + LL After BoS sudah terkonfirmasi
+    // Tujuan: Tracking HH tertinggi sejak LL terakhir untuk Lower High detection
+    if (bosBearishConfirmedFlag_M15 && llAfterBosConfirmedFlag_M15)
+    {
+        absoluteHighestHH_M15 = -1;
+        timeAbsoluteHighestHH_M15 = 0;
+        PrintFormat("🔄 [RESUME MODE 3 BEARISH M15] Reset absoluteHighestHH_M15 untuk tracking HH sejak LL @ %s", 
+                    TimeToString(lastTimeLL_M15));
+    }
+    
+    // ✅ FIX: Reset absoluteLowestLL_M15 jika resume dalam MODE 3 BULLISH
+    // MODE 3 BULLISH Part 2: BoS Bullish + HH After BoS sudah terkonfirmasi
+    // Tujuan: Tracking LL terendah sejak HH terakhir untuk Higher Low detection
+    if (bosBullishConfirmedFlag_M15 && hhAfterBosConfirmedFlag_M15)
+    {
+        absoluteLowestLL_M15 = -1;
+        timeAbsoluteLowestLL_M15 = 0;
+        PrintFormat("🔄 [RESUME MODE 3 BULLISH M15] Reset absoluteLowestLL_M15 untuk tracking LL sejak HH @ %s", 
+                    TimeToString(lastTimeHH_M15));
+    }
+    
     g_StateResumed = true;
     g_StateFilePath = stateFile;
     
@@ -5175,6 +5197,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                             PrintFormat("📈 [MODE 3 BEARISH M15] Update HH tertinggi sejak LL terakhir (%s): %.2f -> %.2f @ %s",
                                         TimeToString(lastTimeLL_M15), previousHH, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         }
+                        
+                        // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
+                        lastAcceptedHH_M15 = absoluteHighestHH_M15;
+                        UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     }
                 }
 
@@ -5209,6 +5235,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                                 rates_M15[i].high, rejectReason_M15, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                     string boxNameRejected_M15 = "zone_hh_M15_" + IntegerToString((int)rates_M15[i].time);
                     if (ObjectFind(0, boxNameRejected_M15) >= 0) ObjectDelete(0, boxNameRejected_M15);
+                    continue; // ✅ FIX: Skip ke HH berikutnya setelah reject
                 }
                 else if (isLowerHigh_M15)
                 {
@@ -5691,8 +5718,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                             PrintFormat("📉 [MODE 3 M15] Update LL terendah sejak HH terakhir (%s): %.2f -> %.2f @ %s",
                                         TimeToString(time_lastHHAfterBos_M15), previousLowest, lowestLLSinceLastHHAfterBos_M15, TimeToString(rates_M15[i].time));
                         }
-                        // Opsional: Update visual untuk lowestLLSinceLastHHAfterBos_M15 jika diperlukan
-                        // UpdateAcceptedLevelVisuals_M15(lowestLLSinceLastHHAfterBos_M15, "LowestLL", rates_M15[i].time);
+                        
+                        // ✅ FIX: Simpan LL terendah ke accepted history & export ke CSV
+                        lastAcceptedLL_M15 = lowestLLSinceLastHHAfterBos_M15;
+                        UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
                     }
                 }
                 

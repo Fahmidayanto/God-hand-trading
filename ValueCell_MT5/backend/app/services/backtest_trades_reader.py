@@ -29,6 +29,7 @@ class BacktestTradesReader:
         global _cached_trades, _cached_timestamp
         now = time.time()
         if _cached_trades is not None and (now - _cached_timestamp) < CACHE_TTL:
+            logger.info(f"[BacktestTradesReader] Using cached data ({len(_cached_trades)} trades)")
             return self._build_response(_cached_trades)
 
         if not self.backtest_dir.exists():
@@ -38,6 +39,7 @@ class BacktestTradesReader:
         if not csv_files:
             return self._empty_response()
 
+        logger.info(f"[BacktestTradesReader] Found {len(csv_files)} CSV files")
         all_trades = []
         for csv_file in csv_files:
             file_count = 0
@@ -49,11 +51,17 @@ class BacktestTradesReader:
                         if trade:
                             all_trades.append(trade)
                             file_count += 1
-                logger.info(f"[BacktestTradesReader] {csv_file.name}: {file_count}")
+                logger.info(f"[BacktestTradesReader] {csv_file.name}: {file_count} trades")
             except Exception as e:
                 logger.warning(f"[BacktestTradesReader] Error {csv_file.name}: {e}")
 
-        logger.info(f"[BacktestTradesReader] Total: {len(all_trades)}")
+        # Debug: Count trades by year
+        trades_by_year = {}
+        for trade in all_trades:
+            year = datetime.fromisoformat(trade['entry_time'].replace('Z', '+00:00')).year
+            trades_by_year[year] = trades_by_year.get(year, 0) + 1
+        logger.info(f"[BacktestTradesReader] Total: {len(all_trades)}, by year: {trades_by_year}")
+        
         _cached_trades = all_trades
         _cached_timestamp = now
         return self._build_response(all_trades)

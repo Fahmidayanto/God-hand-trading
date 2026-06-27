@@ -97,7 +97,7 @@ class MarketDataStreamer:
             if c["time"] not in seen:
                 seen.add(c["time"])
                 unique.append(c)
-        candles = unique[:200000]
+        candles = unique[:250000]
 
         yield json.dumps({
             "type": "complete",

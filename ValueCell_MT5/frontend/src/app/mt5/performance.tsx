@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Particles from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import type { Engine } from "@tsparticles/engine";
@@ -18,7 +18,6 @@ import {
   DollarSign,
   ArrowDownRight,
 } from "lucide-react";
-import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 import {
   Chart as ChartJS,
@@ -64,6 +63,7 @@ interface MonthlyPNLData {
 }
 
 export default function PerformancePage() {
+  const pageRef = useRef<HTMLDivElement>(null);
   const [monthlyPNL, setMonthlyPNL] = useState<MonthlyPNLData[]>([]);
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
@@ -98,6 +98,7 @@ export default function PerformancePage() {
   };
 
   const loadPerformanceData = async () => {
+    if (!pageRef.current?.offsetParent) return;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
       const params = new URLSearchParams();
@@ -284,7 +285,8 @@ export default function PerformancePage() {
   };
 
   return (
-    <div 
+    <div
+      ref={pageRef}
       style={{ 
         background: "var(--bg-deepspace)",
         minHeight: "100vh",
@@ -295,7 +297,7 @@ export default function PerformancePage() {
       }}
     >
       <Particles
-        id="tsparticles"
+        id="tsparticles-performance"
         init={particlesInit}
         options={{
             background: { color: { value: "transparent" } },
@@ -343,9 +345,6 @@ export default function PerformancePage() {
             "radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%), var(--bg-deepspace)",
         }}
       />
-
-      {/* Sidebar */}
-      <MT5Sidebar />
 
       <div 
         className="relative z-10" 

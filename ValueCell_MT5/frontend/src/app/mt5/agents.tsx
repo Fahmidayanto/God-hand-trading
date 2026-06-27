@@ -1,8 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Particles from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import type { Engine } from "@tsparticles/engine";
-import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 
 interface Agent {
@@ -18,6 +17,7 @@ interface Agent {
 }
 
 export default function AgentsPage() {
+  const pageRef = useRef<HTMLDivElement>(null);
   const [agents, setAgents] = useState<Agent[]>([
     {
       name: "Price Action Agent",
@@ -85,6 +85,7 @@ export default function AgentsPage() {
   }, []);
 
   const loadAgentsData = async () => {
+    if (!pageRef.current?.offsetParent) return;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
       const response = await fetch(
@@ -137,7 +138,8 @@ export default function AgentsPage() {
   };
 
   return (
-    <div 
+    <div
+      ref={pageRef}
       style={{ 
         background: "var(--bg-deepspace)",
         minHeight: "100vh",
@@ -148,7 +150,7 @@ export default function AgentsPage() {
       }}
     >
       <Particles
-        id="tsparticles"
+        id="tsparticles-agents"
         init={particlesInit}
         options={{
             background: { color: { value: "transparent" } },
@@ -196,9 +198,6 @@ export default function AgentsPage() {
             "radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%), var(--bg-deepspace)",
         }}
       />
-
-      {/* Sidebar */}
-      <MT5Sidebar />
 
       <div 
         className="relative z-10" 

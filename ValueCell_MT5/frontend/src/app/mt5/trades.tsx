@@ -19,7 +19,6 @@ import {
   TradesOverlayPrimitive,
   type TradeOverlayEntry,
 } from "@/components/valuecell/charts/trades-overlay-primitive";
-import MT5Sidebar from "./components/MT5Sidebar";
 import MT5Footer from "./components/MT5Footer";
 
 interface Trade {
@@ -157,6 +156,8 @@ export default function TradesPage() {
   
 
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartDataLoadedRef = useRef(false);
+  const isLoadingChartDataRef = useRef(false);
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
@@ -415,18 +416,24 @@ export default function TradesPage() {
       }
     } else {
       console.log('⏭️ Skipping chart init: already initialized or container not ready');
+      if (chartContainerRef.current) {
+        loadChartData(false);
+      }
     }
 
-    const handleResize = () => {
-      if (chartRef.current && chartContainerRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-        });
-      }
-    };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && chartRef.current && chartContainerRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight,
+          });
+        }
+      });
+    });
 
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    if (chartContainerRef.current) observer.observe(chartContainerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -487,6 +494,11 @@ export default function TradesPage() {
   // }, [chartCandles]);
 
   const loadChartData = async (forceRefresh = false, loadMode?: 'recent' | 'full', timeframeOverride?: string) => {
+    if (isLoadingChartDataRef.current && !forceRefresh) {
+      console.log('⏭️ loadChartData: skipped (already loading)');
+      return;
+    }
+    isLoadingChartDataRef.current = true;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
       
@@ -517,29 +529,10 @@ export default function TradesPage() {
         });
         
         if (data.candles && candlestickSeriesRef.current) {
-          // Debug: Log first candle to check timestamp
-          if (data.candles.length > 0) {
-            const firstCandle = data.candles[0];
-            const lastCandle = data.candles[data.candles.length - 1];
-            
-            console.log('📊 Data range:', {
-              first: new Date(firstCandle.time * 1000).toISOString(),
-              last: new Date(lastCandle.time * 1000).toISOString(),
-              total: data.candles.length,
-            });
-            console.log('📊 Data range:', {
-              first: new Date(firstCandle.time * 1000).toISOString(),
-              last: new Date(lastCandle.time * 1000).toISOString(),
-              total: data.candles.length,
-            });
-          }
-          
           const processedCandles = processCandles(data.candles);
           
           console.log('✅ Processed candles:', processedCandles.length);
           
-          // CRITICAL FIX: Preserve viewport position when updating data
-          // Save current visible range before setData
           const timeScale = chartRef.current?.timeScale();
           const currentVisibleRange = timeScale?.getVisibleRange();
           
@@ -549,10 +542,9 @@ export default function TradesPage() {
           }
           
           // Restore viewport position after setData (prevents auto-scroll)
-          if (currentVisibleRange && timeScale && !forceRefresh) {
+          if (chartDataLoadedRef.current && currentVisibleRange && timeScale && !forceRefresh) {
             setTimeout(() => {
               timeScale.setVisibleRange(currentVisibleRange);
-              console.log('🔒 Viewport position preserved');
             }, 0);
           }
           
@@ -599,6 +591,8 @@ export default function TradesPage() {
       console.error("API error:", error);
       console.warn("⚠️ Unable to load chart data");
       setDataMode('recent'); // Reset to recent on error
+    } finally {
+      isLoadingChartDataRef.current = false;
     }
   };
   
@@ -931,8 +925,6 @@ export default function TradesPage() {
   };
 
   const overlayTradeEntries = () => {
-    if (overlayGuardRef.current) return;
-    overlayGuardRef.current = true;
     if (tradesPrimitiveRef.current && candlestickSeriesRef.current) {
       try { candlestickSeriesRef.current.detachPrimitive(tradesPrimitiveRef.current); } catch (e) {}
     }
@@ -941,17 +933,47 @@ export default function TradesPage() {
     if (tradesEl) tradesEl.innerHTML = '';
 
     if (!showTrades || !backtestTradesData || !chartRef.current || !candlestickSeriesRef.current) {
-      overlayGuardRef.current = false;
+      console.log('[overlayTradeEntries] SKIP:', { showTrades, hasData: !!backtestTradesData, hasChart: !!chartRef.current, hasSeries: !!candlestickSeriesRef.current });
       return;
     }
 
     const trades = backtestTradesData.trades ?? [];
+    console.log('[overlayTradeEntries] Total trades from API:', trades.length);
     if (trades.length === 0) {
-      overlayGuardRef.current = false;
       return;
     }
 
+    // Debug: Check trades distribution by year
+    const tradesByYear = trades.reduce((acc, t) => {
+      const year = new Date(t.entry_time_ts * 1000).getFullYear();
+      acc[year] = (acc[year] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+    console.log('[overlayTradeEntries] Trades by year:', tradesByYear);
+
+    // Debug: Show sample 2026 trades
+    const trades2026 = trades.filter(t => new Date(t.entry_time_ts * 1000).getFullYear() === 2026);
+    console.log('[overlayTradeEntries] 2026 trades sample:', trades2026.slice(0, 3).map(t => ({
+      type: t.type,
+      entry_price: t.entry_price,
+      entry_time: new Date(t.entry_time_ts * 1000).toISOString(),
+      exit_time: t.exit_time_ts ? new Date(t.exit_time_ts * 1000).toISOString() : null,
+      sl: t.sl,
+      tp: t.tp,
+    })));
+
     const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
+    console.log('[overlayTradeEntries] Last candle time:', lastCandle, lastCandle ? new Date(lastCandle * 1000).toISOString() : null);
+    
+    // Debug: Chart candles time range
+    if (chartCandles.length > 0) {
+      const firstCandle = chartCandles[0]?.time;
+      console.log('[overlayTradeEntries] Chart candles range:', {
+        first: new Date(firstCandle * 1000).toISOString(),
+        last: new Date(lastCandle! * 1000).toISOString(),
+        total: chartCandles.length,
+      });
+    }
 
     // ponytail: all lines drawn via canvas primitive, no series needed
     const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
@@ -962,9 +984,9 @@ export default function TradesPage() {
     }));
     primitive.setTrades(entries);
     primitive.setLastCandleTime(lastCandle as number | null);
+    primitive.setTimeframe(activeTimeframe); // Pass active timeframe
     tradesPrimitiveRef.current = primitive;
     renderTradesLabels(trades);
-    overlayGuardRef.current = false;
   };
 
   const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
@@ -1509,6 +1531,28 @@ export default function TradesPage() {
     }
   }, [showEMA200]);
 
+  // On first chart data load — set visible range to show all candles
+  useEffect(() => {
+    console.log('📏 ChartCandles effect: trigger', {
+      chartRef: !!chartRef.current,
+      len: chartCandles.length,
+      loaded: chartDataLoadedRef.current,
+      first: chartCandles[0]?.time,
+      last: chartCandles[chartCandles.length - 1]?.time,
+    });
+    if (!chartRef.current || chartCandles.length === 0 || chartDataLoadedRef.current) return;
+    chartDataLoadedRef.current = true;
+    const ts = chartRef.current.timeScale();
+    const first = chartCandles[0].time;
+    const last = chartCandles[chartCandles.length - 1].time;
+    const pad = (last - first) * 0.02;
+    console.log('📏 ChartCandles effect: setting range', {
+      first: new Date(first * 1000).toISOString(),
+      last: new Date(last * 1000).toISOString(),
+    });
+    ts.setVisibleRange({ from: (first - pad) as any, to: (last + pad) as any });
+  }, [chartCandles]);
+
   // Toggle trade entries overlay
   useEffect(() => {
     overlayTradeEntries();
@@ -1631,6 +1675,7 @@ export default function TradesPage() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!chartContainerRef.current?.offsetParent) return;
       const t = e.target as HTMLElement;
       if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA") return;
       if (!chartRef.current) return;
@@ -1694,7 +1739,7 @@ export default function TradesPage() {
       }}
     >
       <Particles
-        id="tsparticles"
+        id="tsparticles-trades"
         init={particlesInit}
         options={{
             background: { color: { value: "transparent" } },
@@ -1744,10 +1789,6 @@ export default function TradesPage() {
       />
 
       {/* Sidebar */}
-      <div>
-        <MT5Sidebar />
-      </div>
-
       <div 
         className="relative z-10"
         style={{ 
@@ -2281,3 +2322,4 @@ export default function TradesPage() {
     </div>
   );
 }
+
