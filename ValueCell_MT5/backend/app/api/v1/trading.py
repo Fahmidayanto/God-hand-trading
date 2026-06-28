@@ -450,6 +450,7 @@ async def get_backtest_chart_data_stream(
     return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 
+@router.get("/candles")
 async def get_candles(
     symbol: str = Query("XAUUSD", description="Trading symbol"),
     timeframe: str = Query("M15", description="Timeframe"),

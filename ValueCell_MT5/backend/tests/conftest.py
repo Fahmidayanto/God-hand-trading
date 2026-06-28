@@ -1,6 +1,10 @@
 """Pytest configuration and fixtures."""
 
 import pytest
+
+def pytest_ignore_collect(path, config):
+    # Ignore the special 'nul' device file that confuses pytest on Windows
+    return getattr(path, "basename", None) == "nul"
 from fastapi.testclient import TestClient
 
 from app.main import app

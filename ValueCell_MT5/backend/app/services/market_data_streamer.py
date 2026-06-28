@@ -88,7 +88,7 @@ class MarketDataStreamer:
                             "step": step, "total_estimated": total_estimated,
                         })
 
-        yield json.dumps({"type": "progress", "percent": 100, "step": "Sorting & finalizing...", "total_estimated": total_estimated})
+        # Progress final step removed as per spec
 
         candles.sort(key=lambda c: c["time"])
         seen: set = set()
@@ -97,7 +97,7 @@ class MarketDataStreamer:
             if c["time"] not in seen:
                 seen.add(c["time"])
                 unique.append(c)
-        candles = unique[:250000]
+        candles = unique[:200000]
 
         yield json.dumps({
             "type": "complete",
