@@ -1083,6 +1083,19 @@ export default function TradesPage() {
     // Use provided candles or fall back to state (for effect-triggered calls)
     const candlesToUse = candles ?? chartCandles;
 
+    // Filter structure lines by timeframe.
+    // On M15 chart we only draw M15-derived lines to avoid H1/H4/D1 clutter;
+    // on higher timeframes we keep all lines for broader context.
+    const shouldFilterByTimeframe = activeTimeframe === "M15";
+    const filterByTimeframe = <T extends { timeframe?: string }>(items: T[] | undefined | null): T[] => {
+      if (!items) return [];
+      return shouldFilterByTimeframe ? items.filter((item) => item.timeframe === "M15") : items;
+    };
+    const filteredBosLines = filterByTimeframe(structureLines.bos_lines);
+    const filteredChochLines = filterByTimeframe(structureLines.choch_lines);
+    const filteredHhPoints = filterByTimeframe(structureLines.hh_points);
+    const filteredLlPoints = filterByTimeframe(structureLines.ll_points);
+
     // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
     const candleTimeMap = new Map<number, ChartCandle>();
     const candleTimeArray: number[] = [];
@@ -1335,8 +1348,8 @@ export default function TradesPage() {
       // Bearish BoS/CHoCH forms an LL level, so look in LL points
       const isBullish = direction === 'BULLISH';
       const levelPoints = isBullish
-        ? (structureLines.hh_points ?? [])
-        : (structureLines.ll_points ?? []);
+        ? (filteredHhPoints)
+        : (filteredLlPoints);
 
       // Find the matching price level (allow small tolerance for floating point)
       const tolerance = 0.05;
@@ -1365,7 +1378,7 @@ export default function TradesPage() {
 
     // Add BoS lines
     let bosAdded = 0;
-    structureLines.bos_lines?.forEach((bos, index) => {
+    filteredBosLines.forEach((bos, index) => {
       console.log(`Adding BoS #${index + 1}:`, { price: bos.price, time: bos.time, timestamp: bos.timestamp, prevPrice: bos.previous_price });
       const color = bos.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       // timestamp is already in milliseconds from backend
@@ -1392,7 +1405,7 @@ export default function TradesPage() {
 
     // Add CHoCH lines
     let chochAdded = 0;
-    structureLines.choch_lines?.forEach((choch, index) => {
+    filteredChochLines.forEach((choch, index) => {
       console.log(`Adding CHoCH #${index + 1}:`, { price: choch.price, time: choch.time, timestamp: choch.timestamp, prevPrice: choch.previous_price });
       const eventTime = choch.timestamp;
       const formationTime = choch.price
@@ -1419,8 +1432,8 @@ export default function TradesPage() {
     // because the BoS/CHoCH line already represents that level (more recent event).
     const bosChochPrices = new Set<number>();
     const PRICE_TOLERANCE = 0.05;
-    const allBos = structureLines.bos_lines ?? [];
-    const allChoch = structureLines.choch_lines ?? [];
+    const allBos = filteredBosLines;
+    const allChoch = filteredChochLines;
     [...allBos, ...allChoch].forEach((evt) => {
       if (evt.price != null) {
         bosChochPrices.add(Math.round(evt.price / PRICE_TOLERANCE));
@@ -1438,10 +1451,10 @@ export default function TradesPage() {
 
     let hhAdded = 0;
     console.log('\n🔵 Processing HH points...');
-    if (!structureLines.hh_points || structureLines.hh_points.length === 0) {
+    if (!filteredHhPoints || filteredHhPoints.length === 0) {
       console.warn('⚠️ No HH points available!');
     } else {
-      structureLines.hh_points.forEach((hh, index) => {
+      filteredHhPoints.forEach((hh, index) => {
         if (priceMatchesBosChoch(hh.price)) {
           hhSkippedByDup++;
           console.log(`  ⏭️ HH #${index + 1} (${hh.price}) skipped: matches a BoS/CHoCH price (dedup)`);
@@ -1483,10 +1496,10 @@ export default function TradesPage() {
     let llSkippedByDup = 0;
     let llAdded = 0;
     console.log('\n🟠 Processing LL points...');
-    if (!structureLines.ll_points || structureLines.ll_points.length === 0) {
+    if (!filteredLlPoints || filteredLlPoints.length === 0) {
       console.warn('⚠️ No LL points available!');
     } else {
-      structureLines.ll_points.forEach((ll, index) => {
+      filteredLlPoints.forEach((ll, index) => {
         if (priceMatchesBosChoch(ll.price)) {
           llSkippedByDup++;
           console.log(`  ⏭️ LL #${index + 1} (${ll.price}) skipped: matches a BoS/CHoCH price (dedup)`);
@@ -1557,7 +1570,16 @@ export default function TradesPage() {
     // Only draw when structure data actually changed (hash comparison prevents
     // redundant redraws from 30s refetch cycles with identical data)
     if (showStructure && structureLines && chartRef.current && candlestickSeriesRef.current && chartCandles.length > 0) {
-      const hash = `${structureLines.total_points}|${structureLines.bos_lines?.length}|${structureLines.choch_lines?.length}|${structureLines.hh_points?.length}|${structureLines.ll_points?.length}`;
+      // Mirror the filtering logic in overlayMarketStructure so the hash changes
+      // when the active timeframe switches between M15 (filtered) and others (all).
+      const shouldFilterByTimeframe = activeTimeframe === "M15";
+      const filterCount = (items?: Array<{ timeframe?: string }>) => {
+        if (!items) return 0;
+        return shouldFilterByTimeframe
+          ? items.filter((item) => item.timeframe === "M15").length
+          : items.length;
+      };
+      const hash = `${activeTimeframe}|${structureLines.total_points}|${filterCount(structureLines.bos_lines)}|${filterCount(structureLines.choch_lines)}|${filterCount(structureLines.hh_points)}|${filterCount(structureLines.ll_points)}`;
       if (hash !== structureLinesVersionRef.current) {
         structureLinesVersionRef.current = hash;
         overlayMarketStructure(chartCandles);
