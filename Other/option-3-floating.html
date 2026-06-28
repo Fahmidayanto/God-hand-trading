@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Option 3 — Floating Overlay Toolbar</title>
+  <style>
+    :root {
+      --bg-deepspace: #0a0e27;
+      --bg-surface: #111827;
+      --bg-elevated: #1f2937;
+      --glass-primary: rgba(17, 24, 39, 0.6);
+      --glass-secondary: rgba(31, 41, 55, 0.5);
+      --glass-border: rgba(59, 130, 246, 0.2);
+      --neon-blue: #3b82f6;
+      --neon-cyan: #06b6d4;
+      --neon-emerald: #10b981;
+      --neon-ruby: #ef4444;
+      --neon-amber: #fbbf24;
+      --neon-purple: #8b5cf6;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-tertiary: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-deepspace);
+      color: var(--text-primary);
+      font-family: Inter, system-ui, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .label {
+      color: var(--text-tertiary);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .glass-card {
+      background: var(--glass-primary);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.05);
+      padding: 16px 20px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+    .btn.active { color: #fff; }
+    .btn.active[data-accent="purple"] { background: rgba(139,92,246,0.2); border-color: var(--neon-purple); color: #c4b5fd; box-shadow: 0 0 12px rgba(139,92,246,0.25); }
+    .btn.active[data-accent="cyan"] { background: rgba(6,182,212,0.15); border-color: var(--neon-cyan); color: #67e8f9; box-shadow: 0 0 12px rgba(6,182,212,0.2); }
+    .btn.active[data-accent="amber"] { background: rgba(251,191,36,0.15); border-color: var(--neon-amber); color: #fcd34d; box-shadow: 0 0 12px rgba(251,191,36,0.2); }
+    .count { color: var(--text-tertiary); font-size: 10px; font-weight: 600; }
+    .segmented {
+      display: inline-flex;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .segmented button {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .segmented button:last-child { border-right: none; }
+    .segmented button:hover { color: var(--text-primary); background: var(--bg-elevated); }
+    .segmented button.active { background: var(--neon-blue); color: #fff; }
+    select {
+      padding: 6px 10px;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    select:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .chart-wrapper {
+      position: relative;
+      height: 500px;
+      background: rgba(6,9,20,0.6);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .floating-pill {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      z-index: 20;
+    }
+    .floating-pill .btn {
+      background: transparent;
+      border-color: transparent;
+      padding: 6px 8px;
+    }
+    .floating-pill .btn:hover {
+      background: var(--bg-elevated);
+    }
+    .floating-pill .divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(148,163,184,0.25);
+      margin: 0 2px;
+    }
+    .actions-menu {
+      position: relative;
+    }
+    .dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      min-width: 180px;
+      background: var(--bg-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 6px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+      z-index: 30;
+    }
+    .actions-menu:hover .dropdown { display: block; }
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .dropdown-item:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .chart-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      font-size: 14px;
+      pointer-events: none;
+    }
+    @media (max-width: 700px) {
+      .header { flex-direction: column; align-items: flex-start; }
+      .floating-pill { left: 12px; right: auto; flex-wrap: wrap; max-width: calc(100% - 24px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="label">Option 3 — Floating Overlay Toolbar</div>
+    <div class="glass-card">
+      <div class="header">
+        <div class="title">📈 XAUUSD H1 Chart</div>
+        <div class="toolbar-group">
+          <div class="segmented">
+            <button>M15</button>
+            <button>M30</button>
+            <button class="active">H1</button>
+            <button>H4</button>
+            <button>D1</button>
+          </div>
+          <select title="Timezone">
+            <option>🌐 UTC</option>
+            <option>🏦 Broker</option>
+            <option>🖥️ Local</option>
+          </select>
+          <div style="width:1px; height:20px; background: rgba(148,163,184,0.25); margin: 0 4px;"></div>
+          <div class="actions-menu">
+            <button class="btn">Actions ▾</button>
+            <div class="dropdown">
+              <div class="dropdown-item"><span>🔄</span> Refresh</div>
+              <div class="dropdown-item"><span>📅</span> Load full history</div>
+              <div class="dropdown-item"><span>🎯</span> Jump to date</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-wrapper">
+        <div class="chart-placeholder">
+          Chart area — lightweight-charts canvas
+        </div>
+
+        <!-- Floating layer toggles -->
+        <div class="floating-pill">
+          <button class="btn active" data-accent="purple" title="Structure">
+            <span>🏗️</span>
+            <span class="count">124</span>
+          </button>
+          <button class="btn active" data-accent="cyan" title="Sessions">
+            <span>🕒</span>
+            <span class="count">8</span>
+          </button>
+          <button class="btn active" data-accent="amber" title="EMA 200">
+            <span>📈</span>
+          </button>
+          <button class="btn" data-accent="blue" title="Trades">
+            <span>📊</span>
+            <span class="count">42</span>
+          </button>
+          <div class="divider"></div>
+          <button class="btn" title="Zoom out">−</button>
+          <button class="btn" title="Reset zoom">⟲</button>
+          <button class="btn" title="Zoom in">+</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

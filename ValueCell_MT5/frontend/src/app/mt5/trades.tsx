@@ -20,6 +20,7 @@ import {
   type TradeOverlayEntry,
 } from "@/components/valuecell/charts/trades-overlay-primitive";
 import MT5Footer from "./components/MT5Footer";
+import ChartToolbar from "./components/ChartToolbar";
 
 interface Trade {
   trade_id: string;
@@ -804,18 +805,98 @@ export default function TradesPage() {
   };
   
   // Handle year change - jump to January of selected year
-  const handleYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newYear = e.target.value;
+  const handleYearChange = (newYear: string) => {
     setSelectedYear(newYear);
     setSelectedMonth("01"); // Reset to January when year changes
     jumpToDate(newYear, "01");
   };
-  
+
   // Handle month change - jump to selected month of current year
-  const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newMonth = e.target.value;
+  const handleMonthChange = (newMonth: string) => {
     setSelectedMonth(newMonth);
     jumpToDate(selectedYear, newMonth);
+  };
+
+  // Handle timezone change - extracted so it can be reused by the toolbar
+  const handleTimezoneChange = (newMode: "utc" | "broker" | "local") => {
+    console.log("🔄 TIMEZONE CHANGE TRIGGERED");
+    console.log("  Previous mode:", chartTimezone.display_mode);
+    console.log("  New mode:", newMode);
+    console.log("  Previous state:", chartTimezone);
+
+    // Mark that user manually changed timezone
+    userChangedTimezone.current = true;
+    console.log("  🔒 User changed timezone flag set to TRUE");
+
+    const newTimezone = { ...chartTimezone, display_mode: newMode };
+    console.log("  New state to set:", newTimezone);
+
+    setChartTimezone(newTimezone);
+    console.log("  ✅ setChartTimezone called");
+
+    // Update chart localization in real-time
+    if (chartRef.current) {
+      console.log("  📊 Chart ref exists, updating options...");
+
+      chartRef.current.applyOptions({
+        localization: {
+          locale: "en-US",
+          timeFormatter: (time: number) => {
+            return formatChartTime(time, newMode, newTimezone.broker_offset_hours);
+          },
+        },
+      });
+      console.log("  ✅ applyOptions called with new formatter");
+
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      console.log("  Current visible range:", visibleRange);
+
+      if (visibleRange) {
+        const tempRange = {
+          from: (visibleRange.from as number) - 0.0001,
+          to: (visibleRange.to as number) + 0.0001,
+        };
+        console.log("  Setting temp range:", tempRange);
+        timeScale.setVisibleRange(tempRange);
+
+        setTimeout(() => {
+          if (chartRef.current) {
+            console.log("  Restoring original range:", visibleRange);
+            chartRef.current.timeScale().setVisibleRange(visibleRange);
+            console.log("  ✅ Force redraw complete");
+          }
+        }, 10);
+      } else {
+        console.warn("  ⚠️ No visible range available");
+      }
+    } else {
+      console.warn("  ⚠️ Chart ref not available");
+    }
+
+    console.log("🔄 TIMEZONE CHANGE HANDLER COMPLETE\n");
+  };
+
+  // Zoom controls
+  const handleZoomIn = () => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    const current = ts.options().barSpacing ?? 8;
+    ts.applyOptions({ barSpacing: Math.min(current * 1.2, 30) });
+  };
+
+  const handleZoomOut = () => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    const current = ts.options().barSpacing ?? 8;
+    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 4) });
+  };
+
+  const handleResetZoom = () => {
+    if (!chartRef.current) return;
+    chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
+    const centerDate = `${selectedYear}-${selectedMonth}-01`;
+    focusChartOnDate(centerDate, 0, chartCandles);
   };
 
   // Guard to prevent concurrent executions
@@ -1856,286 +1937,40 @@ export default function TradesPage() {
 
         {/* Chart Section */}
         <div className="glass-card mb-8">
-          <div className="flex justify-between items-center mb-5">
-            <span className="text-xl font-semibold">📈 XAUUSD {activeTimeframe} Chart</span>
-            <div className="flex gap-2 items-center flex-wrap">
-              {/* Market Structure Toggle */}
-              <button
-                onClick={() => setShowStructure(!showStructure)}
-                className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 ${
-                  showStructure
-                    ? "!border-[var(--neon-purple)] !text-[var(--neon-purple)] shadow-[0_0_15px_rgba(168,85,247,0.3)]"
-                    : ""
-                }`}
-                title="Toggle Market Structure Overlay"
-              >
-                <span>🏗️</span>
-                <span>Structure</span>
-                {structureLines && (
-                  <span className="text-xs opacity-70">
-                    ({structureLines.total_points})
-                  </span>
-                )}
-              </button>
-
-              {/* Session Zones Toggle */}
-              <button
-                onClick={() => setShowSessions(!showSessions)}
-                className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 ${
-                  showSessions
-                    ? "!border-[var(--neon-cyan)] !text-[var(--neon-cyan)] shadow-[0_0_15px_rgba(34,211,238,0.3)]"
-                    : ""
-                }`}
-                title="Toggle Session Zone Shadows"
-              >
-                <span>🕒</span>
-                <span>Sessions</span>
-                {sessionZonesData && (
-                  <span className="text-xs opacity-70">
-                    ({sessionZonesData.total_zones})
-                  </span>
-                )}
-              </button>
-              
-              {/* EMA 200 Toggle */}
-              <button
-                onClick={() => setShowEMA200(!showEMA200)}
-                className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 ${
-                  showEMA200
-                    ? "!border-[#f59e0b] !text-[#f59e0b] shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                    : ""
-                }`}
-                title="Toggle EMA 200 Line"
-              >
-                <span>📈</span>
-                <span>EMA 200</span>
-              </button>
-
-              {/* Trades Entry/SL/TP Toggle */}
-              <button
-                onClick={() => setShowTrades(!showTrades)}
-                className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 ${
-                  showTrades
-                    ? "!border-[#3b82f6] !text-[#3b82f6] shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                    : ""
-                }`}
-                title="Toggle Trade Entry/SL/TP Overlay"
-              >
-                <span>📊</span>
-                <span>Trades</span>
-                {backtestTradesData && (
-                  <span className="text-xs opacity-70">
-                    ({backtestTradesData.total_trades})
-                  </span>
-                )}
-              </button>
-              
-              {/* Load Full History Button - show whenever full history not yet cached */}
-              {!fullHistoryLoadedRef.current[activeTimeframe] && dataMode !== 'loading' && !loadProgress.visible && (
-                <button
-                  onClick={loadFullHistory}
-                  disabled={isJumping}
-                  className="px-3 py-2 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 rounded-lg text-xs transition-all hover:from-purple-600/30 hover:to-blue-600/30 hover:border-purple-400/50 flex items-center gap-2 text-purple-300 hover:text-purple-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Load full historical data from 2020 and cache for instant navigation"
-                >
-                  <span>📅</span>
-                  <span>Load Full History</span>
-                  <span className="text-[10px] opacity-70">(2020-2026 • Cache for instant jumps)</span>
-                </button>
-              )}
-              
-              {/* Data Mode Indicator */}
-              {dataMode === 'loading' && (
-                <div className="px-3 py-2 bg-blue-600/10 border border-blue-500/30 rounded-lg text-xs flex items-center gap-2 text-blue-300 animate-pulse">
-                  <span className="animate-spin">⏳</span>
-                  <span>Loading full history...</span>
-                </div>
-              )}
-              
-              {dataMode === 'full' && fullHistoryLoadedRef.current[activeTimeframe] && (
-                <div className="px-3 py-2 bg-green-600/10 border border-green-500/30 rounded-lg text-xs flex items-center gap-2 text-green-300">
-                  <span>✅</span>
-                  <span>Full History Cached</span>
-                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles • Instant jumps enabled)</span>
-                </div>
-              )}
-              
-              {dataMode === 'full' && !fullHistoryLoadedRef.current[activeTimeframe] && (
-                <div className="px-3 py-2 bg-amber-600/10 border border-amber-500/30 rounded-lg text-xs flex items-center gap-2 text-amber-300">
-                  <span>📌</span>
-                  <span>Date Jump Mode</span>
-                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles • Load Full History for instant cache)</span>
-                </div>
-              )}
-              
-              {dataMode === 'recent' && candlesCount > 0 && (
-                <div className="px-3 py-2 bg-slate-600/10 border border-slate-500/20 rounded-lg text-xs flex items-center gap-2 text-slate-300">
-                  <span>⚡</span>
-                  <span>Quick Mode</span>
-                  <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles)</span>
-                </div>
-              )}
-              
-              {/* Divider */}
-              <div className="h-6 w-px bg-slate-700/50"></div>
-              
-              {/* Manual Refresh Button */}
-              <button
-                onClick={() => loadChartData(true, dataMode as 'recent' | 'full')}
-                disabled={dataMode === 'loading'}
-                className="px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Manually refresh chart data"
-              >
-                <span>🔄</span>
-                <span>Refresh</span>
-              </button>
-
-              {/* Reset Zoom Button */}
-              <button
-                onClick={() => {
-                  if (chartRef.current) {
-                    chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
-                    const centerDate = `${selectedYear}-${selectedMonth}-01`;
-                    focusChartOnDate(centerDate, 0, chartCandles);
-                  }
-                }}
-                className="px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] flex items-center gap-2"
-                title="Reset zoom to default level"
-              >
-                <span>🔍</span>
-                <span>Reset Zoom</span>
-              </button>
-              
-              {/* Year/Month Jump Navigation - Instant Jump */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Jump to:</span>
-                
-                <select
-                  value={selectedYear}
-                  onChange={handleYearChange}
-                  disabled={isJumping}
-                  className="px-2 py-1 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded text-xs hover:bg-[var(--bg-elevated)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Select year - jumps to January of that year"
-                >
-                  {availableYears.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-                
-                <select
-                  value={selectedMonth}
-                  onChange={handleMonthChange}
-                  disabled={isJumping}
-                  className="px-2 py-1 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded text-xs hover:bg-[var(--bg-elevated)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Select month - jumps to that month immediately"
-                >
-                  {availableMonths.map(month => (
-                    <option key={month.value} value={month.value}>{month.label}</option>
-                  ))}
-                </select>
-                
-                {/* Loading indicator shown during jump */}
-                {isJumping && (
-                  <div className="px-2 py-1 bg-blue-600/10 border border-blue-500/30 rounded text-xs flex items-center gap-1 text-blue-300">
-                    <span className="animate-spin">⏳</span>
-                    <span className="text-[10px]">Jumping...</span>
-                  </div>
-                )}
-              </div>
-              
-              {/* Timezone Selector */}
-              <select
-                value={chartTimezone.display_mode}
-                onChange={(e) => {
-                  const newMode = e.target.value as 'utc' | 'broker' | 'local';
-                  console.log('🔄 TIMEZONE CHANGE TRIGGERED');
-                  console.log('  Previous mode:', chartTimezone.display_mode);
-                  console.log('  New mode:', newMode);
-                  console.log('  Previous state:', chartTimezone);
-                  
-                  // Mark that user manually changed timezone
-                  userChangedTimezone.current = true;
-                  console.log('  🔒 User changed timezone flag set to TRUE');
-                  
-                  const newTimezone = {...chartTimezone, display_mode: newMode};
-                  console.log('  New state to set:', newTimezone);
-                  
-                  setChartTimezone(newTimezone);
-                  console.log('  ✅ setChartTimezone called');
-                  
-                  // Update chart localization in real-time
-                  if (chartRef.current) {
-                    console.log('  📊 Chart ref exists, updating options...');
-                    
-                    // Force immediate update by re-applying options
-                    chartRef.current.applyOptions({
-                      localization: {
-                        locale: 'en-US',
-                        timeFormatter: (time: number) => {
-                          return formatChartTime(time, newMode, newTimezone.broker_offset_hours);
-                        },
-                      },
-                    });
-                    console.log('  ✅ applyOptions called with new formatter');
-                    
-                    // Trigger full time scale redraw
-                    const timeScale = chartRef.current.timeScale();
-                    
-                    // Get current visible range
-                    const visibleRange = timeScale.getVisibleRange();
-                    console.log('  Current visible range:', visibleRange);
-                    
-                    // Force complete redraw by temporarily changing and restoring range
-                    if (visibleRange) {
-                      const tempRange = {
-                        from: (visibleRange.from as number) - 0.0001,
-                        to: (visibleRange.to as number) + 0.0001,
-                      };
-                      console.log('  Setting temp range:', tempRange);
-                      timeScale.setVisibleRange(tempRange);
-                      
-                      // Restore original range after a tiny delay to force redraw
-                      setTimeout(() => {
-                        if (chartRef.current) {
-                          console.log('  Restoring original range:', visibleRange);
-                          chartRef.current.timeScale().setVisibleRange(visibleRange);
-                          console.log('  ✅ Force redraw complete');
-                        }
-                      }, 10);
-                    } else {
-                      console.warn('  ⚠️ No visible range available');
-                    }
-                  } else {
-                    console.warn('  ⚠️ Chart ref not available');
-                  }
-                  
-                  console.log('🔄 TIMEZONE CHANGE HANDLER COMPLETE\n');
-                }}
-                className="px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] hover:border-[var(--neon-blue)] text-[var(--text-primary)]"
-                title="Chart Timezone Display"
-              >
-                <option value="utc">🌐 UTC</option>
-                <option value="broker">🏦 Broker Time</option>
-                <option value="local">🖥️ Local Time</option>
-              </select>
-
-              {/* DISABLED: year & month dropdown */}
-              
-              {/* Timeframe buttons */}
-              {["M15", "M30", "H1", "H4", "D1"].map((tf) => (
-                <button
-                  key={tf}
-                  onClick={() => changeTimeframe(tf)}
-                  className={`px-3 py-2 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs transition-all hover:bg-[var(--bg-elevated)] hover:border-[var(--neon-blue)] hover:text-[var(--neon-blue)] ${
-                    tf === activeTimeframe
-                      ? "bg-[var(--neon-blue)] !text-white !border-[var(--neon-blue)] shadow-[0_0_20px_rgba(59,130,246,0.4)]"
-                      : ""
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
-            </div>
+          <div className="mb-5">
+            <ChartToolbar
+              title={<span className="text-xl font-semibold">📈 XAUUSD {activeTimeframe} Chart</span>}
+              activeTimeframe={activeTimeframe}
+              onTimeframeChange={changeTimeframe}
+              selectedYear={selectedYear}
+              onYearChange={handleYearChange}
+              selectedMonth={selectedMonth}
+              onMonthChange={handleMonthChange}
+              availableYears={availableYears}
+              availableMonths={availableMonths}
+              chartTimezone={chartTimezone}
+              onTimezoneChange={handleTimezoneChange}
+              showStructure={showStructure}
+              onToggleStructure={() => setShowStructure((prev) => !prev)}
+              showSessions={showSessions}
+              onToggleSessions={() => setShowSessions((prev) => !prev)}
+              showEMA200={showEMA200}
+              onToggleEMA200={() => setShowEMA200((prev) => !prev)}
+              showTrades={showTrades}
+              onToggleTrades={() => setShowTrades((prev) => !prev)}
+              structureLines={structureLines}
+              sessionZonesData={sessionZonesData}
+              backtestTradesData={backtestTradesData}
+              isFullHistoryLoaded={!!fullHistoryLoadedRef.current[activeTimeframe]}
+              dataMode={dataMode}
+              candlesCount={candlesCount}
+              onRefresh={() => loadChartData(true, dataMode as "recent" | "full")}
+              onLoadFullHistory={loadFullHistory}
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onResetZoom={handleResetZoom}
+              isJumping={isJumping}
+            />
           </div>
           <div 
             ref={chartContainerRef} 

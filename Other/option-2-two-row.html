@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Option 2 — Two-Row Header</title>
+  <style>
+    :root {
+      --bg-deepspace: #0a0e27;
+      --bg-surface: #111827;
+      --bg-elevated: #1f2937;
+      --glass-primary: rgba(17, 24, 39, 0.6);
+      --glass-secondary: rgba(31, 41, 55, 0.5);
+      --glass-border: rgba(59, 130, 246, 0.2);
+      --neon-blue: #3b82f6;
+      --neon-cyan: #06b6d4;
+      --neon-emerald: #10b981;
+      --neon-ruby: #ef4444;
+      --neon-amber: #fbbf24;
+      --neon-purple: #8b5cf6;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-tertiary: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg-deepspace);
+      color: var(--text-primary);
+      font-family: Inter, system-ui, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .label {
+      color: var(--text-tertiary);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .glass-card {
+      background: var(--glass-primary);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 1px rgba(255,255,255,0.05);
+      padding: 16px 20px;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .row + .row {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(59, 130, 246, 0.12);
+    }
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .section-label {
+      color: var(--text-tertiary);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+    .title {
+      font-size: 18px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn:hover {
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+    .btn.active { color: #fff; }
+    .btn.active[data-accent="purple"] { background: rgba(139,92,246,0.2); border-color: var(--neon-purple); color: #c4b5fd; box-shadow: 0 0 12px rgba(139,92,246,0.25); }
+    .btn.active[data-accent="cyan"] { background: rgba(6,182,212,0.15); border-color: var(--neon-cyan); color: #67e8f9; box-shadow: 0 0 12px rgba(6,182,212,0.2); }
+    .btn.active[data-accent="amber"] { background: rgba(251,191,36,0.15); border-color: var(--neon-amber); color: #fcd34d; box-shadow: 0 0 12px rgba(251,191,36,0.2); }
+    .btn.active[data-accent="blue"] { background: rgba(59,130,246,0.15); border-color: var(--neon-blue); color: #93c5fd; box-shadow: 0 0 12px rgba(59,130,246,0.2); }
+    .count { color: var(--text-tertiary); font-size: 10px; font-weight: 600; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      border: 1px solid;
+      white-space: nowrap;
+    }
+    .chip.success { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #6ee7b7; }
+    .chip.info { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: #93c5fd; }
+    .segmented {
+      display: inline-flex;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .segmented button {
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--glass-border);
+      color: var(--text-secondary);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .segmented button:last-child { border-right: none; }
+    .segmented button:hover { color: var(--text-primary); background: var(--bg-elevated); }
+    .segmented button.active { background: var(--neon-blue); color: #fff; }
+    select {
+      padding: 6px 10px;
+      background: var(--glass-secondary);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    select:hover { background: var(--bg-elevated); color: var(--text-primary); }
+    .chart-placeholder {
+      margin-top: 16px;
+      height: 500px;
+      background: rgba(6,9,20,0.6);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-tertiary);
+      font-size: 14px;
+    }
+    @media (max-width: 900px) {
+      .row { flex-direction: column; align-items: stretch; }
+      .toolbar-group { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="label">Option 2 — Two-Row Header</div>
+    <div class="glass-card">
+      <!-- Row 1: title + status + data actions -->
+      <div class="row">
+        <div class="toolbar-group">
+          <div class="title">📈 XAUUSD H1 Chart</div>
+        </div>
+        <div class="toolbar-group">
+          <span class="section-label">Status</span>
+          <div class="chip success">
+            <span>✅</span>
+            <span>Full History Cached</span>
+            <span class="count">(124k candles)</span>
+          </div>
+          <span class="section-label" style="margin-left: 8px;">Actions</span>
+          <button class="btn"><span>🔄</span> Refresh</button>
+          <button class="btn"><span>📅</span> Load Full History</button>
+        </div>
+      </div>
+
+      <!-- Row 2: timeframe + layers + jump + timezone -->
+      <div class="row">
+        <div class="toolbar-group">
+          <span class="section-label">Timeframe</span>
+          <div class="segmented">
+            <button>M15</button>
+            <button>M30</button>
+            <button class="active">H1</button>
+            <button>H4</button>
+            <button>D1</button>
+          </div>
+        </div>
+
+        <div class="toolbar-group">
+          <span class="section-label">Layers</span>
+          <button class="btn active" data-accent="purple">
+            <span>🏗️</span> Structure <span class="count">(124)</span>
+          </button>
+          <button class="btn active" data-accent="cyan">
+            <span>🕒</span> Sessions <span class="count">(8)</span>
+          </button>
+          <button class="btn active" data-accent="amber">
+            <span>📈</span> EMA 200
+          </button>
+          <button class="btn" data-accent="blue">
+            <span>📊</span> Trades <span class="count">(42)</span>
+          </button>
+        </div>
+
+        <div class="toolbar-group">
+          <span class="section-label">Jump</span>
+          <select><option>2026</option><option>2025</option></select>
+          <select><option>June</option><option>May</option></select>
+          <div style="width:1px; height:20px; background: rgba(148,163,184,0.25); margin: 0 4px;"></div>
+          <select title="Timezone">
+            <option>🌐 UTC</option>
+            <option>🏦 Broker</option>
+            <option>🖥️ Local</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="chart-placeholder">
+        Chart area — lightweight-charts canvas
+      </div>
+    </div>
+  </div>
+</body>
+</html>
