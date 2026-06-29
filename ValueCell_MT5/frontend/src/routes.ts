@@ -22,6 +22,7 @@ export default [
     layout("app/mt5/_layout.tsx", [
       index("app/mt5/dashboard.tsx"),
       route("/trades", "app/mt5/trades.tsx"),
+      route("/rongsokan", "app/mt5/rongsokan.tsx"),
       route("/performance", "app/mt5/performance.tsx"),
       route("/agents", "app/mt5/agents.tsx"),
       route("/settings", "app/mt5/settings.tsx"),

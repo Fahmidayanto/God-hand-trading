@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import MT5Sidebar from "./components/MT5Sidebar";
 import Dashboard from "./dashboard";
 import Trades from "./trades";
+import Rongsokan from "./rongsokan";
 import Performance from "./performance";
 import Agents from "./agents";
 import Settings from "./settings";
@@ -10,6 +11,7 @@ import Settings from "./settings";
 const pages = [
   { path: "/mt5", Component: Dashboard },
   { path: "/mt5/trades", Component: Trades },
+  { path: "/mt5/rongsokan", Component: Rongsokan },
   { path: "/mt5/performance", Component: Performance },
   { path: "/mt5/agents", Component: Agents },
   { path: "/mt5/settings", Component: Settings },

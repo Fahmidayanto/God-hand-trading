@@ -34,7 +34,7 @@ export interface ChartToolbarProps {
   backtestTradesData?: { total_trades?: number } | null;
 
   isFullHistoryLoaded: boolean;
-  dataMode: "recent" | "full" | "loading";
+  dataMode: "recent" | "full" | "loading" | "window";
   candlesCount: number;
 
   onRefresh: () => void;

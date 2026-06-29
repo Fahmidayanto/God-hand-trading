@@ -168,3 +168,70 @@ export const useBacktestTrades = () => {
     staleTime: 900000, // 15 min stale
   });
 };
+
+// Rongsokan API Hooks
+export const useRongsokanMarketStructureLines = (fromDate?: string, toDate?: string) => {
+  const params = new URLSearchParams();
+  if (fromDate) params.set("from_date", fromDate);
+  if (toDate) params.set("to_date", toDate);
+  const queryString = params.toString();
+  return useQuery({
+    queryKey: ["trading", "rongsokan-structure-lines", fromDate ?? "2020-01-01"],
+    queryFn: () => apiClient.get<MarketStructureLines>(`/trading/rongsokan-structure-lines?${queryString}`),
+    refetchInterval: 900000, // Refresh every 15 minutes
+    staleTime: 900000, // Don't refetch within 15 minutes
+  });
+};
+
+export const useRongsokanBacktestTrades = () => {
+  return useQuery({
+    queryKey: ["trading", "rongsokan-trades"],
+    queryFn: () => apiClient.get<BacktestTradesResponse>("/trading/rongsokan-trades"),
+    staleTime: 900000, // 15 min stale
+  });
+};
+
+export interface RongsokanChartDataResponse {
+  symbol: string;
+  timeframe: string;
+  candles: Array<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    ema200?: number;
+  }>;
+  ema_periods: { ema200: number };
+  mode: string;
+  from_date: string;
+  center_date?: string;
+  candles_count: number;
+  timezone: {
+    broker_offset_hours: number;
+    display_mode: string;
+    candle_times_are_utc: boolean;
+  };
+}
+
+export const useRongsokanChartData = (
+  symbol: string = "XAUUSD",
+  timeframe: string = "M15",
+  fromDate: string = "2020-01-01",
+  mode: "recent" | "full" | "window" = "recent",
+  centerDate?: string
+) => {
+  const params = new URLSearchParams();
+  params.set("symbol", symbol);
+  params.set("timeframe", timeframe);
+  params.set("from_date", fromDate);
+  params.set("mode", mode);
+  if (centerDate) params.set("center_date", centerDate);
+
+  return useQuery({
+    queryKey: ["trading", "rongsokan-chart-data", symbol, timeframe, fromDate, mode, centerDate ?? ""],
+    queryFn: () => apiClient.get<RongsokanChartDataResponse>(`/trading/chart/rongsokan-data?${params.toString()}`),
+    refetchInterval: mode === "recent" ? 30000 : false, // Only auto-refresh in recent mode
+    staleTime: mode === "recent" ? 30000 : 900000,
+  });
+};

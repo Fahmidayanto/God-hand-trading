@@ -6,6 +6,7 @@
 # Backtest results (large CSV files)
 Backtest_result/*.csv
 catboost_info/
+Other/Backtest_rongsokan/
 
 # Python cache
 __pycache__/

@@ -6,6 +6,7 @@ export default function MT5Sidebar() {
   const navLinks = [
     { path: "/mt5", label: "Dashboard", icon: "🏠" },
     { path: "/mt5/trades", label: "Trades", icon: "📊" },
+    { path: "/mt5/rongsokan", label: "Rongsokan", icon: "🔋" },
     { path: "/mt5/performance", label: "Performance", icon: "📈" },
     { path: "/mt5/agents", label: "Agents", icon: "🤖" },
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },

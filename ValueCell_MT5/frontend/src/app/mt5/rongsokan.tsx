@@ -1,0 +1,1797 @@
+import { useEffect, useRef, useState } from "react";
+import { 
+  createChart, 
+  type IChartApi, 
+  type ISeriesApi,
+  CandlestickSeries,
+  LineSeries,
+  LineStyle,
+} from "lightweight-charts";
+import Particles from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
+import type { Engine } from "@tsparticles/engine";
+import { useRongsokanMarketStructureLines, useSessionZones, useRongsokanBacktestTrades, useRongsokanChartData, type BacktestTrade } from "@/api/mt5_agents";
+import {
+  SessionZonesPrimitive,
+  type SessionZoneBox,
+} from "@/components/valuecell/charts/session-zones-primitive";
+import {
+  TradesOverlayPrimitive,
+  type TradeOverlayEntry,
+} from "@/components/valuecell/charts/trades-overlay-primitive";
+import MT5Footer from "./components/MT5Footer";
+import ChartToolbar from "./components/ChartToolbar";
+
+interface Trade {
+  trade_id: string;
+  symbol: string;
+  type: string;
+  entry_price: number;
+  exit_price: number | null;
+  lot_size: number;
+  pnl: number;
+  status: string;
+  open_time: string;
+}
+
+type ChartCandle = {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  ema200?: number;
+};
+
+export default function RongsokanPage() {
+  const [stats, setStats] = useState({
+    total_trades: 0,
+    win_rate: 0,
+    total_pnl: 0,
+    open_positions: 0,
+  });
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [showStructure, setShowStructure] = useState(true);
+  const [showSessions, setShowSessions] = useState(true);
+  const [showEMA200, setShowEMA200] = useState(true);
+  const [showTrades, setShowTrades] = useState(false);
+  const [activeTimeframe, setActiveTimeframe] = useState("M15"); // Timeframe state
+  const [chartCandles, setChartCandles] = useState<ChartCandle[]>([]);
+  const latestProgressRef = useRef({ percent: 0, step: '', total: 0 });
+  const [loadProgress, setLoadProgress] = useState<{
+    visible: boolean;
+    percent: number;
+    step: string;
+    total: number;
+  }>({ visible: false, percent: 0, step: '', total: 0 });
+  
+  // Data loading mode state
+  const [dataMode, setDataMode] = useState<'recent' | 'full' | 'window'>('recent');
+  const [chartFromDate, setChartFromDate] = useState(() => {
+    // Default: 6 months ago
+    const date = new Date();
+    date.setMonth(date.getMonth() - 6);
+    return date.toISOString().split('T')[0];
+  });
+  const [candlesCount, setCandlesCount] = useState(0);
+  
+  // Year/Month Jump Navigation state
+  const [selectedYear, setSelectedYear] = useState("2026");
+  const [selectedMonth, setSelectedMonth] = useState("06");
+  const [isJumping, setIsJumping] = useState(false);
+  
+  // Available years (2020-2026)
+  const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+  
+  // Available months
+  const availableMonths = [
+    { value: "01", label: "January" },
+    { value: "02", label: "February" },
+    { value: "03", label: "March" },
+    { value: "04", label: "April" },
+    { value: "05", label: "May" },
+    { value: "06", label: "June" },
+    { value: "07", label: "July" },
+    { value: "08", label: "August" },
+    { value: "09", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
+  ];
+  
+  // CHART TIMEZONE DEFAULT = UTC.
+  // When the page first opens, UTC is always selected (per requirement).
+  // The user can manually switch to 'broker' or 'local'; once switched, that
+  // choice is preserved across data refreshes. UTC stays default until then.
+  const [chartTimezone, setChartTimezone] = useState<{broker_offset_hours: number, display_mode: string, candle_times_are_utc: boolean}>({
+    broker_offset_hours: 3,
+    display_mode: 'utc', // Default to UTC on every page open
+    candle_times_are_utc: true
+  });
+
+  const [activeYear, setActiveYear] = useState<string>("2026");
+  // DISABLED: year/month dropdown
+  // const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+  // const [availableMonths, setAvailableMonths] = useState<Array<{label: string, value: number}>>([]);
+  // const [selectedMonth, setSelectedMonth] = useState<string>("");
+  // const monthsInitialized = useRef(false);
+
+  // Track if user has manually changed timezone (don't override if true)
+  const userChangedTimezone = useRef(false);
+  
+  // Helper function to format time based on timezone mode
+  // This is separate so it can be called with fresh timezone values
+  const indonesianMonths = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  const formatChartTime = (time: number, displayMode: string, brokerOffset: number): string => {
+    const date = new Date(time * 1000);
+    let day: string, month: string, year: number, hours: string, minutes: string;
+    
+    if (displayMode === 'utc') {
+      day = String(date.getUTCDate()).padStart(2, '0');
+      month = indonesianMonths[date.getUTCMonth()];
+      year = date.getUTCFullYear();
+      hours = String(date.getUTCHours()).padStart(2, '0');
+      minutes = String(date.getUTCMinutes()).padStart(2, '0');
+    } else if (displayMode === 'broker') {
+      const brokerTime = new Date((time + brokerOffset * 3600) * 1000);
+      day = String(brokerTime.getUTCDate()).padStart(2, '0');
+      month = indonesianMonths[brokerTime.getUTCMonth()];
+      year = brokerTime.getUTCFullYear();
+      hours = String(brokerTime.getUTCHours()).padStart(2, '0');
+      minutes = String(brokerTime.getUTCMinutes()).padStart(2, '0');
+    } else { // local
+      day = String(date.getDate()).padStart(2, '0');
+      month = indonesianMonths[date.getMonth()];
+      year = date.getFullYear();
+      hours = String(date.getHours()).padStart(2, '0');
+      minutes = String(date.getMinutes()).padStart(2, '0');
+    }
+    
+    return `${day} ${month} ${year} ${hours}:${minutes}`;
+  };
+  
+
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartDataLoadedRef = useRef(false);
+  const isLoadingChartDataRef = useRef(false);
+  const chartRef = useRef<IChartApi | null>(null);
+  const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+  const structureSeriesRef = useRef<ISeriesApi<"Line">[]>([]); // Line series for structure
+  const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
+  const tradesPrimitiveRef = useRef<TradesOverlayPrimitive | null>(null);
+  // ponytail: shares overlayGuardRef with structure, no separate guard needed
+  
+  // Ref to always get the latest timezone state in formatter
+  const chartTimezoneRef = useRef(chartTimezone);
+  
+  // ========================
+  // CLIENT-SIDE CACHE SYSTEM
+  // ========================
+  // Cache full candle data in memory for instant navigation
+  // Key format: "{timeframe}" (e.g., "M15", "H1")
+  // This eliminates the need to fetch from API on every month jump
+  const candleCacheRef = useRef<{
+    [key: string]: {
+      candles: ChartCandle[];
+      loadedAt: number; // timestamp when cached
+      fromDate: string; // e.g., "2020-01-01"
+      toDate: string;   // e.g., "2026-06-25"
+      totalCount: number;
+    }
+  }>({});
+  
+  // Flag to track if full history has been loaded for current timeframe
+  const fullHistoryLoadedRef = useRef<{[key: string]: boolean}>({});
+  
+  // Track if full cached data is currently DISPLAYED on chart (not just cached).
+  // Prevents redundant setData + overlay rebuild on year/month jumps within same timeframe.
+  const fullDataDisplayedRef = useRef<{[key: string]: boolean}>({});
+  
+  // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
+  const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  
+  // Update ref whenever chartTimezone changes
+  useEffect(() => {
+    console.log('📍 chartTimezone state changed:', {
+      oldState: chartTimezoneRef.current,
+      newState: chartTimezone
+    });
+    chartTimezoneRef.current = chartTimezone;
+  }, [chartTimezone]);
+  
+  // Load market structure lines (2020-01-01 to now, from all CSV files)
+  const { data: structureLines } = useRongsokanMarketStructureLines("2020-01-01");
+
+  // Load session zones - sync with chart data mode
+  const { data: sessionZonesData } = useSessionZones(chartFromDate);
+
+  // Load backtest trades for Entry/SL/TP overlay
+  const { data: backtestTradesData } = useRongsokanBacktestTrades();
+
+  // Load chart data using Rongsokan hook
+  const { data: chartData, refetch: refetchChartData } = useRongsokanChartData(
+    "XAUUSD",
+    activeTimeframe,
+    chartFromDate,
+    dataMode,
+    dataMode === 'window' ? `${selectedYear}-${selectedMonth}-01` : undefined
+  );
+
+  const processCandles = (candles: any[]): ChartCandle[] =>
+    candles.map((candle: any) => ({
+      time: candle.time as number,
+      open: candle.open,
+      high: candle.high,
+      low: candle.low,
+      close: candle.close,
+      ema200: candle.ema200,
+    }));
+
+  const updateEma200Series = (candles: ChartCandle[]) => {
+    if (!ema200SeriesRef.current) return;
+
+    const ema200Data = candles
+      .filter((candle) => candle.ema200 != null)
+      .map((candle) => ({
+        time: candle.time as number,
+        value: candle.ema200 as number,
+      }));
+
+    ema200SeriesRef.current.setData(ema200Data as any);
+  };
+
+  const updateLoadedCandles = (candles: ChartCandle[], count = candles.length) => {
+    candlestickSeriesRef.current?.setData(candles as any);
+    setChartCandles(candles);
+    setCandlesCount(count);
+    updateEma200Series(candles);
+    sessionZonesPrimitiveRef.current?.setCandleTimes(candles.map((candle) => candle.time));
+  };
+
+  const cacheFullHistory = (timeframe: string, candles: ChartCandle[]) => {
+    candleCacheRef.current[timeframe] = {
+      candles,
+      loadedAt: Date.now(),
+      fromDate: '2020-01-01',
+      toDate: new Date(candles[candles.length - 1].time * 1000).toISOString().split('T')[0],
+      totalCount: candles.length,
+    };
+    fullHistoryLoadedRef.current[timeframe] = true;
+  };
+
+  const focusChartOnDate = (centerDate: string, delayMs = 50, candles?: ChartCandle[]) => {
+    const centerTimestamp = Date.parse(`${centerDate}T00:00:00Z`) / 1000;
+
+    const doScroll = () => {
+      const timeScale = chartRef.current?.timeScale();
+      if (!timeScale) return;
+
+      if (candles && candles.length > 0) {
+        const idx = candles.findIndex((c: ChartCandle) => c.time >= centerTimestamp);
+        if (idx >= 0) {
+          timeScale.setVisibleLogicalRange({
+            from: idx as any,
+            to: Math.min(candles.length - 1, idx + 287) as any,
+          });
+        }
+      }
+
+      renderStructureLabelsOverlay(structureLabelsRef.current);
+    };
+
+    if (delayMs === 0) {
+      requestAnimationFrame(doScroll);
+    } else {
+      setTimeout(() => requestAnimationFrame(doScroll), delayMs);
+    }
+  };
+
+  const getWindowStartDate = (centerDate: string) => {
+    const windowStart = new Date(`${centerDate}T00:00:00Z`);
+    windowStart.setUTCMonth(windowStart.getUTCMonth() - 3);
+    return windowStart.toISOString().split('T')[0];
+  };
+
+  const particlesInit = async (engine: Engine) => {
+    await loadSlim(engine);
+  };
+
+  useEffect(() => {
+    console.log('📊 Chart initialization effect triggered');
+    console.log('chartContainerRef.current:', !!chartContainerRef.current);
+    console.log('chartRef.current:', !!chartRef.current);
+    
+    if (chartContainerRef.current && !chartRef.current) {
+      console.log('✅ Initializing chart...');
+      try {
+        const chart = createChart(chartContainerRef.current, {
+          autoSize: true, // Auto-fit chart to container size via ResizeObserver
+          layout: {
+            background: { color: "rgba(17, 24, 39, 0.3)" },
+            textColor: "#cbd5e1",
+          },
+          grid: {
+            vertLines: { color: "rgba(100, 116, 139, 0.1)" },
+            horzLines: { color: "rgba(100, 116, 139, 0.1)" },
+          },
+          crosshair: {
+            mode: 0, // Normal crosshair mode (0 = normal, 1 = magnet)
+            vertLine: {
+              width: 1,
+              color: 'rgba(224, 227, 235, 0.5)',
+              style: 0,
+              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+            },
+            horzLine: {
+              width: 1,
+              color: 'rgba(224, 227, 235, 0.5)',
+              style: 0,
+              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+            },
+          },
+          rightPriceScale: {
+            borderColor: "rgba(100, 116, 139, 0.3)",
+          },
+          timeScale: {
+            borderColor: "rgba(100, 116, 139, 0.3)",
+            timeVisible: true,
+            secondsVisible: false,
+            rightOffset: 5,
+            barSpacing: 8,
+            minBarSpacing: 4,
+            fixLeftEdge: false,
+            fixRightEdge: false,
+            lockVisibleTimeRangeOnResize: false,
+            rightBarStaysOnScroll: true,
+            shiftVisibleRangeOnNewBar: false, // CRITICAL: Disable auto-scroll when data updates
+          },
+          localization: {
+            locale: 'en-US',
+            timeFormatter: (time: number) => {
+              // Use ref to get latest timezone state (avoids stale closure)
+              const currentTimezone = chartTimezoneRef.current;
+              console.log('🕐 Initial formatter called, using ref:', {
+                displayMode: currentTimezone.display_mode,
+                brokerOffset: currentTimezone.broker_offset_hours
+              });
+              return formatChartTime(time, currentTimezone.display_mode, currentTimezone.broker_offset_hours);
+            },
+          },
+        });
+
+        // Log timezone info
+        const timezoneOffset = new Date().getTimezoneOffset();
+        console.log('🕐 Browser timezone offset (minutes):', timezoneOffset);
+        console.log('🕐 This means browser is:', timezoneOffset > 0 ? `GMT-${timezoneOffset/60}` : `GMT+${-timezoneOffset/60}`);
+
+        const candlestickSeries = chart.addSeries(CandlestickSeries, {
+          upColor: "#10b981",
+          downColor: "#ef4444",
+          borderVisible: false,
+          wickUpColor: "#10b981",
+          wickDownColor: "#ef4444",
+        });
+
+        chartRef.current = chart;
+        candlestickSeriesRef.current = candlestickSeries;
+
+        // Add EMA 200 line series (initially hidden, data loaded via API)
+        const ema200Series = chart.addSeries(LineSeries, {
+          color: "#f59e0b",
+          lineWidth: 2 as any,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          title: "EMA 200",
+          visible: showEMA200,
+        });
+        ema200SeriesRef.current = ema200Series;
+        console.log('📉 EMA 200 series created:', {
+          visible: showEMA200,
+          color: '#f59e0b',
+          seriesRef: !!ema200SeriesRef.current,
+        });
+
+        // Attach the session-zone shadow primitive (drawn beneath candles).
+        try {
+          const sessionPrimitive = new SessionZonesPrimitive();
+          (candlestickSeries as any).attachPrimitive(sessionPrimitive);
+          sessionZonesPrimitiveRef.current = sessionPrimitive;
+        } catch (e) {
+          console.warn("Could not attach session zones primitive:", e);
+        }
+        
+        // Re-render structure labels with 50ms debounce when user pans/zooms
+        // Prevents DOM churn at 60fps (innerHTML='' + createElement per label per frame)
+        chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
+          if (scrollLabelDebounceRef.current) clearTimeout(scrollLabelDebounceRef.current);
+          scrollLabelDebounceRef.current = setTimeout(
+            () => renderStructureLabelsOverlay(structureLabelsRef.current),
+            50
+          );
+        });
+
+        console.log('✅ Chart initialized successfully');
+        console.log('chartRef.current:', !!chartRef.current);
+        console.log('candlestickSeriesRef.current:', !!candlestickSeriesRef.current);
+
+        // Hook returns the data once, but if it fetched before the chart series
+        // existed the data effect would have skipped setData. Trigger a refetch
+        // now that the series is ready so the candles render.
+        chartDataLoadedRef.current = false;
+        refetchChartData();
+      } catch (error) {
+        console.error('❌ Error creating chart:', error);
+      }
+    } else {
+      console.log('⏭️ Skipping chart init: already initialized or container not ready');
+    }
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0 && chartRef.current) {
+          chartRef.current.applyOptions({ width, height });
+        }
+      }
+    });
+
+    if (chartContainerRef.current) resizeObserver.observe(chartContainerRef.current);
+
+    const intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting && chartRef.current && chartContainerRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight,
+          });
+        }
+      });
+    });
+    if (chartContainerRef.current) intersectionObserver.observe(chartContainerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+    };
+  }, []);
+
+  // Load trade history - using Rongsokan trades
+  useEffect(() => {
+    if (backtestTradesData && backtestTradesData.trades) {
+      const formattedTrades = backtestTradesData.trades.map((t, i) => ({
+        trade_id: `#TRD-${String(i + 1).padStart(3, '0')}`,
+        symbol: "XAUUSD",
+        type: t.type,
+        entry_price: t.entry_price,
+        exit_price: t.exit_time_ts ? t.entry_price + (t.type === "BUY" ? 10 : -10) : null,
+        lot_size: t.lot_size,
+        pnl: t.profit,
+        status: t.exit_time_ts ? "CLOSED" : "OPEN",
+        open_time: t.entry_time,
+      }));
+      setTrades(formattedTrades);
+      
+      const totalPnl = formattedTrades.reduce((sum, t) => sum + t.pnl, 0);
+      const winCount = formattedTrades.filter(t => t.pnl > 0).length;
+      const totalTrades = formattedTrades.length;
+      const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
+      
+      setStats({
+        total_trades: totalTrades,
+        win_rate: Math.round(winRate * 10) / 10,
+        total_pnl: Math.round(totalPnl * 100) / 100,
+        open_positions: formattedTrades.filter(t => t.status === "OPEN").length,
+      });
+    }
+  }, [backtestTradesData]);
+
+  // Handle chart data from hook
+  useEffect(() => {
+    if (chartData && chartData.candles && candlestickSeriesRef.current) {
+      console.log('✅ Chart data received from hook:', {
+        mode: chartData.mode,
+        from_date: chartData.from_date,
+        candles: chartData.candles?.length,
+        candlesCount: chartData.candles_count,
+      });
+      
+      const processedCandles = processCandles(chartData.candles);
+      
+      const timeScale = chartRef.current?.timeScale();
+      const currentVisibleRange = timeScale?.getVisibleRange();
+      
+      updateLoadedCandles(processedCandles, chartData.candles_count || processedCandles.length);
+      if (chartData.mode === 'full' && processedCandles.length > 0) {
+        cacheFullHistory(activeTimeframe, processedCandles);
+      }
+      
+      // Restore viewport position after setData (prevents auto-scroll)
+      if (chartDataLoadedRef.current && currentVisibleRange && timeScale) {
+        setTimeout(() => {
+          timeScale.setVisibleRange(currentVisibleRange);
+        }, 0);
+      }
+      
+      chartDataLoadedRef.current = true;
+      
+      // Update mode state if loading was triggered
+      setDataMode(chartData.mode as any);
+          
+      // Store timezone info from API.
+      if (chartData.timezone) {
+        if (userChangedTimezone.current) {
+          // Keep user's manually chosen mode, just refresh broker offset
+          setChartTimezone(prev => ({
+            ...prev,
+            broker_offset_hours: chartData.timezone.broker_offset_hours ?? prev.broker_offset_hours,
+          }));
+          console.log('🚫 Skipping display_mode override (user manually changed it); refreshed broker offset only');
+        } else {
+          // Default path: force UTC as the display mode, only adopt broker offset from API
+          setChartTimezone(prev => ({
+            ...prev,
+            broker_offset_hours: chartData.timezone.broker_offset_hours ?? prev.broker_offset_hours,
+            display_mode: 'utc',
+          }));
+          console.log('🌍 Defaulting chart display_mode to UTC (broker offset from API:', chartData.timezone.broker_offset_hours, ')');
+        }
+      }
+      console.log(`✅ Chart data loaded successfully (${chartData.mode} mode)`);
+      
+      // Trigger structure overlay with fresh candle data
+      if (showStructure && structureLines) {
+        console.log('🔄 Triggering structure overlay');
+        overlayMarketStructure(processedCandles, true);
+      }
+    }
+  }, [chartData, activeTimeframe, dataMode, chartFromDate, showStructure, structureLines]);
+
+  useEffect(() => {
+    // Auto-refresh chart data every 30 seconds (increased from 5s for performance)
+    // ONLY refresh in recent mode AND only if user hasn't jumped to specific date
+    // Disable auto-refresh when exploring historical data to prevent unwanted scrolling
+    const chartInterval = setInterval(() => {
+      if (chartRef.current && candlestickSeriesRef.current && dataMode === 'recent' && !isJumping) {
+        // Only auto-refresh if we're truly in recent mode (last 6 months)
+        // Don't refresh if user is exploring historical data via jump
+        const recentThreshold = new Date();
+        recentThreshold.setMonth(recentThreshold.getMonth() - 6);
+        
+        // Check if chartFromDate is within recent range
+        const chartDate = new Date(chartFromDate);
+        if (chartDate >= recentThreshold) {
+          console.log('🔄 Auto-refresh chart data (recent mode only)');
+          refetchChartData();
+        } else {
+          console.log('⏸️ Skipping auto-refresh (user is viewing historical data)');
+        }
+      }
+    }, 30000); // 30 seconds instead of 5 seconds
+    return () => clearInterval(chartInterval);
+  }, [activeTimeframe, activeYear, dataMode, chartFromDate, isJumping, refetchChartData]);
+
+  // DISABLED: months generation from candle data
+  // useEffect(() => {
+  //   if (chartCandles.length === 0 || monthsInitialized.current) return;
+  //   monthsInitialized.current = true;
+  //
+  //   const times = chartCandles.map(c => c.time);
+  //   const minTime = Math.min(...times);
+  //   const maxTime = Math.max(...times);
+  //
+  //   const months: Array<{label: string, value: number}> = [];
+  //   const minDate = new Date(minTime * 1000);
+  //   const maxDate = new Date(maxTime * 1000);
+  //   const cursor = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), 1));
+  //   const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  //
+  //   while (cursor <= maxDate) {
+  //     const y = cursor.getUTCFullYear();
+  //     const m = cursor.getUTCMonth();
+  //     const start = Math.floor(Date.UTC(y, m, 1) / 1000);
+  //     months.push({ label: names[m], value: start });
+  //     cursor.setUTCMonth(m + 1);
+  //   }
+  //
+  //   setAvailableMonths(months);
+  //   setSelectedMonth(prev => prev === "" && months.length > 0 ? String(months[0].value) : prev);
+  // }, [chartCandles]);
+
+  // Load full history function with caching
+  const loadFullHistory = async () => {
+    setLoadProgress({ visible: true, percent: 0, step: 'Counting rows...', total: 0 });
+
+    const cacheKey = activeTimeframe;
+    const cachedData = candleCacheRef.current[cacheKey];
+    if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
+      const ts = chartRef.current?.timeScale();
+      const prevRange = ts?.getVisibleRange();
+      const prevBarSpacing = ts?.options()?.barSpacing;
+      setChartFromDate(cachedData.fromDate);
+      updateLoadedCandles(cachedData.candles, cachedData.totalCount);
+      setDataMode('full');
+      if (showStructure && structureLines) {
+        overlayMarketStructure(cachedData.candles, true);
+      }
+      if (prevRange && ts) {
+        setTimeout(() => {
+          ts.setVisibleRange(prevRange);
+          if (prevBarSpacing != null) ts.applyOptions({ barSpacing: prevBarSpacing });
+        }, 0);
+      }
+      fullDataDisplayedRef.current[cacheKey] = true;
+      setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
+      return;
+    }
+
+    setDataMode('full');
+    setChartFromDate('2020-01-01');
+
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const chartUrl = `${apiUrl}/trading/chart/rongsokan-data-stream?symbol=XAUUSD&timeframe=${activeTimeframe}&from_date=2020-01-01&mode=full`;
+
+      const response = await fetch(chartUrl);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const reader = response.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let completeData: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.trim()) continue;
+          const msg = JSON.parse(line);
+
+          if (msg.type === 'progress') {
+            latestProgressRef.current = {
+              percent: msg.percent,
+              step: msg.step,
+              total: msg.total_estimated ?? 0,
+            };
+          } else if (msg.type === 'complete') {
+            completeData = msg.data;
+          } else if (msg.type === 'error') {
+            console.error('Backend error:', msg.message);
+            setDataMode('recent');
+            setLoadProgress({ visible: false, percent: 0, step: '', total: 0 });
+            return;
+          }
+
+          if (i % 20 === 19) {
+            await new Promise(r => setTimeout(r, 0));
+          }
+        }
+      }
+
+      if (!completeData) throw new Error('No complete event received');
+      const { candles } = completeData;
+
+      if (candles && candles.length > 0) {
+        const processedCandles = processCandles(candles);
+        cacheFullHistory(cacheKey, processedCandles);
+        const ts = chartRef.current?.timeScale();
+        const prevRange = ts?.getVisibleRange();
+        const prevBarSpacing = ts?.options()?.barSpacing;
+        if (candlestickSeriesRef.current) updateLoadedCandles(processedCandles);
+        if (prevRange && ts) {
+          setTimeout(() => {
+            ts.setVisibleRange(prevRange);
+            if (prevBarSpacing != null) ts.applyOptions({ barSpacing: prevBarSpacing });
+          }, 0);
+        }
+        setDataMode('full');
+        if (showStructure && structureLines) {
+          requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+        }
+        fullDataDisplayedRef.current[cacheKey] = true;
+      }
+    } catch (error) {
+      console.error('Stream error:', error);
+      setDataMode('recent');
+    } finally {
+      latestProgressRef.current = { percent: 100, step: '', total: 0 };
+      setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
+    }
+  };
+  
+  // Jump to specific year/month function (refactored to use cache)
+  const jumpToDate = async (year: string, month: string) => {
+    const centerDate = `${year}-${month}-01`;
+    console.log('🎯 jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
+
+    setIsJumping(true);
+    
+    const cacheKey = activeTimeframe;
+    const cachedData = candleCacheRef.current[cacheKey];
+    console.log('🎯 cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
+
+    // Check if we have cached full history for this timeframe
+    if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
+      console.log('🎯 CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
+      console.log('💾 Cache info:', {
+        totalCandles: cachedData.totalCount,
+        dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
+      });
+      
+      try {
+        if (candlestickSeriesRef.current && chartRef.current && cachedData.candles.length > 0) {
+          if (!fullDataDisplayedRef.current[cacheKey]) {
+            // First time displaying this cached data for this timeframe
+            console.log('📊 Displaying cached data for', cacheKey, ':', {
+              totalCandles: cachedData.totalCount,
+              dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
+            });
+            updateLoadedCandles(cachedData.candles);
+            setChartFromDate(cachedData.fromDate);
+            setDataMode('full');
+            fullDataDisplayedRef.current[cacheKey] = true;
+            // Scroll first, overlay draws in next frame — prevents 1.5s freeze before scroll
+            focusChartOnDate(centerDate, 50, cachedData.candles);
+            if (showStructure && structureLines) {
+              requestAnimationFrame(() => overlayMarketStructure(cachedData.candles, true));
+            }
+          } else {
+            // Data & overlay already on chart — instant scroll
+            updateLoadedCandles(cachedData.candles);
+            focusChartOnDate(centerDate, 0, cachedData.candles);
+          }
+          console.log('🎯 jumpToDate COMPLETE (cached)');
+        }
+      } catch (error) {
+        console.error('❌ Error using cache:', error);
+      } finally {
+        setIsJumping(false);
+      }
+      return;
+    }
+    
+    // No cache available - fetch from API (fallback to original behavior)
+    console.log('⚠️ No cache available, fetching from API...');
+    setDataMode('full');
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const chartUrl = `${apiUrl}/trading/chart/rongsokan-data?symbol=XAUUSD&timeframe=${activeTimeframe}&center_date=${centerDate}`;
+      
+      console.log('🔄 Fetching windowed data:', chartUrl);
+      const response = await fetch(chartUrl);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Windowed data received:', {
+          mode: data.mode,
+          center_date: data.center_date,
+          candles: data.candles?.length,
+        });
+        
+        if (data.candles && candlestickSeriesRef.current && chartRef.current) {
+          // Process candles
+          const processedCandles = processCandles(data.candles);
+          
+          updateLoadedCandles(processedCandles, data.candles_count || processedCandles.length);
+          
+          // Update session zones to match window
+          setChartFromDate(getWindowStartDate(centerDate));
+          
+          // Don't set to 'recent' - keep as 'full' to prevent auto-refresh
+          // Window mode should not trigger auto-refresh
+          setDataMode('full');
+          
+          // Scroll chart to center date
+          focusChartOnDate(centerDate, 50, processedCandles);
+          
+          // Defer overlay to next frame so scroll renders first without freeze
+          if (showStructure && structureLines) {
+            requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+          }
+          console.log(`✅ Jumped to ${centerDate} successfully`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Jump to date error:', error);
+      setDataMode('recent');
+    } finally {
+      setIsJumping(false);
+    }
+  };
+  
+  // Handle year change - jump to January of selected year
+  const handleYearChange = (newYear: string) => {
+    setSelectedYear(newYear);
+    setSelectedMonth("01"); // Reset to January when year changes
+    jumpToDate(newYear, "01");
+  };
+
+  // Handle month change - jump to selected month of current year
+  const handleMonthChange = (newMonth: string) => {
+    setSelectedMonth(newMonth);
+    jumpToDate(selectedYear, newMonth);
+  };
+
+  // Handle timezone change - extracted so it can be reused by the toolbar
+  const handleTimezoneChange = (newMode: "utc" | "broker" | "local") => {
+    console.log("🔄 TIMEZONE CHANGE TRIGGERED");
+    console.log("  Previous mode:", chartTimezone.display_mode);
+    console.log("  New mode:", newMode);
+    console.log("  Previous state:", chartTimezone);
+
+    // Mark that user manually changed timezone
+    userChangedTimezone.current = true;
+    console.log("  🔒 User changed timezone flag set to TRUE");
+
+    const newTimezone = { ...chartTimezone, display_mode: newMode };
+    console.log("  New state to set:", newTimezone);
+
+    setChartTimezone(newTimezone);
+    console.log("  ✅ setChartTimezone called");
+
+    // Update chart localization in real-time
+    if (chartRef.current) {
+      console.log("  📊 Chart ref exists, updating options...");
+
+      chartRef.current.applyOptions({
+        localization: {
+          locale: "en-US",
+          timeFormatter: (time: number) => {
+            return formatChartTime(time, newMode, newTimezone.broker_offset_hours);
+          },
+        },
+      });
+      console.log("  ✅ applyOptions called with new formatter");
+
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      console.log("  Current visible range:", visibleRange);
+
+      if (visibleRange) {
+        const tempRange = {
+          from: (visibleRange.from as number) - 0.0001,
+          to: (visibleRange.to as number) + 0.0001,
+        };
+        console.log("  Setting temp range:", tempRange);
+        timeScale.setVisibleRange(tempRange);
+
+        setTimeout(() => {
+          if (chartRef.current) {
+            console.log("  Restoring original range:", visibleRange);
+            chartRef.current.timeScale().setVisibleRange(visibleRange);
+            console.log("  ✅ Force redraw complete");
+          }
+        }, 10);
+      } else {
+        console.warn("  ⚠️ No visible range available");
+      }
+    } else {
+      console.warn("  ⚠️ Chart ref not available");
+    }
+
+    console.log("🔄 TIMEZONE CHANGE HANDLER COMPLETE\n");
+  };
+
+  // Zoom controls
+  const handleZoomIn = () => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    const current = ts.options().barSpacing ?? 8;
+    ts.applyOptions({ barSpacing: Math.min(current * 1.2, 30) });
+  };
+
+  const handleZoomOut = () => {
+    if (!chartRef.current) return;
+    const ts = chartRef.current.timeScale();
+    const current = ts.options().barSpacing ?? 8;
+    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 4) });
+  };
+
+  const handleResetZoom = () => {
+    if (!chartRef.current) return;
+    chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
+    const centerDate = `${selectedYear}-${selectedMonth}-01`;
+    focusChartOnDate(centerDate, 0, chartCandles);
+  };
+
+  // Guard to prevent concurrent executions
+  const overlayGuardRef = useRef(false);
+
+  // Track structure lines version to skip redundant redraws on 30s refetch
+  const structureLinesVersionRef = useRef('');
+
+  // Store the latest labels so they can be re-rendered when the user pans/zooms
+  const structureLabelsRef = useRef<Array<{
+    time: number;
+    price: number;
+    color: string;
+    text: string;
+    isResistance: boolean;
+  }>>([]);
+
+  // Render structure labels as HTML overlay on the chart container.
+  // lightweight-charts v5 has no setMarkers, so we position <span> elements
+  // using series.priceToCoordinate() and series.timeToCoordinate().
+  const renderStructureLabelsOverlay = (
+    labels: Array<{
+      time: number;
+      startTime: number;
+      endTime: number;
+      price: number;
+      color: string;
+      text: string;
+      isResistance: boolean;
+    }>,
+  ) => {
+    structureLabelsRef.current = labels;
+    const overlayEl = document.getElementById('structure-labels-overlay');
+    if (!overlayEl || !chartRef.current || !candlestickSeriesRef.current) return;
+
+    overlayEl.innerHTML = '';
+    const series = candlestickSeriesRef.current;
+
+    const timeScale = chartRef.current.timeScale();
+    const visibleRange = timeScale.getVisibleRange();
+    const visibleFrom = visibleRange ? Number(visibleRange.from) : null;
+    const visibleTo = visibleRange ? Number(visibleRange.to) : null;
+
+    for (const lbl of labels) {
+      // Place the label at the geometric MIDDLE of its line (lbl.time is the
+      // candle nearest the midpoint between startTime and endTime). Skip drawing
+      // only when the line is fully outside the visible range (perf).
+      if (visibleFrom !== null && visibleTo !== null) {
+        if (lbl.endTime < visibleFrom || lbl.startTime > visibleTo) continue;
+      }
+      const labelTime = lbl.time;
+
+      const x = timeScale.timeToCoordinate(labelTime as any);
+      const y = series.priceToCoordinate(lbl.price);
+      if (x === null || y === null) continue;
+
+      const span = document.createElement('span');
+      span.textContent = lbl.text;
+      span.style.position = 'absolute';
+      // Translate to center horizontally and offset vertically from the line
+      span.style.transform = 'translateX(-50%)';
+      // Resistance labels above the line, support labels below
+      span.style.top = lbl.isResistance
+        ? `${Math.max(2, (y as number) - 18)}px`
+        : `${(y as number) + 4}px`;
+      span.style.left = `${x as number}px`;
+      span.style.color = lbl.color;
+      span.style.fontSize = '10px';
+      span.style.fontWeight = '600';
+      span.style.fontFamily = 'monospace';
+      span.style.background = 'rgba(17, 24, 39, 0.85)';
+      span.style.padding = '1px 5px';
+      span.style.borderRadius = '3px';
+      span.style.border = `1px solid ${lbl.color}`;
+      span.style.whiteSpace = 'nowrap';
+      span.style.pointerEvents = 'none';
+      overlayEl.appendChild(span);
+    }
+  };
+
+  const renderTradesLabels = (trades: BacktestTrade[]) => {
+    const overlayEl = document.getElementById('trades-labels-overlay');
+    if (!overlayEl || !chartRef.current || !candlestickSeriesRef.current) return;
+    overlayEl.innerHTML = '';
+    const series = candlestickSeriesRef.current;
+    const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
+
+    for (const trade of trades) {
+      const endTs = trade.exit_time_ts ?? lastCandle;
+      if (!endTs) continue;
+      const midTime = Math.floor((trade.entry_time_ts + endTs) / 2) as any;
+      const labels = [
+        { price: trade.entry_price, color: '#3b82f6', text: `Entry ${trade.entry_price}` },
+      ];
+      if (trade.sl !== null) labels.push({ price: trade.sl, color: '#ef4444', text: `SL ${trade.sl}` });
+      if (trade.tp !== null) labels.push({ price: trade.tp, color: '#22c55e', text: `TP ${trade.tp}` });
+
+      for (const lbl of labels) {
+        const x = chartRef.current.timeScale().timeToCoordinate(midTime);
+        const y = series.priceToCoordinate(lbl.price);
+        if (x === null || y === null) continue;
+        const span = document.createElement('span');
+        span.textContent = lbl.text;
+        span.style.position = 'absolute';
+        span.style.transform = 'translateX(-50%)';
+        span.style.top = `${(y as number) - 10}px`;
+        span.style.left = `${x as number}px`;
+        span.style.color = lbl.color;
+        span.style.fontSize = '10px';
+        span.style.fontWeight = '600';
+        span.style.fontFamily = 'monospace';
+        span.style.background = 'rgba(17, 24, 39, 0.85)';
+        span.style.padding = '1px 5px';
+        span.style.borderRadius = '3px';
+        span.style.border = `1px solid ${lbl.color}`;
+        span.style.whiteSpace = 'nowrap';
+        span.style.pointerEvents = 'none';
+        overlayEl.appendChild(span);
+      }
+    }
+  };
+
+  const overlayTradeEntries = () => {
+    if (tradesPrimitiveRef.current && candlestickSeriesRef.current) {
+      try { candlestickSeriesRef.current.detachPrimitive(tradesPrimitiveRef.current); } catch (e) {}
+    }
+    tradesPrimitiveRef.current = null;
+    const tradesEl = document.getElementById('trades-labels-overlay');
+    if (tradesEl) tradesEl.innerHTML = '';
+
+    if (!showTrades || !backtestTradesData || !chartRef.current || !candlestickSeriesRef.current) {
+      console.log('[overlayTradeEntries] SKIP:', { showTrades, hasData: !!backtestTradesData, hasChart: !!chartRef.current, hasSeries: !!candlestickSeriesRef.current });
+      return;
+    }
+
+    const trades = backtestTradesData.trades ?? [];
+    console.log('[overlayTradeEntries] Total trades from API:', trades.length);
+    if (trades.length === 0) {
+      return;
+    }
+
+    // Debug: Check trades distribution by year
+    const tradesByYear = trades.reduce((acc, t) => {
+      const year = new Date(t.entry_time_ts * 1000).getFullYear();
+      acc[year] = (acc[year] || 0) + 1;
+      return acc;
+    }, {} as Record<number, number>);
+    console.log('[overlayTradeEntries] Trades by year:', tradesByYear);
+
+    // Debug: Show sample 2026 trades
+    const trades2026 = trades.filter(t => new Date(t.entry_time_ts * 1000).getFullYear() === 2026);
+    console.log('[overlayTradeEntries] 2026 trades sample:', trades2026.slice(0, 3).map(t => ({
+      type: t.type,
+      entry_price: t.entry_price,
+      entry_time: new Date(t.entry_time_ts * 1000).toISOString(),
+      exit_time: t.exit_time_ts ? new Date(t.exit_time_ts * 1000).toISOString() : null,
+      sl: t.sl,
+      tp: t.tp,
+    })));
+
+    const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
+    console.log('[overlayTradeEntries] Last candle time:', lastCandle, lastCandle ? new Date(lastCandle * 1000).toISOString() : null);
+    
+    // Debug: Chart candles time range
+    if (chartCandles.length > 0) {
+      const firstCandle = chartCandles[0]?.time;
+      console.log('[overlayTradeEntries] Chart candles range:', {
+        first: new Date(firstCandle * 1000).toISOString(),
+        last: new Date(lastCandle! * 1000).toISOString(),
+        total: chartCandles.length,
+      });
+    }
+
+    // ponytail: all lines drawn via canvas primitive, no series needed
+    const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
+    candlestickSeriesRef.current.attachPrimitive(primitive);
+    const entries: TradeOverlayEntry[] = trades.map(t => ({
+      type: t.type, entry_price: t.entry_price, sl: t.sl, tp: t.tp,
+      profit: t.profit, entry_time_ts: t.entry_time_ts, exit_time_ts: t.exit_time_ts,
+    }));
+    primitive.setTrades(entries);
+    primitive.setLastCandleTime(lastCandle as number | null);
+    primitive.setTimeframe(activeTimeframe); // Pass active timeframe
+    tradesPrimitiveRef.current = primitive;
+    renderTradesLabels(trades);
+  };
+
+  const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
+    if (!chartRef.current || !showStructure || !structureLines) return;
+    
+    // Prevent concurrent executions
+    if (overlayGuardRef.current) {
+      console.log('⏸️ overlayMarketStructure already running, skipping');
+      return;
+    }
+    overlayGuardRef.current = true;
+
+    // Use provided candles or fall back to state (for effect-triggered calls)
+    const candlesToUse = candles ?? chartCandles;
+
+    // Filter structure lines by timeframe.
+    // On M15 chart we only draw M15-derived lines to avoid H1/H4/D1 clutter;
+    // on higher timeframes we keep all lines for broader context.
+    const shouldFilterByTimeframe = activeTimeframe === "M15";
+    const filterByTimeframe = <T extends { timeframe?: string }>(items: T[] | undefined | null): T[] => {
+      if (!items) return [];
+      return shouldFilterByTimeframe ? items.filter((item) => item.timeframe === "M15") : items;
+    };
+    const filteredBosLines = filterByTimeframe(structureLines.bos_lines);
+    const filteredChochLines = filterByTimeframe(structureLines.choch_lines);
+    const filteredHhPoints = filterByTimeframe(structureLines.hh_points);
+    const filteredLlPoints = filterByTimeframe(structureLines.ll_points);
+
+    // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
+    const candleTimeMap = new Map<number, ChartCandle>();
+    const candleTimeArray: number[] = [];
+    for (let i = 0; i < candlesToUse.length; i++) {
+      const c = candlesToUse[i];
+      candleTimeMap.set(c.time, c as ChartCandle);
+      candleTimeArray.push(c.time);
+    }
+    // Binary search helper: returns index of first candle with time >= target
+    const lowerBound = (target: number): number => {
+      let lo = 0, hi = candleTimeArray.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (candleTimeArray[mid] < target) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
+
+    // Clear existing structure series
+    structureSeriesRef.current.forEach(series => {
+      try {
+        chartRef.current?.removeSeries(series);
+      } catch (e) {
+        console.debug('Could not remove series:', e);
+      }
+    });
+    structureSeriesRef.current = [];
+    
+    // Get actual visible candle range from time scale
+    const timeScale = chartRef.current!.timeScale();
+    const visibleLogicalRange = timeScale.getVisibleLogicalRange();
+    
+    console.log('📅 Chart visible logical range:', visibleLogicalRange);
+    
+    // Get first visible candle timestamp
+    // We need to coordinate with the actual candle data loaded
+    let firstVisibleCandleTime: number | null = null;
+    try {
+      if (visibleLogicalRange) {
+        // Convert logical index to time coordinate
+        const leftIndex = Math.floor(visibleLogicalRange.from);
+        const timeAtIndex = timeScale.coordinateToTime(leftIndex);
+        if (timeAtIndex) {
+          firstVisibleCandleTime = typeof timeAtIndex === 'number' ? timeAtIndex : null;
+          console.log('📅 First visible candle time:', firstVisibleCandleTime, new Date((firstVisibleCandleTime || 0) * 1000).toISOString());
+        }
+      }
+    } catch (e) {
+      console.warn('Could not get first visible candle time:', e);
+    }
+
+    // Helper function to create horizontal line from timestamp
+    // lineType:
+    //   'HH'  - Higher High: starts at formation, stops when candle.high > price
+    //   'LL'  - Lower Low:   starts at formation, stops when candle.low < price
+    //   'BOS_CHOCH' - BoS/CHoCH: starts at level formation time, ends at break event time
+    //                  (line goes from LEFT → the break candle, not beyond)
+    // Collect label info here; will be rendered as HTML overlay on candlestick series
+    // (setMarkers does not exist in lightweight-charts v5)
+    const structureLabels: Array<{
+      time: number;
+      startTime: number;
+      endTime: number;
+      price: number;
+      color: string;
+      text: string;
+      isResistance: boolean;
+    }> = [];
+
+    const createHorizontalLine = (
+      price: number,
+      timestamp: number,
+      color: string,
+      lineWidth: number,
+      lineStyle: number,
+      label: string,
+      lineType?: 'HH' | 'LL' | 'BOS_CHOCH',
+      levelFormationTime?: number, // For BoS/CHoCH: when the broken level was first formed (seconds)
+    ) => {
+      try {
+        // Get visible time range from chart
+        const timeScale = chartRef.current!.timeScale();
+        const visibleRange = timeScale.getVisibleRange();
+        
+        // CRITICAL: Check if timestamp is in milliseconds or seconds
+        const isMilliseconds = timestamp > 10000000000;
+        const eventTimeSeconds = isMilliseconds ? Math.floor(timestamp / 1000) : timestamp;
+        
+        // Determine start and end time based on line type
+        let startTimeSeconds: number;
+        let endTimeSeconds: number;
+        
+        // Period map used to size the BoS/CHoCH fallback segment when no
+        // formation time is found in HH/LL data. Declared here so both
+        // branches (BOS_CHOCH and HH/LL) can reference it.
+        const timeframePeriods: {[key: string]: number} = {
+          'M15': 900,   // 15 minutes
+          'M30': 1800,  // 30 minutes
+          'H1': 3600,   // 1 hour
+          'H4': 14400,  // 4 hours
+          'D1': 86400,  // 1 day
+        };
+
+        // Latest actual candle time in the loaded data. We use this (not
+        // the right edge of the visible range) as the end time for HH/LL
+        // lines so they never bleed into the empty area past the last bar.
+        // `rightOffset: 5` on the chart means the visible range extends
+        // ~5 bars past the last candle, which was the previous source of
+        // the "line pokes through the last candle and keeps going" bug.
+        const lastCandleTime: number | null = candlesToUse.length > 0
+          ? candlesToUse[candlesToUse.length - 1].time
+          : null;
+        
+        if (lineType === 'BOS_CHOCH') {
+          // BoS/CHoCH: line from level formation → break event
+          // startTime = when the level was first formed (from HH/LL data)
+          // endTime = the break event time
+          const timeframePeriod = timeframePeriods[activeTimeframe] ?? 900;
+          const formationFallback = Math.max(0, eventTimeSeconds - timeframePeriod);
+          startTimeSeconds = levelFormationTime ?? formationFallback;
+          endTimeSeconds = eventTimeSeconds;
+
+          // find the first candle after formation whose high/low crosses `price`
+          const dirUp = color === '#10b981';
+          const bosStart = lowerBound(startTimeSeconds + 1);
+          for (let i = bosStart; i < candleTimeArray.length; i++) {
+            const candle = candlesToUse[i];
+            if (candle.time > endTimeSeconds) break;
+            const crossed = dirUp ? candle.high > price : candle.low < price;
+            if (crossed) {
+              endTimeSeconds = candle.time;
+              break;
+            }
+          }
+        } else {
+          // HH/LL: line starts at the level's formation event and stops at
+          // the LAST ACTUAL CANDLE (not `Date.now()` and not the right
+          // edge of the visible range). This matches the comment intent of
+          // "stops at last candle" and prevents the line from bleeding into
+          // the empty area past the last bar.
+          startTimeSeconds = eventTimeSeconds;
+          endTimeSeconds = lastCandleTime ?? eventTimeSeconds;
+        }
+        
+        // Find the breaking candle for HH/LL lines — cap at 20 candles after formation
+        if (lineType === 'HH' || lineType === 'LL') {
+          const hhStart = lowerBound(startTimeSeconds + 1);
+          const endIdx = Math.min(hhStart + 20, candleTimeArray.length);
+          let broke = false;
+          for (let i = hhStart; i < endIdx; i++) {
+            const candle = candlesToUse[i];
+            if ((lineType === 'HH' ? candle.high > price : candle.low < price)) {
+              endTimeSeconds = candle.time;
+              broke = true;
+              break;
+            }
+          }
+          if (!broke && endIdx > hhStart) {
+            endTimeSeconds = candlesToUse[endIdx - 1].time;
+          }
+        }
+        
+        // Always start line from the actual candle OPEN time (not close time)
+        // CSV timestamp is candle CLOSE time, so we need to subtract 1 period
+        // Find which candle formed this HH/LL — O(1) Map lookup
+        let actualStartTime = startTimeSeconds;
+        const matchingCandle = candleTimeMap.get(startTimeSeconds);
+        
+        if (!matchingCandle) {
+          // No exact match — binary search for nearest candle before event
+          const idx = lowerBound(startTimeSeconds);
+          if (idx > 0) {
+            actualStartTime = candleTimeArray[idx - 1];
+          } else if (idx < candleTimeArray.length) {
+            actualStartTime = candleTimeArray[idx];
+          }
+        }
+        
+        // Safety check: skip if start >= end
+        if (actualStartTime >= endTimeSeconds) {
+          return false;
+        }
+        
+        const lineOptions = {
+          color,
+          lineWidth,
+          lineStyle,
+          priceLineVisible: false,
+          lastValueVisible: false, // Remove right-side price badges to prevent overlap with candles
+          // No title — label is placed in the middle of the line via marker instead
+        };
+        
+        // Create line data from event time to end
+        const lineData: Array<{ time: number; value: number }> = [
+          { time: actualStartTime, value: price }, // Start point
+        ];
+        lineData.push({ time: endTimeSeconds, value: price }); // End point
+
+        const lineSeries = chartRef.current!.addSeries(LineSeries, lineOptions);
+        lineSeries.setData(lineData);
+
+        // Collect label info for HTML overlay in the middle of the line
+        // Use binary search to find nearest candle to midpoint — avoids O(n) scan
+        if (label && candleTimeArray.length > 0) {
+          const rawMidTime = Math.floor((actualStartTime + endTimeSeconds) / 2);
+          const midIdx = lowerBound(rawMidTime);
+          // Clamp to [actualStartTime, endTimeSeconds] range
+          const candidates: number[] = [];
+          if (midIdx > 0) candidates.push(candleTimeArray[midIdx - 1]);
+          if (midIdx < candleTimeArray.length) candidates.push(candleTimeArray[midIdx]);
+          if (midIdx + 1 < candleTimeArray.length) candidates.push(candleTimeArray[midIdx + 1]);
+          let nearestCandleTime = actualStartTime;
+          let nearestDist = Infinity;
+          for (const t of candidates) {
+            if (t < actualStartTime || t > endTimeSeconds) continue;
+            const dist = Math.abs(t - rawMidTime);
+            if (dist < nearestDist) {
+              nearestDist = dist;
+              nearestCandleTime = t;
+            }
+          }
+          structureLabels.push({
+            time: nearestCandleTime,
+            startTime: actualStartTime,
+            endTime: endTimeSeconds,
+            price,
+            color,
+            text: label,
+            isResistance: lineType !== 'LL',
+          });
+        }
+
+        structureSeriesRef.current.push(lineSeries);
+        return true;
+      } catch (e) {
+        console.error('Error creating line:', e);
+        return false;
+      }
+    };
+
+    // Helper: find when a price level was first formed in HH/LL data.
+    // IMPORTANT: We look up the BoS/CHoCH's OWN price (the level that the line is
+    // drawn at), NOT PreviousPrice. The BoS line is drawn at `bos.price`, so its
+    // formation time must be when that exact level first appeared in HH/LL data.
+    // - BoS/CHoCH Bullish at price X → the level is an HH (higher high) → search HH points
+    // - BoS/CHoCH Bearish at price X → the level is an LL (lower low)  → search LL points
+    // We keep the OLDEST (earliest) occurrence (first time that level was formed).
+    const findLevelFormationTime = (
+      levelPrice: number,
+      direction: string, // 'BULLISH' or 'BEARISH'
+    ): number | undefined => {
+      // Bullish BoS/CHoCH forms an HH level, so look in HH points
+      // Bearish BoS/CHoCH forms an LL level, so look in LL points
+      const isBullish = direction === 'BULLISH';
+      const levelPoints = isBullish
+        ? (filteredHhPoints)
+        : (filteredLlPoints);
+
+      // Find the matching price level (allow small tolerance for floating point)
+      const tolerance = 0.05;
+      let matchTime: number | undefined;
+
+      for (const point of levelPoints) {
+        if (Math.abs(point.price - levelPrice) < tolerance) {
+          const pointTimeSec = point.timestamp > 10000000000
+            ? Math.floor(point.timestamp / 1000)
+            : point.timestamp;
+          // Keep the oldest (earliest) formation time
+          if (matchTime === undefined || pointTimeSec < matchTime) {
+            matchTime = pointTimeSec;
+          }
+        }
+      }
+
+      if (matchTime !== undefined) {
+        console.log(`  🔍 Level ${levelPrice.toFixed(2)} formed at ${matchTime} (${new Date(matchTime * 1000).toISOString()}) [searched ${isBullish ? 'HH' : 'LL'} points]`);
+      } else {
+        console.log(`  ⚠️ Could not find formation time for level ${levelPrice.toFixed(2)} in ${isBullish ? 'HH' : 'LL'} points`);
+      }
+
+      return matchTime;
+    };
+
+    // Drawing strategy mirrors the Trades page: draw EVERY BoS and EVERY CHoCH
+    // line (they never suppress each other, even at the same price), then draw
+    // HH/LL but skip any whose price matches an existing BoS/CHoCH level
+    // (the BoS/CHoCH line already represents that level — dedup only HH/LL).
+
+    // Add BoS lines
+    let bosAdded = 0;
+    filteredBosLines.forEach((bos) => {
+      const color = bos.direction === 'BULLISH' ? '#10b981' : '#ef4444';
+      const formationTime = bos.price
+        ? findLevelFormationTime(bos.price, bos.direction)
+        : undefined;
+      if (createHorizontalLine(
+        bos.price,
+        bos.timestamp,
+        color,
+        2,
+        LineStyle.Solid,
+        `BoS ${bos.price.toFixed(2)}`,
+        'BOS_CHOCH',
+        formationTime,
+      )) {
+        bosAdded++;
+      }
+    });
+
+    // Add CHoCH lines
+    let chochAdded = 0;
+    filteredChochLines.forEach((choch) => {
+      const color = choch.direction === 'BULLISH' ? '#10b981' : '#ef4444';
+      const formationTime = choch.price
+        ? findLevelFormationTime(choch.price, choch.direction)
+        : undefined;
+      if (createHorizontalLine(
+        choch.price,
+        choch.timestamp,
+        color,
+        2,
+        LineStyle.Dashed,
+        `CHoCH ${choch.price.toFixed(2)}`,
+        'BOS_CHOCH',
+        formationTime,
+      )) {
+        chochAdded++;
+      }
+    });
+
+    // Dedup (Opsi A): hide HH/LL whose price matches any BoS/CHoCH price.
+    const PRICE_TOLERANCE = 0.05;
+    const bosChochPrices = new Set<number>();
+    [...filteredBosLines, ...filteredChochLines].forEach((evt) => {
+      if (evt.price != null) bosChochPrices.add(Math.round(evt.price / PRICE_TOLERANCE));
+    });
+    const priceMatchesBosChoch = (price: number): boolean => {
+      if (bosChochPrices.size === 0) return false;
+      const key = Math.round(price / PRICE_TOLERANCE);
+      // Check exact bucket + neighbors to handle floating point near boundaries
+      return bosChochPrices.has(key) || bosChochPrices.has(key - 1) || bosChochPrices.has(key + 1);
+    };
+
+    // Dedup HH/LL points that repeat at the same price (CSV emits an "Update"
+    // row each time a swing is re-touched). Keep the OLDEST occurrence — that's
+    // the candle where the level first formed, which is where its line starts.
+    const dedupKeepOldest = <T extends { price: number; timestamp: number }>(points: T[]): T[] => {
+      const byPrice = new Map<number, T>();
+      for (const p of points) {
+        const key = Math.round(p.price / PRICE_TOLERANCE);
+        const existing = byPrice.get(key);
+        if (!existing || p.timestamp < existing.timestamp) byPrice.set(key, p);
+      }
+      return [...byPrice.values()];
+    };
+    const dedupedHhPoints = dedupKeepOldest(filteredHhPoints);
+    const dedupedLlPoints = dedupKeepOldest(filteredLlPoints);
+
+    // Add HH lines (skip those overlapping a BoS/CHoCH level)
+    let hhAdded = 0;
+    let hhSkippedByDup = 0;
+    dedupedHhPoints.forEach((hh) => {
+      if (priceMatchesBosChoch(hh.price)) {
+        hhSkippedByDup++;
+        return;
+      }
+      const isH1 = hh.timeframe === 'H1';
+      if (createHorizontalLine(
+        hh.price,
+        hh.timestamp,
+        isH1 ? '#1e40af' : '#60a5fa',
+        isH1 ? 2 : 1.5,
+        isH1 ? LineStyle.Dashed : LineStyle.Dotted,
+        `HH [${hh.timeframe}] ${hh.price.toFixed(2)}`,
+        'HH',
+      )) {
+        hhAdded++;
+      }
+    });
+
+    // Add LL lines (skip those overlapping a BoS/CHoCH level)
+    let llAdded = 0;
+    let llSkippedByDup = 0;
+    dedupedLlPoints.forEach((ll) => {
+      if (priceMatchesBosChoch(ll.price)) {
+        llSkippedByDup++;
+        return;
+      }
+      const isH1 = ll.timeframe === 'H1';
+      if (createHorizontalLine(
+        ll.price,
+        ll.timestamp,
+        isH1 ? '#c2410c' : '#fb923c',
+        isH1 ? 2 : 1.5,
+        isH1 ? LineStyle.Dashed : LineStyle.Dotted,
+        `LL [${ll.timeframe}] ${ll.price.toFixed(2)}`,
+        'LL',
+      )) {
+        llAdded++;
+      }
+    });
+
+    // Render all collected labels as HTML overlay on the chart container
+    renderStructureLabelsOverlay(structureLabels);
+
+    console.log('\n✅ ===== OVERLAY COMPLETE =====');
+    console.log('Lines added:', {
+      bos: bosAdded,
+      choch: chochAdded,
+      hh: hhAdded,
+      ll: llAdded,
+      total: bosAdded + chochAdded + hhAdded + llAdded,
+      skippedByDup: { hh: hhSkippedByDup, ll: llSkippedByDup },
+    });
+    console.log('Total line series:', structureSeriesRef.current.length);
+    
+    overlayGuardRef.current = false;
+  };
+
+  // Sync overlays when data/state changes
+  useEffect(() => {
+    if (showStructure && structureLines) {
+      console.log('🔄 useEffect: Triggering structure overlay');
+      overlayMarketStructure(chartCandles);
+    }
+  }, [chartCandles, structureLines, activeTimeframe, showStructure]);
+
+  useEffect(() => {
+    if (showSessions && sessionZonesData && sessionZonesPrimitiveRef.current) {
+      const boxes: SessionZoneBox[] = sessionZonesData.zones.map(zone => ({
+        startTime: zone.start_time,
+        endTime: zone.end_time,
+        session: zone.session,
+        status: zone.status as "CLOSED" | "OPEN",
+        openPrice: zone.open_price,
+        highPrice: zone.high_price,
+        lowPrice: zone.low_price,
+        closePrice: zone.close_price,
+        rangePoints: zone.range_points,
+        durationBars: zone.duration_bars,
+        isDst: zone.is_dst,
+      }));
+      sessionZonesPrimitiveRef.current.setBoxes(boxes);
+    } else if (sessionZonesPrimitiveRef.current) {
+      sessionZonesPrimitiveRef.current.setBoxes([]);
+    }
+  }, [sessionZonesData, showSessions, chartCandles]);
+
+  useEffect(() => {
+    if (showTrades) {
+      overlayTradeEntries();
+    }
+    return () => {
+      if (tradesPrimitiveRef.current && candlestickSeriesRef.current) {
+        try { candlestickSeriesRef.current.detachPrimitive(tradesPrimitiveRef.current); } catch (e) {}
+      }
+      const tradesEl = document.getElementById('trades-labels-overlay');
+      if (tradesEl) tradesEl.innerHTML = '';
+    };
+  }, [showTrades, backtestTradesData, chartCandles, activeTimeframe]);
+
+  useEffect(() => {
+    if (ema200SeriesRef.current) {
+      ema200SeriesRef.current.applyOptions({ visible: showEMA200 });
+    }
+  }, [showEMA200]);
+
+  // Progress indicator effect
+  useEffect(() => {
+    if (loadProgress.visible && latestProgressRef.current.percent > 0) {
+      setLoadProgress(prev => ({
+        ...prev,
+        percent: latestProgressRef.current.percent,
+        step: latestProgressRef.current.step,
+        total: latestProgressRef.current.total,
+      }));
+    }
+  }, [loadProgress.visible, latestProgressRef.current.percent]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollLabelDebounceRef.current) {
+        clearTimeout(scrollLabelDebounceRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div
+      style={{
+        background: "var(--bg-deepspace)",
+        minHeight: "100vh",
+        width: "100%",
+        position: "relative",
+        overflowX: "hidden",
+        overflowY: "auto"
+      }}
+    >
+      <Particles
+        id="tsparticles-rongsokan"
+        init={particlesInit}
+        options={{
+          background: { color: { value: "transparent" } },
+          fpsLimit: 60,
+          particles: {
+            number: { value: 80, density: { enable: true } },
+            color: { value: "#3b82f6" },
+            shape: { type: "circle" },
+            opacity: { value: 0.3 },
+            size: { value: { min: 1, max: 3 } },
+            links: {
+              enable: true,
+              distance: 150,
+              color: "#3b82f6",
+              opacity: 0.2,
+              width: 1,
+            },
+            move: {
+              enable: true,
+              speed: 1,
+              direction: "none",
+              outModes: { default: "out" },
+            },
+          },
+          interactivity: {
+            events: {
+              onHover: { enable: true, mode: "grab" },
+              onClick: { enable: true, mode: "push" },
+            },
+            modes: {
+              grab: { distance: 140, links: { opacity: 0.5 } },
+              push: { quantity: 4 },
+            },
+          },
+        }}
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 0 }}
+      />
+
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 1,
+          background:
+            "radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%), radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%), var(--bg-deepspace)",
+        }}
+      />
+
+      <div
+        className="relative z-10"
+        style={{
+          width: "100%",
+          paddingLeft: "240px",
+          minHeight: "calc(149vh - 0px)"
+        }}
+      >
+        <div className="w-full px-12 py-8">
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-[36px] font-bold mb-3 bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-cyan)] bg-clip-text text-transparent">
+              🔋 Rongsokan
+            </h1>
+            <p className="text-[var(--text-tertiary)] text-base">
+              Market structure, sessions, and backtest trade overlay
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-4 gap-6 mb-8">
+            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
+              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                Total Trades
+              </div>
+              <div className="text-2xl font-semibold mono mb-1">
+                {stats.total_trades}
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">Last 30 days</div>
+            </div>
+
+            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
+              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                Win Rate
+              </div>
+              <div className={`text-2xl font-semibold mono mb-1 ${stats.win_rate >= 50 ? 'positive' : 'negative'}`}>
+                {stats.win_rate.toFixed(1)}%
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">Winning percentage</div>
+            </div>
+
+            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
+              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                Total P&L
+              </div>
+              <div className={`text-2xl font-semibold mono mb-1 ${stats.total_pnl >= 0 ? 'positive' : 'negative'}`}>
+                {stats.total_pnl >= 0 ? '+' : ''}${stats.total_pnl.toFixed(2)}
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">Profit & Loss</div>
+            </div>
+
+            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
+              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+                Open Positions
+              </div>
+              <div className="text-2xl font-semibold neutral mono mb-1">
+                {stats.open_positions}
+              </div>
+              <div className="text-sm text-[var(--text-tertiary)]">
+                {stats.open_positions === 0 ? 'No active trades' : `${stats.open_positions} active trade${stats.open_positions > 1 ? 's' : ''}`}
+              </div>
+            </div>
+          </div>
+
+          {/* Chart Section */}
+          <div className="glass-card mb-8">
+            <div className="mb-5">
+              <ChartToolbar
+                title={<span className="text-xl font-semibold">🔋 XAUUSD {activeTimeframe} Chart</span>}
+                activeTimeframe={activeTimeframe}
+                onTimeframeChange={setActiveTimeframe}
+                selectedYear={selectedYear}
+                onYearChange={handleYearChange}
+                selectedMonth={selectedMonth}
+                onMonthChange={handleMonthChange}
+                availableYears={availableYears}
+                availableMonths={availableMonths}
+                chartTimezone={chartTimezone}
+                onTimezoneChange={handleTimezoneChange}
+                showStructure={showStructure}
+                onToggleStructure={() => setShowStructure((prev) => !prev)}
+                showSessions={showSessions}
+                onToggleSessions={() => setShowSessions((prev) => !prev)}
+                showEMA200={showEMA200}
+                onToggleEMA200={() => setShowEMA200((prev) => !prev)}
+                showTrades={showTrades}
+                onToggleTrades={() => setShowTrades((prev) => !prev)}
+                structureLines={structureLines}
+                sessionZonesData={sessionZonesData}
+                backtestTradesData={backtestTradesData}
+                isFullHistoryLoaded={!!fullHistoryLoadedRef.current[activeTimeframe]}
+                dataMode={dataMode}
+                candlesCount={candlesCount}
+                onRefresh={() => refetchChartData()}
+                onLoadFullHistory={loadFullHistory}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onResetZoom={handleResetZoom}
+                isJumping={isJumping}
+              />
+            </div>
+            <div
+              ref={chartContainerRef}
+              id="chart-container"
+              className="w-full rounded-xl overflow-hidden relative"
+              style={{ width: "100%", height: "700px" }}
+            >
+              <div
+                id="structure-labels-overlay"
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{ zIndex: 10 }}
+              />
+              <div
+                id="trades-labels-overlay"
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{ zIndex: 11 }}
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div>
+            <MT5Footer />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

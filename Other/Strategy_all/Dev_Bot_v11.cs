@@ -4740,6 +4740,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
     //+----------------------------+
     //--- Loop Deteksi High/Low M15 ---| (Lines ~350-1500)
     //+----------------------------+
+
+    int ratesSize_M15 = ArraySize(rates_M15);
+
     for (int i = ArraySize(rates_M15) - WindowSize_M15 - 1; i >= WindowSize_M15; i--)
     {
         // --- Skip bars if they are within already processed CHoCH/BoS zones M15 ---
@@ -4760,10 +4763,70 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             if (rates_M15[i].high < rates_M15[j].high) isHigh_M15 = false;  // Not highest high in window
             if (rates_M15[i].low > rates_M15[j].low) isLow_M15    = false;  // Not lowest low in window
         }
+
+        // ✅ Asymmetric window for Lower High detection after LL after BoS
+        // Kiri: mulai dari LL terakhir (bukan 25 bar mutlak)
+        // Kanan: tetap 25 bar ke depan
+        bool isLHCandidate_M15 = false;
+        if (!isHigh_M15 && bosBearishConfirmedFlag_M15 && llAfterBosConfirmedFlag_M15 &&
+            lastTimeLL_M15 > 0 && rates_M15[i].time > lastTimeLL_M15)
+        {
+            isLHCandidate_M15 = true;
+
+            // Right side: full WindowSize bars into the future (newer bars -> lower index)
+            int rightEnd_M15 = i - WindowSize_M15;
+            if (rightEnd_M15 < 0) rightEnd_M15 = 0;
+            for (int j = i - 1; j >= rightEnd_M15; j--)
+            {
+                if (rates_M15[i].high < rates_M15[j].high) { isLHCandidate_M15 = false; break; }
+            }
+
+            // Left side: from previous bar back until we hit the last accepted LL (older bars -> higher index)
+            if (isLHCandidate_M15)
+            {
+                for (int j = i + 1; j < ratesSize_M15; j++)
+                {
+                    if (rates_M15[j].time <= lastTimeLL_M15) break; // reached LL or older
+                    if (rates_M15[i].high < rates_M15[j].high) { isLHCandidate_M15 = false; break; }
+                }
+            }
+        }
+
+        // ✅ Asymmetric window for Higher Low detection after HH after BoS (bullish)
+        // Mirror dari LH bearish. Kiri: mulai dari HH terakhir (time_lastHHAfterBos_M15),
+        // bukan WindowSize bar mutlak. Kanan: tetap WindowSize bar ke depan.
+        // Catatan: pakai time_lastHHAfterBos_M15 (bukan lastTimeHH_M15 yang tidak
+        // pernah di-update saat runtime). Tujuan: HL valid tidak salah-tolak karena
+        // lookback kiri melewati HH terakhir → pencarian LL terendah bullish lebih akurat.
+        bool isHLCandidate_M15 = false;
+        if (!isLow_M15 && bosBullishConfirmedFlag_M15 && hhAfterBosConfirmedFlag_M15 &&
+            time_lastHHAfterBos_M15 > 0 && rates_M15[i].time > time_lastHHAfterBos_M15)
+        {
+            isHLCandidate_M15 = true;
+
+            // Right side: full WindowSize bars into the future (newer bars -> lower index)
+            int rightEndLL_M15 = i - WindowSize_M15;
+            if (rightEndLL_M15 < 0) rightEndLL_M15 = 0;
+            for (int j = i - 1; j >= rightEndLL_M15; j--)
+            {
+                if (rates_M15[i].low > rates_M15[j].low) { isHLCandidate_M15 = false; break; }
+            }
+
+            // Left side: from previous bar back until we hit the last HH after BoS (older bars -> higher index)
+            if (isHLCandidate_M15)
+            {
+                for (int j = i + 1; j < ratesSize_M15; j++)
+                {
+                    if (rates_M15[j].time <= time_lastHHAfterBos_M15) break; // reached HH or older
+                    if (rates_M15[i].low > rates_M15[j].low) { isHLCandidate_M15 = false; break; }
+                }
+            }
+        }
+
         //  PrintFormat("🧐 Cek Price M15: Time=%s | Open=%.2f | Close=%.2f | Low=%.2f |",
         //     TimeToString(rates_M15[1].time), rates_M15[1].open, rates_M15[1].close, rates_M15[1].low);
         // --- Process High (HH) M15 ---
-        if (isHigh_M15)
+        if (isHigh_M15 || isLHCandidate_M15)
         {   
             //----------------------------------------+
             // --- Basic Logging & Spam Prevention M15 ---|
@@ -5274,7 +5337,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         }
         
         // --- Process Low (LL) M15 ---
-        if (isLow_M15)
+        if (isLow_M15 || isHLCandidate_M15)
         {
             //----------------------------------------+
             // --- Basic Logging & Spam Prevention M15 ---|
@@ -5563,7 +5626,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             // Setelah CHoCH dan HH, cari LL terendah sebelum BoS Bullish M15  |
             //-------------------------------------------------------------+
             if ((chochBullish_M15 || hhAfterChochConfirmedFlag_M15) && 
-    (!bosBullishConfirmedFlag_M15 || rates_M15[i].time < timeBoSBullish_M15)) // Tambahkan !bosBullishConfirmedFlag_M15
+    (!bosBullishConfirmedFlag_M15 || rates_M15[i].time < timeBoSBullish_M15) && // Tambahkan !bosBullishConfirmedFlag_M15
+    rates_M15[i].time > time_choch_bullish_M15)
             {
                 PrintFormat("🔍 [MODE 2 M15 - DEBUG ENTRY] Memasuki MODE 2. chochBullish_M15=%s, hhAfterChochConfirmedFlag_M15=%s, bosBullishConfirmedFlag_M15=%s",
                             chochBullish_M15 ? "true" : "false",
@@ -5820,7 +5884,43 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 double   tempHH_M15         = lastAcceptedHH_M15;
                 datetime tempHHTime_M15     = lastLoggedValidHHTime_M15;
                          preChochLL_M15     = lastAcceptedLL_M15;
-                UpdateAcceptedLevelVisuals_M15(preChochLL_M15, "LL", rates_M15[0].time); // Update visualisasi
+
+                // ✅ FIX: Cari LOW TERENDAH MURNI dalam window (HH yang di-break → candle CHoCH).
+                // Seed pakai sentinel (-1), BUKAN lastAcceptedLL_M15. Sebelumnya seed = LL lama
+                // (mis. 1400 yang terbentuk SEBELUM HH) → swing low pullback di dalam window yang
+                // lebih tinggi (mis. 1425) selalu ter-mask & tidak pernah terpilih.
+                // Window: time > tempHHTime_M15 (setelah HH) DAN time <= candle break.
+                // 1400 otomatis excluded (loop break saat time <= tempHHTime_M15), jadi LL referensi
+                // CHoCH Bullish = titik terendah retracement sebelum breakout (basis HL & SL buy).
+                if (tempHHTime_M15 > 0)
+                {
+                    double   lowestLLBeforeChoCH     = -1;   // sentinel: belum ada low di window
+                    datetime lowestLLBeforeChoCHTime = 0;
+                    for (int k = 1; k < ratesSize_M15; k++)
+                    {
+                        if (rates_M15[k].time <= tempHHTime_M15) break;      // sudah melewati HH yang di-break
+                        if (rates_M15[k].time > rates_M15[1].time) continue; // lebih baru dari candle break
+                        if (lowestLLBeforeChoCH < 0 || rates_M15[k].low < lowestLLBeforeChoCH)
+                        {
+                            lowestLLBeforeChoCH     = rates_M15[k].low;
+                            lowestLLBeforeChoCHTime = rates_M15[k].time;
+                        }
+                    }
+                    // Fallback (defensif): window kosong → pertahankan LL lama.
+                    if (lowestLLBeforeChoCH < 0)
+                    {
+                        lowestLLBeforeChoCH     = lastAcceptedLL_M15;
+                        lowestLLBeforeChoCHTime = lastTimeLL_M15;
+                    }
+                    lastAcceptedLL_M15 = lowestLLBeforeChoCH;
+                    lastTimeLL_M15     = lowestLLBeforeChoCHTime;
+                    preChochLL_M15     = lowestLLBeforeChoCH;
+                }
+
+                // Pakai lastTimeLL_M15 (= waktu low hasil loop window), BUKAN rates_M15[0].time.
+                // rates_M15[0] = candle yang sedang terbentuk (candle berikutnya setelah break),
+                // sehingga LL ter-stamp di waktu salah (mis. 16:15) padahal low sebenarnya 05:00.
+                UpdateAcceptedLevelVisuals_M15(preChochLL_M15, "LL", lastTimeLL_M15); // Update visualisasi
                         //  lastAcceptedLL_M15 = -1;                     // Reset lastAcceptedLL_M15 untuk mode 1
                         //  lastAcceptedHH_M15 = -1;
                 Print("🔔🔔🔔 === ⚡⚡⚡ [CHoCH BULLISH TRIGGERED M15] ⚡⚡⚡ === 🔔🔔🔔");
@@ -5880,7 +5980,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 preChochHH_M15                = -1; // Simpan HH sebelum CHoCH Bullish
                 // SAVE CHoCH BULLISH DATA - price = HH yang di-break (tempHH_M15), previousPrice = LL referensi
                 SaveLLHHBOSToArray("CHoCH", "Bullish", tempHH_M15, rates_M15[1].time, "M15", "Confirmed", preChochLL_M15, 0);
-                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, rates_M15[1].time, "M15", "PreChoCH", 0, 0);
+                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, lastTimeLL_M15, "M15", "PreChoCH", 0, 0);
                 ResetMode2_M15(); // Reset variabel MODE 2                   
                 Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset untuk siklus baru.");
                 UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time);
@@ -5895,9 +5995,43 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             double   tempLL_M15         = lastAcceptedLL_M15;        // Simpan nilai LL yang ditembus
             datetime tempLLTime_M15     = lastLoggedValidLLTime_M15; // Simpan waktu LL yang ditembus
                      preChochHH_M15     = lastAcceptedHH_M15;        // Simpan HH sebelum CHoCH Bearish (untuk referensi MODE 2)
-            // === PERBAIKAN: Update lastAcceptedHH ke HH terdekat terakhir yang terbentuk sebelum CHoCH Bearish ===
-            lastAcceptedHH_M15 = lastLoggedValidHH_M15;              // Update lastAcceptedHH ke HH terdekat terakhir
-            UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[1].time); // Update visualisasi HH setelah update
+            // ✅ KONSISTENSI dgn CHoCH Bullish (mirror): cari HIGH TERTINGGI MURNI di window
+            // (LL yang di-break → candle break CHoCH) sebagai referensi HH = lower-high leg bearish.
+            // Tanpa ini hanya pakai lastLoggedValidHH yang bisa nyangkut di HH lama (mis. 1200
+            // sebelum LL) padahal lower-high antara LL & break (mis. 1150) yang relevan utk SL sell.
+            // Window: time > tempLLTime_M15 (setelah LL di-break) DAN time <= candle break.
+            datetime preChochHHTime_M15 = lastLoggedValidHHTime_M15; // fallback waktu
+            {
+                double   highestHHInWindow_M15     = -1;  // sentinel
+                datetime highestHHInWindowTime_M15 = 0;
+                if (tempLLTime_M15 > 0)
+                {
+                    for (int k = 1; k < ratesSize_M15; k++)
+                    {
+                        if (rates_M15[k].time <= tempLLTime_M15) break;      // sudah melewati LL yang di-break
+                        if (rates_M15[k].time > rates_M15[1].time) continue; // lebih baru dari candle break
+                        if (highestHHInWindow_M15 < 0 || rates_M15[k].high > highestHHInWindow_M15)
+                        {
+                            highestHHInWindow_M15     = rates_M15[k].high;
+                            highestHHInWindowTime_M15 = rates_M15[k].time;
+                        }
+                    }
+                }
+                if (highestHHInWindow_M15 > 0)
+                {
+                    preChochHH_M15     = highestHHInWindow_M15;
+                    lastAcceptedHH_M15 = highestHHInWindow_M15;
+                    preChochHHTime_M15 = highestHHInWindowTime_M15;
+                    PrintFormat("🔧 [CHoCH BEARISH M15] HH referensi (LH) = high tertinggi window LL→break: %.2f @ %s",
+                                preChochHH_M15, TimeToString(preChochHHTime_M15));
+                }
+                else
+                {
+                    // Fallback (window kosong): perilaku lama — HH terdekat terakhir yang ter-log.
+                    lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                }
+            }
+            UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_M15); // waktu high asli (bukan candle break)
                   // lastAcceptedHH_M15 = -1;                    // Reset lastAcceptedHH_M15 untuk mode transisi
                     //  lastAcceptedLL_M15 = -1;                    // Reset lastAcceptedLL_M15 untuk mode transisi (opsional, tergantung logika MODE 1 bearish)
             //--- Logging ---
@@ -5967,7 +6101,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             preChochLL_M15                = -1; // Simpan LL sebelum CHoCH Bearish (untuk referensi MODE 2)
             // SAVE CHoCH BEARISH DATA - price = LL yang di-break (tempLL_M15), previousPrice = HH referensi (preChochHH_M15)
             SaveLLHHBOSToArray("CHoCH", "Bearish", tempLL_M15, rates_M15[1].time, "M15", "Confirmed", preChochHH_M15, 0);
-            SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, rates_M15[1].time, "M15", "PreChoCH", 0, 0);
+            SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, preChochHHTime_M15, "M15", "PreChoCH", 0, 0);
             ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
             Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset");
             // Optional: Hapus visual LL lama jika diperlukan
@@ -5993,6 +6127,38 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
          isInTrendBullish_M15 > 0 && rates_M15[1].close > postChoCH_HH_M15 + 50 * _Point)
     ))
     {
+        // ✅ KONSISTENSI dgn CHoCH Bullish: cari LOW TERENDAH MURNI di window
+        // (HH yang di-break → candle break BoS) sebagai referensi LL (HL leg bullish).
+        // Tanpa ini, lastAcceptedLL bisa nyangkut di LL lama pra-CHoCH yang lebih dalam
+        // (mis. 4424) padahal pullback low antara HH & break (mis. 4458) adalah HL yang
+        // relevan untuk SL buy. Window: time > time_postChoCH_HH_M15 (setelah HH) DAN
+        // time <= candle break. Seed sentinel (-1); window kosong → LL lama dipertahankan.
+        if (time_postChoCH_HH_M15 > 0)
+        {
+            double   lowestLLBeforeBoS_M15     = -1;
+            datetime lowestLLBeforeBoSTime_M15 = 0;
+            for (int k = 1; k < ratesSize_M15; k++)
+            {
+                if (rates_M15[k].time <= time_postChoCH_HH_M15) break;   // sudah melewati HH yang di-break
+                if (rates_M15[k].time > rates_M15[1].time) continue;     // lebih baru dari candle break
+                if (lowestLLBeforeBoS_M15 < 0 || rates_M15[k].low < lowestLLBeforeBoS_M15)
+                {
+                    lowestLLBeforeBoS_M15     = rates_M15[k].low;
+                    lowestLLBeforeBoSTime_M15 = rates_M15[k].time;
+                }
+            }
+            if (lowestLLBeforeBoS_M15 > 0)
+            {
+                PrintFormat("🔧 [BoS BULLISH M15] LL referensi (HL) = low terendah window HH→break: %.2f @ %s (LL lama %.2f)",
+                            lowestLLBeforeBoS_M15, TimeToString(lowestLLBeforeBoSTime_M15), lastAcceptedLL_M15);
+                lastAcceptedLL_M15 = lowestLLBeforeBoS_M15;
+                lastTimeLL_M15     = lowestLLBeforeBoSTime_M15;
+                // Simpan HL ke history SEKARANG (sebelum reset lastAcceptedLL=-1 di akhir blok),
+                // dgn waktu low asli (lastTimeLL_M15) → ter-export ke CSV & tampil di chart.
+                UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", lastTimeLL_M15);
+            }
+        }
+
         string bosLineName_M15  = "BoS_Bull_M15_" + IntegerToString((int)time_postChoCH_HH_M15);
         string bosLabelName_M15 = bosLineName_M15 + "_label";
         //=== Gambar garis dari postChoCH_HH_M15 ke candle dan label di tengah ===//

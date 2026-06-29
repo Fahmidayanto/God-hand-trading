@@ -534,6 +534,128 @@ async def get_backtest_trades():
         )
 
 
+# ===========================
+# RONGSONKAN ENDPOINTS
+# ===========================
+
+@router.get("/chart/rongsokan-data")
+async def get_rongsokan_chart_data(
+    symbol: str = Query("XAUUSD"),
+    timeframe: str = Query("M15"),
+    from_date: str = Query("2020-01-01", description="Start date YYYY-MM-DD"),
+    mode: str = Query("recent", description="Loading mode: 'recent', 'full', or 'window'"),
+    center_date: str = Query(None, description="Center date for jump navigation YYYY-MM-DD"),
+):
+    """
+    Rongsokan chart candles from Backtest_rongsokan CSV files.
+    
+    Reads MarketData_{symbol}_{timeframe}_*.csv from D:\\Project\\Project MT5\\Other\\Backtest_rongsokan
+    
+    Modes:
+    - 'recent': Last 6 months (fast)
+    - 'full': From 2020 (slow, streams via /chart/rongsokan-data-stream)
+    - 'window': ±3 months around center_date (for jump navigation)
+    """
+    try:
+        from app.services.rongsokan_data_reader import rongsokan_reader
+
+        data = rongsokan_reader.get_candles(
+            symbol=symbol,
+            timeframe=timeframe,
+            from_date=from_date,
+            mode=mode,
+            center_date=center_date,
+        )
+
+        logger.info(f"[RONGSOKAN API] Returning {data['candles_count']} candles (mode={mode})")
+        return data
+
+    except Exception as e:
+        logger.error(f"Rongsokan chart data error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.get("/chart/rongsokan-data-stream")
+async def get_rongsokan_chart_data_stream(
+    symbol: str = Query("XAUUSD"),
+    timeframe: str = Query("M15"),
+    from_date: str = Query("2020-01-01", description="Start date YYYY-MM-DD"),
+    mode: str = Query("full", description="Loading mode: 'full'"),
+):
+    """
+    Stream Rongsokan candle data with real-time progress via NDJSON.
+    Used by the frontend "Load Full History" button to show a progress bar.
+    """
+    from app.services.rongsokan_data_reader import rongsokan_reader
+
+    async def generate():
+        async for line in rongsokan_reader.stream_candles(symbol, timeframe, from_date, mode):
+            yield line + "\n"
+
+    return StreamingResponse(generate(), media_type="application/x-ndjson")
+
+
+@router.get("/rongsokan-trades")
+async def get_rongsokan_trades():
+    """
+    Get Rongsokan backtest trade entries with SL/TP for chart overlay.
+    
+    Reads all Backtest_Results_XAUUSD_*.csv files from D:\\Project\\Project MT5\\Other\\Backtest_rongsokan
+    
+    Returns:
+        Dictionary containing:
+        - trades: List of trade objects with type, prices, times
+        - total_trades: Count
+        - last_updated: ISO timestamp
+    """
+    try:
+        from app.services.rongsokan_data_reader import rongsokan_reader
+
+        data = rongsokan_reader.get_trades()
+
+        logger.info(f"[RONGSOKAN API] Returning {data['total_trades']} backtest trades")
+        return data
+
+    except Exception as e:
+        logger.error(f"Rongsokan trades error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
+@router.get("/rongsokan-structure-lines")
+async def get_rongsokan_structure_lines(
+    from_date: str = Query("2020-01-01", description="Start date YYYY-MM-DD"),
+    to_date: str = Query(None, description="End date YYYY-MM-DD"),
+):
+    """
+    Get Rongsokan market structure lines from LLHHBOSData CSV.
+    
+    Reads LLHHBOSData_*.csv files from D:\\Project\\Project MT5\\Other\\Backtest_rongsokan
+    
+    Returns:
+        Dictionary containing bos_lines, choch_lines, hh_points, ll_points
+    """
+    try:
+        from app.services.rongsokan_data_reader import rongsokan_reader
+
+        data = rongsokan_reader.get_structure_lines(from_date=from_date, to_date=to_date)
+
+        logger.info(f"[RONGSOKAN API] Structure lines: {data['total_points']} points")
+        return data
+
+    except Exception as e:
+        logger.error(f"Rongsokan structure lines error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
 @router.get("/positions", response_model=List[Position])
 async def get_open_positions(
     mt5: MT5Manager = Depends(get_mt5_manager),
