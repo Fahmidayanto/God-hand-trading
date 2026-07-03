@@ -47,7 +47,7 @@ class LanceDBManager:
         # Connect to LanceDB
         self.db = lancedb.connect(str(self.db_path))
         
-        logger.info(f"📊 LanceDB connected: {self.db_path}")
+        logger.info(f"[DB] LanceDB connected: {self.db_path}")
         
         # Initialize collections
         self._init_collections()
@@ -75,7 +75,7 @@ class LanceDBManager:
             logger.info("Creating collection: trade_outcomes")
             self._create_trade_outcomes_collection()
         
-        logger.info(f"✅ LanceDB collections ready: {len(self.db.table_names())} collections")
+        logger.info(f"[OK] LanceDB collections ready: {len(self.db.table_names())} collections")
     
     # ========== COLLECTION 1: Historical Structures ==========
     

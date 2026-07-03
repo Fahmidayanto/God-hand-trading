@@ -1447,17 +1447,37 @@ export default function RongsokanPage() {
       }
     });
 
-    // Dedup (Opsi A): hide HH/LL whose price matches any BoS/CHoCH price.
+    // Dedup (Opsi A, TIME-SCOPED): sembunyikan HH/LL hanya jika ada BoS/CHoCH se-level
+    // yang men-BREAK level itu — yaitu BoS/CHoCH yang terjadi SETELAH formasi HH/LL dan
+    // dalam window waktu wajar (swing yang sama). Tanpa scope waktu, BoS/CHoCH dari bulan
+    // lain yang kebetulan se-level (mis. BoS 4475.71 Jan vs HH 4475.77 Jun, beda 0.06 USD)
+    // ikut menyembunyikan HH/LL → garis hilang. BoS/CHoCH SELALU tetap digambar penuh.
     const PRICE_TOLERANCE = 0.05;
-    const bosChochPrices = new Set<number>();
+    const DEDUP_TIME_WINDOW_SEC = 7 * 24 * 3600; // 7 hari: rentang wajar HH/LL → break-nya
+    const toSec = (t: number) => (t > 1e10 ? Math.floor(t / 1000) : t);
+    // bucket harga → daftar timestamp (detik) event BoS/CHoCH di level itu
+    const bosChochByBucket = new Map<number, number[]>();
     [...filteredBosLines, ...filteredChochLines].forEach((evt) => {
-      if (evt.price != null) bosChochPrices.add(Math.round(evt.price / PRICE_TOLERANCE));
+      if (evt.price == null || evt.timestamp == null) return;
+      const key = Math.round(evt.price / PRICE_TOLERANCE);
+      const arr = bosChochByBucket.get(key);
+      if (arr) arr.push(toSec(evt.timestamp));
+      else bosChochByBucket.set(key, [toSec(evt.timestamp)]);
     });
-    const priceMatchesBosChoch = (price: number): boolean => {
-      if (bosChochPrices.size === 0) return false;
+    const priceMatchesBosChoch = (price: number, levelTime: number): boolean => {
+      if (bosChochByBucket.size === 0) return false;
       const key = Math.round(price / PRICE_TOLERANCE);
-      // Check exact bucket + neighbors to handle floating point near boundaries
-      return bosChochPrices.has(key) || bosChochPrices.has(key - 1) || bosChochPrices.has(key + 1);
+      const lt = toSec(levelTime);
+      // Cek bucket eksak + tetangga (floating point), tapi hanya match BoS/CHoCH yang
+      // terjadi SETELAH level terbentuk dan dalam window (= break swing yang sama).
+      for (const k of [key - 1, key, key + 1]) {
+        const arr = bosChochByBucket.get(k);
+        if (!arr) continue;
+        for (const ts of arr) {
+          if (ts >= lt && ts - lt <= DEDUP_TIME_WINDOW_SEC) return true;
+        }
+      }
+      return false;
     };
 
     // Dedup HH/LL points that repeat at the same price (CSV emits an "Update"
@@ -1479,7 +1499,7 @@ export default function RongsokanPage() {
     let hhAdded = 0;
     let hhSkippedByDup = 0;
     dedupedHhPoints.forEach((hh) => {
-      if (priceMatchesBosChoch(hh.price)) {
+      if (priceMatchesBosChoch(hh.price, hh.timestamp)) {
         hhSkippedByDup++;
         return;
       }
@@ -1501,7 +1521,7 @@ export default function RongsokanPage() {
     let llAdded = 0;
     let llSkippedByDup = 0;
     dedupedLlPoints.forEach((ll) => {
-      if (priceMatchesBosChoch(ll.price)) {
+      if (priceMatchesBosChoch(ll.price, ll.timestamp)) {
         llSkippedByDup++;
         return;
       }

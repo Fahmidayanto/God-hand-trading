@@ -2081,6 +2081,8 @@ input int  WarmupBars_H1    = 200;    // jumlah bar history untuk backfill
 
 input bool EnableDrawLines_H1 = false; // ✅ ON/OFF gambar line/zone H1. true=TAMPILKAN, false=sembunyikan (logic tetap jalan). Default false biar backtest bersih.
 
+input int MaxLineLengthBars = 50; // Panjang MAKSIMAL garis HH/LL (candle dari formasi) — broken maupun belum
+
 input bool EnableRejectLogs = false; // ✅ Aktifkan log HH/LL yang direject untuk tracking backtest. Auto-disabled saat Optimization.
 
 bool g_BackfillMode_H1 = false; // true saat proses backfill (gambar saja, tanpa entry)
@@ -2321,7 +2323,49 @@ void SyncLastSessionCSV()
     }
     else
     {
-        Print("ℹ️ [SYNC LAST SESSION] No previous session files found in BacktestResultPath for this month.");
+        // [FIX] Fallback ke bulan sebelumnya — kasus EA mati akhir bulan, restart awal bulan baru.
+        int prevMonth = dt.mon - 1;
+        int prevYear  = dt.year;
+        if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+        string prevYearMonth = StringFormat("%d-%02d", prevYear, prevMonth);
+        
+        for (int d = 31; d >= 1; d--)
+        {
+            string checkDateStr = StringFormat("%s-%02d", prevYearMonth, d);
+            string csvFilename  = "LLHHBOSData_" + _Symbol + "_" + checkDateStr + ".csv";
+            string srcPath = BacktestResultPath + "\\" + csvFilename;
+            string dstPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + csvFilename;
+            if (CopyFileW(srcPath, dstPath, false))
+            {
+                prevDateStr = checkDateStr;
+                PrintFormat("🔍 [SYNC LAST SESSION] Bulan ini kosong → pakai session bulan lalu: %s", prevDateStr);
+                break;
+            }
+        }
+        
+        if (prevDateStr != "")
+        {
+            // Copy file pendamping dari tanggal yang sama
+            string fileState = "MarketStructure_State_" + _Symbol + "_" + prevDateStr + ".txt";
+            string srcState  = BacktestResultPath + "\\" + fileState;
+            string dstState  = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + fileState;
+            if (CopyFileW(srcState, dstState, false))
+                PrintFormat("   ✅ Synced state (prev month): %s", fileState);
+            
+            string fileResults = "Backtest_Results_" + _Symbol + "_" + prevDateStr + ".csv";
+            string srcResults  = BacktestResultPath + "\\" + fileResults;
+            string dstResults  = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + fileResults;
+            CopyFileW(srcResults, dstResults, false);
+            
+            string fileSummary = "Backtest_Summary_" + _Symbol + "_" + prevDateStr + ".csv";
+            string srcSummary  = BacktestResultPath + "\\" + fileSummary;
+            string dstSummary  = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + fileSummary;
+            CopyFileW(srcSummary, dstSummary, false);
+        }
+        else
+        {
+            Print("ℹ️ [SYNC LAST SESSION] No previous session files found in BacktestResultPath for this month.");
+        }
     }
 }
 
@@ -2336,25 +2380,53 @@ void SyncBacktestCSV()
     if (!isLiveTrading) return;
     if (BacktestResultPath == "") return;
     
-    string todayDateStr = TimeToString(TimeCurrent(), TIME_DATE);
+    datetime currentTime = TimeCurrent();
+    MqlDateTime dt;
+    TimeToStruct(currentTime, dt);
+    
+    string todayDateStr = TimeToString(currentTime, TIME_DATE);
     StringReplace(todayDateStr, ".", "-");
     string csvFilename = "LLHHBOSData_" + _Symbol + "_" + todayDateStr + ".csv";
     
     string srcPath = BacktestResultPath + "\\" + csvFilename;
     string dstPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + csvFilename;
     
-    // Copy file dari backtest result ke MQL5 sandbox (overwrite)
+    // Copy file dari backtest result ke MQL5 sandbox
     if (CopyFileW(srcPath, dstPath, false))
     {
         Print("✅ [SYNC CSV] Backtest data synced to sandbox: ", csvFilename);
+        return;
     }
-    else
+    
+    // [FIX] Fallback ke bulan sebelumnya jika file hari ini belum ada di BacktestResultPath
+    int prevMonth = dt.mon - 1;
+    int prevYear  = dt.year;
+    if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+    string prevYearMonth = StringFormat("%d-%02d", prevYear, prevMonth);
+    
+    string fallbackFile = "";
+    for (int d = 31; d >= 1; d--)
+    {
+        string checkDateStr = StringFormat("%s-%02d", prevYearMonth, d);
+        string checkFilename = "LLHHBOSData_" + _Symbol + "_" + checkDateStr + ".csv";
+        string checkSrcPath = BacktestResultPath + "\\" + checkFilename;
+        string checkDstPath = TerminalInfoString(TERMINAL_DATA_PATH) + "\\MQL5\\Files\\" + checkFilename;
+        
+        if (CopyFileW(checkSrcPath, checkDstPath, false))
+        {
+            fallbackFile = checkFilename;
+            Print("✅ [SYNC CSV] Bulan ini kosong → sync backtest bulan lalu ke sandbox: ", fallbackFile);
+            break;
+        }
+    }
+    
+    if (fallbackFile == "")
     {
         int err = GetLastError();
-        if (err == 2) // ERROR_FILE_NOT_FOUND
-            Print("ℹ️ [SYNC CSV] No backtest file found at: ", srcPath);
+        if (err == 5019) // ERR_DLL_CALLS_PROHIBITED
+            Print("❌ [SYNC CSV] Gagal sync. Harap centang 'Allow DLL imports' di setelan EA.");
         else
-            Print("❌ [SYNC CSV] Failed to copy (error ", err, "): ", srcPath);
+            Print("ℹ️ [SYNC CSV] Tidak ada file backtest baru untuk disinkronkan.");
     }
 }
 
@@ -2454,6 +2526,30 @@ void ReverseSyncCSV()
 }
 
 //+------------------------------------------------------------------+
+//| Helper dedup visual: waktu formasi TERTUA harga-sama (window)     |
+//| Dipakai HANYA di RedrawVisualsFromCSV (jalur visual live, bukan   |
+//| trade/backtest) untuk menarik garis LL/HH duplikat ke waktu       |
+//| candle formasi asli. Window cegah merge level sah harga-sama jauh.|
+//+------------------------------------------------------------------+
+int g_AcceptedDedupWindowSec = 1209600; // 14 hari: window dedup harga-sama LL/HH (cover konsolidasi panjang sebelum CHoCH)
+
+// Waktu formasi TERTUA untuk harga tertentu DALAM window dari refTime. 0 jika tak ada.
+// Match harga EXACT-cent (< _Point) — duplikat MODE1 selalu copy harga persis, jadi exact
+// match cegah merge level sah beda-cent walau window besar.
+datetime OldestTimeForPrice(double &priceArr[], datetime &timeArr[], int cnt, double price, datetime refTime)
+{
+    datetime oldest = 0;
+    for (int i = 0; i < cnt; i++)
+    {
+        if (MathAbs(priceArr[i] - price) >= _Point) continue; // beda cent → bukan duplikat
+        long dt = (long)timeArr[i] - (long)refTime; if (dt < 0) dt = -dt;
+        if (dt > g_AcceptedDedupWindowSec) continue;
+        if (oldest == 0 || timeArr[i] < oldest) oldest = timeArr[i];
+    }
+    return oldest;
+}
+
+//+------------------------------------------------------------------+
 //| LOAD CSV TO ARRAYS - Load LLHHBOSData CSV ke memory arrays       |
 //| Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong    |
 //| Dipanggil saat EA di-attach (live trading) SEBELUM export        |
@@ -2480,6 +2576,27 @@ void LoadLLHHBOSDataToArrays()
         {
             csvFile = candidate;
             break;
+        }
+    }
+
+    if (csvFile == "")
+    {
+        // [FIX] Fallback ke bulan sebelumnya — kasus EA mati akhir bulan, restart awal bulan baru.
+        int prevMonth2 = dt.mon - 1;
+        int prevYear2  = dt.year;
+        if (prevMonth2 < 1) { prevMonth2 = 12; prevYear2--; }
+        string prevYearMonth2 = StringFormat("%d-%02d", prevYear2, prevMonth2);
+        
+        for (int d = 31; d >= 1; d--)
+        {
+            string checkDateStr = StringFormat("%s-%02d", prevYearMonth2, d);
+            string candidate    = "LLHHBOSData_" + _Symbol + "_" + checkDateStr + ".csv";
+            if (FileIsExist(candidate))
+            {
+                csvFile = candidate;
+                PrintFormat("📂 [LOAD DATA] Bulan ini kosong → load history bulan lalu: %s", csvFile);
+                break;
+            }
         }
     }
 
@@ -2578,22 +2695,41 @@ bool IsLevelSuperseded(double &breakArr[], int breakCnt, double price, double to
 //+------------------------------------------------------------------+
 datetime FindFormationTime(double &formPriceArr[], datetime &formTimeArr[], int formCnt, double price, double tolerance, datetime eventTime)
 {
-    // Cari HH/LL formation dengan harga yang sama, dan time < eventTime (formation harus sebelum break)
-    datetime found = 0;
+    // 1. Cari formasi TERBARU yang cocok harga & sebelum eventTime (ujung cluster).
+    datetime latest = 0;
+    for (int i = 0; i < formCnt; i++)
+        if (MathAbs(formPriceArr[i] - price) <= tolerance && formTimeArr[i] < eventTime)
+            if (formTimeArr[i] > latest) latest = formTimeArr[i];
+    if (latest == 0) return 0;
+
+    // 2. Dari cluster (formasi dalam window SEBELUM 'latest'), ambil yang TERTUA.
+    //    Tujuan: titik formasi ASLI (mis. HH 06.29 20:00), bukan duplikat stale yang
+    //    ter-stamp di waktu candle lain (mis. 06.30 04:00). Match EXACT-cent + window
+    //    cegah ikut-sertanya formasi harga beda-cent / periode jauh.
+    datetime found = latest;
     for (int i = 0; i < formCnt; i++)
     {
-        if (MathAbs(formPriceArr[i] - price) <= tolerance && formTimeArr[i] < eventTime)
-        {
-            // Ambil formation yang PALING DEKAT dengan eventTime (terakhir sebelum break)
-            if (formTimeArr[i] > found)
-                found = formTimeArr[i];
-        }
+        if (MathAbs(formPriceArr[i] - price) >= _Point) continue; // exact-cent only
+        if (formTimeArr[i] >= eventTime) continue;
+        long gap = (long)latest - (long)formTimeArr[i];
+        if (gap >= 0 && gap <= g_AcceptedDedupWindowSec && formTimeArr[i] < found)
+            found = formTimeArr[i];
     }
     return found;
 }
 
 void RedrawVisualsFromCSV()
 {
+    // ponytail: hapus semua objek redraw_* lama dulu → clean slate. Tanpa ini, garis
+    // yang sekarang di-skip dedup (mis. LL dup di waktu salah) nyangkut dari attach
+    // sebelumnya karena redraw cuma hapus-per-nama untuk garis yang DIA gambar.
+    for (int c = ObjectsTotal(0) - 1; c >= 0; c--)
+    {
+        string nmDel = ObjectName(0, c);
+        if (StringFind(nmDel, "redraw_") == 0)
+            ObjectDelete(0, nmDel);
+    }
+
     // ponytail: scan mundur dari hari ini sampai tanggal 1 di bulan yang sama.
     // sama seperti LoadLLHHBOSDataToArrays — konsisten untuk EA off >2 hari.
     datetime currentTime = TimeCurrent();
@@ -2781,6 +2917,22 @@ void RedrawVisualsFromCSV()
         // ✅ Skip draw H1 bila EnableDrawLines_H1 dimatikan (M15 tetap digambar)
         if (!EnableDrawLines_H1 && !isM15)
             continue;
+
+        // ponytail: REMAP waktu HH/LL Accepted ke formasi TERTUA harga-sama (dedup keep oldest).
+        // Duplikat lama (mis. LL ter-stamp di waktu candle HH setelah CHoCH) di-tarik ke waktu
+        // candle low/high asli → garis & nama objek canonical. Filter redrawLastLL tetap jalan;
+        // occurrence yang lolos filter menggambar di waktu tertua ini (nama objek sama → 1 garis).
+        if (status == "Accepted")
+        {
+            datetime oldT = 0;
+            if (type == "HH")
+                oldT = isM15 ? OldestTimeForPrice(hhFormPriceM15, hhFormTimeM15, hhFormCntM15, price, time)
+                             : OldestTimeForPrice(hhFormPriceH1,  hhFormTimeH1,  hhFormCntH1,  price, time);
+            else if (type == "LL")
+                oldT = isM15 ? OldestTimeForPrice(llFormPriceM15, llFormTimeM15, llFormCntM15, price, time)
+                             : OldestTimeForPrice(llFormPriceH1,  llFormTimeH1,  llFormCntH1,  price, time);
+            if (oldT > 0) time = oldT;
+        }
         
         // Find break point: first M15 candle after event whose close penetrates the level
         datetime lineEndTime = 0;
@@ -2820,28 +2972,29 @@ void RedrawVisualsFromCSV()
             lineEndTime = 0;  // reset, biarkan logic di bawah yang extend
         }
         
-        // No break found: extend to current time + 3 days
+        // No break found: garis HH/LL belum-break dibatasi panjang MaxLineLengthBars candle.
         if (lineEndTime == 0)
-            lineEndTime = MathMax(currentTime, time + m15PeriodSec) + 259200;
+            lineEndTime = time + MaxLineLengthBars * m15PeriodSec;
         
         // Minimum 1 bar width
         if (lineEndTime <= time)
             lineEndTime = time + m15PeriodSec;
+
+        // Cap panjang garis HH/LL maksimal MaxLineLengthBars candle dari formasi — termasuk
+        // yang SUDAH di-break tapi break-nya jauh (mis. LL 4121) → garis tidak terlalu panjang.
+        // CHoCH/BoS tidak terpengaruh (pakai 'time' sebagai endpoint, bukan lineEndTime).
+        if (type == "HH" || type == "LL")
+        {
+            datetime lenCap = time + MaxLineLengthBars * m15PeriodSec;
+            if (lineEndTime > lenCap) lineEndTime = lenCap;
+        }
         
         // === Draw HH Accepted ===
         if (type == "HH" && status == "Accepted")
         {
-            // FILTER: HH harus > last accepted HH (replicate live detection behavior)
-            if (isM15)
-            {
-                if (redrawLastHH_M15 > 0 && price <= redrawLastHH_M15) continue;
-                redrawLastHH_M15 = price;
-            }
-            else
-            {
-                if (redrawLastHH_H1 > 0 && price <= redrawLastHH_H1) continue;
-                redrawLastHH_H1 = price;
-            }
+            // ponytail: filter monotonic "HH harus > lastHH" DIHAPUS — dulu menolak Lower-High (LH)
+            // yang valid di fase bearish (mis. HH 4144.9 = LH referensi BoS Bearish). CSV hanya berisi
+            // level Accepted (sudah divalidasi live) → gambar semua, kecuali yang superseded di bawah.
             
             // 🔧 FILTER OVERLAP: Skip HH yang sudah ditembus CHoCH/BoS Bullish di level sama
             // Break event (CHoCH/BoS Bullish) lebih signifikan → HH formation di-hide
@@ -2872,17 +3025,9 @@ void RedrawVisualsFromCSV()
         // === Draw LL Accepted ===
         else if (type == "LL" && status == "Accepted")
         {
-            // FILTER: LL harus < last accepted LL (replicate live detection behavior)
-            if (isM15)
-            {
-                if (redrawLastLL_M15 > 0 && price >= redrawLastLL_M15) continue;
-                redrawLastLL_M15 = price;
-            }
-            else
-            {
-                if (redrawLastLL_H1 > 0 && price >= redrawLastLL_H1) continue;
-                redrawLastLL_H1 = price;
-            }
+            // ponytail: filter monotonic "LL harus < lastLL" DIHAPUS — dulu menolak Higher-Low (HL)
+            // yang valid di fase bullish. CSV hanya berisi level Accepted → gambar semua, kecuali
+            // yang superseded di bawah.
             
             // 🔧 FILTER OVERLAP: Skip LL yang sudah ditembus CHoCH/BoS Bearish di level sama
             // Break event (CHoCH/BoS Bearish) lebih signifikan → LL formation di-hide
@@ -3214,8 +3359,8 @@ int OnInit()
     // ✅ SYNC BACKTEST CSV: Copy backtest history ke MQL5 sandbox SEBELUM load
     if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
     {
-        SyncLastSessionCSV();
-        SyncBacktestCSV();
+        // SyncLastSessionCSV();
+        // SyncBacktestCSV();
     }
     
     // ✅ SET EXPORT DATE AWAL: Tentukan g_ExportDateStr & rename file lama (jika ada)
@@ -3389,28 +3534,65 @@ void SetExportDate()
             {
                 do
                 {
-                    // Extract tanggal dari nama file
-                    // Contoh: "LLHHBOSData_XAUUSD_2026-06-19.csv"
-                    //          prefixLen = len("LLHHBOSData_XAUUSD_")
                     int prefixLen = StringLen("LLHHBOSData_" + _Symbol + "_");
-                    // Backtest_Results prefix lebih panjang, tapi substring 10 char dari posisi prefixLen tetap valid
-                    // karena format tanggal selalu "YYYY-MM-DD" (10 char) setelah prefix
                     if (p == 0) prefixLen = StringLen("Backtest_Results_" + _Symbol + "_");
                     else if (p == 2) prefixLen = StringLen("MarketStructure_State_" + _Symbol + "_");
 
-                    string datePart  = StringSubstr(foundFilename, prefixLen, 10);  // "2026-06-19"
+                    string datePart  = StringSubstr(foundFilename, prefixLen, 10);
 
-                    // Validasi: bulan sama (7 karakter pertama) DAN bukan hari ini
                     if (StringSubstr(datePart, 0, 7) == yearMonth && datePart != todayDateStr)
                     {
                         prevDateStr = datePart;
                         PrintFormat("🔍 [RESUME] File lama ditemukan: %s (tanggal %s → akan di-rename ke %s)",
                                     foundFilename, prevDateStr, todayDateStr);
-                        break;  // Ambil file pertama yang cocok
+                        break;
                     }
                 } while (FileFindNext(searchHandle, foundFilename));
 
                 FileFindClose(searchHandle);
+            }
+        }
+        
+        // [FIX] Fallback ke bulan sebelumnya jika tidak ada file lama di bulan berjalan.
+        // Kasus: Ganti bulan dari Juni ke Juli.
+        if (prevDateStr == "")
+        {
+            int prevMonth = dt.mon - 1;
+            int prevYear  = dt.year;
+            if (prevMonth < 1) { prevMonth = 12; prevYear--; }
+            string prevYearMonth = StringFormat("%d-%02d", prevYear, prevMonth);
+            
+            searchPatterns[0] = "Backtest_Results_" + _Symbol + "_" + prevYearMonth + "-*.csv";
+            searchPatterns[1] = "LLHHBOSData_" + _Symbol + "_" + prevYearMonth + "-*.csv";
+            searchPatterns[2] = "MarketStructure_State_" + _Symbol + "_" + prevYearMonth + "-*.txt";
+            
+            for (int p = 0; p < 3 && prevDateStr == ""; p++)
+            {
+                string foundFilename  = "";
+                long   searchHandle   = FileFindFirst(searchPatterns[p], foundFilename);
+
+                if (searchHandle != INVALID_HANDLE)
+                {
+                    do
+                    {
+                        int prefixLen = StringLen("LLHHBOSData_" + _Symbol + "_");
+                        if (p == 0) prefixLen = StringLen("Backtest_Results_" + _Symbol + "_");
+                        else if (p == 2) prefixLen = StringLen("MarketStructure_State_" + _Symbol + "_");
+
+                        string datePart  = StringSubstr(foundFilename, prefixLen, 10);
+                        
+                        // Validasi: Berada di bulan sebelumnya
+                        if (StringSubstr(datePart, 0, 7) == prevYearMonth)
+                        {
+                            prevDateStr = datePart;
+                            PrintFormat("🔍 [RESUME] File lama bulan lalu ditemukan: %s (tanggal %s → akan di-rename ke %s)",
+                                        foundFilename, prevDateStr, todayDateStr);
+                            break;
+                        }
+                    } while (FileFindNext(searchHandle, foundFilename));
+
+                    FileFindClose(searchHandle);
+                }
             }
         }
         
@@ -3655,6 +3837,29 @@ bool LoadMarketStructureState()
         }
     }
     
+    // [FIX] Fallback ke bulan sebelumnya jika bulan ini tidak ada state file.
+    // Kasus: EA mati di akhir bulan, restart di awal bulan baru.
+    // Day 31→1 aman: FileIsExist() return false untuk tanggal tidak valid (mis. 31 Feb).
+    if (stateFile == "")
+    {
+        int prevMonth = dt.mon - 1;
+        int prevYear  = dt.year;
+        if (prevMonth < 1) { prevMonth = 12; prevYear--; } // Januari → Desember tahun lalu
+        string prevYearMonth = StringFormat("%d-%02d", prevYear, prevMonth);
+        
+        for (int d = 31; d >= 1; d--)
+        {
+            string checkDateStr = StringFormat("%s-%02d", prevYearMonth, d);
+            string candidate = "MarketStructure_State_" + _Symbol + "_" + checkDateStr + ".txt";
+            if (FileIsExist(candidate))
+            {
+                stateFile = candidate;
+                PrintFormat("📂 [RESUME] Bulan ini kosong → pakai state bulan lalu: %s", stateFile);
+                break;
+            }
+        }
+    }
+    
     if (stateFile == "")
     {
         Print("ℹ️ [RESUME] No previous state file found");
@@ -3695,8 +3900,13 @@ bool LoadMarketStructureState()
         else if (key == "M15_time_choch_bullish") time_choch_bullish_M15 = StringToTime(value);
         else if (key == "M15_chochBearishConfirmed") chochBearishConfirmedFlag_M15 = (value == "true");
         else if (key == "M15_time_choch_bearish") time_choch_bearish_M15 = StringToTime(value);
+        // [FIX] Restore flag aktif chochBullish/Bearish yang sebelumnya tidak tersimpan
+        else if (key == "M15_chochBullish") chochBullish_M15 = (value == "true");
+        else if (key == "M15_chochBearish") chochBearish_M15 = (value == "true");
         else if (key == "M15_bosBullishConfirmed") bosBullishConfirmedFlag_M15 = (value == "true");
+        else if (key == "M15_timeBoSBullish") timeBoSBullish_M15 = StringToTime(value);
         else if (key == "M15_bosBearishConfirmed") bosBearishConfirmedFlag_M15 = (value == "true");
+        else if (key == "M15_timeBoSBearish") timeBoSBearish_M15 = StringToTime(value);
         else if (key == "M15_isInTrendBullish") isInTrendBullish_M15 = (value == "true");
         else if (key == "M15_isInTrendBearish") isInTrendBearish_M15 = (value == "true");
         else if (key == "M15_hhAfterChoch") hhAfterChochConfirmedFlag_M15 = (value == "true");
@@ -3721,6 +3931,9 @@ bool LoadMarketStructureState()
         else if (key == "H1_lastTimeLL") lastTimeLL_H1 = StringToTime(value);
         else if (key == "H1_chochBullishConfirmed") chochBullishConfirmedFlag_H1 = (value == "true");
         else if (key == "H1_chochBearishConfirmed") chochBearishConfirmedFlag_H1 = (value == "true");
+        // [FIX] Restore flag aktif chochBullish/Bearish H1 yang sebelumnya tidak tersimpan
+        else if (key == "H1_chochBullish") chochBullish_H1 = (value == "true");
+        else if (key == "H1_chochBearish") chochBearish_H1 = (value == "true");
         else if (key == "H1_bosBullishConfirmed") bosBullishConfirmedFlag_H1 = (value == "true");
         else if (key == "H1_bosBearishConfirmed") bosBearishConfirmedFlag_H1 = (value == "true");
         else if (key == "H1_isInTrendBullish") isInTrendBullish_H1 = (value == "true");
@@ -3739,6 +3952,52 @@ bool LoadMarketStructureState()
     }
     
     FileClose(handle);
+    
+    // ponytail: fallback untuk state lama yang belum menyimpan waktu BoS
+    if (bosBullishConfirmedFlag_M15 && timeBoSBullish_M15 <= 0 && lastTimeHH_M15 > 0)
+    {
+        timeBoSBullish_M15 = lastTimeHH_M15;
+        PrintFormat("🔄 [RESUME FALLBACK M15] timeBoSBullish tidak tersimpan, di-set ke lastTimeHH: %s", TimeToString(timeBoSBullish_M15));
+    }
+    if (bosBearishConfirmedFlag_M15 && timeBoSBearish_M15 <= 0 && lastTimeLL_M15 > 0)
+    {
+        timeBoSBearish_M15 = lastTimeLL_M15;
+        PrintFormat("🔄 [RESUME FALLBACK M15] timeBoSBearish tidak tersimpan, di-set ke lastTimeLL: %s", TimeToString(timeBoSBearish_M15));
+    }
+    
+    // [FIX] Backward compat: state file lama tidak menyimpan M15_chochBullish / M15_chochBearish.
+    // Reconstruct dari flags Confirmed + kondisi siklus yang masih aktif.
+    // Kondisi chochBullish aktif = CHoCH Bullish sudah confirmed TAPI BoS belum (atau sudah BoS
+    // tapi masih dalam tren bullish). Ini mencegah break HH yang seharusnya BoS → malah CHoCH baru.
+    if (!chochBullish_M15 && chochBullishConfirmedFlag_M15 && !bosBullishConfirmedFlag_M15)
+    {
+        chochBullish_M15 = true;
+        PrintFormat("🔄 [RESUME FALLBACK M15] chochBullish_M15 direkonstruksi: chochBullishConfirmed=true + belum BoS");
+    }
+    else if (!chochBullish_M15 && bosBullishConfirmedFlag_M15 && isInTrendBullish_M15)
+    {
+        // Dalam tren bullish aktif (BoS sudah confirmed, masih dalam tren)
+        chochBullish_M15 = true;
+        PrintFormat("🔄 [RESUME FALLBACK M15] chochBullish_M15 direkonstruksi: bosBullishConfirmed + isInTrendBullish");
+    }
+    if (!chochBearish_M15 && chochBearishConfirmedFlag_M15 && !bosBearishConfirmedFlag_M15)
+    {
+        chochBearish_M15 = true;
+        PrintFormat("🔄 [RESUME FALLBACK M15] chochBearish_M15 direkonstruksi: chochBearishConfirmed=true + belum BoS");
+    }
+    else if (!chochBearish_M15 && bosBearishConfirmedFlag_M15 && isInTrendBearish_M15)
+    {
+        // Dalam tren bearish aktif (BoS sudah confirmed, masih dalam tren)
+        chochBearish_M15 = true;
+        PrintFormat("🔄 [RESUME FALLBACK M15] chochBearish_M15 direkonstruksi: bosBearishConfirmed + isInTrendBearish");
+    }
+    
+    // Log diagnostik postChoCH_HH setelah restore (membantu debug state resume)
+    if (postChoCH_HH_M15 > 0)
+        PrintFormat("🔍 [RESUME DIAG M15] postChoCH_HH_M15=%.2f @ %s | chochBullish=%s | hhAfterChoch=%s",
+                    postChoCH_HH_M15, TimeToString(time_postChoCH_HH_M15),
+                    chochBullish_M15 ? "true" : "false",
+                    hhAfterChochConfirmedFlag_M15 ? "true" : "false");
     
     Print("✅ [RESUME] Previous session state restored!");
     Print("");
@@ -3784,6 +4043,28 @@ bool LoadMarketStructureState()
                     TimeToString(lastTimeHH_M15));
     }
     
+    // [FIX] Backward compat H1: reconstruct chochBullish_H1/chochBearish_H1 dari flags Confirmed
+    if (!chochBullish_H1 && chochBullishConfirmedFlag_H1 && !bosBullishConfirmedFlag_H1)
+    {
+        chochBullish_H1 = true;
+        PrintFormat("🔄 [RESUME FALLBACK H1] chochBullish_H1 direkonstruksi: chochBullishConfirmed=true + belum BoS");
+    }
+    else if (!chochBullish_H1 && bosBullishConfirmedFlag_H1 && isInTrendBullish_H1)
+    {
+        chochBullish_H1 = true;
+        PrintFormat("🔄 [RESUME FALLBACK H1] chochBullish_H1 direkonstruksi: bosBullishConfirmed + isInTrendBullish");
+    }
+    if (!chochBearish_H1 && chochBearishConfirmedFlag_H1 && !bosBearishConfirmedFlag_H1)
+    {
+        chochBearish_H1 = true;
+        PrintFormat("🔄 [RESUME FALLBACK H1] chochBearish_H1 direkonstruksi: chochBearishConfirmed=true + belum BoS");
+    }
+    else if (!chochBearish_H1 && bosBearishConfirmedFlag_H1 && isInTrendBearish_H1)
+    {
+        chochBearish_H1 = true;
+        PrintFormat("🔄 [RESUME FALLBACK H1] chochBearish_H1 direkonstruksi: bosBearishConfirmed + isInTrendBearish");
+    }
+    
     g_StateResumed = true;
     g_StateFilePath = stateFile;
     
@@ -3817,8 +4098,15 @@ void SaveMarketStructureState()
     FileWrite(handle, "M15_time_choch_bullish=" + TimeToString(time_choch_bullish_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_chochBearishConfirmed=" + (chochBearishConfirmedFlag_M15 ? "true" : "false"));
     FileWrite(handle, "M15_time_choch_bearish=" + TimeToString(time_choch_bearish_M15, TIME_DATE|TIME_SECONDS));
+    // [FIX] Simpan flag aktif chochBullish/Bearish (bukan hanya Confirmed).
+    // Tanpa ini, setelah restart EA selalu mulai false → break HH yang seharusnya
+    // BoS terpicu sebagai CHoCH baru karena chochBullish_M15 tidak pernah direstorasi.
+    FileWrite(handle, "M15_chochBullish=" + (chochBullish_M15 ? "true" : "false"));
+    FileWrite(handle, "M15_chochBearish=" + (chochBearish_M15 ? "true" : "false"));
     FileWrite(handle, "M15_bosBullishConfirmed=" + (bosBullishConfirmedFlag_M15 ? "true" : "false"));
+    FileWrite(handle, "M15_timeBoSBullish=" + TimeToString(timeBoSBullish_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_bosBearishConfirmed=" + (bosBearishConfirmedFlag_M15 ? "true" : "false"));
+    FileWrite(handle, "M15_timeBoSBearish=" + TimeToString(timeBoSBearish_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_isInTrendBullish=" + (isInTrendBullish_M15 ? "true" : "false"));
     FileWrite(handle, "M15_isInTrendBearish=" + (isInTrendBearish_M15 ? "true" : "false"));
     FileWrite(handle, "M15_hhAfterChoch=" + (hhAfterChochConfirmedFlag_M15 ? "true" : "false"));
@@ -3843,6 +4131,9 @@ void SaveMarketStructureState()
     FileWrite(handle, "H1_lastTimeLL=" + TimeToString(lastTimeLL_H1, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "H1_chochBullishConfirmed=" + (chochBullishConfirmedFlag_H1 ? "true" : "false"));
     FileWrite(handle, "H1_chochBearishConfirmed=" + (chochBearishConfirmedFlag_H1 ? "true" : "false"));
+    // [FIX] Simpan flag aktif chochBullish/Bearish H1 (analog M15)
+    FileWrite(handle, "H1_chochBullish=" + (chochBullish_H1 ? "true" : "false"));
+    FileWrite(handle, "H1_chochBearish=" + (chochBearish_H1 ? "true" : "false"));
     FileWrite(handle, "H1_bosBullishConfirmed=" + (bosBullishConfirmedFlag_H1 ? "true" : "false"));
     FileWrite(handle, "H1_bosBearishConfirmed=" + (bosBearishConfirmedFlag_H1 ? "true" : "false"));
     FileWrite(handle, "H1_isInTrendBullish=" + (isInTrendBullish_H1 ? "true" : "false"));
@@ -3910,7 +4201,7 @@ void OnDeinit(const int reason)
     
     SetExportDate();
     ExportAllData();
-    ReverseSyncCSV();  // Final sync ke Backtest_result\ setelah export
+    // ReverseSyncCSV();  // Final sync ke Backtest_result\ setelah export
     
     // ✅ AUTO-SAVE STATE sebelum exit (LIVE TRADING ONLY)
     if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
@@ -4745,6 +5036,263 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
     for (int i = ArraySize(rates_M15) - WindowSize_M15 - 1; i >= WindowSize_M15; i--)
     {
+        // ✅ Skip bars yang sudah diproses pada sesi sebelumnya untuk menghindari overwrite/reset state
+        if (backfillMode && g_LastProcessedBarTime_M15 > 0 && rates_M15[i].time <= g_LastProcessedBarTime_M15)
+        {
+            continue;
+        }
+
+        //-----------------------------------------------------------------------------------+
+        // BACKFILL-ONLY CHoCH DETECTION (gap setelah EA restart)                              |
+        // Live CHoCH trigger (akhir fungsi) hanya evaluasi rates_M15[1] → break yang terjadi  |
+        // LALU PULIH di dalam gap warmup tidak terdeteksi (mis. LL break 04:00 lalu recover    |
+        // sebelum bar terakhir warmup). Di sini cek SETIAP bar baru dalam gap supaya transisi  |
+        // trend tercatat. Mirror cascade flag STRUKTUR dari live, TAPI OMIT semua mutasi trade |
+        // (entry/closure/counter) — konsisten precedent BoS-continuation-backfill.             |
+        // Guard g_LastProcessedBarTime_M15 > 0 → HANYA jalan saat resume; fresh start & live   |
+        // path (backfillMode=false) tidak terpengaruh sama sekali.                             |
+        //-----------------------------------------------------------------------------------+
+        if (backfillMode && g_LastProcessedBarTime_M15 > 0 && rates_M15[i].time > g_LastProcessedBarTime_M15)
+        {
+            // --- Backfill CHoCH Bullish: close break HH terakhir ---
+            if (!chochBullish_M15 && !isInTrendBullish_M15 &&
+                lastAcceptedHH_M15 > 0 && rates_M15[i].close > lastAcceptedHH_M15 + 50 * _Point)
+            {
+                double   tempHH_BF     = lastAcceptedHH_M15;
+                datetime tempHHTime_BF = lastLoggedValidHHTime_M15;
+                         preChochLL_M15 = lastAcceptedLL_M15;
+
+                // Cari LOW TERENDAH MURNI window (HH break → candle break) = HL leg bullish
+                if (tempHHTime_BF > 0)
+                {
+                    double   lowestLL_BF     = -1;
+                    datetime lowestLLTime_BF = 0;
+                    for (int k = 1; k < ratesSize_M15; k++)
+                    {
+                        if (rates_M15[k].time <= tempHHTime_BF) break;
+                        if (rates_M15[k].time > rates_M15[i].time) continue;
+                        if (lowestLL_BF < 0 || rates_M15[k].low < lowestLL_BF)
+                        {
+                            lowestLL_BF     = rates_M15[k].low;
+                            lowestLLTime_BF = rates_M15[k].time;
+                        }
+                    }
+                    if (lowestLL_BF < 0) { lowestLL_BF = lastAcceptedLL_M15; lowestLLTime_BF = lastTimeLL_M15; }
+                    lastAcceptedLL_M15 = lowestLL_BF;
+                    lastTimeLL_M15     = lowestLLTime_BF;
+                    preChochLL_M15     = lowestLL_BF;
+                }
+                UpdateAcceptedLevelVisuals_M15(preChochLL_M15, "LL", lastTimeLL_M15);
+
+                Print("🔔 [CHoCH BULLISH M15 - BACKFILL] Break HH di gap: ",
+                      DoubleToString(tempHH_BF, _Digits), " @ ", TimeToString(rates_M15[i].time));
+
+                string chochName_BF = "CHoCH_Bull_M15_BF_" + IntegerToString((int)tempHHTime_BF) + "_at_" + IntegerToString((int)rates_M15[i].time);
+                ObjectDelete(0, chochName_BF);
+                ObjectCreate(0, chochName_BF, OBJ_TREND, 0, tempHHTime_BF, tempHH_BF, rates_M15[i].time, tempHH_BF);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_COLOR, clrGold);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_WIDTH, 1);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_STYLE, STYLE_SOLID);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_BACK, true);
+
+                // --- Flag cascade STRUKTUR (mirror live CHoCH Bullish, OMIT mutasi trade) ---
+                chochBullish_M15              = true;
+                hhAfterChochConfirmedFlag_M15 = false;
+                isInTrendBearish_M15          = false;
+                chochBearish_M15              = false;
+                chochBearishConfirmedFlag_M15 = false;
+                llAfterChochConfirmedFlag_M15 = false;
+                bosBearishConfirmedFlag_M15   = false;
+                llAfterBosConfirmedFlag_M15   = false;
+                bosBullishJustLogged_M15      = false;
+                time_postChoCH_HH_M15         = -1;
+                time_postChoCH_LL_M15         = -1;
+                time_choch_bullish_M15        = rates_M15[i].time;
+                time_choch_bearish_M15        = -1;
+                timeBoSBearish_M15            = -1;
+                postChoCH_LL_M15              = -1;
+                preChochHH_M15                = -1;
+                // ponytail: OMIT entryCountBuy/activeBuyCount/CheckTradeClosure — backfill struktur saja (posisi nyata direkonsiliasi terpisah)
+                SaveLLHHBOSToArray("CHoCH", "Bullish", tempHH_BF, rates_M15[i].time, "M15", "Confirmed", preChochLL_M15, 0);
+                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, lastTimeLL_M15, "M15", "PreChoCH", 0, 0);
+                ResetMode2_M15();
+                UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[i].time);
+                continue;
+            }
+
+            // --- Backfill CHoCH Bearish: close break LL terakhir ---
+            if (!chochBearish_M15 && !isInTrendBearish_M15 &&
+                lastAcceptedLL_M15 > 0 && rates_M15[i].close < lastAcceptedLL_M15 - 5 * _Point)
+            {
+                double   tempLL_BF     = lastAcceptedLL_M15;
+                datetime tempLLTime_BF = lastLoggedValidLLTime_M15;
+                         preChochHH_M15 = lastAcceptedHH_M15;
+                datetime preChochHHTime_BF = lastLoggedValidHHTime_M15;
+
+                // Cari HIGH TERTINGGI MURNI window (LL break → candle break) = LH leg bearish
+                {
+                    double   highestHH_BF     = -1;
+                    datetime highestHHTime_BF = 0;
+                    if (tempLLTime_BF > 0)
+                    {
+                        for (int k = 1; k < ratesSize_M15; k++)
+                        {
+                            if (rates_M15[k].time <= tempLLTime_BF) break;
+                            if (rates_M15[k].time > rates_M15[i].time) continue;
+                            if (highestHH_BF < 0 || rates_M15[k].high > highestHH_BF)
+                            {
+                                highestHH_BF     = rates_M15[k].high;
+                                highestHHTime_BF = rates_M15[k].time;
+                            }
+                        }
+                    }
+                    if (highestHH_BF > 0)
+                    {
+                        preChochHH_M15     = highestHH_BF;
+                        lastAcceptedHH_M15 = highestHH_BF;
+                        preChochHHTime_BF  = highestHHTime_BF;
+                    }
+                    else
+                    {
+                        lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                    }
+                }
+                UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_BF);
+
+                Print("🔔 [CHoCH BEARISH M15 - BACKFILL] Break LL di gap: ",
+                      DoubleToString(tempLL_BF, _Digits), " @ ", TimeToString(rates_M15[i].time));
+
+                string chochName_BF = "CHoCH_Bear_M15_BF_" + IntegerToString((int)tempLLTime_BF) + "_at_" + IntegerToString((int)rates_M15[i].time);
+                ObjectDelete(0, chochName_BF);
+                ObjectCreate(0, chochName_BF, OBJ_TREND, 0, tempLLTime_BF, tempLL_BF, rates_M15[i].time, tempLL_BF);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_COLOR, clrOrangeRed);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_WIDTH, 1);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_STYLE, STYLE_SOLID);
+                ObjectSetInteger(0, chochName_BF, OBJPROP_BACK, true);
+
+                // --- Flag cascade STRUKTUR (mirror live CHoCH Bearish, OMIT mutasi trade) ---
+                chochBearish_M15              = true;
+                isInTrendBullish_M15          = false;
+                chochBullish_M15              = false;
+                hhAfterChochConfirmedFlag_M15 = false;
+                chochBullishConfirmedFlag_M15 = false;
+                llAfterChochConfirmedFlag_M15 = false;
+                bosBullishConfirmedFlag_M15   = false;
+                hhAfterBosConfirmedFlag_M15   = false;
+                postChoCH_HH_M15              = -1;
+                time_postChoCH_HH_M15         = -1;
+                // ponytail: OMIT entryCountSell/activeSellCount/CheckTradeClosure — backfill struktur saja (posisi nyata direkonsiliasi terpisah)
+                time_postChoCH_LL_M15         = -1;
+                postChoCH_LL_M15              = -1;
+                time_choch_bearish_M15        = rates_M15[i].time;
+                time_choch_bullish_M15        = -1;
+                timeBoSBullish_M15            = -1;
+                preChochLL_M15                = -1;
+                llBeforeHHAfterBos_M15        = -1;
+                timeLLBeforeHHAfterBos_M15    = 0;
+                llBeforeHHAfterBosSaved_M15   = false;
+                SaveLLHHBOSToArray("CHoCH", "Bearish", tempLL_BF, rates_M15[i].time, "M15", "Confirmed", preChochHH_M15, 0);
+                SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, preChochHHTime_BF, "M15", "PreChoCH", 0, 0);
+                ResetMode2Bearish_M15();
+                continue;
+            }
+
+            // --- Backfill BoS Bullish PERTAMA (transisi CHoCH→trend): close break postChoCH_HH ---
+            // Continuation sudah ditangani blok BUG #3 (di dalam pivot processing). Ini melengkapi
+            // first-BoS yang break-lalu-pulih di gap → kelas bug yang sama dgn CHoCH.
+            if (chochBullish_M15 && !isInTrendBullish_M15 &&
+                postChoCH_HH_M15 > 0 && time_postChoCH_HH_M15 > 0 &&
+                rates_M15[i].time > time_postChoCH_HH_M15 &&
+                rates_M15[i].close > postChoCH_HH_M15 + 50 * _Point)
+            {
+                // Window-low search untuk HL leg (mirror live first-BoS bullish)
+                {
+                    double   lowestLL_BF2     = -1;
+                    datetime lowestLLTime_BF2 = 0;
+                    for (int k = 1; k < ratesSize_M15; k++)
+                    {
+                        if (rates_M15[k].time <= time_postChoCH_HH_M15) break;
+                        if (rates_M15[k].time > rates_M15[i].time) continue;
+                        if (lowestLL_BF2 < 0 || rates_M15[k].low < lowestLL_BF2)
+                        {
+                            lowestLL_BF2     = rates_M15[k].low;
+                            lowestLLTime_BF2 = rates_M15[k].time;
+                        }
+                    }
+                    if (lowestLL_BF2 > 0)
+                    {
+                        lastAcceptedLL_M15 = lowestLL_BF2;
+                        lastTimeLL_M15     = lowestLLTime_BF2;
+                        UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", lastTimeLL_M15);
+                    }
+                }
+
+                double   bosBullBreakLevel_BF2 = postChoCH_HH_M15;
+                datetime bosBullBreakTime_BF2  = time_postChoCH_HH_M15;
+                Print("🚀 [BoS BULLISH PERTAMA M15 - BACKFILL] Break postChoCH_HH di gap: ",
+                      DoubleToString(bosBullBreakLevel_BF2, _Digits), " @ ", TimeToString(rates_M15[i].time));
+
+                string bosName_BF2b = "BoS_Bull_M15_BF1_" + IntegerToString((int)bosBullBreakTime_BF2) + "_at_" + IntegerToString((int)rates_M15[i].time);
+                ObjectDelete(0, bosName_BF2b);
+                ObjectCreate(0, bosName_BF2b, OBJ_TREND, 0, bosBullBreakTime_BF2, bosBullBreakLevel_BF2, rates_M15[i].time, bosBullBreakLevel_BF2);
+                ObjectSetInteger(0, bosName_BF2b, OBJPROP_COLOR, clrDeepSkyBlue);
+                ObjectSetInteger(0, bosName_BF2b, OBJPROP_WIDTH, 1);
+                ObjectSetInteger(0, bosName_BF2b, OBJPROP_STYLE, STYLE_SOLID);
+                ObjectSetInteger(0, bosName_BF2b, OBJPROP_BACK, true);
+
+                // --- Flag cascade STRUKTUR (mirror live first-BoS bullish, OMIT entry) ---
+                postChoCH_HH_M15            = -1;
+                time_postChoCH_HH_M15       = 0;
+                bosBullishConfirmedFlag_M15 = true;
+                isInTrendBullish_M15        = true;
+                preChochLL_M15              = -1;
+                timeBoSBullish_M15          = rates_M15[i].time;
+                // ponytail: OMIT trade.Buy/entryCount/closure — backfill struktur saja
+                SaveLLHHBOSToArray("BoS", "Bullish", bosBullBreakLevel_BF2, rates_M15[i].time, "M15", "Confirmed", lastAcceptedLL_M15, 0);
+                // MODE3 ref (mirror live)
+                llBeforeHHAfterBos_M15      = lastAcceptedLL_M15;
+                timeLLBeforeHHAfterBos_M15  = rates_M15[i].time;
+                llBeforeHHAfterBosSaved_M15 = true;
+                continue;
+            }
+
+            // --- Backfill BoS Bearish PERTAMA (transisi CHoCH→trend): close break postChoCH_LL ---
+            if (chochBearish_M15 && !isInTrendBearish_M15 && !bearishSearchCompleted_M15 &&
+                postChoCH_LL_M15 > 0 && time_postChoCH_LL_M15 > 0 &&
+                rates_M15[i].time > time_postChoCH_LL_M15 &&
+                rates_M15[i].close < postChoCH_LL_M15 - 50 * _Point)
+            {
+                double   bosBearBreakLevel_BF2 = postChoCH_LL_M15;
+                datetime bosBearBreakTime_BF2  = time_postChoCH_LL_M15;
+                Print("🔥 [BoS BEARISH PERTAMA M15 - BACKFILL] Break postChoCH_LL di gap: ",
+                      DoubleToString(bosBearBreakLevel_BF2, _Digits), " @ ", TimeToString(rates_M15[i].time));
+
+                string bosName_BF2s = "BoS_Bear_M15_BF1_" + IntegerToString((int)bosBearBreakTime_BF2) + "_at_" + IntegerToString((int)rates_M15[i].time);
+                ObjectDelete(0, bosName_BF2s);
+                ObjectCreate(0, bosName_BF2s, OBJ_TREND, 0, bosBearBreakTime_BF2, bosBearBreakLevel_BF2, rates_M15[i].time, bosBearBreakLevel_BF2);
+                ObjectSetInteger(0, bosName_BF2s, OBJPROP_COLOR, clrOrange);
+                ObjectSetInteger(0, bosName_BF2s, OBJPROP_WIDTH, 1);
+                ObjectSetInteger(0, bosName_BF2s, OBJPROP_STYLE, STYLE_SOLID);
+                ObjectSetInteger(0, bosName_BF2s, OBJPROP_BACK, true);
+
+                // --- Flag cascade STRUKTUR (mirror live first-BoS bearish, OMIT entry) ---
+                postChoCH_LL_M15            = -1;
+                time_postChoCH_LL_M15       = -1;
+                bosBearishConfirmedFlag_M15 = true;
+                isInTrendBearish_M15        = true;
+                timeBoSBearish_M15          = rates_M15[i].time;
+                absoluteHighFound_M15       = false;
+                bearishSearchCompleted_M15  = false;
+                // ponytail: OMIT trade.Sell/entryCount/closure — backfill struktur saja
+                SaveLLHHBOSToArray("BoS", "Bearish", bosBearBreakLevel_BF2, rates_M15[i].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
+                // MODE3 ref (mirror live)
+                hhBeforellAfterBos_M15      = lastAcceptedHH_M15;
+                timehhBeforellAfterBos_M15  = rates_M15[i].time;
+                llBeforeHHAfterBosSaved_M15 = true;
+                continue;
+            }
+        }
+
         // --- Skip bars if they are within already processed CHoCH/BoS zones M15 ---
         if ((chochBullish_M15 && rates_M15[i].time < time_postChoCH_HH_M15) ||
             (isInTrendBullish_M15 && rates_M15[i].time < time_lastBoS_HH_M15) ||
@@ -4868,7 +5416,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     lastAcceptedLL_M15            = preChochLL_M15;
                     lastAcceptedHH_M15            = rates_M15[i].high;  
-                    UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);//Perubahan tadi di komen
+                    // FIX: LL (preChochLL) di-stamp pakai lastTimeLL_M15 (waktu low asli, mis. 05:00),
+                    // BUKAN rates_M15[i].time (= waktu candle HH, mis. 21:15) → cegah duplikat LL
+                    // di waktu salah. Konsisten dgn fix window-search di CHoCH trigger.
+                    UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", lastTimeLL_M15);
                     // PrintFormat("DEBUG M15     : Checking HH After CHoCH Confirmed Flag trigger at HH %.2f @ %s", rates_M15[i].high, TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     // lastAcceptedLL_M15= -1; Perubahan
@@ -6099,6 +6650,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             time_choch_bullish_M15        = -1;
             timeBoSBullish_M15            = -1;
             preChochLL_M15                = -1; // Simpan LL sebelum CHoCH Bearish (untuk referensi MODE 2)
+            // ponytail: reset referensi HL/BoS agar tidak tertinggal ke siklus berikutnya
+            llBeforeHHAfterBos_M15        = -1;
+            timeLLBeforeHHAfterBos_M15    = 0;
+            llBeforeHHAfterBosSaved_M15   = false;
             // SAVE CHoCH BEARISH DATA - price = LL yang di-break (tempLL_M15), previousPrice = HH referensi (preChochHH_M15)
             SaveLLHHBOSToArray("CHoCH", "Bearish", tempLL_M15, rates_M15[1].time, "M15", "Confirmed", preChochHH_M15, 0);
             SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, preChochHHTime_M15, "M15", "PreChoCH", 0, 0);
@@ -6833,6 +7388,12 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
     //--------------------------------+
     for (int i = ArraySize(rates_H1) - WindowSize_H1 - 1; i >= WindowSize_H1; i--)
     {
+        // ✅ Skip bars yang sudah diproses pada sesi sebelumnya untuk menghindari overwrite/reset state
+        if (backfillMode && g_LastProcessedBarTime_H1 > 0 && rates_H1[i].time <= g_LastProcessedBarTime_H1)
+        {
+            continue;
+        }
+
         // --- Skip bars if they are within already processed CHoCH/BoS zones H1 ---
         if ((chochBullish_H1 && rates_H1[i].time < time_postChoCH_HH_H1) ||
             (isInTrendBullish_H1 && rates_H1[i].time < time_lastBoS_HH_H1) ||
@@ -8055,7 +8616,7 @@ void OnTick()
             SetExportDate();            // Handle date rollover
             ExportAllData();            // Export semua CSV per candle close
             SaveMarketStructureState(); // ponytail: state selalu fresh tiap candle
-            ReverseSyncCSV();           // Sync ke Backtest_result\
+            // ReverseSyncCSV();           // Sync ke Backtest_result\
         }
         //+------------------------------------------------------------------+
 

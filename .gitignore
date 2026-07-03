@@ -1,4 +1,4 @@
-﻿# MetaTrader 5 generated files
+# MetaTrader 5 generated files
 *.ex5
 *.log
 *.tpl
@@ -81,7 +81,8 @@ nul
 **/MarketStructure_State*.txt
 
 # Local screenshots & archives
-screenshot_*.png
+*.png
+*.txt
 *.zip
 
 # Markdown files

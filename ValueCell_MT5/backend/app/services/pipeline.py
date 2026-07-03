@@ -19,6 +19,10 @@ import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional
+from pathlib import Path
+import os
+import glob
+import csv
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +198,94 @@ def _get_session(ts: datetime) -> str:
         return "NEW_YORK"
     else:
         return "OVERLAP"
+
+
+def _read_new_csv_events(filepath: Path, last_processed_time: Optional[datetime]) -> List[Dict]:
+    """Read new market structure events from LLHHBOSData CSV file."""
+    events = []
+    if not filepath.exists():
+        return events
+
+    try:
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+
+        # Find header index
+        header_idx = -1
+        for idx, line in enumerate(lines):
+            if line.startswith("Type,Direction/Action"):
+                header_idx = idx
+                break
+
+        if header_idx == -1:
+            return events
+
+        # Parse lines after header_idx
+        reader = csv.DictReader(lines[header_idx:])
+        for row in reader:
+            # Clean keys/values
+            row = {k.strip(): v.strip() for k, v in row.items() if k is not None and v is not None}
+
+            time_str = row.get("Time")
+            if not time_str:
+                continue
+
+            try:
+                # Format: 2026.01.05 04:45:00
+                event_time = datetime.strptime(time_str, "%Y.%m.%d %H:%M:%S")
+            except ValueError:
+                continue
+
+            # If we already processed this event, skip
+            if last_processed_time and event_time <= last_processed_time:
+                continue
+
+            raw_type = row.get("Type", "")
+            raw_dir = row.get("Direction/Action", "")
+
+            # Normalize event_type
+            event_type = "BoS"
+            if "choch" in raw_type.lower():
+                event_type = "CHoCH"
+            elif "hh" in raw_type.lower():
+                event_type = "HH"
+            elif "ll" in raw_type.lower():
+                event_type = "LL"
+
+            # Normalize direction
+            direction = "Bullish"
+            if "bearish" in raw_dir.lower() or "bearish" in raw_type.lower():
+                direction = "Bearish"
+            elif "update" in raw_dir.lower():
+                if "bullish" in raw_type.lower() or "hh" in raw_type.lower():
+                    direction = "Bullish"
+                elif "bearish" in raw_type.lower() or "ll" in raw_type.lower():
+                    direction = "Bearish"
+
+            try:
+                price = float(row.get("Price", 0.0))
+            except ValueError:
+                price = 0.0
+
+            tf = row.get("Timeframe", "M15")
+
+            events.append({
+                "timestamp": event_time,
+                "symbol": "XAUUSD",
+                "timeframe": tf,
+                "event_type": event_type,
+                "direction": direction,
+                "price": price,
+                "phase": None,
+                "session": _get_session(event_time),
+                "source": "csv_polling",
+                "triggered_trade": False
+            })
+
+    except Exception as e:
+        logger.error(f"[Track1] Error parsing CSV structure file {filepath}: {e}")
+
+    return events
 
 
 # ─── DB insertion helpers ─────────────────────────────────────────────────────
@@ -412,6 +504,8 @@ class Track1Pipeline:
         self._cycle = 0
         # Simpan candle terakhir per timeframe agar _record_agent_decision bisa pakai
         self._last_candles: Dict[str, List[Dict]] = {}
+        # Simpan timestamp terakhir dari event CSV yang berhasil di-insert
+        self._last_csv_timestamp: Optional[datetime] = None
 
     # ── Public API ────────────────────────────────────────────────────────
 
@@ -563,10 +657,12 @@ class Track1Pipeline:
 
             candles_m15 = self._last_candles.get("M15", [])
             candles_h1  = self._last_candles.get("H1", [])
+            candles_h4  = self._last_candles.get("H4", [])
 
             decision = build_agent_decision(
                 candles_m15=candles_m15,
                 candles_h1=candles_h1 if candles_h1 else None,
+                candles_h4=candles_h4 if candles_h4 else None,
                 symbol="XAUUSD",
             )
 

@@ -209,6 +209,7 @@ def _fetch_economic_events_safe() -> List[Dict[str, Any]]:
 def build_agent_decision(
     candles_m15: List[Dict],
     candles_h1: Optional[List[Dict]] = None,
+    candles_h4: Optional[List[Dict]] = None,
     symbol: str = "XAUUSD",
 ) -> Dict[str, Any]:
     """
@@ -217,7 +218,8 @@ def build_agent_decision(
 
     Args:
         candles_m15: List candle M15 dari MT5Manager.get_candles()
-        candles_h1:  List candle H1 (opsional, untuk ML Agent)
+        candles_h1:  List candle H1 (opsional, untuk ML Agent & H1 EMA scoring)
+        candles_h4:  List candle H4 (opsional, untuk H4 EMA scoring di MSA v2)
         symbol:      Simbol trading
 
     Returns:
@@ -240,6 +242,7 @@ def build_agent_decision(
 
         df_m15 = _candles_to_dataframe(candles_m15)
         df_h1  = _candles_to_dataframe(candles_h1) if candles_h1 else None
+        df_h4  = _candles_to_dataframe(candles_h4) if candles_h4 else None
 
         current_bar_raw = candles_m15[-1]
         current_bar = {
@@ -264,6 +267,7 @@ def build_agent_decision(
             "structure_events": _fetch_recent_structures(symbol, count=50),
             "m15_history":      df_m15,
             "h1_data":          df_h1,
+            "h4_data":          df_h4,   # ← H4 EMA scoring untuk MSA v2
             "atr":              atr,
             "session":          session,
             "news_headlines":   _fetch_news_headlines_safe(),

@@ -190,7 +190,7 @@ export default function ChartToolbar({
           >
             {selectedYear} <span className="ml-0.5">▾</span>
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {availableYears.map((year, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = year === selectedYear;
@@ -221,7 +221,7 @@ export default function ChartToolbar({
           >
             {selectedMonthLabel} <span className="ml-0.5">▾</span>
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {availableMonths.map((month, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = month.value === selectedMonth;
@@ -254,7 +254,7 @@ export default function ChartToolbar({
             <span>{activeTimezoneLabel.label}</span>
             <span className="ml-0.5">▾</span>
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {timezoneOptions.map((tz, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = tz.value === chartTimezone.display_mode;
@@ -288,7 +288,7 @@ export default function ChartToolbar({
           >
             Actions <span className="ml-0.5">▾</span>
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[220px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[220px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {/* Toggle items */}
             <div
               onClick={onToggleStructure}

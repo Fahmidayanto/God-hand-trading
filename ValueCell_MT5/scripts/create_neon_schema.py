@@ -47,8 +47,18 @@ def create_schema(conn):
     """Create all tables for dual-track system"""
     
     with conn.cursor() as cur:
-        logger.info("🔧 Creating schema for DUAL-TRACK SYSTEM...")
-        
+        logger.info("🔧 Dropping existing tables to perform clean rebuild...")
+        tables_to_drop = [
+            "realtime_ohlcv", "realtime_structures", "trades", "agent_decisions",
+            "state_machine", "agent_performance", "agent_sentiment_logs", "historical_ohlcv_audit",
+            "historical_structures_audit", "csv_load_log", "cross_validation",
+            "llhhbosdata_xauusd", "backtest_results_xauusd", "marketdata_xauusd_m15",
+            "marketdata_xauusd_h1", "marketdata_xauusd_h4", "sessionzone_xauusd"
+        ]
+        for table in tables_to_drop:
+            cur.execute(f"DROP TABLE IF EXISTS {table} CASCADE")
+        logger.info("✅ Dropped existing tables.")
+
         # ========== TRACK 1: REAL-TIME TABLES (from MT5 Python API) ==========
         logger.info("\n📊 TRACK 1: Creating real-time tables...")
         
@@ -166,52 +176,166 @@ def create_schema(conn):
             )
         """)
         
-        logger.info("✅ Track 1 tables created (6 tables)")
+        # 6b. Agent sentiment logs table
+        logger.info("   Creating table: agent_sentiment_logs")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS agent_sentiment_logs (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                symbol VARCHAR(10) DEFAULT 'XAUUSD',
+                sentiment_score REAL NOT NULL,
+                sentiment_label VARCHAR(15) NOT NULL,
+                sentiment_strength VARCHAR(15),
+                bullish_news_count INT DEFAULT 0,
+                bearish_news_count INT DEFAULT 0,
+                triggered_keywords TEXT[],
+                upcoming_events_count INT DEFAULT 0,
+                high_impact_events_count INT DEFAULT 0,
+                avoid_trading_triggered BOOLEAN DEFAULT FALSE,
+                next_event_name VARCHAR(150),
+                next_event_time TIMESTAMP WITH TIME ZONE
+            )
+        """)
+        
+        # Create index on timestamp for sentiment logs
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_agent_sentiment_logs_time ON agent_sentiment_logs(timestamp DESC)")
+        
+        logger.info("✅ Track 1 tables created (7 tables)")
         
         # ========== TRACK 2: AUDIT TABLES (from CSV batch load) ==========
         logger.info("\n📁 TRACK 2: Creating audit tables...")
         
-        # 7. Historical OHLCV audit trail
-        logger.info("   Creating table: historical_ohlcv_audit")
+        # 7. LLHHBOSData
+        logger.info("   Creating table: llhhbosdata_xauusd")
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS historical_ohlcv_audit (
+            CREATE TABLE IF NOT EXISTS llhhbosdata_xauusd (
                 id SERIAL PRIMARY KEY,
-                timestamp TIMESTAMP NOT NULL,
-                symbol VARCHAR(10) NOT NULL,
+                type VARCHAR(20) NOT NULL,
+                direction_action VARCHAR(50),
+                price DECIMAL(10, 2),
+                time TIMESTAMP NOT NULL,
                 timeframe VARCHAR(10) NOT NULL,
+                status VARCHAR(20),
+                previous_price DECIMAL(10, 2),
+                previous_time TIMESTAMP,
+                csv_filename VARCHAR(255),
+                loaded_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(time, timeframe, type, price)
+            )
+        """)
+        
+        # 8. Backtest Results
+        logger.info("   Creating table: backtest_results_xauusd")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS backtest_results_xauusd (
+                id SERIAL PRIMARY KEY,
+                ticket BIGINT,
+                symbol VARCHAR(10) NOT NULL,
+                type VARCHAR(10) NOT NULL,
+                entry_price DECIMAL(10, 2),
+                exit_price DECIMAL(10, 2),
+                sl DECIMAL(10, 2),
+                tp DECIMAL(10, 2),
+                profit DECIMAL(10, 2),
+                spread_cost DECIMAL(10, 2),
+                commission DECIMAL(10, 2),
+                swap DECIMAL(10, 2),
+                net_profit DECIMAL(10, 2),
+                session VARCHAR(50),
+                session_isdst VARCHAR(10),
+                entry_time TIMESTAMP NOT NULL,
+                exit_time TIMESTAMP,
+                lot_size DECIMAL(10, 2),
+                magic_number INT,
+                timeframe VARCHAR(10) NOT NULL,
+                status VARCHAR(20),
+                reject_reason VARCHAR(100),
+                csv_filename VARCHAR(255),
+                loaded_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(entry_time, ticket, type)
+            )
+        """)
+
+        # 9. MarketData M15
+        logger.info("   Creating table: marketdata_xauusd_m15")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS marketdata_xauusd_m15 (
+                id SERIAL PRIMARY KEY,
+                time TIMESTAMP NOT NULL,
                 open DECIMAL(10, 2),
                 high DECIMAL(10, 2),
                 low DECIMAL(10, 2),
                 close DECIMAL(10, 2),
                 volume BIGINT,
+                spread INT,
                 ema200 DECIMAL(10, 2),
-                source VARCHAR(20) DEFAULT 'csv_export',
                 csv_filename VARCHAR(255),
                 loaded_at TIMESTAMP DEFAULT NOW(),
-                UNIQUE(timestamp, symbol, timeframe, source)
+                UNIQUE(time)
             )
         """)
-        
-        # 8. Historical structure events audit trail
-        logger.info("   Creating table: historical_structures_audit")
+
+        # 10. MarketData H1
+        logger.info("   Creating table: marketdata_xauusd_h1")
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS historical_structures_audit (
+            CREATE TABLE IF NOT EXISTS marketdata_xauusd_h1 (
                 id SERIAL PRIMARY KEY,
-                timestamp TIMESTAMP NOT NULL,
-                symbol VARCHAR(10) NOT NULL,
-                timeframe VARCHAR(10) NOT NULL,
-                event_type VARCHAR(20),
-                direction VARCHAR(10),
-                price DECIMAL(10, 2),
-                status VARCHAR(20),
-                session VARCHAR(20),
-                source VARCHAR(20) DEFAULT 'csv_export',
+                time TIMESTAMP NOT NULL,
+                open DECIMAL(10, 2),
+                high DECIMAL(10, 2),
+                low DECIMAL(10, 2),
+                close DECIMAL(10, 2),
+                volume BIGINT,
+                spread INT,
+                ema200 DECIMAL(10, 2),
                 csv_filename VARCHAR(255),
-                loaded_at TIMESTAMP DEFAULT NOW()
+                loaded_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(time)
+            )
+        """)
+
+        # 11. MarketData H4
+        logger.info("   Creating table: marketdata_xauusd_h4")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS marketdata_xauusd_h4 (
+                id SERIAL PRIMARY KEY,
+                time TIMESTAMP NOT NULL,
+                open DECIMAL(10, 2),
+                high DECIMAL(10, 2),
+                low DECIMAL(10, 2),
+                close DECIMAL(10, 2),
+                volume BIGINT,
+                spread INT,
+                ema200 DECIMAL(10, 2),
+                csv_filename VARCHAR(255),
+                loaded_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(time)
+            )
+        """)
+
+        # 12. SessionZone
+        logger.info("   Creating table: sessionzone_xauusd")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS sessionzone_xauusd (
+                id SERIAL PRIMARY KEY,
+                start_time TIMESTAMP NOT NULL,
+                end_time TIMESTAMP,
+                duration_bars INT,
+                session VARCHAR(50),
+                status VARCHAR(20),
+                is_dst VARCHAR(10),
+                open_price DECIMAL(10, 2),
+                high_price DECIMAL(10, 2),
+                low_price DECIMAL(10, 2),
+                close_price DECIMAL(10, 2),
+                range_points INT,
+                csv_filename VARCHAR(255),
+                loaded_at TIMESTAMP DEFAULT NOW(),
+                UNIQUE(start_time, session)
             )
         """)
         
-        # 9. CSV load tracking
+        # 13. CSV load tracking
         logger.info("   Creating table: csv_load_log")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS csv_load_log (
@@ -226,7 +350,7 @@ def create_schema(conn):
             )
         """)
         
-        # 10. Cross-validation results
+        # 14. Cross-validation results
         logger.info("   Creating table: cross_validation")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS cross_validation (
@@ -247,7 +371,7 @@ def create_schema(conn):
             )
         """)
         
-        logger.info("✅ Track 2 tables created (4 tables)")
+        logger.info("✅ Track 2 tables created (8 tables)")
         
         # ========== CREATE INDEXES FOR PERFORMANCE ==========
         logger.info("\n🔍 Creating indexes for performance...")
@@ -261,8 +385,8 @@ def create_schema(conn):
         cur.execute("CREATE INDEX IF NOT EXISTS idx_realtime_structures_event ON realtime_structures(event_type, direction)")
         logger.info("   ✅ Index: idx_realtime_structures_event")
         
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_historical_audit_timestamp ON historical_ohlcv_audit(timestamp DESC)")
-        logger.info("   ✅ Index: idx_historical_audit_timestamp")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_marketdata_m15_time ON marketdata_xauusd_m15(time DESC)")
+        logger.info("   ✅ Index: idx_marketdata_m15_time")
         
         cur.execute("CREATE INDEX IF NOT EXISTS idx_csv_load_date ON csv_load_log(file_date DESC)")
         logger.info("   ✅ Index: idx_csv_load_date")
@@ -288,9 +412,14 @@ def verify_schema(conn):
         "agent_decisions",
         "state_machine",
         "agent_performance",
+        "agent_sentiment_logs",
         # Track 2
-        "historical_ohlcv_audit",
-        "historical_structures_audit",
+        "llhhbosdata_xauusd",
+        "backtest_results_xauusd",
+        "marketdata_xauusd_m15",
+        "marketdata_xauusd_h1",
+        "marketdata_xauusd_h4",
+        "sessionzone_xauusd",
         "csv_load_log",
         "cross_validation",
     ]
@@ -331,8 +460,13 @@ def get_table_counts(conn):
         "agent_decisions",
         "state_machine",
         "agent_performance",
-        "historical_ohlcv_audit",
-        "historical_structures_audit",
+        "agent_sentiment_logs",
+        "llhhbosdata_xauusd",
+        "backtest_results_xauusd",
+        "marketdata_xauusd_m15",
+        "marketdata_xauusd_h1",
+        "marketdata_xauusd_h4",
+        "sessionzone_xauusd",
         "csv_load_log",
         "cross_validation",
     ]

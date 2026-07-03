@@ -142,10 +142,11 @@ class OrchestratorAgent:
             if "market_structure" in self.agents:
                 logger.info("📊 Step 1: Market Structure Analysis...")
                 ms_result = self.agents["market_structure"].analyze(
-                    df=market_data["df"],
+                    df_m15=market_data["df"],
                     symbol=symbol,
-                    timeframe=timeframe,
-                    session=market_data.get("session", "Other")
+                    session=market_data.get("session", "Other"),
+                    df_h1=market_data.get("h1_data"),   # Multi-TF EMA scoring H1
+                    df_h4=market_data.get("h4_data"),   # Multi-TF EMA scoring H4
                 )
                 agent_results["market_structure"] = ms_result
                 logger.info(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")

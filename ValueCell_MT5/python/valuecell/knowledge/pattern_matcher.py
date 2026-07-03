@@ -29,7 +29,7 @@ class PatternMatcher:
             db_manager: LanceDB instance (creates new if None)
         """
         self.db = db_manager if db_manager else LanceDBManager()
-        logger.info("🔍 PatternMatcher initialized")
+        logger.info("[SEARCH] PatternMatcher initialized")
     
     def find_similar_patterns(
         self,

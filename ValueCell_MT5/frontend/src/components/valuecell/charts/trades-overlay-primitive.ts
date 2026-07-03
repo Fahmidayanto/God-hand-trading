@@ -49,26 +49,6 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
     const visibleTrades = this.source.trades.filter((t) => {
       return t.sl !== null && t.tp !== null;
     });
-    
-    // Debug: Check 2026 trades
-    const trades2026 = visibleTrades.filter(t => new Date(t.entry_time_ts * 1000).getFullYear() === 2026);
-    console.log('[TradesPrimitive] draw:', { 
-      totalTrades: this.source.trades.length, 
-      visibleTrades: visibleTrades.length,
-      trades2026: trades2026.length,
-      visibleRange: { from: visibleFrom, to: visibleTo, fromDate: new Date(visibleFrom * 1000).toISOString(), toDate: new Date(visibleTo * 1000).toISOString() }
-    });
-    
-    if (trades2026.length > 0) {
-      console.log('[TradesPrimitive] Sample 2026 trade:', {
-        entry_time: new Date(trades2026[0].entry_time_ts * 1000).toISOString(),
-        exit_time: trades2026[0].exit_time_ts ? new Date(trades2026[0].exit_time_ts * 1000).toISOString() : null,
-        entry_price: trades2026[0].entry_price,
-        sl: trades2026[0].sl,
-        tp: trades2026[0].tp,
-      });
-    }
-
     if (visibleTrades.length === 0) return;
 
     target.useBitmapCoordinateSpace((scope) => {

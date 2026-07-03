@@ -347,10 +347,6 @@ export default function TradesPage() {
             timeFormatter: (time: number) => {
               // Use ref to get latest timezone state (avoids stale closure)
               const currentTimezone = chartTimezoneRef.current;
-              console.log('🕐 Initial formatter called, using ref:', {
-                displayMode: currentTimezone.display_mode,
-                brokerOffset: currentTimezone.broker_offset_hours
-              });
               return formatChartTime(time, currentTimezone.display_mode, currentTimezone.broker_offset_hours);
             },
           },
@@ -459,8 +455,6 @@ export default function TradesPage() {
         if (chartDate >= recentThreshold) {
           console.log('🔄 Auto-refresh chart data (recent mode only)');
           loadChartData(false, 'recent');
-        } else {
-          console.log('⏸️ Skipping auto-refresh (user is viewing historical data)');
         }
       }
     }, 30000); // 30 seconds instead of 5 seconds
@@ -858,7 +852,7 @@ export default function TradesPage() {
           to: (visibleRange.to as number) + 0.0001,
         };
         console.log("  Setting temp range:", tempRange);
-        timeScale.setVisibleRange(tempRange);
+        timeScale.setVisibleRange(tempRange as any);
 
         setTimeout(() => {
           if (chartRef.current) {
@@ -1014,47 +1008,16 @@ export default function TradesPage() {
     if (tradesEl) tradesEl.innerHTML = '';
 
     if (!showTrades || !backtestTradesData || !chartRef.current || !candlestickSeriesRef.current) {
-      console.log('[overlayTradeEntries] SKIP:', { showTrades, hasData: !!backtestTradesData, hasChart: !!chartRef.current, hasSeries: !!candlestickSeriesRef.current });
       return;
     }
 
     const trades = backtestTradesData.trades ?? [];
-    console.log('[overlayTradeEntries] Total trades from API:', trades.length);
     if (trades.length === 0) {
       return;
     }
 
-    // Debug: Check trades distribution by year
-    const tradesByYear = trades.reduce((acc, t) => {
-      const year = new Date(t.entry_time_ts * 1000).getFullYear();
-      acc[year] = (acc[year] || 0) + 1;
-      return acc;
-    }, {} as Record<number, number>);
-    console.log('[overlayTradeEntries] Trades by year:', tradesByYear);
-
-    // Debug: Show sample 2026 trades
-    const trades2026 = trades.filter(t => new Date(t.entry_time_ts * 1000).getFullYear() === 2026);
-    console.log('[overlayTradeEntries] 2026 trades sample:', trades2026.slice(0, 3).map(t => ({
-      type: t.type,
-      entry_price: t.entry_price,
-      entry_time: new Date(t.entry_time_ts * 1000).toISOString(),
-      exit_time: t.exit_time_ts ? new Date(t.exit_time_ts * 1000).toISOString() : null,
-      sl: t.sl,
-      tp: t.tp,
-    })));
-
+    console.log('💼 Trades overlay activated. Loaded trades:', trades.length);
     const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
-    console.log('[overlayTradeEntries] Last candle time:', lastCandle, lastCandle ? new Date(lastCandle * 1000).toISOString() : null);
-    
-    // Debug: Chart candles time range
-    if (chartCandles.length > 0) {
-      const firstCandle = chartCandles[0]?.time;
-      console.log('[overlayTradeEntries] Chart candles range:', {
-        first: new Date(firstCandle * 1000).toISOString(),
-        last: new Date(lastCandle! * 1000).toISOString(),
-        total: chartCandles.length,
-      });
-    }
 
     // ponytail: all lines drawn via canvas primitive, no series needed
     const primitive = tradesPrimitiveRef.current ?? new TradesOverlayPrimitive();
@@ -1280,7 +1243,7 @@ export default function TradesPage() {
         
         const lineOptions = {
           color,
-          lineWidth,
+          lineWidth: lineWidth as any,
           lineStyle,
           priceLineVisible: false,
           lastValueVisible: false, // Remove right-side price badges to prevent overlap with candles
@@ -1288,13 +1251,13 @@ export default function TradesPage() {
         };
         
         // Create line data from event time to end
-        const lineData: Array<{ time: number; value: number }> = [
+        const lineData: Array<{ time: any; value: number }> = [
           { time: actualStartTime, value: price }, // Start point
         ];
         lineData.push({ time: endTimeSeconds, value: price }); // End point
 
         const lineSeries = chartRef.current!.addSeries(LineSeries, lineOptions);
-        lineSeries.setData(lineData);
+        lineSeries.setData(lineData as any);
 
         // Collect label info for HTML overlay in the middle of the line
         // Use binary search to find nearest candle to midpoint — avoids O(n) scan
@@ -1367,19 +1330,15 @@ export default function TradesPage() {
         }
       }
 
-      if (matchTime !== undefined) {
-        console.log(`  🔍 Level ${levelPrice.toFixed(2)} formed at ${matchTime} (${new Date(matchTime * 1000).toISOString()}) [searched ${isBullish ? 'HH' : 'LL'} points]`);
-      } else {
-        console.log(`  ⚠️ Could not find formation time for level ${levelPrice.toFixed(2)} in ${isBullish ? 'HH' : 'LL'} points`);
-      }
+      // No log
 
       return matchTime;
     };
 
     // Add BoS lines
     let bosAdded = 0;
-    filteredBosLines.forEach((bos, index) => {
-      console.log(`Adding BoS #${index + 1}:`, { price: bos.price, time: bos.time, timestamp: bos.timestamp, prevPrice: bos.previous_price });
+    filteredBosLines.slice(-30).forEach((bos, index) => {
+
       const color = bos.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       // timestamp is already in milliseconds from backend
       const eventTime = bos.timestamp;
@@ -1399,14 +1358,14 @@ export default function TradesPage() {
         formationTime
       )) {
         bosAdded++;
-        console.log(`✅ BoS #${index + 1} added: formation→${formationTime ?? '?'} to break→${eventTime}`);
+
       }
     });
 
     // Add CHoCH lines
     let chochAdded = 0;
-    filteredChochLines.forEach((choch, index) => {
-      console.log(`Adding CHoCH #${index + 1}:`, { price: choch.price, time: choch.time, timestamp: choch.timestamp, prevPrice: choch.previous_price });
+    filteredChochLines.slice(-30).forEach((choch, index) => {
+
       const eventTime = choch.timestamp;
       const formationTime = choch.price
         ? findLevelFormationTime(choch.price, choch.direction)
@@ -1423,7 +1382,7 @@ export default function TradesPage() {
         formationTime
       )) {
         chochAdded++;
-        console.log(`✅ CHoCH #${index + 1} added: formation→${formationTime ?? '?'} to break→${eventTime}`);
+
       }
     });
 
@@ -1450,14 +1409,10 @@ export default function TradesPage() {
     let hhSkippedByDup = 0;
 
     let hhAdded = 0;
-    console.log('\n🔵 Processing HH points...');
-    if (!filteredHhPoints || filteredHhPoints.length === 0) {
-      console.warn('⚠️ No HH points available!');
-    } else {
-      filteredHhPoints.forEach((hh, index) => {
+    if (filteredHhPoints && filteredHhPoints.length > 0) {
+      filteredHhPoints.slice(-50).forEach((hh, index) => {
         if (priceMatchesBosChoch(hh.price)) {
           hhSkippedByDup++;
-          console.log(`  ⏭️ HH #${index + 1} (${hh.price}) skipped: matches a BoS/CHoCH price (dedup)`);
           return;
         }
         const isH1 = hh.timeframe === 'H1';
@@ -1466,15 +1421,7 @@ export default function TradesPage() {
         const lineStyle = isH1 ? LineStyle.Dashed : LineStyle.Dotted;
         const label = `HH [${hh.timeframe}] ${hh.price.toFixed(2)}`;
         
-        console.log(`Adding HH #${index + 1}:`, { 
-          price: hh.price, 
-          time: hh.time, 
-          timestamp: hh.timestamp,
-          timeframe: hh.timeframe,
-          color,
-          lineWidth,
-          lineStyle: isH1 ? 'dashed' : 'dotted'
-        });
+
         
         const eventTime = hh.timestamp;
         if (createHorizontalLine(
@@ -1487,7 +1434,7 @@ export default function TradesPage() {
           'HH' // HH line stops when high > price
         )) {
           hhAdded++;
-          console.log(`✅ HH #${index + 1} [${hh.timeframe}] added at ${eventTime}ms (${hh.time})`);
+
         }
       });
     }
@@ -1495,14 +1442,10 @@ export default function TradesPage() {
     // Add LL lines (with H1 vs M15 differentiation)
     let llSkippedByDup = 0;
     let llAdded = 0;
-    console.log('\n🟠 Processing LL points...');
-    if (!filteredLlPoints || filteredLlPoints.length === 0) {
-      console.warn('⚠️ No LL points available!');
-    } else {
-      filteredLlPoints.forEach((ll, index) => {
+    if (filteredLlPoints && filteredLlPoints.length > 0) {
+      filteredLlPoints.slice(-50).forEach((ll, index) => {
         if (priceMatchesBosChoch(ll.price)) {
           llSkippedByDup++;
-          console.log(`  ⏭️ LL #${index + 1} (${ll.price}) skipped: matches a BoS/CHoCH price (dedup)`);
           return;
         }
         const isH1 = ll.timeframe === 'H1';
@@ -1511,15 +1454,7 @@ export default function TradesPage() {
         const lineStyle = isH1 ? LineStyle.Dashed : LineStyle.Dotted;
         const label = `LL [${ll.timeframe}] ${ll.price.toFixed(2)}`;
         
-        console.log(`Adding LL #${index + 1}:`, { 
-          price: ll.price, 
-          time: ll.time, 
-          timestamp: ll.timestamp,
-          timeframe: ll.timeframe,
-          color,
-          lineWidth,
-          lineStyle: isH1 ? 'dashed' : 'dotted'
-        });
+
         
         const eventTime = ll.timestamp;
         if (createHorizontalLine(
@@ -1532,7 +1467,7 @@ export default function TradesPage() {
           'LL' // LL line stops when low < price
         )) {
           llAdded++;
-          console.log(`✅ LL #${index + 1} [${ll.timeframe}] added at ${eventTime}ms (${ll.time})`);
+
         }
       });
     }
@@ -1579,13 +1514,14 @@ export default function TradesPage() {
           ? items.filter((item) => item.timeframe === "M15").length
           : items.length;
       };
-      const hash = `${activeTimeframe}|${structureLines.total_points}|${filterCount(structureLines.bos_lines)}|${filterCount(structureLines.choch_lines)}|${filterCount(structureLines.hh_points)}|${filterCount(structureLines.ll_points)}`;
+      const lastCandleTime = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1].time : 0;
+      const hash = `${activeTimeframe}|${chartCandles.length}|${lastCandleTime}|${structureLines.total_points}|${filterCount(structureLines.bos_lines)}|${filterCount(structureLines.choch_lines)}|${filterCount(structureLines.hh_points)}|${filterCount(structureLines.ll_points)}`;
       if (hash !== structureLinesVersionRef.current) {
         structureLinesVersionRef.current = hash;
         overlayMarketStructure(chartCandles);
       }
     }
-  }, [showStructure, structureLines]);
+  }, [showStructure, structureLines, chartCandles, activeTimeframe]);
 
   // Update session-zone shadows when data or toggle changes
   useEffect(() => {
@@ -1594,12 +1530,6 @@ export default function TradesPage() {
       console.warn('⚠️ Session zones primitive not initialized');
       return;
     }
-
-    console.log('🕒 [SESSION DEBUG] Updating session zones:', {
-      showSessions,
-      totalZones: sessionZonesData?.total_zones,
-      zonesReceived: sessionZonesData?.zones?.length,
-    });
 
     primitive.setVisible(showSessions);
 
@@ -1612,12 +1542,6 @@ export default function TradesPage() {
         session: z.session,
         open: z.status === "OPEN",
       }));
-    
-    console.log('🕒 [SESSION DEBUG] Boxes prepared:', {
-      totalBoxes: boxes.length,
-      firstBox: boxes[0],
-      lastBox: boxes[boxes.length - 1],
-    });
     
     primitive.setBoxes(boxes);
     console.log('✅ Session zones updated successfully');
@@ -1681,17 +1605,17 @@ export default function TradesPage() {
   const loadTradeHistory = async () => {
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
-      console.log('Fetching trades from:', `${apiUrl}/trading/trades/history`);
+
       
       const response = await fetch(
         `${apiUrl}/trading/trades/history?days=30`
       );
       
-      console.log('Trades API response status:', response.status, response.ok);
+
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Trades API data received:', data.trades?.length, 'trades');
+
         
         if (data.trades) {
           setTrades(data.trades);
@@ -1701,7 +1625,7 @@ export default function TradesPage() {
             total_pnl: data.total_pnl ?? 0,
             open_positions: data.open_positions ?? 0,
           });
-          console.log('✅ Real trades data loaded from MT5');
+
           return;
         }
       }

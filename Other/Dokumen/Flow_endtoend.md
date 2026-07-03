@@ -777,32 +777,7 @@ STEP 6: Setiap hari (scheduled job)
 
 ## 📁 **TRACK 2: Tabel dan Kolom yang Diload dari CSV (Dari Kode)**
 
-### **7️⃣ TABLE: `historical_ohlcv_audit` - Data Harga dari CSV**
-
-**Sumber:** CSV Export dari Dev_Bot (MarketData_M15_*, MarketData_H1_*, MarketData_H4_*)
-**Fungsi:** Menyimpan data harga dari CSV untuk audit trail
-
-| Kolom | Tipe | Keterangan |
-|-------|------|-----------|
-| id | SERIAL PRIMARY KEY | ID unik |
-| timestamp | TIMESTAMP NOT NULL | Waktu data |
-| symbol | VARCHAR(10) | XAUUSD |
-| timeframe | VARCHAR(10) | M15, H1, H4 |
-| open | DECIMAL(10,2) | Harga buka |
-| high | DECIMAL(10,2) | Harga tertinggi |
-| low | DECIMAL(10,2) | Harga terendah |
-| close | DECIMAL(10,2) | Harga tutup |
-| volume | BIGINT | Volume |
-| ema200 | DECIMAL(10,2) | EMA 200 periode |
-| source | VARCHAR(20) | 'csv_export' |
-| csv_filename | VARCHAR(255) | Nama file CSV (tracking) |
-| loaded_at | TIMESTAMP | Waktu load (auto) |
-
-**Constraint:** UNIQUE(timestamp, symbol, timeframe, source)
-
----
-
-### **8️⃣ TABLE: `historical_structures_audit` - Pola dari CSV**
+### **7️⃣ TABLE: `llhhbosdata_xauusd` - Pola Swing dari CSV**
 
 **Sumber:** CSV Export dari Dev_Bot (LLHHBOSData_*.csv)
 **Fungsi:** Menyimpan event pola (HH/LL/CHoCH/BoS) dari CSV untuk audit trail
@@ -810,43 +785,129 @@ STEP 6: Setiap hari (scheduled job)
 | Kolom | Tipe | Keterangan |
 |-------|------|-----------|
 | id | SERIAL PRIMARY KEY | ID unik |
-| timestamp | TIMESTAMP NOT NULL | Waktu deteksi (dari CSV) |
-| symbol | VARCHAR(10) | XAUUSD |
-| timeframe | VARCHAR(10) | M15, H1, H4 |
-| event_type | VARCHAR(20) | BoS, CHoCH, HH, LL |
-| direction | VARCHAR(10) | Bullish atau Bearish |
-| price | DECIMAL(10,2) | Harga saat event |
-| status | VARCHAR(20) | Status dari CSV |
-| session | VARCHAR(20) | London, New York, Asia |
-| source | VARCHAR(20) | 'csv_export' |
-| csv_filename | VARCHAR(255) | Nama file CSV (tracking) |
-| loaded_at | TIMESTAMP | Waktu load (auto) |
+| type | VARCHAR(20) NOT NULL | Tipe event (HH, LL, CHoCH, BoS) |
+| direction_action | VARCHAR(50) | Arah/Aksi (Bullish, Bearish, Update, Confirmed) |
+| price | DECIMAL(10, 2) | Harga saat event terbentuk |
+| time | TIMESTAMP NOT NULL | Waktu kejadian event |
+| timeframe | VARCHAR(10) NOT NULL | M15, H1, H4 |
+| status | VARCHAR(20) | Status (Accepted, Denied, PreChoCH, dll.) |
+| previous_price | DECIMAL(10, 2) | Harga referensi sebelumnya |
+| previous_time | TIMESTAMP | Waktu referensi sebelumnya |
+| csv_filename | VARCHAR(255) | Nama file CSV asal (tracking) |
+| loaded_at | TIMESTAMP | Waktu di-load ke database |
+
+**Constraint:** UNIQUE(time, timeframe, type, price) ON CONFLICT DO NOTHING
 
 ---
 
-### **9️⃣ TABLE: `csv_load_log` - Log Proses Load CSV**
+### **8️⃣ TABLE: `backtest_results_xauusd` - Hasil Eksekusi Trade dari CSV**
 
-**Sumber:** CSV to DB Loader (scheduled job setiap hari 00:00)
-**Fungsi:** Tracking file CSV mana saja yang sudah di-load, kapan, dan status-nya
+**Sumber:** CSV Export dari Dev_Bot (Backtest_Results_*.csv)
+**Fungsi:** Menyimpan data eksekusi order/posisi trading untuk audit performa
 
 | Kolom | Tipe | Keterangan |
 |-------|------|-----------|
 | id | SERIAL PRIMARY KEY | ID unik |
-| filename | VARCHAR(255) NOT NULL | Nama file CSV (LLHHBOSData_*.csv, MarketData_*.csv) |
-| file_date | DATE | Tanggal file CSV |
-| rows_loaded | INT | Jumlah baris yang di-load |
-| loaded_at | TIMESTAMP | Waktu load (auto) |
-| status | VARCHAR(20) | SUCCESS, FAILED, PARTIAL |
-| error_message | TEXT | Pesan error jika ada |
+| ticket | BIGINT | Nomor tiket order MT5 |
+| symbol | VARCHAR(10) NOT NULL | Simbol instrumen (XAUUSD) |
+| type | VARCHAR(10) NOT NULL | Tipe posisi (BUY, SELL) |
+| entry_price | DECIMAL(10, 2) | Harga entry |
+| exit_price | DECIMAL(10, 2) | Harga exit |
+| sl | DECIMAL(10, 2) | Stop Loss |
+| tp | DECIMAL(10, 2) | Take Profit |
+| profit | DECIMAL(10, 2) | Profit kotor |
+| spread_cost | DECIMAL(10, 2) | Biaya spread |
+| commission | DECIMAL(10, 2) | Komisi broker |
+| swap | DECIMAL(10, 2) | Biaya swap inap |
+| net_profit | DECIMAL(10, 2) | Profit bersih |
+| session | VARCHAR(50) | Sesi pasar saat entry (London, New York, Asia, dll.) |
+| session_isdst | VARCHAR(10) | Status DST sesi (YES/NO) |
+| entry_time | TIMESTAMP NOT NULL | Waktu entry |
+| exit_time | TIMESTAMP | Waktu exit |
+| lot_size | DECIMAL(10, 2) | Ukuran lot posisi |
+| magic_number | INT | ID unik robot (Magic Number) |
+| timeframe | VARCHAR(10) NOT NULL | Timeframe running (M15, H1, H4) |
+| status | VARCHAR(20) | Status trade (EXECUTED, REJECTED) |
+| reject_reason | VARCHAR(100) | Alasan penolakan jika status REJECTED |
+| csv_filename | VARCHAR(255) | Nama file CSV asal (tracking) |
+| loaded_at | TIMESTAMP | Waktu di-load ke database |
+
+**Constraint:** UNIQUE(entry_time, ticket, type) ON CONFLICT DO NOTHING
+
+---
+
+### **9️⃣ TABLE: `marketdata_xauusd_m15` / `_h1` / `_h4` - Data OHLCV & Indikator**
+
+**Sumber:** CSV Export dari Dev_Bot (MarketData_M15_*, MarketData_H1_*, MarketData_H4_*)
+**Fungsi:** Menyimpan data candlestick (OHLCV) dan indikator (EMA200) untuk audit & visualisasi
+
+| Kolom | Tipe | Keterangan |
+|-------|------|-----------|
+| id | SERIAL PRIMARY KEY | ID unik |
+| time | TIMESTAMP NOT NULL | Waktu bar candlestick |
+| open | DECIMAL(10, 2) | Harga Open |
+| high | DECIMAL(10, 2) | Harga High |
+| low | DECIMAL(10, 2) | Harga Low |
+| close | DECIMAL(10, 2) | Harga Close |
+| volume | BIGINT | Volume transaksi (Tick Volume) |
+| spread | INT | Spread instrumen dalam points |
+| ema200 | DECIMAL(10, 2) | Nilai indikator EMA 200 |
+| csv_filename | VARCHAR(255) | Nama file CSV asal (tracking) |
+| loaded_at | TIMESTAMP | Waktu di-load ke database |
+
+**Constraint:** UNIQUE(time) ON CONFLICT DO NOTHING
+
+---
+
+### **🔟 TABLE: `sessionzone_xauusd` - Data Sesi Pasar**
+
+**Sumber:** CSV Export dari Dev_Bot (SessionZone_*.csv)
+**Fungsi:** Menyimpan data range harga dan statistik untuk setiap sesi trading (Sydney, Tokyo, London, New York)
+
+| Kolom | Tipe | Keterangan |
+|-------|------|-----------|
+| id | SERIAL PRIMARY KEY | ID unik |
+| start_time | TIMESTAMP NOT NULL | Waktu awal sesi |
+| end_time | TIMESTAMP | Waktu akhir sesi |
+| duration_bars | INT | Durasi sesi dalam jumlah bar |
+| session | VARCHAR(50) | Nama sesi trading (Sydney_Tokyo, London_NewYork, dll.) |
+| status | VARCHAR(20) | Status sesi |
+| is_dst | VARCHAR(10) | Status DST (YES/NO) |
+| open_price | DECIMAL(10, 2) | Harga pembukaan sesi |
+| high_price | DECIMAL(10, 2) | Harga tertinggi selama sesi |
+| low_price | DECIMAL(10, 2) | Harga terendah selama sesi |
+| close_price | DECIMAL(10, 2) | Harga penutupan sesi |
+| range_points | INT | Range harga dalam points (High - Low) |
+| csv_filename | VARCHAR(255) | Nama file CSV asal (tracking) |
+| loaded_at | TIMESTAMP | Waktu di-load ke database |
+
+**Constraint:** UNIQUE(start_time, session) ON CONFLICT DO NOTHING
+
+---
+
+### **1️⃣1️⃣ TABLE: `csv_load_log` - Log Proses Load CSV**
+
+**Sumber:** Watcher Daemon (CSVWatcherService memantau folder setiap 5 detik)
+**Fungsi:** Melacak file CSV mana saja yang sudah di-load secara incremental, jumlah baris, dan statusnya
+
+| Kolom | Tipe | Keterangan |
+|-------|------|-----------|
+| id | SERIAL PRIMARY KEY | ID unik |
+| filename | VARCHAR(255) NOT NULL | Nama file CSV |
+| file_date | DATE | Tanggal file di-load |
+| rows_loaded | INT | Jumlah baris/lines yang sudah berhasil di-import |
+| loaded_at | TIMESTAMP | Waktu terakhir pembaruan data load |
+| status | VARCHAR(20) | Status load ('success', 'error') |
+| error_message | TEXT | Detail pesan error jika proses load gagal |
 
 **Constraint:** UNIQUE(filename)
 
 ---
 
-### **🔟 TABLE: `cross_validation` - Perbandingan TRACK 1 vs TRACK 2**
+### **1️⃣2️⃣ TABLE: `cross_validation` - Hasil Rekonsiliasi Real-time vs CSV**
 
-**Sumber:** Daily batch validation (membandingkan realtime_* vs historical_*_audit)
-**Fungsi:** Cross-check apakah TRACK 1 dan TRACK 2 sesuai atau ada perbedaan
+**Sumber:** Perbandingan berkala antara data realtime_* (Track 1) vs data historical (Track 2)
+**Fungsi:** Menyimpan skor akurasi dan rekonsiliasi antara Track 1 dan Track 2
 
 | Kolom | Tipe | Keterangan |
 |-------|------|-----------|
@@ -854,15 +915,15 @@ STEP 6: Setiap hari (scheduled job)
 | validation_date | DATE NOT NULL | Tanggal validasi |
 | timeframe | VARCHAR(10) | M15, H1, H4 |
 | event_type | VARCHAR(20) | BoS, CHoCH, HH, LL |
-| total_realtime | INT | Jumlah event di TRACK 1 (realtime_structures) |
-| total_csv | INT | Jumlah event di TRACK 2 (historical_structures_audit) |
-| matches | INT | Event yang match (sama) |
-| mismatches | INT | Event yang berbeda |
-| missing_in_realtime | INT | Event ada di CSV tapi tidak di realtime |
-| missing_in_csv | INT | Event ada di realtime tapi tidak di CSV |
-| match_rate | DECIMAL(5,4) | Persentase kecocokan (0-1) |
-| avg_price_diff | DECIMAL(10,2) | Rata-rata perbedaan harga |
-| created_at | TIMESTAMP | Waktu validasi (auto) |
+| total_realtime | INT | Jumlah data di tabel realtime |
+| total_csv | INT | Jumlah data di tabel audit (CSV) |
+| matches | INT | Jumlah data yang cocok |
+| mismatches | INT | Jumlah data tidak cocok |
+| missing_in_realtime | INT | Data hanya ada di CSV |
+| missing_in_csv | INT | Data hanya ada di realtime |
+| match_rate | DECIMAL(5, 4) | Persentase kecocokan (0.0 - 1.0) |
+| avg_price_diff | DECIMAL(10, 2) | Rata-rata selisih harga data |
+| created_at | TIMESTAMP | Waktu analisis |
 
 **Constraint:** UNIQUE(validation_date, timeframe)
 

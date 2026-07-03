@@ -31,18 +31,19 @@ async def lifespan(app: FastAPI):
 
     # Initialize MT5 connection
     mt5_manager = None
-    try:
-        from app.core.mt5_manager import MT5Manager
-        mt5_manager = MT5Manager()
-        if mt5_manager.connect():
-            logger.info("[OK] MT5 connection established")
-        else:
-            logger.warning("[WARNING] MT5 connection failed — running in degraded mode")
-    except Exception as e:
-        logger.error(f"[ERROR] MT5 initialization error: {e}")
+    # try:
+    #     from app.core.mt5_manager import MT5Manager
+    #     mt5_manager = MT5Manager()
+    #     if mt5_manager.connect():
+    #         logger.info("[OK] MT5 connection established")
+    #     else:
+    #         logger.warning("[WARNING] MT5 connection failed — running in degraded mode")
+    # except Exception as e:
+    #     logger.error(f"[ERROR] MT5 initialization error: {e}")
 
     # Initialize Neon PostgreSQL connection pool
     pipeline = None
+    watcher = None
     try:
         from app.core.database import init_db_pool
         db_ready = init_db_pool(minconn=1, maxconn=5)
@@ -50,11 +51,17 @@ async def lifespan(app: FastAPI):
             logger.info("[DB] [OK] Neon PostgreSQL pool ready")
 
             # Start Track 1 real-time pipeline
-            from app.services.pipeline import Track1Pipeline
-            pipeline = Track1Pipeline(interval_seconds=settings.TRACK1_INTERVAL_SECONDS)
-            await pipeline.start()
+            # from app.services.pipeline import Track1Pipeline
+            # pipeline = Track1Pipeline(interval_seconds=settings.TRACK1_INTERVAL_SECONDS)
+            # await pipeline.start()
+
+            # Start Track 2 CSV Watcher Service
+            from app.services.csv_watcher_service import CSVWatcherService
+            watcher = CSVWatcherService(check_interval_seconds=5)
+            watcher.start()
+            logger.info("[Watcher] [OK] CSV Watcher Service started")
         else:
-            logger.warning("[DB] [WARNING] Neon DB pool failed — Track 1 pipeline NOT started")
+            logger.warning("[DB] [WARNING] Neon DB pool failed — Track 1 & Watcher pipeline NOT started")
     except Exception as e:
         logger.error(f"[DB] Pipeline startup error: {e}")
 
@@ -62,6 +69,14 @@ async def lifespan(app: FastAPI):
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
     logger.info("[STOP] Shutting down application")
+
+    # Stop CSV watcher
+    if watcher is not None:
+        try:
+            watcher.stop()
+            logger.info("[Watcher] CSV Watcher stopped")
+        except Exception as e:
+            logger.warning(f"[Watcher] Error stopping watcher: {e}")
 
     # Stop Track 1 pipeline
     if pipeline is not None:

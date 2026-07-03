@@ -81,7 +81,7 @@ def create_test_data(scenario: str = "bullish", bars: int = 150) -> pd.DataFrame
     })
     
     logger.info(
-        f"✅ Data created | "
+        f"[OK] Data created | "
         f"Price range: {df['low'].min():.2f} - {df['high'].max():.2f} | "
         f"Total change: {df['close'].iloc[-1] - df['close'].iloc[0]:.2f} pips"
     )
@@ -100,22 +100,21 @@ def test_agent_with_scenario(agent: MarketStructureAgent, scenario: str):
     
     # Analyze
     result = agent.analyze(
-        df=df,
+        df_m15=df,
         symbol="XAUUSD",
-        timeframe="M15",
         session="London"
     )
     
     # Print results
     logger.info("")
-    logger.info("🎯 AGENT RESPONSE:")
+    logger.info("[RESPONSE] AGENT RESPONSE:")
     logger.info(f"   Signal: {result['signal']}")
     logger.info(f"   Confidence: {result['confidence']:.3f}")
     logger.info(f"   Reasoning: {result['reasoning']}")
     logger.info("")
     
     if result['structure_events']:
-        logger.info(f"📊 Structure Events ({len(result['structure_events'])}):")
+        logger.info(f"[EVENTS] Structure Events ({len(result['structure_events'])}):")
         for i, event in enumerate(result['structure_events'][-3:], 1):
             logger.info(
                 f"   {i}. {event['type']} @ "
@@ -125,7 +124,7 @@ def test_agent_with_scenario(agent: MarketStructureAgent, scenario: str):
     
     if result['pattern_analysis']:
         pa = result['pattern_analysis']
-        logger.info(f"🔍 Pattern Analysis:")
+        logger.info(f"[PATTERNS] Pattern Analysis:")
         logger.info(f"   Similar patterns: {pa['total_count']}")
         logger.info(f"   Win rate: {pa['win_rate']:.1%}")
         logger.info(f"   Avg profit: {pa['avg_profit']:.1f} pips")
@@ -134,11 +133,11 @@ def test_agent_with_scenario(agent: MarketStructureAgent, scenario: str):
     
     metadata = result.get('metadata', {})
     if metadata:
-        logger.info(f"📈 Market State:")
+        logger.info(f"[STATE] Market State:")
         logger.info(f"   Current price: {metadata.get('current_price', 0):.2f}")
-        logger.info(f"   EMA200: {metadata.get('ema200', 0):.2f}")
+        logger.info(f"   EMA200 M15: {metadata.get('ema200_m15', 0):.2f}")
         logger.info(f"   Price vs EMA: {metadata.get('price_vs_ema', 'N/A')}")
-        logger.info(f"   Distance: {metadata.get('ema_distance', 0):.2f} pips")
+        logger.info(f"   Phase: {result.get('phase', 'N/A')}")
         logger.info("")
     
     return result
@@ -177,14 +176,14 @@ def test_error_handling():
     # Test 1: Empty DataFrame
     logger.info("Test 1: Empty DataFrame")
     df_empty = pd.DataFrame()
-    result = agent.analyze(df_empty)
+    result = agent.analyze(df_m15=df_empty)
     logger.info(f"   Result: {result['signal']} | Reasoning: {result['reasoning']}")
     logger.info("")
     
     # Test 2: Insufficient data
     logger.info("Test 2: Insufficient data (5 bars, need at least 11)")
     df_small = create_test_data(bars=5)
-    result = agent.analyze(df_small)
+    result = agent.analyze(df_m15=df_small)
     logger.info(f"   Result: {result['signal']} | Reasoning: {result['reasoning']}")
     logger.info("")
     
@@ -195,14 +194,14 @@ def test_error_handling():
         "close": np.random.uniform(2300, 2350, 150)
         # Missing: open, high, low, volume
     })
-    result = agent.analyze(df_incomplete)
+    result = agent.analyze(df_m15=df_incomplete)
     logger.info(f"   Result: {result['signal']} | Reasoning: {result['reasoning']}")
     logger.info("")
 
 
 def test_all_scenarios():
     """Run all test scenarios"""
-    logger.info("🚀 STARTING MARKET STRUCTURE AGENT TESTS")
+    logger.info("[START] STARTING MARKET STRUCTURE AGENT TESTS")
     logger.info("=" * 70)
     logger.info("")
     
@@ -229,7 +228,7 @@ def test_all_scenarios():
     
     # Summary
     logger.info("=" * 70)
-    logger.info("📊 TEST SUMMARY")
+    logger.info("[SUMMARY] TEST SUMMARY")
     logger.info("=" * 70)
     logger.info("")
     
@@ -242,7 +241,7 @@ def test_all_scenarios():
         )
     
     logger.info("")
-    logger.info("✅ ALL TESTS COMPLETE!")
+    logger.info("[OK] ALL TESTS COMPLETE!")
     logger.info("")
 
 
