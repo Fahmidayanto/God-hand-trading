@@ -479,15 +479,15 @@ export default function RongsokanPage() {
       const timeScale = chartRef.current.timeScale();
       const currentScroll = timeScale.scrollPosition();
 
-      // Scroll speed based on arrow keys (10 bars per press)
-      const SCROLL_SPEED = 10; 
+      // Scroll speed based on arrow keys (25 bars per press, instant transition)
+      const SCROLL_SPEED = 25; 
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
-        timeScale.scrollToPosition(currentScroll - SCROLL_SPEED, true);
+        timeScale.scrollToPosition(currentScroll - SCROLL_SPEED, false);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        timeScale.scrollToPosition(currentScroll + SCROLL_SPEED, true);
+        timeScale.scrollToPosition(currentScroll + SCROLL_SPEED, false);
       }
     };
 
