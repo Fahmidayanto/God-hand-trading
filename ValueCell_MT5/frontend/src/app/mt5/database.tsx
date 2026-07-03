@@ -205,21 +205,26 @@ export default function Database() {
           </div>
 
           {/* Table Control */}
-          <div className="flex gap-4 items-center mb-4">
-            <span className="text-sm text-slate-400">Select PostgreSQL Table:</span>
-            <select
-              value={selectedTable}
-              onChange={(e) => setSelectedTable(e.target.value)}
-              className="bg-slate-950 border border-slate-700/50 text-slate-200 px-3 py-1.5 rounded-lg focus:outline-none"
-            >
-              <option value="llhhbosdata_xauusd">llhhbosdata_xauusd (Swing Events)</option>
-              <option value="backtest_results_xauusd">backtest_results_xauusd (Trades)</option>
-              <option value="marketdata_xauusd_m15">marketdata_xauusd_m15 (OHLCV)</option>
-              <option value="marketdata_xauusd_h1">marketdata_xauusd_h1 (OHLCV)</option>
-              <option value="marketdata_xauusd_h4">marketdata_xauusd_h4 (OHLCV)</option>
-              <option value="sessionzone_xauusd">sessionzone_xauusd (Session Zones)</option>
-              <option value="csv_load_log">csv_load_log (Import Logger)</option>
-            </select>
+          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm">
+            <span className="text-sm text-slate-400 font-medium ml-1">📋 Select Table:</span>
+            <div className="relative">
+              <select
+                value={selectedTable}
+                onChange={(e) => setSelectedTable(e.target.value)}
+                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all cursor-pointer text-sm font-semibold appearance-none hover:bg-slate-900 shadow-inner"
+              >
+                <option value="llhhbosdata_xauusd">llhhbosdata_xauusd (Swing Events)</option>
+                <option value="backtest_results_xauusd">backtest_results_xauusd (Trades)</option>
+                <option value="marketdata_xauusd_m15">marketdata_xauusd_m15 (OHLCV)</option>
+                <option value="marketdata_xauusd_h1">marketdata_xauusd_h1 (OHLCV)</option>
+                <option value="marketdata_xauusd_h4">marketdata_xauusd_h4 (OHLCV)</option>
+                <option value="sessionzone_xauusd">sessionzone_xauusd (Session Zones)</option>
+                <option value="csv_load_log">csv_load_log (Import Logger)</option>
+              </select>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 text-xs">
+                ▼
+              </div>
+            </div>
           </div>
 
           {/* Data Grid */}
