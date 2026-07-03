@@ -91,3 +91,6 @@ nul
 # Kimchi files
 .kimchi/
 
+# Superpowers brainstorming folder
+.superpowers/
+
