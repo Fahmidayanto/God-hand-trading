@@ -75,7 +75,8 @@ export default function Database() {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto text-slate-200">
+    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "hidden" }}>
+      <div className="px-12 py-8 text-slate-200">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
@@ -87,9 +88,10 @@ export default function Database() {
         </div>
         <button
           onClick={handleRefresh}
-          className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 rounded-lg text-sm font-semibold transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+          className="p-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 rounded-lg text-lg transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] flex items-center justify-center"
+          title="Refresh Data"
         >
-          🔄 Refresh Data
+          🔄
         </button>
       </div>
 
@@ -250,6 +252,7 @@ export default function Database() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

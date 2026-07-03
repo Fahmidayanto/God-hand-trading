@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 import "@/i18n";
 import AppSidebar from "@/components/valuecell/app/app-sidebar";
 import { useLanguage } from "@/store/settings-store";
@@ -61,6 +61,9 @@ import { BackendHealthCheck } from "@/components/valuecell/app/backend-health-ch
 import { TrackerProvider } from "./provider/tracker-provider";
 
 export default function Root() {
+  const location = useLocation();
+  const isMT5 = location.pathname.startsWith("/mt5");
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider
@@ -74,7 +77,7 @@ export default function Root() {
           <TrackerProvider>
             <SidebarProvider>
               <div className="fixed flex size-full overflow-hidden">
-                <AppSidebar />
+                {!isMT5 && <AppSidebar />}
 
                 <main
                   className="relative flex flex-1 overflow-hidden"
