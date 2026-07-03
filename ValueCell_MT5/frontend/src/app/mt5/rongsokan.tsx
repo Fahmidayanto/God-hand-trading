@@ -479,8 +479,15 @@ export default function RongsokanPage() {
       const timeScale = chartRef.current.timeScale();
       const currentScroll = timeScale.scrollPosition();
 
-      // Scroll speed based on arrow keys (25 bars per press, instant transition)
-      const SCROLL_SPEED = 25; 
+      // Calculate scroll speed to represent exactly 1 day (24 hours) based on current timeframe
+      let SCROLL_SPEED = 96; // Default for M15 (24 hours * 4 candles/hour)
+      if (activeTimeframe === "H1") {
+        SCROLL_SPEED = 24; // 24 hours * 1 candle/hour
+      } else if (activeTimeframe === "H4") {
+        SCROLL_SPEED = 6;  // 24 hours / 4 hours/candle
+      } else if (activeTimeframe === "D1" || activeTimeframe === "D") {
+        SCROLL_SPEED = 1;  // 1 candle per day
+      }
 
       if (e.key === "ArrowLeft") {
         e.preventDefault();
@@ -495,7 +502,7 @@ export default function RongsokanPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [activeTimeframe]);
 
   // Load trade history - using Rongsokan trades
   useEffect(() => {
