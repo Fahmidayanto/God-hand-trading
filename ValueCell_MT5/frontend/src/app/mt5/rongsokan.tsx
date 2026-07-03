@@ -461,6 +461,42 @@ export default function RongsokanPage() {
     };
   }, []);
 
+  // Listen for arrow key events to scroll the chart timescale left/right
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if user is typing in an input/select/textarea
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "SELECT" ||
+        document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.getAttribute("contenteditable") === "true"
+      ) {
+        return;
+      }
+
+      if (!chartRef.current) return;
+
+      const timeScale = chartRef.current.timeScale();
+      const currentScroll = timeScale.scrollPosition();
+
+      // Scroll speed based on arrow keys (10 bars per press)
+      const SCROLL_SPEED = 10; 
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        timeScale.scrollToPosition(currentScroll - SCROLL_SPEED, true);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        timeScale.scrollToPosition(currentScroll + SCROLL_SPEED, true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   // Load trade history - using Rongsokan trades
   useEffect(() => {
     if (backtestTradesData && backtestTradesData.trades) {
