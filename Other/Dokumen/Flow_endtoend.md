@@ -1,52 +1,39 @@
-## 📐 ARCHITECTURE OVERVIEW (HYBRID APPROACH)
-
-```
+## 📐 ARCHITECTURE OVERVIEW (HYBRID APPROACH)```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    MT5 ECOSYSTEM (DUAL-TRACK SYSTEM)                     │
+│                    MT5 ECOSYSTEM (SINGLE-TRACK SYSTEM)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
+│                                                                         │
 │  ┌────────────────────────────────────────────────────────────────┐    │
 │  │         MetaTrader 5 Terminal (Live Market Data)                │    │
-│  │  • Real-time tick data streaming                                │    │
 │  │  • OHLCV bars forming (M15/H1/H4)                              │    │
 │  │  • Price updates every tick                                     │    │
-│  └──────────────┬─────────────────────┬────────────────────────────┘    │
-│                 │                     │                                  │
-│    TRACK 1: Real-time ⚡          TRACK 2: Backup 📁                   │
-│    (Primary - Trading)             (Secondary - Audit)                   │
-│                 │                     │                                  │
-│                 ▼                     ▼                                  │
-│  ┌──────────────────────┐    ┌─────────────────────────────────────┐   │
-│  │  MT5 Python API      │    │  Dev_Bot_v11.cs (MQL5 EA)           │   │
-│  │  (Primary Path)      │    │  (Optional - Monitoring Only)       │   │
-│  │  TRACK 1 SOURCE      │    │  TRACK 2 SOURCE                     │   │
-│  │                      │    │                                     │   │
-│  │  • Direct bar access │    │  • HH/LL/CHoCH/BoS detection       │   │
-│  │  • copy_rates_*()    │    │  • Export CSV (backup/audit)       │   │
-│  │  • No file I/O       │    │  • Visual markers on chart         │   │
-│  │  • Event-driven      │    │  • NO TRADING EXECUTION            │   │
-│  └──────────┬───────────┘    └───────────┬─────────────────────────┘   │
-│             │                             │                              │
-│    TRACK 1: Real-time ⚡            TRACK 2: Backup 📁                 │
-│    (Primary - Trading)             (Secondary - Audit)                   │
-│             │                             │                              │
-│             ▼ DIRECT TO                   ▼ CSV Files (Backup)           │
-│  ┌─────────────────────────────┐   ┌──────────────────────────────┐     │
-│  │  MT5 DATA ADAPTER           │   │  Backtest_result/            │     │
-│  │  (Primary Real-time)        │   │  ├── LLHHBOSData_*.csv       │     │
-│  │  ┌─────────────────────────┐│   │  ├── MarketData_M15_*.csv    │     │
-│  │  │ 1. Ambil data real-time ││   │  ├── MarketData_H1_*.csv     │     │
-│  │  │ 2. Deteksi pola (HH/LL) ││   │  └── SessionZone_*.csv       │     │
-│  │  │ 3. Deteksi event        ││   │                              │     │
-│  │  │ 4. Normalisasi data     ││   │  └────────────┬──────────────┘     │
-│  │  └────────────┬────────────┘│   │               │                     │
-│  │               │             │   │ Daily Batch Load (00:00)            │
-│  └───────────────┼─────────────┘   │ ┌──────────────────────────────┐   │
-│                  │                  │ │ CSV to DB Loader (Scheduled) │   │
-│                  │ DIRECT TO         │ │ • Load yesterday's CSV       │   │
-│                  ▼ KNOWLEDGE BASE    │ │ • Store to audit tables     │   │
+│  └────────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│                                   ▼                                    │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │  Dev_Bot_v11.cs (MQL5 EA)                                       │    │
+│  │  (Active - Deteksi + Trading)                                   │    │
+│  │  TRACK 2 SOURCE                                                 │    │
+│  │                                                                 │    │
+│  │  • HH/LL/CHoCH/BoS detection                                   │    │
+│  │  • Export 8 CSV per M15 close                                   │    │
+│  │  • Visual markers on chart                                      │    │
+│  │  • Trading execution (Buy/Sell)                                 │    │
+│  └────────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│                                   ▼ CSV Files (Backup)                 │
+│  ┌────────────────────────────────────────────────────────────────┐    │
+│  │  Backtest_result/                                               │    │
+│  │  ├── Backtest_Results_*.csv     ├── MarketData_M15_*.csv        │    │
+│  │  ├── Backtest_Summary_*.csv     ├── MarketData_H1_*.csv         │    │
+│  │  ├── LLHHBOSData_*.csv          ├── MarketData_H4_*.csv         │    │
+│  │  ├── MarketStructure_*.csv      └── SessionZone_*.csv           │    │
+│  └────────────────────────────────┬───────────────────────────────┘    │
+│                                   │                                    │
+│                                   ▼                                    │
+│                     CSV Watcher Service (ON) 📁                        │
 │  ┌────────────────────────────────────────────────────────────────┐   │
-│  │                 KNOWLEDGE BASE (Dual Storage)                   │   │
+│  │                 KNOWLEDGE BASE (Storage)                        │   │
 │  │  ┌──────────────────────────────────────────────────────────┐  │   │
 │  │  │  LanceDB Collections:                                     │  │   │
 │  │  │  • historical_structures (pattern similarity search)     │  │   │
@@ -55,60 +42,45 @@
 │  │  │  • trade_outcomes (ML training data)                     │  │   │
 │  │  │                                                           │  │   │
 │  │  │  Neon PostgreSQL Tables:                                  │  │   │
-│  │  │  ├─ Real-time (from TRACK 1 - MT5 API):                 │  │   │
-│  │  │  │  • realtime_ohlcv                                     │  │   │
-│  │  │  │  • realtime_structures                                │  │   │
-│  │  │  │  • trades (execution records)                         │  │   │
-│  │  │  │  • agent_decisions (multi-agent logs)                 │  │   │
-│  │  │  │  • state_machine (current state)                      │  │   │
-│  │  │  │  • agent_performance (tracking)                       │  │   │
-│  │  │  │                                                        │  │   │
-│  │  │  └─ Audit Trail (from TRACK 2 - CSV batch load):        │  │   │
-│  │  │     • historical_ohlcv_audit                             │  │   │
-│  │  │     • historical_structures_audit                        │  │   │
+│  │  │  └─ Audit Trail (from TRACK 2 - [ACTIVE]):                │  │   │
+│  │  │     • marketdata_xauusd_m15 / h1 / h4                     │  │   │
+│  │  │     • llhhbosdata_xauusd                                  │  │   │
+│  │  │     • backtest_results_xauusd                             │  │   │
+│  │  │     • sessionzone_xauusd                                  │  │   │
 │  │  │     • csv_load_log (tracking)                            │  │   │
 │  │  │     • cross_validation (Track 1 vs Track 2)             │  │   │
 │  │  └──────────────────────────────────────────────────────────┘  │   │
 │  └────────────────────────────────────────────────────────────────┘   │
-│                              ▼                                           │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │                    ORCHESTRATOR AGENT                           │    │
-│  │  (Coordinator - receives market data & triggers discussion)     │    │
-│  └────────────────┬──────────────────────────┬────────────────────┘    │
-│                   │                          │                          │
-│         ┌─────────┴─────────┬────────────────┴────────┬──────────┐     │
-│         ▼                   ▼                         ▼          ▼     │
-│  ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓  ┏━━━━━━━┓   │
-│  ┃  MARKET     ┃    ┃  ML MODEL   ┃    ┃   RISK      ┃  ┃ SENT. ┃   │
-│  ┃ STRUCTURE   ┃    ┃ PREDICTION  ┃    ┃ MANAGEMENT  ┃  ┃ AGENT ┃   │
-│  ┃   AGENT     ┃    ┃   AGENT     ┃    ┃   AGENT     ┃  ┃       ┃   │
-│  ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛  ┗━━━━━━━┛   │
-│         │                   │                         │          │     │
-│         └─────────┬─────────┴────────────────┬────────┴──────────┘     │
-│                   ▼                          ▼                          │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │                    CONSENSUS ENGINE                             │    │
-│  │  • Weighted voting system                                       │    │
-│  │  • Conflict resolution logic                                    │    │
-│  │  • Confidence aggregation                                       │    │
-│  └────────────────────────────────┬───────────────────────────────┘    │
-│                                   ▼                                     │
-│  ┌────────────────────────────────────────────────────────────────┐    │
-│  │                   EXECUTION AGENT                               │    │
-│  │  • MT5 Python API (order_send)                                  │    │
-│  │  • Position management                                          │    │
-│  │  • Risk controls (max position size, daily loss limit)          │    │
-│  └────────────────────────────────┬───────────────────────────────┘    │
-│                                   ▼                                     │
-└───────────────────────────────────┼─────────────────────────────────────┘
-                                    │
-                                    ▼ MT5 Python API
-                    ┌───────────────────────────────┐
-                    │   MetaTrader 5 Terminal       │
-                    │   • Place orders              │
-                    │   • Monitor positions         │
-                    │   • Update SL/TP              │
-                    └───────────────────────────────┘
+│                              ▼                                        │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                    ORCHESTRATOR AGENT                          │   │
+│  │  (Coordinator - receives market data & triggers discussion)    │   │
+│  └────────────────┬──────────────────────────┬────────────────────┘   │
+│                   │                          │                        │
+│         ┌─────────┴─────────┬────────────────┴────────┬──────────┐    │
+│         ▼                   ▼                         ▼          ▼    │
+│  ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓  ┏━━━━━━━┓  │
+│  ┃  MARKET     ┃    ┃  ML MODEL   ┃    ┃   RISK      ┃  ┃ SENT. ┃  │
+│  ┃ STRUCTURE   ┃    ┃ PREDICTION  ┃    ┃ MANAGEMENT  ┃  ┃ AGENT ┃  │
+│  ┃   AGENT     ┃    ┃   AGENT     ┃    ┃   AGENT     ┃  ┃       ┃  │
+│  ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛  ┗━━━━━━━┛  │
+│         │                   │                         │          │    │
+│         └─────────┬─────────┴────────────────┬────────┴──────────┘    │
+│                   ▼                          ▼                        │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                    CONSENSUS ENGINE                            │   │
+│  │  • Weighted voting system                                      │   │
+│  │  • Conflict resolution logic                                   │   │
+│  │  • Confidence aggregation                                      │   │
+│  └────────────────────────────────┬───────────────────────────────┘   │
+│                                   ▼                                   │
+│  ┌────────────────────────────────────────────────────────────────┐   │
+│  │                   EXECUTION AGENT                              │   │
+│  │  • Order monitoring / logging                                  │   │
+│  │  • Position management                                         │   │
+│  │  • Risk controls (max position size, daily loss limit)         │   │
+│  └────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
