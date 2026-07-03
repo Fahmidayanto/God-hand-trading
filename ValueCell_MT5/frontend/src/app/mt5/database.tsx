@@ -218,7 +218,7 @@ export default function Database() {
           </div>
 
           {/* Table Control */}
-          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm relative">
+          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm relative z-20">
             <span className="text-sm text-slate-400 font-medium ml-1">📋 Select Table:</span>
             <div className="relative">
               {/* Dropdown Trigger Button */}
