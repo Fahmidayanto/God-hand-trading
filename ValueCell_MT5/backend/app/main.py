@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs
+from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs, database
 from app.config import get_settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -199,6 +199,12 @@ app.include_router(
     websocket.router,
     prefix=f"{settings.API_V1_PREFIX}/ws",
     tags=["WebSocket"],
+)
+
+app.include_router(
+    database.router,
+    prefix=f"{settings.API_V1_PREFIX}/database",
+    tags=["Database"],
 )
 
 # ValueCell legacy endpoints (for backward compatibility)
