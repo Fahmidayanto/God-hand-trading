@@ -1609,19 +1609,14 @@ export default function RongsokanPage() {
 
   useEffect(() => {
     if (showSessions && sessionZonesData && sessionZonesPrimitiveRef.current) {
-      const boxes: SessionZoneBox[] = sessionZonesData.zones.map(zone => ({
-        startTime: zone.start_time,
-        endTime: zone.end_time,
-        session: zone.session,
-        status: zone.status as "CLOSED" | "OPEN",
-        openPrice: zone.open_price,
-        highPrice: zone.high_price,
-        lowPrice: zone.low_price,
-        closePrice: zone.close_price,
-        rangePoints: zone.range_points,
-        durationBars: zone.duration_bars,
-        isDst: zone.is_dst,
-      }));
+      const boxes: SessionZoneBox[] = sessionZonesData.zones
+        .filter(z => z.end_time > z.start_time)
+        .map(zone => ({
+          start: zone.start_time,
+          end: zone.end_time,
+          session: zone.session,
+          open: zone.status === "OPEN",
+        }));
       sessionZonesPrimitiveRef.current.setBoxes(boxes);
     } else if (sessionZonesPrimitiveRef.current) {
       sessionZonesPrimitiveRef.current.setBoxes([]);
