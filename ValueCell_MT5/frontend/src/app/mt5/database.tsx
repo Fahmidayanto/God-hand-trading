@@ -28,6 +28,19 @@ export default function Database() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [autoSync, setAutoSync] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const TABLES_METADATA = [
+    { value: "llhhbosdata_xauusd", label: "llhhbosdata_xauusd (Swing Events)" },
+    { value: "backtest_results_xauusd", label: "backtest_results_xauusd (Trades)" },
+    { value: "marketdata_xauusd_m15", label: "marketdata_xauusd_m15 (OHLCV)" },
+    { value: "marketdata_xauusd_h1", label: "marketdata_xauusd_h1 (OHLCV)" },
+    { value: "marketdata_xauusd_h4", label: "marketdata_xauusd_h4 (OHLCV)" },
+    { value: "sessionzone_xauusd", label: "sessionzone_xauusd (Session Zones)" },
+    { value: "csv_load_log", label: "csv_load_log (Import Logger)" },
+  ];
+
+  const currentLabel = TABLES_METADATA.find(t => t.value === selectedTable)?.label || selectedTable;
 
   const API_BASE = "http://localhost:8000/api/v1/database";
 
@@ -205,25 +218,48 @@ export default function Database() {
           </div>
 
           {/* Table Control */}
-          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm">
+          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm relative">
             <span className="text-sm text-slate-400 font-medium ml-1">📋 Select Table:</span>
             <div className="relative">
-              <select
-                value={selectedTable}
-                onChange={(e) => setSelectedTable(e.target.value)}
-                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all cursor-pointer text-sm font-semibold appearance-none hover:bg-slate-900 shadow-inner"
+              {/* Dropdown Trigger Button */}
+              <button
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all cursor-pointer text-sm font-semibold hover:bg-slate-900 shadow-inner flex items-center min-w-[280px] text-left"
               >
-                <option value="llhhbosdata_xauusd">llhhbosdata_xauusd (Swing Events)</option>
-                <option value="backtest_results_xauusd">backtest_results_xauusd (Trades)</option>
-                <option value="marketdata_xauusd_m15">marketdata_xauusd_m15 (OHLCV)</option>
-                <option value="marketdata_xauusd_h1">marketdata_xauusd_h1 (OHLCV)</option>
-                <option value="marketdata_xauusd_h4">marketdata_xauusd_h4 (OHLCV)</option>
-                <option value="sessionzone_xauusd">sessionzone_xauusd (Session Zones)</option>
-                <option value="csv_load_log">csv_load_log (Import Logger)</option>
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 text-xs">
-                ▼
-              </div>
+                <span className="truncate">{currentLabel}</span>
+                <span className="absolute right-3 text-slate-500 text-[10px]">
+                  {dropdownOpen ? "▲" : "▼"}
+                </span>
+              </button>
+
+              {/* Dropdown Popup List */}
+              {dropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
+                  <div className="absolute left-0 right-0 mt-2 bg-slate-950/95 border border-blue-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-slate-900/40 py-1">
+                    {TABLES_METADATA.map((tbl) => {
+                      const isSelected = selectedTable === tbl.value;
+                      return (
+                        <button
+                          key={tbl.value}
+                          onClick={() => {
+                            setSelectedTable(tbl.value);
+                            setDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-all flex items-center justify-between ${
+                            isSelected
+                              ? "bg-blue-500/15 text-blue-400 font-bold border-l-2 border-blue-500"
+                              : "text-slate-300 hover:bg-slate-900/70 hover:text-white"
+                          }`}
+                        >
+                          <span>{tbl.label}</span>
+                          {isSelected && <span className="text-xs text-blue-400 drop-shadow-[0_0_5px_rgba(59,130,246,0.6)]">●</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
