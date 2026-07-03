@@ -10,6 +10,7 @@ export default function MT5Sidebar() {
     { path: "/mt5/performance", label: "Performance", icon: "📈" },
     { path: "/mt5/agents", label: "Agents", icon: "🤖" },
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },
+    { path: "/mt5/database", label: "DB Inspector", icon: "💾" },
   ];
 
   const isActive = (path: string) => {

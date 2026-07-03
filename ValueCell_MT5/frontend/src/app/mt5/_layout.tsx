@@ -7,6 +7,7 @@ import Rongsokan from "./rongsokan";
 import Performance from "./performance";
 import Agents from "./agents";
 import Settings from "./settings";
+import Database from "./database";
 
 const pages = [
   { path: "/mt5", Component: Dashboard },
@@ -15,6 +16,7 @@ const pages = [
   { path: "/mt5/performance", Component: Performance },
   { path: "/mt5/agents", Component: Agents },
   { path: "/mt5/settings", Component: Settings },
+  { path: "/mt5/database", Component: Database },
 ];
 
 export default function MT5Layout() {
