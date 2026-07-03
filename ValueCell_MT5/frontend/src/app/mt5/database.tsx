@@ -24,9 +24,10 @@ export default function Database() {
   const [activeTab, setActiveTab] = useState<"neon" | "lance">("neon");
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedTable, setSelectedTable] = useState<string>("llhhbosdata_xauusd");
-  const [previewData, setPreviewData] = useState<TableData | null>(null);
+  const [previewCache, setPreviewCache] = useState<Record<string, TableData>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [autoSync, setAutoSync] = useState(false);
 
   const API_BASE = "http://localhost:8000/api/v1/database";
 
@@ -41,19 +42,25 @@ export default function Database() {
     }
   };
 
-  const fetchTablePreview = async (table: string) => {
-    setLoading(true);
-    setError(null);
+  const fetchTablePreview = async (table: string, silent = false) => {
+    const hasCache = !!previewCache[table];
+    if (!hasCache && !silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const res = await fetch(`${API_BASE}/neon/preview?table=${table}&limit=50`);
       if (!res.ok) throw new Error(`Failed to load data from ${table}`);
       const data = await res.json();
-      setPreviewData(data);
+      setPreviewCache(prev => ({ ...prev, [table]: data }));
     } catch (err: any) {
-      setError(err.message || "Failed to load data");
-      setPreviewData(null);
+      if (!hasCache) {
+        setError(err.message || "Failed to load data");
+      }
     } finally {
-      setLoading(false);
+      if (!hasCache) {
+        setLoading(false);
+      }
     }
   };
 
@@ -67,15 +74,47 @@ export default function Database() {
     }
   }, [selectedTable, activeTab]);
 
+  // Interval for AutoSync
+  useEffect(() => {
+    if (!autoSync) return;
+    const interval = setInterval(() => {
+      fetchStats();
+      if (activeTab === "neon") {
+        fetchTablePreview(selectedTable, true); // Silent background update
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [autoSync, selectedTable, activeTab]);
+
   const handleRefresh = () => {
     fetchStats();
     if (activeTab === "neon") {
-      fetchTablePreview(selectedTable);
+      fetchTablePreview(selectedTable, false); // force loading spinner
     }
   };
 
+  const previewData = previewCache[selectedTable] || null;
+
   return (
-    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "hidden" }}>
+    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "hidden" }} className="db-inspector-scroll">
+      <style>{`
+        .db-inspector-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .db-inspector-scroll::-webkit-scrollbar-track {
+          background: rgba(15, 23, 42, 0.1);
+          border-radius: 8px;
+        }
+        .db-inspector-scroll::-webkit-scrollbar-thumb {
+          background: rgba(59, 130, 246, 0.2);
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .db-inspector-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(59, 130, 246, 0.35);
+        }
+      `}</style>
       <div className="px-12 py-8 text-slate-200">
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -86,13 +125,25 @@ export default function Database() {
             Verify database storage row counts and preview records in NeonDB and LanceDB.
           </p>
         </div>
-        <button
-          onClick={handleRefresh}
-          className="p-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 rounded-lg text-lg transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] flex items-center justify-center"
-          title="Refresh Data"
-        >
-          🔄
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setAutoSync(!autoSync)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 border ${
+              autoSync
+                ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse"
+                : "bg-slate-800/40 text-slate-400 hover:text-slate-200 border-slate-700/50 hover:bg-slate-800/80"
+            }`}
+          >
+            ⏱️ Auto-Sync: {autoSync ? "ON" : "OFF"}
+          </button>
+          <button
+            onClick={handleRefresh}
+            className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:opacity-90 rounded-lg text-md transition-all shadow-[0_0_15px_rgba(59,130,246,0.3)] flex items-center justify-center h-[38px] w-[38px]"
+            title="Refresh Data"
+          >
+            🔄
+          </button>
+        </div>
       </div>
 
       {/* Tab Selection */}
@@ -176,7 +227,7 @@ export default function Database() {
             {loading && <div className="p-8 text-center text-slate-400">Loading data from NeonDB...</div>}
             {error && <div className="p-8 text-center text-red-400 font-medium">⚠️ Error: {error}</div>}
             {!loading && !error && previewData && (
-              <div className="overflow-x-auto max-h-[500px]">
+              <div className="overflow-auto max-h-[500px] db-inspector-scroll">
                 <table className="w-full border-collapse text-sm text-left">
                   <thead>
                     <tr className="bg-slate-950/70 border-b border-slate-700/40">
