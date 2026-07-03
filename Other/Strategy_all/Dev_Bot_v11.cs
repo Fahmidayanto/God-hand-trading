@@ -349,7 +349,6 @@ void CaptureOpenTrades()
     
     if (openPositions == 0)
     {
-        PrintFormat("ℹ️ [CAPTURE OPEN] Tidak ada open positions untuk di-capture");
         return;
     }
     
@@ -769,7 +768,6 @@ void ExportLLHHBOSToCSV()
                 }
             }
             FileClose(handleRead);
-            Print("📂 Loaded ", existingKeyCount, " existing event keys from ", filename);
         }
     }
     
@@ -907,8 +905,9 @@ void ExportLLHHBOSToCSV()
     
     FileClose(handle);
     
-    if (isLiveTrading)
+    if (isLiveTrading && newEventsAdded > 0)
     {
+        Print("📂 Loaded ", existingKeyCount, " existing event keys from ", filename);
         Print("✅ APPEND MODE: Added ", newEventsAdded, " new events to ", filename,
               " (Skipped ", (g_UnifiedEventCount - newEventsAdded), " duplicates)");
     }
