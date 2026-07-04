@@ -416,7 +416,7 @@ export default function PerformancePage() {
 
         {/* Filter Controls */}
         <div className="mb-6">
-          <div className="glass-card !p-5 !mb-0 relative overflow-hidden">
+          <div className="glass-card !p-5 !mb-0 relative overflow-visible">
             {/* Decorative gradient glow */}
             <div
               className="absolute -top-24 -right-24 w-64 h-64 rounded-full pointer-events-none"
@@ -462,20 +462,20 @@ export default function PerformancePage() {
                   </div>
                   
                   {isYearOpen && (
-                    <div className="absolute z-50 w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(6,182,212,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(6,182,212,0.15)] overflow-hidden transition-all max-h-60 overflow-y-auto">
+                    <div className="absolute z-[100] w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(6,182,212,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(6,182,212,0.15)] transition-all overflow-visible">
                       <div
                         onClick={() => {
                           setSelectedYear(null);
                           setIsYearOpen(false);
                         }}
-                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between ${
+                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between rounded-t-xl ${
                           selectedYear === null ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
                         }`}
                       >
                         <span>All Years</span>
                         {selectedYear === null && <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]" />}
                       </div>
-                      {availableYears.map((year) => (
+                      {availableYears.map((year, idx) => (
                         <div
                           key={year}
                           onClick={() => {
@@ -483,6 +483,8 @@ export default function PerformancePage() {
                             setIsYearOpen(false);
                           }}
                           className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between ${
+                            idx === availableYears.length - 1 ? "rounded-b-xl" : ""
+                          } ${
                             selectedYear === year ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
                           }`}
                         >
@@ -527,13 +529,13 @@ export default function PerformancePage() {
                   </div>
                   
                   {isMonthOpen && (
-                    <div className="absolute z-50 w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(168,85,247,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.15)] overflow-hidden transition-all max-h-60 overflow-y-auto">
+                    <div className="absolute z-[100] w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(168,85,247,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.15)] transition-all overflow-visible">
                       <div
                         onClick={() => {
                           setSelectedMonth(null);
                           setIsMonthOpen(false);
                         }}
-                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between ${
+                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between rounded-t-xl ${
                           selectedMonth === null ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
                         }`}
                       >
@@ -553,7 +555,7 @@ export default function PerformancePage() {
                         { val: 10, label: 'October' },
                         { val: 11, label: 'November' },
                         { val: 12, label: 'December' },
-                      ].map((month) => (
+                      ].map((month, idx, arr) => (
                         <div
                           key={month.val}
                           onClick={() => {
@@ -561,6 +563,8 @@ export default function PerformancePage() {
                             setIsMonthOpen(false);
                           }}
                           className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between ${
+                            idx === arr.length - 1 ? "rounded-b-xl" : ""
+                          } ${
                             selectedMonth === month.val ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
                           }`}
                         >
