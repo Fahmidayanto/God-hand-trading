@@ -416,7 +416,7 @@ export default function PerformancePage() {
 
         {/* Filter Controls */}
         <div className="mb-6">
-          <div className="glass-card !p-5 !mb-0 relative overflow-visible">
+          <div className="glass-card !p-5 !mb-0 relative overflow-visible z-[40]">
             {/* Decorative gradient glow */}
             <div
               className="absolute -top-24 -right-24 w-64 h-64 rounded-full pointer-events-none"
