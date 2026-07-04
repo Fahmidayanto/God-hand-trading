@@ -313,3 +313,106 @@ def build_agent_decision(
     except Exception as exc:
         logger.warning(f"[OrchestratorService] build_agent_decision failed: {exc}", exc_info=True)
         return _fallback_decision()
+
+
+def run_orchestrator_from_db(symbol: str = "XAUUSD") -> Optional[Dict[str, Any]]:
+    """
+    Query latest candles from NeonDB and run the OrchestratorAgent consensus.
+    Inserts resulting decision snapshot into agent_decisions and agent_sentiment_logs.
+    """
+    from app.core.database import get_db_conn, is_pool_ready
+    import json
+    
+    if not is_pool_ready():
+        logger.warning("[OrchestratorService] DB pool not ready, cannot run from DB")
+        return None
+
+    try:
+        candles_m15 = []
+        candles_h1 = []
+        candles_h4 = []
+
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                # Query M15
+                cur.execute(
+                    """
+                    SELECT time, open, high, low, close, volume
+                    FROM marketdata_xauusd_m15
+                    ORDER BY time DESC
+                    LIMIT 100
+                    """
+                )
+                rows_m15 = cur.fetchall()
+                
+                # Query H1
+                cur.execute(
+                    """
+                    SELECT time, open, high, low, close, volume
+                    FROM marketdata_xauusd_h1
+                    ORDER BY time DESC
+                    LIMIT 100
+                    """
+                )
+                rows_h1 = cur.fetchall()
+
+                # Query H4
+                cur.execute(
+                    """
+                    SELECT time, open, high, low, close, volume
+                    FROM marketdata_xauusd_h4
+                    ORDER BY time DESC
+                    LIMIT 100
+                    """
+                )
+                rows_h4 = cur.fetchall()
+
+        # Check if we have enough candles (at least 30) for M15
+        if len(rows_m15) < 30:
+            logger.warning(f"[OrchestratorService] Not enough M15 candles in DB ({len(rows_m15)}) to run orchestrator")
+            return None
+
+        # Convert query results to list of dicts. Note: fetchall is ordered DESC, so we need to REVERSE it to be chronological
+        def parse_rows(rows):
+            candles = []
+            for r_time, r_open, r_high, r_low, r_close, r_volume in reversed(rows):
+                candles.append({
+                    "time": int(r_time.timestamp()),
+                    "open": float(r_open),
+                    "high": float(r_high),
+                    "low": float(r_low),
+                    "close": float(r_close),
+                    "volume": int(r_volume)
+                })
+            return candles
+
+        candles_m15 = parse_rows(rows_m15)
+        candles_h1 = parse_rows(rows_h1) if rows_h1 else None
+        candles_h4 = parse_rows(rows_h4) if rows_h4 else None
+
+        # Run decision building logic
+        decision = build_agent_decision(
+            candles_m15=candles_m15,
+            candles_h1=candles_h1,
+            candles_h4=candles_h4,
+            symbol=symbol
+        )
+
+        # Write to db
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                from app.services.pipeline import _insert_agent_decision, _insert_sentiment_log
+                _insert_agent_decision(cur, decision)
+                _insert_sentiment_log(cur, decision['timestamp'], decision['symbol'], decision['sentiment'])
+            conn.commit()
+
+        logger.info(
+            f"[OrchestratorService] DB-driven decision recorded successfully: "
+            f"{decision['final_decision']} (score={decision['consensus_score']:.4f})"
+        )
+        return decision
+
+    except Exception as e:
+        logger.error(f"[OrchestratorService] Error running orchestrator from DB: {e}", exc_info=True)
+        return None
+

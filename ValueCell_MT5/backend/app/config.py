@@ -73,7 +73,7 @@ class Settings(BaseSettings):
     PGSSLMODE: str = "require"
 
     # Track 1 pipeline
-    TRACK1_INTERVAL_SECONDS: int = 30   # How often to sync data (seconds)
+    TRACK1_INTERVAL_SECONDS: int = 60   # How often to sync data (seconds)
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-in-production"

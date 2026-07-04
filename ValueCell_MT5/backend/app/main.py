@@ -51,9 +51,10 @@ async def lifespan(app: FastAPI):
             logger.info("[DB] [OK] Neon PostgreSQL pool ready")
 
             # Start Track 1 real-time pipeline
-            # from app.services.pipeline import Track1Pipeline
-            # pipeline = Track1Pipeline(interval_seconds=settings.TRACK1_INTERVAL_SECONDS)
-            # await pipeline.start()
+            from app.services.pipeline import Track1Pipeline
+            pipeline = Track1Pipeline(interval_seconds=settings.TRACK1_INTERVAL_SECONDS)
+            await pipeline.start()
+
 
             # Start Track 2 CSV Watcher Service
             from app.services.csv_watcher_service import CSVWatcherService

@@ -496,7 +496,7 @@ class Track1Pipeline:
     Stop with `await pipeline.stop()`.
     """
 
-    def __init__(self, interval_seconds: int = 30):
+    def __init__(self, interval_seconds: int = 60):
         self.interval = interval_seconds
         self._task: Optional[asyncio.Task] = None
         self._running = False
@@ -547,134 +547,15 @@ class Track1Pipeline:
 
     def _run_cycle(self) -> None:
         """Synchronous cycle executed in a thread pool executor."""
-        from app.core.database import get_db_conn, is_pool_ready
-        from app.core.mt5_manager import MT5Manager
-
         self._cycle += 1
         cycle_start = datetime.utcnow()
-        logger.debug(f"[Track1] Cycle {self._cycle} start at {cycle_start.isoformat()}")
-
-        if not is_pool_ready():
-            logger.warning("[Track1] DB pool not ready — skipping cycle.")
-            return
-
-        mt5 = MT5Manager()
-        mt5_connected = mt5.connect()
-        if not mt5_connected:
-            logger.warning("[Track1] MT5 not connected — syncing skipped for this cycle.")
+        logger.info(f"[Track1] Cycle {self._cycle} start at {cycle_start.isoformat()}")
 
         try:
-            with get_db_conn() as conn:
-                total_ohlcv = 0
-                total_structures = 0
-
-                for tf in TIMEFRAMES:
-                    candles = mt5.get_candles(
-                        symbol="XAUUSD",
-                        timeframe=tf,
-                        count=CANDLE_COUNT,
-                    ) if mt5_connected else []
-
-                    if not candles:
-                        logger.debug(f"[Track1] No candles for {tf} — skipping.")
-                        continue
-
-                    # ── EMA-200 ───────────────────────────────────────────
-                    closes = [c["close"] for c in candles]
-                    emas = _compute_ema(closes, period=200)
-
-                    rows = []
-                    for i, c in enumerate(candles):
-                        rows.append(
-                            {
-                                "timestamp": datetime.utcfromtimestamp(c["time"]),
-                                "symbol":    "XAUUSD",
-                                "timeframe": tf,
-                                "open":      c["open"],
-                                "high":      c["high"],
-                                "low":       c["low"],
-                                "close":     c["close"],
-                                "volume":    c["volume"],
-                                "ema200":    round(emas[i], 2) if emas[i] else None,
-                                "source":    "mt5_api",
-                            }
-                        )
-
-                    with conn.cursor() as cur:
-                        n = _upsert_ohlcv(cur, rows)
-                        total_ohlcv += n
-
-                    conn.commit()
-
-                    # ── Simpan candles untuk OrchestratorService ──────────
-                    self._last_candles[tf] = candles
-
-                    # ── Market Structure Detection ────────────────────────
-                    new_events = self._swing_detector.detect(
-                        candles, tf, "XAUUSD"
-                    )
-
-                    if new_events:
-                        with conn.cursor() as cur:
-                            n = _insert_structures(cur, new_events)
-                            total_structures += n
-                        conn.commit()
-
-                # ── Open Positions Sync ───────────────────────────────────
-                positions_synced = 0
-                if mt5_connected:
-                    positions = mt5.get_positions()
-                    if positions:
-                        with conn.cursor() as cur:
-                            positions_synced = _upsert_trades(cur, positions)
-                        conn.commit()
-
-                # ── Agent Decision Snapshot ───────────────────────────────
-                self._record_agent_decision(conn)
-
-                elapsed = (datetime.utcnow() - cycle_start).total_seconds()
-                logger.info(
-                    f"[Track1] Cycle {self._cycle}: "
-                    f"ohlcv={total_ohlcv} | structures={total_structures} | "
-                    f"positions={positions_synced} | elapsed={elapsed:.1f}s"
-                )
-
+            from app.services.orchestrator_service import run_orchestrator_from_db
+            run_orchestrator_from_db("XAUUSD")
+            
+            elapsed = (datetime.utcnow() - cycle_start).total_seconds()
+            logger.info(f"[Track1] Cycle {self._cycle} completed in {elapsed:.1f}s")
         except Exception as exc:
-            import psycopg2.pool as _pgpool
-            if isinstance(exc, _pgpool.PoolError):
-                # Pool was closed during shutdown — not an error, just log debug
-                logger.debug(f"[Track1] Pool closed during cycle (shutdown race) — OK.")
-            else:
-                logger.error(f"[Track1] DB cycle error: {exc}", exc_info=True)
-        finally:
-            if mt5_connected:
-                mt5.disconnect()
-
-    def _record_agent_decision(self, conn) -> None:
-        """Record agent consensus snapshot menggunakan OrchestratorAgent nyata."""
-        try:
-            from app.services.orchestrator_service import build_agent_decision
-
-            candles_m15 = self._last_candles.get("M15", [])
-            candles_h1  = self._last_candles.get("H1", [])
-            candles_h4  = self._last_candles.get("H4", [])
-
-            decision = build_agent_decision(
-                candles_m15=candles_m15,
-                candles_h1=candles_h1 if candles_h1 else None,
-                candles_h4=candles_h4 if candles_h4 else None,
-                symbol="XAUUSD",
-            )
-
-            with conn.cursor() as cur:
-                _insert_agent_decision(cur, decision)
-                _insert_sentiment_log(cur, decision['timestamp'], decision['symbol'], decision['sentiment'])
-            conn.commit()
-
-            logger.debug(
-                f"[Track1] Agent decision recorded: "
-                f"{decision['final_decision']} (score={decision['consensus_score']:.4f})"
-            )
-
-        except Exception as exc:
-            logger.warning(f"[Track1] Agent decision snapshot failed: {exc}", exc_info=True)
+            logger.error(f"[Track1] DB cycle error: {exc}", exc_info=True)

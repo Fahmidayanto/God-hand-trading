@@ -1,85 +1,90 @@
-## 📐 ARCHITECTURE OVERVIEW (HYBRID APPROACH)```
+## 📐 ARCHITECTURE OVERVIEW (HYBRID APPROACH)
+```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                    MT5 ECOSYSTEM (SINGLE-TRACK SYSTEM)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  ┌────────────────────────────────────────────────────────────────┐    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │         MetaTrader 5 Terminal (Live Market Data)                │    │
 │  │  • OHLCV bars forming (M15/H1/H4)                              │    │
 │  │  • Price updates every tick                                     │    │
-│  └────────────────────────────────┬───────────────────────────────┘    │
-│                                   │                                    │
-│                                   ▼                                    │
-│  ┌────────────────────────────────────────────────────────────────┐    │
+│  └────────────────────────────────┬────────────────────────────────┘    │
+│                                   │                                    │ 
+│                                   ▼                                    │ 
+│  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  Dev_Bot_v11.cs (MQL5 EA)                                       │    │
 │  │  (Active - Deteksi + Trading)                                   │    │
 │  │  TRACK 2 SOURCE                                                 │    │
 │  │                                                                 │    │
-│  │  • HH/LL/CHoCH/BoS detection                                   │    │
+│  │  • HH/LL/CHoCH/BoS detection                                    │    │
 │  │  • Export 8 CSV per M15 close                                   │    │
 │  │  • Visual markers on chart                                      │    │
 │  │  • Trading execution (Buy/Sell)                                 │    │
 │  └────────────────────────────────┬───────────────────────────────┘    │
-│                                   │                                    │
-│                                   ▼ CSV Files (Backup)                 │
-│  ┌────────────────────────────────────────────────────────────────┐    │
+│                                   │                                    │ 
+│         Export .csv (Backtest_result - symlink dari MQL5/Files)        │ 
+│                                   ▼                                    │ 
+│  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  Backtest_result/                                               │    │
 │  │  ├── Backtest_Results_*.csv     ├── MarketData_M15_*.csv        │    │
 │  │  ├── Backtest_Summary_*.csv     ├── MarketData_H1_*.csv         │    │
 │  │  ├── LLHHBOSData_*.csv          ├── MarketData_H4_*.csv         │    │
 │  │  ├── MarketStructure_*.csv      └── SessionZone_*.csv           │    │
-│  └────────────────────────────────┬───────────────────────────────┘    │
+│  └────────────────────────────────┬────────────────────────────────┘    │
+│                                   │                                    │
+│                      CSV Watcher Service (ON) 📁                       │
+│                                   ▼                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │  Pemetaan File CSV ke NeonDB:                                   │    │
+│  │  ├── LLHHBOSData_*.csv       ──> Tabel: llhhbosdata_xauusd      │    │
+│  │  ├── Backtest_Results_*.csv  ──> Tabel: backtest_results_xauusd │    │
+│  │  ├── MarketData_M15_*.csv    ──> Tabel: marketdata_xauusd_m15   │    │
+│  │  ├── MarketData_H1_*.csv     ──> Tabel: marketdata_xauusd_h1    │    │
+│  │  ├── MarketData_H4_*.csv     ──> Tabel: marketdata_xauusd_h4    │    │
+│  │  ├── SessionZone_*.csv       ──> Tabel: sessionzone_xauusd      │    │
+│  │  └── Status Load             ──> Tabel: csv_load_log            │    │
+│  └────────────────────────────────┬────────────────────────────────┘    │
 │                                   │                                    │
 │                                   ▼                                    │
-│                     CSV Watcher Service (ON) 📁                        │
-│  ┌────────────────────────────────────────────────────────────────┐   │
-│  │                 KNOWLEDGE BASE (Storage)                        │   │
-│  │  ┌──────────────────────────────────────────────────────────┐  │   │
-│  │  │  LanceDB Collections:                                     │  │   │
-│  │  │  • historical_structures (pattern similarity search)     │  │   │
-│  │  │  • market_conditions (OHLCV + indicators)                │  │   │
-│  │  │  • session_patterns (session behaviors)                  │  │   │
-│  │  │  • trade_outcomes (ML training data)                     │  │   │
-│  │  │                                                           │  │   │
-│  │  │  Neon PostgreSQL Tables:                                  │  │   │
-│  │  │  └─ Audit Trail (from TRACK 2 - [ACTIVE]):                │  │   │
-│  │  │     • marketdata_xauusd_m15 / h1 / h4                     │  │   │
-│  │  │     • llhhbosdata_xauusd                                  │  │   │
-│  │  │     • backtest_results_xauusd                             │  │   │
-│  │  │     • sessionzone_xauusd                                  │  │   │
-│  │  │     • csv_load_log (tracking)                            │  │   │
-│  │  │     • cross_validation (Track 1 vs Track 2)             │  │   │
-│  │  └──────────────────────────────────────────────────────────┘  │   │
-│  └────────────────────────────────────────────────────────────────┘   │
-│                              ▼                                        │
-│  ┌────────────────────────────────────────────────────────────────┐   │
-│  │                    ORCHESTRATOR AGENT                          │   │
-│  │  (Coordinator - receives market data & triggers discussion)    │   │
-│  └────────────────┬──────────────────────────┬────────────────────┘   │
-│                   │                          │                        │
-│         ┌─────────┴─────────┬────────────────┴────────┬──────────┐    │
-│         ▼                   ▼                         ▼          ▼    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                 KNOWLEDGE BASE (Storage)                        │    │
+│  │  ┌───────────────────────────────────────────────────────────┐  │    │
+│  │  │  LanceDB Collections:                                     │  │    │
+│  │  │  • historical_structures (pattern similarity search)      │  │    │
+│  │  │  • market_conditions (OHLCV + indicators)                 │  │    │
+│  │  │  • session_patterns (session behaviors)                   │  │    │
+│  │  │  • trade_outcomes (ML training data)                      │  │    │
+│  │  └───────────────────────────────────────────────────────────┘  │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
+│                                   ▼                                    │
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    ORCHESTRATOR AGENT                          │    │
+│  │  (Coordinator - receives market data & triggers discussion)    │    │
+│  └────────────────┬──────────────────────────┬─────────────────────┘    │
+│                   │                          │                        │ 
+│         ┌─────────┴─────────┬────────────────┴────────┬───────────┐    │
+│         ▼                   ▼                         ▼           ▼    │
 │  ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓  ┏━━━━━━━┓  │
 │  ┃  MARKET     ┃    ┃  ML MODEL   ┃    ┃   RISK      ┃  ┃ SENT. ┃  │
 │  ┃ STRUCTURE   ┃    ┃ PREDICTION  ┃    ┃ MANAGEMENT  ┃  ┃ AGENT ┃  │
 │  ┃   AGENT     ┃    ┃   AGENT     ┃    ┃   AGENT     ┃  ┃       ┃  │
 │  ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛  ┗━━━━━━━┛  │
-│         │                   │                         │          │    │
-│         └─────────┬─────────┴────────────────┬────────┴──────────┘    │
-│                   ▼                          ▼                        │
-│  ┌────────────────────────────────────────────────────────────────┐   │
-│  │                    CONSENSUS ENGINE                            │   │
-│  │  • Weighted voting system                                      │   │
-│  │  • Conflict resolution logic                                   │   │
-│  │  • Confidence aggregation                                      │   │
-│  └────────────────────────────────┬───────────────────────────────┘   │
-│                                   ▼                                   │
-│  ┌────────────────────────────────────────────────────────────────┐   │
-│  │                   EXECUTION AGENT                              │   │
-│  │  • Order monitoring / logging                                  │   │
-│  │  • Position management                                         │   │
-│  │  • Risk controls (max position size, daily loss limit)         │   │
-│  └────────────────────────────────────────────────────────────────┘   │
+│         │                   │                         │           │    │
+│         └─────────┬─────────┴────────────────┬────────┴───────────┘    │
+│                   ▼                          ▼                        │ 
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                    CONSENSUS ENGINE                            │    │
+│  │  • Weighted voting system                                      │    │
+│  │  • Conflict resolution logic                                   │    │
+│  │  • Confidence aggregation                                      │    │
+│  └────────────────────────────────┬────────────────────────────────┘    │
+│                                   ▼                                   │ 
+│  ┌─────────────────────────────────────────────────────────────────┐    │
+│  │                   EXECUTION AGENT                              │    │
+│  │  • Order monitoring / logging                                  │    │
+│  │  • Position management                                         │    │
+│  │  • Risk controls (max position size, daily loss limit)         │    │
+│  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 

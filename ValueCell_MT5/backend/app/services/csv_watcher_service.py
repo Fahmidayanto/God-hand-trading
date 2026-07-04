@@ -3,6 +3,7 @@ CSV Watcher Service - Watches Backtest_result/ and loads updates into Neon Postg
 """
 
 import os
+import sys
 import csv
 import time
 import logging
@@ -78,6 +79,7 @@ class CSVWatcherService:
         
         self._running = False
         self._thread: Optional[threading.Thread] = None
+        self.lancedb = None
         
         # In-memory cache of file metadata: {file_path: (mtime, size)}
         self._file_metadata: Dict[Path, tuple] = {}
@@ -109,6 +111,20 @@ class CSVWatcherService:
         if not is_pool_ready():
             logger.error("❌ Neon DB Pool is not initialized. Watcher thread exiting.")
             return
+
+        # Initialize LanceDB connection
+        try:
+            project_root = self.backtest_dir.parent
+            lancedb_path = project_root / "ValueCell_MT5" / "python" / "valuecell" / "data" / "lancedb"
+            py_dir = str(project_root / "ValueCell_MT5" / "python")
+            if py_dir not in sys.path:
+                sys.path.insert(0, py_dir)
+                
+            from valuecell.knowledge.lance_db import LanceDBManager
+            self.lancedb = LanceDBManager(str(lancedb_path))
+            logger.info("✅ CSVWatcherService connected to LanceDB successfully.")
+        except Exception as e:
+            logger.error(f"❌ CSVWatcherService failed to connect to LanceDB: {e}", exc_info=True)
 
         # Phase 1: Startup Historical Scan (Option A)
         try:
@@ -274,6 +290,8 @@ class CSVWatcherService:
             if parsed_rows:
                 logger.info(f"📥 Loading {len(parsed_rows)} new rows from {filename} into {table_name}...")
                 self._bulk_insert_rows(parsed_rows, table_name)
+                # Option B: Sync NeonDB records to LanceDB
+                self._sync_to_lancedb_from_neondb(parsed_rows, table_name)
                 
             # Update log
             self._save_last_processed_line(filename, total_lines)
@@ -414,3 +432,255 @@ class CSVWatcherService:
         except Exception as e:
             logger.error(f"❌ Failed to bulk insert into {table_name}: {e}")
             raise e
+
+    def _sync_to_lancedb_from_neondb(self, parsed_rows: List[Dict[str, Any]], table_name: str):
+        """Option B: Fetch recently inserted NeonDB records and push them to LanceDB."""
+        if not self.lancedb or not parsed_rows:
+            return
+            
+        try:
+            if table_name == "llhhbosdata_xauusd":
+                logger.info(f"🔄 Syncing {len(parsed_rows)} structures from NeonDB to LanceDB...")
+                with get_db_conn() as conn:
+                    with conn.cursor() as cur:
+                        for row in parsed_rows:
+                            is_bullish = 'BULL' in str(row.get('direction_action', '')).upper() or 'HH' in str(row.get('type', '')).upper()
+                            expected_type = "BUY" if is_bullish else "SELL"
+                            
+                            query = """
+                                SELECT 
+                                    s.type, s.direction_action, s.price, s.time, s.timeframe, s.status,
+                                    COALESCE(m15.ema200, h1.ema200, h4.ema200, s.price) as ema200,
+                                    r.net_profit, r.session, r.entry_price, r.exit_price, r.entry_time, r.exit_time
+                                FROM llhhbosdata_xauusd s
+                                LEFT JOIN marketdata_xauusd_m15 m15 ON s.time = m15.time AND s.timeframe = 'M15'
+                                LEFT JOIN marketdata_xauusd_h1 h1 ON s.time = h1.time AND s.timeframe = 'H1'
+                                LEFT JOIN marketdata_xauusd_h4 h4 ON s.time = h4.time AND s.timeframe = 'H4'
+                                LEFT JOIN backtest_results_xauusd r ON r.symbol = 'XAUUSD' AND r.timeframe = s.timeframe AND r.type = %s 
+                                    AND r.entry_time >= s.time AND r.entry_time <= s.time + interval '1 hour'
+                                WHERE s.time = %s AND s.timeframe = %s AND s.type = %s AND s.price = %s
+                                LIMIT 1
+                            """
+                            cur.execute(query, (expected_type, row['time'], row['timeframe'], row['type'], row['price']))
+                            db_row = cur.fetchone()
+                            
+                            if db_row:
+                                s_type, s_dir, s_price, s_time, s_tf, s_status, ema200, net_profit, session, entry_pr, exit_pr, t_entry, t_exit = db_row
+                                
+                                event_type = "BoS"
+                                if "choch" in s_type.lower():
+                                    event_type = "CHoCH"
+                                elif "hh" in s_type.lower():
+                                    event_type = "HH"
+                                elif "ll" in s_type.lower():
+                                    event_type = "LL"
+                                    
+                                direction = "Bullish" if is_bullish else "Bearish"
+                                
+                                outcome = "PENDING"
+                                profit_pips = 0.0
+                                duration_minutes = 0
+                                norm_session = "London"
+                                
+                                if net_profit is not None:
+                                    outcome = "WIN" if float(net_profit) > 0 else "LOSS"
+                                    entry_pr = float(entry_pr or 0)
+                                    exit_pr = float(exit_pr or 0)
+                                    if expected_type == "BUY":
+                                        pips = (exit_pr - entry_pr) * 10.0
+                                    else:
+                                        pips = (entry_pr - exit_pr) * 10.0
+                                    profit_pips = round(pips, 2)
+                                    
+                                    try:
+                                        duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
+                                    except:
+                                        duration_minutes = 0
+                                    norm_session = self._normalize_session(session)
+                                else:
+                                    hour = s_time.hour
+                                    if 8 <= hour < 13:
+                                        norm_session = "London"
+                                    elif 13 <= hour < 22:
+                                        norm_session = "NewYork"
+                                    elif 22 <= hour or hour < 8:
+                                        norm_session = "Asia"
+                                        
+                                pattern_dict = {
+                                    "timestamp": s_time.isoformat(),
+                                    "symbol": "XAUUSD",
+                                    "timeframe": s_tf,
+                                    "event_type": event_type,
+                                    "direction": direction,
+                                    "price": float(s_price),
+                                    "ema200": float(ema200),
+                                    "session": norm_session,
+                                    "outcome": outcome,
+                                    "profit_pips": profit_pips,
+                                    "duration_minutes": duration_minutes
+                                }
+                                
+                                self.lancedb.add_structure_pattern(pattern_dict)
+                                
+            elif table_name == "backtest_results_xauusd":
+                logger.info(f"🔄 Syncing {len(parsed_rows)} trade outcomes from NeonDB to LanceDB...")
+                with get_db_conn() as conn:
+                    with conn.cursor() as cur:
+                        for row in parsed_rows:
+                            query = """
+                                SELECT ticket, symbol, type, entry_price, exit_price, net_profit, session, entry_time, exit_time, timeframe, status
+                                FROM backtest_results_xauusd
+                                WHERE entry_time = %s AND ticket = %s AND type = %s
+                                LIMIT 1
+                            """
+                            cur.execute(query, (row['entry_time'], row['ticket'], row['type']))
+                            db_row = cur.fetchone()
+                            
+                            if db_row:
+                                ticket, symbol, t_type, entry_pr, exit_pr, net_profit, session, t_entry, t_exit, tf, status = db_row
+                                
+                                entry_pr = float(entry_pr or 0)
+                                exit_pr = float(exit_pr or 0)
+                                net_profit = float(net_profit or 0)
+                                
+                                pips = 0.0
+                                if str(t_type) == "BUY":
+                                    pips = (exit_pr - entry_pr) * 10.0
+                                else:
+                                    pips = (entry_pr - exit_pr) * 10.0
+                                    
+                                outcome = "WIN" if net_profit > 0 else "LOSS"
+                                
+                                try:
+                                    duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
+                                except:
+                                    duration_minutes = 0
+                                    
+                                structure_event = "BoS"
+                                expected_dir = "Bullish" if str(t_type) == "BUY" else "Bearish"
+                                
+                                struct_query = """
+                                    SELECT type 
+                                    FROM llhhbosdata_xauusd
+                                    WHERE timeframe = %s AND time <= %s AND time >= %s - interval '1 hour'
+                                    ORDER BY time DESC
+                                    LIMIT 1
+                                """
+                                cur.execute(struct_query, (tf, t_entry, t_entry))
+                                s_row = cur.fetchone()
+                                if s_row:
+                                    raw_type = str(s_row[0]).strip()
+                                    if "choch" in raw_type.lower():
+                                        structure_event = "CHoCH"
+                                    elif "hh" in raw_type.lower():
+                                        structure_event = "HH"
+                                    elif "ll" in raw_type.lower():
+                                        structure_event = "LL"
+                                        
+                                trade_dict = {
+                                    "ticket": int(ticket) if ticket is not None else 0,
+                                    "timestamp": t_entry.isoformat(),
+                                    "symbol": "XAUUSD",
+                                    "type": str(t_type),
+                                    "entry_price": entry_pr,
+                                    "exit_price": exit_pr,
+                                    "profit_pips": round(pips, 2),
+                                    "duration_minutes": duration_minutes,
+                                    "outcome": outcome,
+                                    "structure_event": structure_event,
+                                    "session": self._normalize_session(session),
+                                    "consensus_score": 0.80
+                                }
+                                
+                                self.lancedb.add_trade_outcome(trade_dict)
+                                
+                        self._recalculate_session_patterns(cur)
+
+            # Trigger hybrid orchestrator run
+            if table_name in ("llhhbosdata_xauusd", "backtest_results_xauusd"):
+                try:
+                    logger.info(f"⚡ Hybrid trigger: new records loaded in {table_name}. Executing orchestrator decision...")
+                    from app.services.orchestrator_service import run_orchestrator_from_db
+                    run_orchestrator_from_db("XAUUSD")
+                except Exception as trigger_err:
+                    logger.warning(f"⚠️ Failed to trigger hybrid orchestrator: {trigger_err}")
+                        
+        except Exception as e:
+            logger.error(f"❌ Failed to sync to LanceDB: {e}", exc_info=True)
+
+    def _normalize_session(self, raw_session: str) -> str:
+        if not isinstance(raw_session, str):
+            return "London"
+        raw_lower = raw_session.lower()
+        if "london" in raw_lower:
+            return "London"
+        elif "newyork" in raw_lower or "new_york" in raw_lower:
+            return "NewYork"
+        elif "asia" in raw_lower or "tokyo" in raw_lower or "sydney" in raw_lower:
+            return "Asia"
+        return "London"
+
+    def _recalculate_session_patterns(self, cur):
+        """Recalculate stats per session and update LanceDB session_patterns table."""
+        if not self.lancedb:
+            return
+            
+        logger.info("🔄 Recalculating session patterns in LanceDB...")
+        try:
+            cur.execute("""
+                SELECT 
+                    session,
+                    COUNT(*) as total_trades,
+                    SUM(CASE WHEN net_profit > 0 THEN 1 ELSE 0 END) as wins,
+                    AVG(CASE WHEN type = 'BUY' THEN (exit_price - entry_price)*10.0 ELSE (entry_price - exit_price)*10.0 END) as avg_profit_pips
+                FROM backtest_results_xauusd
+                GROUP BY session
+            """)
+            rows = cur.fetchall()
+            
+            sessions_data = []
+            for r in rows:
+                session_name, total, wins, avg_profit = r
+                if not session_name:
+                    continue
+                norm_name = self._normalize_session(session_name)
+                win_rate = float(wins) / float(total) if total > 0 else 0.50
+                
+                cur.execute("""
+                    SELECT s.type
+                    FROM backtest_results_xauusd r
+                    JOIN llhhbosdata_xauusd s ON s.timeframe = r.timeframe AND s.time <= r.entry_time AND s.time >= r.entry_time - interval '1 hour'
+                    WHERE r.session = %s
+                    GROUP BY s.type
+                    ORDER BY COUNT(*) DESC
+                    LIMIT 1
+                """, (session_name,))
+                s_row = cur.fetchone()
+                best_event = "BoS"
+                if s_row:
+                    raw_type = str(s_row[0]).strip()
+                    if "choch" in raw_type.lower():
+                        best_event = "CHoCH"
+                    elif "hh" in raw_type.lower():
+                        best_event = "HH"
+                    elif "ll" in raw_type.lower():
+                        best_event = "LL"
+                        
+                sessions_data.append({
+                    "id": f"session_{norm_name}",
+                    "session": norm_name,
+                    "date": datetime.now().date().isoformat(),
+                    "win_rate": float(win_rate),
+                    "avg_profit_pips": float(avg_profit or 0.0),
+                    "total_trades": int(total),
+                    "best_event_type": best_event,
+                    "vector": [0.0] * 4
+                })
+                
+            if sessions_data:
+                self.lancedb.clear_collection("session_patterns")
+                table_sp = self.lancedb.db.open_table("session_patterns")
+                table_sp.add(sessions_data)
+                logger.info("✅ LanceDB session_patterns updated successfully.")
+        except Exception as e:
+            logger.error(f"❌ Failed to recalculate session patterns: {e}", exc_info=True)
