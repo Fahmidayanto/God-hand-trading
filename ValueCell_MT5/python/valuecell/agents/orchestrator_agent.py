@@ -155,10 +155,18 @@ class OrchestratorAgent:
             if "ml_prediction" in self.agents and agent_results.get("market_structure"):
                 logger.info("🤖 Step 2: ML Prediction Validation...")
                 
-                # Only validate if market structure gave a signal
+                # Only validate if market structure gave a signal or pre_signal warm-up is active
                 ms_signal = agent_results["market_structure"]["signal"]
+                pre_signal = agent_results["market_structure"].get("pre_signal")
+                is_warmup = ms_signal == "HOLD" and pre_signal is not None
                 
-                if ms_signal in ["BUY", "SELL"]:
+                if ms_signal in ["BUY", "SELL"] or is_warmup:
+                    target_signal = ms_signal
+                    if is_warmup:
+                        pre_dir = pre_signal.get("direction", "Bullish")
+                        target_signal = "BUY" if pre_dir == "Bullish" else "SELL"
+                        logger.info(f"   → Warm-up mode activated for {target_signal}")
+
                     ml_result = self.agents["ml_prediction"].analyze(
                         market_data={
                             "current_bar": market_data["current_bar"],
@@ -166,12 +174,15 @@ class OrchestratorAgent:
                             "h1_data": market_data.get("h1_data"),
                             "m15_history": market_data.get("m15_history")
                         },
-                        structure_signal=ms_signal,
+                        structure_signal=target_signal,
                         symbol=symbol,
                         timeframe=timeframe
                     )
                     agent_results["ml_prediction"] = ml_result
-                    logger.info(f"   → Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                    if is_warmup:
+                        logger.info(f"   → Warm-up ML Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                    else:
+                        logger.info(f"   → Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
                 else:
                     logger.info(f"   → Skipped (MS signal: {ms_signal})")
             
@@ -182,9 +193,23 @@ class OrchestratorAgent:
                 ms_result = agent_results["market_structure"]
                 ml_result = agent_results.get("ml_prediction")
                 
-                # Use ML confidence if available, otherwise MS confidence
-                base_confidence = ml_result["confidence"] if ml_result else ms_result["confidence"]
-                base_signal = ml_result["signal"] if ml_result else ms_result["signal"]
+                # Check for pre_signal warmup
+                ms_signal = ms_result["signal"]
+                pre_signal = ms_result.get("pre_signal")
+                is_warmup = ms_signal == "HOLD" and pre_signal is not None
+                
+                base_confidence = ms_result["confidence"]
+                base_signal = ms_signal
+                
+                if is_warmup:
+                    pre_dir = pre_signal.get("direction", "Bullish")
+                    base_signal = "BUY" if pre_dir == "Bullish" else "SELL"
+                    base_confidence = pre_signal.get("initial_confidence", 0.40)
+                    
+                if ml_result:
+                    # In normal or warmup mode, ML overrides if it ran
+                    base_confidence = ml_result["confidence"]
+                    base_signal = ml_result["signal"]
                 
                 if base_signal in ["BUY", "SELL"]:
                     sentiment_result = self.agents["sentiment"].analyze(
@@ -196,7 +221,10 @@ class OrchestratorAgent:
                         symbol=symbol
                     )
                     agent_results["sentiment"] = sentiment_result
-                    logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    if is_warmup:
+                        logger.info(f"   → Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    else:
+                        logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
                 else:
                     logger.info(f"   → Skipped (signal: {base_signal})")
             
@@ -326,7 +354,14 @@ class OrchestratorAgent:
         
         # Determine winning signal
         final_signal = max(vote_scores, key=vote_scores.get)
-        final_score = vote_scores[final_signal]
+        
+        # Force final_signal to HOLD if Market Structure signal is HOLD (pre-analysis / warm-up)
+        ms_signal = agent_results.get("market_structure", {}).get("signal", "HOLD")
+        if ms_signal == "HOLD":
+            final_signal = "HOLD"
+            final_score = vote_scores["HOLD"]
+        else:
+            final_score = vote_scores[final_signal]
         
         # Calculate consensus level
         total_possible = (VoteWeight.MARKET_STRUCTURE.value +
