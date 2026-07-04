@@ -65,6 +65,12 @@ export default function RongsokanPage() {
     step: string;
     total: number;
   }>({ visible: false, percent: 0, step: '', total: 0 });
+  const [drawLineProgress, setDrawLineProgress] = useState<{
+    visible: boolean;
+    percent: number;
+    current: number;
+    total: number;
+  }>({ visible: false, percent: 0, current: 0, total: 0 });
   
   // Data loading mode state
   const [dataMode, setDataMode] = useState<'recent' | 'full' | 'window'>('recent');
@@ -747,6 +753,7 @@ export default function RongsokanPage() {
       let buffer = '';
       let completeData: any = null;
 
+      let hasComplete = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -767,6 +774,13 @@ export default function RongsokanPage() {
             };
           } else if (msg.type === 'complete') {
             completeData = msg.data;
+            latestProgressRef.current = {
+              percent: 100,
+              step: 'Rendering...',
+              total: msg.data.candles?.length || 0,
+            };
+            hasComplete = true;
+            break;
           } else if (msg.type === 'error') {
             console.error('Backend error:', msg.message);
             setDataMode('recent');
@@ -778,6 +792,7 @@ export default function RongsokanPage() {
             await new Promise(r => setTimeout(r, 0));
           }
         }
+        if (hasComplete) break;
       }
 
       if (!completeData) throw new Error('No complete event received');
@@ -797,8 +812,16 @@ export default function RongsokanPage() {
           }, 0);
         }
         setDataMode('full');
+
+        // Close download popup first
+        latestProgressRef.current = { percent: 100, step: '', total: 0 };
+        setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
+
+        // Yield control to let Popup 1 close fully
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         if (showStructure && structureLines) {
-          requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+          await overlayMarketStructure(processedCandles, true);
         }
         fullDataDisplayedRef.current[cacheKey] = true;
       }
@@ -806,7 +829,6 @@ export default function RongsokanPage() {
       console.error('Stream error:', error);
       setDataMode('recent');
     } finally {
-      latestProgressRef.current = { percent: 100, step: '', total: 0 };
       setLoadProgress({ visible: false, percent: 100, step: '', total: 0 });
     }
   };
@@ -845,7 +867,7 @@ export default function RongsokanPage() {
             // Scroll first, overlay draws in next frame — prevents 1.5s freeze before scroll
             focusChartOnDate(centerDate, 50, cachedData.candles);
             if (showStructure && structureLines) {
-              requestAnimationFrame(() => overlayMarketStructure(cachedData.candles, true));
+              await overlayMarketStructure(cachedData.candles, true);
             }
           } else {
             // Data & overlay already on chart — instant scroll
@@ -899,7 +921,7 @@ export default function RongsokanPage() {
           
           // Defer overlay to next frame so scroll renders first without freeze
           if (showStructure && structureLines) {
-            requestAnimationFrame(() => overlayMarketStructure(processedCandles, true));
+            await overlayMarketStructure(processedCandles, true);
           }
           console.log(`✅ Jumped to ${centerDate} successfully`);
         }
@@ -976,8 +998,8 @@ export default function RongsokanPage() {
 
       if (visibleRange) {
         const tempRange = {
-          from: (visibleRange.from as number) - 0.0001,
-          to: (visibleRange.to as number) + 0.0001,
+          from: ((visibleRange.from as number) - 0.0001) as any,
+          to: ((visibleRange.to as number) + 0.0001) as any,
         };
         console.log("  Setting temp range:", tempRange);
         timeScale.setVisibleRange(tempRange);
@@ -1029,6 +1051,8 @@ export default function RongsokanPage() {
   // Store the latest labels so they can be re-rendered when the user pans/zooms
   const structureLabelsRef = useRef<Array<{
     time: number;
+    startTime: number;
+    endTime: number;
     price: number;
     color: string;
     text: string;
@@ -1205,7 +1229,7 @@ export default function RongsokanPage() {
     renderTradesLabels(trades);
   };
 
-  const overlayMarketStructure = (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
+  const overlayMarketStructure = async (candles?: Array<{time: number, open: number, high: number, low: number, close: number}>, forceRefresh = false) => {
     if (!chartRef.current || !showStructure || !structureLines) return;
     
     // Prevent concurrent executions
@@ -1426,7 +1450,7 @@ export default function RongsokanPage() {
         
         const lineOptions = {
           color,
-          lineWidth,
+          lineWidth: lineWidth as any,
           lineStyle,
           priceLineVisible: false,
           lastValueVisible: false, // Remove right-side price badges to prevent overlap with candles
@@ -1440,7 +1464,7 @@ export default function RongsokanPage() {
         lineData.push({ time: endTimeSeconds, value: price }); // End point
 
         const lineSeries = chartRef.current!.addSeries(LineSeries, lineOptions);
-        lineSeries.setData(lineData);
+        lineSeries.setData(lineData as any);
 
         // Collect label info for HTML overlay in the middle of the line
         // Use binary search to find nearest candle to midpoint — avoids O(n) scan
@@ -1536,62 +1560,58 @@ export default function RongsokanPage() {
       return matchTime;
     };
 
-    // Drawing strategy mirrors the Trades page: draw EVERY BoS and EVERY CHoCH
-    // line (they never suppress each other, even at the same price), then draw
-    // HH/LL but skip any whose price matches an existing BoS/CHoCH level
-    // (the BoS/CHoCH line already represents that level — dedup only HH/LL).
+    // Collect all lines to draw
+    const linesToDraw: Array<{
+      price: number;
+      timestamp: number;
+      color: string;
+      lineWidth: number;
+      lineStyle: number;
+      label: string;
+      lineType?: 'HH' | 'LL' | 'BOS_CHOCH';
+      levelFormationTime?: number;
+    }> = [];
 
-    // Add BoS lines
-    let bosAdded = 0;
+    // Add BoS lines to queue
     filteredBosLines.forEach((bos) => {
       const color = bos.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       const formationTime = bos.price
         ? findLevelFormationTime(bos.price, bos.direction)
         : undefined;
-      if (createHorizontalLine(
-        bos.price,
-        bos.timestamp,
+      linesToDraw.push({
+        price: bos.price,
+        timestamp: bos.timestamp,
         color,
-        2,
-        LineStyle.Solid,
-        `BoS ${bos.price.toFixed(2)}`,
-        'BOS_CHOCH',
-        formationTime,
-      )) {
-        bosAdded++;
-      }
+        lineWidth: 2,
+        lineStyle: LineStyle.Solid,
+        label: `BoS ${bos.price.toFixed(2)}`,
+        lineType: 'BOS_CHOCH',
+        levelFormationTime: formationTime,
+      });
     });
 
-    // Add CHoCH lines
-    let chochAdded = 0;
+    // Add CHoCH lines to queue
     filteredChochLines.forEach((choch) => {
       const color = choch.direction === 'BULLISH' ? '#10b981' : '#ef4444';
       const formationTime = choch.price
         ? findLevelFormationTime(choch.price, choch.direction)
         : undefined;
-      if (createHorizontalLine(
-        choch.price,
-        choch.timestamp,
+      linesToDraw.push({
+        price: choch.price,
+        timestamp: choch.timestamp,
         color,
-        2,
-        LineStyle.Dashed,
-        `CHoCH ${choch.price.toFixed(2)}`,
-        'BOS_CHOCH',
-        formationTime,
-      )) {
-        chochAdded++;
-      }
+        lineWidth: 2,
+        lineStyle: LineStyle.Dashed,
+        label: `CHoCH ${choch.price.toFixed(2)}`,
+        lineType: 'BOS_CHOCH',
+        levelFormationTime: formationTime,
+      });
     });
 
-    // Dedup (Opsi A, TIME-SCOPED): sembunyikan HH/LL hanya jika ada BoS/CHoCH se-level
-    // yang men-BREAK level itu — yaitu BoS/CHoCH yang terjadi SETELAH formasi HH/LL dan
-    // dalam window waktu wajar (swing yang sama). Tanpa scope waktu, BoS/CHoCH dari bulan
-    // lain yang kebetulan se-level (mis. BoS 4475.71 Jan vs HH 4475.77 Jun, beda 0.06 USD)
-    // ikut menyembunyikan HH/LL → garis hilang. BoS/CHoCH SELALU tetap digambar penuh.
+    // Dedup (Opsi A, TIME-SCOPED)
     const PRICE_TOLERANCE = 0.05;
-    const DEDUP_TIME_WINDOW_SEC = 7 * 24 * 3600; // 7 hari: rentang wajar HH/LL → break-nya
+    const DEDUP_TIME_WINDOW_SEC = 7 * 24 * 3600; // 7 hari
     const toSec = (t: number) => (t > 1e10 ? Math.floor(t / 1000) : t);
-    // bucket harga → daftar timestamp (detik) event BoS/CHoCH di level itu
     const bosChochByBucket = new Map<number, number[]>();
     [...filteredBosLines, ...filteredChochLines].forEach((evt) => {
       if (evt.price == null || evt.timestamp == null) return;
@@ -1604,8 +1624,6 @@ export default function RongsokanPage() {
       if (bosChochByBucket.size === 0) return false;
       const key = Math.round(price / PRICE_TOLERANCE);
       const lt = toSec(levelTime);
-      // Cek bucket eksak + tetangga (floating point), tapi hanya match BoS/CHoCH yang
-      // terjadi SETELAH level terbentuk dan dalam window (= break swing yang sama).
       for (const k of [key - 1, key, key + 1]) {
         const arr = bosChochByBucket.get(k);
         if (!arr) continue;
@@ -1616,9 +1634,6 @@ export default function RongsokanPage() {
       return false;
     };
 
-    // Dedup HH/LL points that repeat at the same price (CSV emits an "Update"
-    // row each time a swing is re-touched). Keep the OLDEST occurrence — that's
-    // the candle where the level first formed, which is where its line starts.
     const dedupKeepOldest = <T extends { price: number; timestamp: number }>(points: T[]): T[] => {
       const byPrice = new Map<number, T>();
       for (const p of points) {
@@ -1632,48 +1647,83 @@ export default function RongsokanPage() {
     const dedupedLlPoints = dedupKeepOldest(filteredLlPoints);
 
     // Add HH lines (skip those overlapping a BoS/CHoCH level)
-    let hhAdded = 0;
-    let hhSkippedByDup = 0;
     dedupedHhPoints.forEach((hh) => {
-      if (priceMatchesBosChoch(hh.price, hh.timestamp)) {
-        hhSkippedByDup++;
-        return;
-      }
+      if (priceMatchesBosChoch(hh.price, hh.timestamp)) return;
       const isH1 = hh.timeframe === 'H1';
-      if (createHorizontalLine(
-        hh.price,
-        hh.timestamp,
-        isH1 ? '#1e40af' : '#60a5fa',
-        isH1 ? 2 : 1.5,
-        isH1 ? LineStyle.Dashed : LineStyle.Dotted,
-        `HH [${hh.timeframe}] ${hh.price.toFixed(2)}`,
-        'HH',
-      )) {
-        hhAdded++;
-      }
+      linesToDraw.push({
+        price: hh.price,
+        timestamp: hh.timestamp,
+        color: isH1 ? '#1e40af' : '#60a5fa',
+        lineWidth: isH1 ? 2 : 1.5,
+        lineStyle: isH1 ? LineStyle.Dashed : LineStyle.Dotted,
+        label: `HH [${hh.timeframe}] ${hh.price.toFixed(2)}`,
+        lineType: 'HH',
+      });
     });
 
     // Add LL lines (skip those overlapping a BoS/CHoCH level)
-    let llAdded = 0;
-    let llSkippedByDup = 0;
     dedupedLlPoints.forEach((ll) => {
-      if (priceMatchesBosChoch(ll.price, ll.timestamp)) {
-        llSkippedByDup++;
-        return;
-      }
+      if (priceMatchesBosChoch(ll.price, ll.timestamp)) return;
       const isH1 = ll.timeframe === 'H1';
-      if (createHorizontalLine(
-        ll.price,
-        ll.timestamp,
-        isH1 ? '#c2410c' : '#fb923c',
-        isH1 ? 2 : 1.5,
-        isH1 ? LineStyle.Dashed : LineStyle.Dotted,
-        `LL [${ll.timeframe}] ${ll.price.toFixed(2)}`,
-        'LL',
-      )) {
-        llAdded++;
-      }
+      linesToDraw.push({
+        price: ll.price,
+        timestamp: ll.timestamp,
+        color: isH1 ? '#c2410c' : '#fb923c',
+        lineWidth: isH1 ? 2 : 1.5,
+        lineStyle: isH1 ? LineStyle.Dashed : LineStyle.Dotted,
+        label: `LL [${ll.timeframe}] ${ll.price.toFixed(2)}`,
+        lineType: 'LL',
+      });
     });
+
+    const totalLines = linesToDraw.length;
+    let bosAdded = 0;
+    let chochAdded = 0;
+    let hhAdded = 0;
+    let llAdded = 0;
+
+    // Show drawing progress popup
+    setDrawLineProgress({ visible: true, percent: 0, current: 0, total: totalLines });
+
+    // Draw in chunks of 20 lines to keep progress animation smooth
+    const chunkSize = 20;
+    for (let startIdx = 0; startIdx < totalLines; startIdx += chunkSize) {
+      const endIdx = Math.min(startIdx + chunkSize, totalLines);
+      
+      for (let j = startIdx; j < endIdx; j++) {
+        const line = linesToDraw[j];
+        const success = createHorizontalLine(
+          line.price,
+          line.timestamp,
+          line.color,
+          line.lineWidth,
+          line.lineStyle,
+          line.label,
+          line.lineType,
+          line.levelFormationTime,
+        );
+        if (success) {
+          if (line.lineType === 'BOS_CHOCH') {
+            if (line.label.startsWith('BoS')) bosAdded++;
+            else chochAdded++;
+          } else if (line.lineType === 'HH') {
+            hhAdded++;
+          } else if (line.lineType === 'LL') {
+            llAdded++;
+          }
+        }
+      }
+
+      // Update progress state
+      const percent = Math.round((endIdx / totalLines) * 100);
+      setDrawLineProgress({ visible: true, percent, current: endIdx, total: totalLines });
+
+      // Yield control (10ms)
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    // Hide progress popup
+    setDrawLineProgress({ visible: false, percent: 100, current: totalLines, total: totalLines });
 
     // Render all collected labels as HTML overlay on the chart container
     renderStructureLabelsOverlay(structureLabels);
@@ -1685,7 +1735,6 @@ export default function RongsokanPage() {
       hh: hhAdded,
       ll: llAdded,
       total: bosAdded + chochAdded + hhAdded + llAdded,
-      skippedByDup: { hh: hhSkippedByDup, ll: llSkippedByDup },
     });
     console.log('Total line series:', structureSeriesRef.current.length);
     
@@ -1955,6 +2004,57 @@ export default function RongsokanPage() {
           </div>
         </div>
       </div>
+
+      {/* Progress popup for Load Full History */}
+      {loadProgress.visible && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
+            <div className="text-center mb-4">
+              <div className="text-purple-300 font-semibold text-sm mb-2">
+                📅 Loading Full History
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {loadProgress.percent}%
+              </div>
+              <div className="text-xs text-gray-400">{loadProgress.step}</div>
+              <div className="text-[10px] text-gray-500 mt-1">
+                {loadProgress.total.toLocaleString()} total rows
+              </div>
+            </div>
+            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                style={{ width: `${loadProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Progress popup for Drawing Lines */}
+      {drawLineProgress.visible && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-900 border border-cyan-500/30 rounded-xl p-6 shadow-2xl w-96">
+            <div className="text-center mb-4">
+              <div className="text-cyan-300 font-semibold text-sm mb-2">
+                ✍️ Drawing Structure Lines
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {drawLineProgress.percent}%
+              </div>
+              <div className="text-xs text-gray-400">
+                Drawing line {drawLineProgress.current} of {drawLineProgress.total}
+              </div>
+            </div>
+            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                style={{ width: `${drawLineProgress.percent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

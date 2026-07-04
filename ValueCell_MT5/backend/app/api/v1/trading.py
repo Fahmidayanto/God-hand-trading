@@ -960,7 +960,7 @@ async def get_session_zones(
         )
 
         return {
-            "zones": all_zones[:12000],  # Increased to cover 2020-2026 (11,985 zones)
+            "zones": all_zones,
             "total_zones": len(all_zones),
         }
 
