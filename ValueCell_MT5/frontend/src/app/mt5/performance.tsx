@@ -70,6 +70,26 @@ export default function PerformancePage() {
   const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [isYearOpen, setIsYearOpen] = useState(false);
+  const [isMonthOpen, setIsMonthOpen] = useState(false);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
+  const monthDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(event.target as Node)) {
+        setIsYearOpen(false);
+      }
+      if (monthDropdownRef.current && !monthDropdownRef.current.contains(event.target as Node)) {
+        setIsMonthOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [initialBalance, setInitialBalance] = useState<number>(1000);
   const [summary, setSummary] = useState<{
     max_drawdown: number; profit_factor: number; win_rate: number;
@@ -415,73 +435,141 @@ export default function PerformancePage() {
 
             <div className="relative flex flex-wrap gap-4 items-end">
               {/* Year */}
-              <div className="flex flex-col gap-2 min-w-[160px] flex-1">
+              <div className="flex flex-col gap-2 min-w-[160px] flex-1" ref={yearDropdownRef}>
                 <label className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-semibold">
                   <Calendar className="w-3.5 h-3.5 text-[var(--neon-cyan)]" />
                   Year
                 </label>
                 <div className="relative group">
-                  <select
-                    value={selectedYear ?? ''}
-                    onChange={(e) => setSelectedYear(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full appearance-none pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-medium focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 cursor-pointer"
+                  <button
+                    onClick={() => {
+                      setIsYearOpen(!isYearOpen);
+                      setIsMonthOpen(false);
+                    }}
+                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.4)] backdrop-blur-md border border-[rgba(6,182,212,0.2)] hover:border-[var(--neon-cyan)] hover:shadow-[0_0_12px_rgba(6,182,212,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
                   >
-                    <option value="">All Years</option>
-                    {availableYears.map((year) => (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    ))}
-                  </select>
+                    <span>{selectedYear ? selectedYear : "All Years"}</span>
+                  </button>
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                     <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[rgba(6,182,212,0.18)] to-[rgba(59,130,246,0.18)] border border-[rgba(6,182,212,0.3)]">
                       <CalendarDays className="w-4 h-4 text-[var(--neon-cyan)]" />
                     </div>
                   </div>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-blue)] transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-cyan)] transition-colors">
+                    <svg className={`w-4 h-4 transform transition-transform duration-200 ${isYearOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
+                  
+                  {isYearOpen && (
+                    <div className="absolute z-50 w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(6,182,212,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(6,182,212,0.15)] overflow-hidden transition-all max-h-60 overflow-y-auto">
+                      <div
+                        onClick={() => {
+                          setSelectedYear(null);
+                          setIsYearOpen(false);
+                        }}
+                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between ${
+                          selectedYear === null ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
+                        }`}
+                      >
+                        <span>All Years</span>
+                        {selectedYear === null && <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]" />}
+                      </div>
+                      {availableYears.map((year) => (
+                        <div
+                          key={year}
+                          onClick={() => {
+                            setSelectedYear(year);
+                            setIsYearOpen(false);
+                          }}
+                          className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between ${
+                            selectedYear === year ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
+                          }`}
+                        >
+                          <span>{year}</span>
+                          {selectedYear === year && <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Month */}
-              <div className="flex flex-col gap-2 min-w-[160px] flex-1">
+              <div className="flex flex-col gap-2 min-w-[160px] flex-1" ref={monthDropdownRef}>
                 <label className="flex items-center gap-2 text-[11px] text-[var(--text-tertiary)] uppercase tracking-[0.15em] font-semibold">
                   <Layers className="w-3.5 h-3.5 text-[var(--neon-purple)]" />
                   Month
                 </label>
                 <div className="relative group">
-                  <select
-                    value={selectedMonth ?? ''}
-                    onChange={(e) => setSelectedMonth(e.target.value ? parseInt(e.target.value) : null)}
-                    className="w-full appearance-none pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-medium focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 cursor-pointer"
+                  <button
+                    onClick={() => {
+                      setIsMonthOpen(!isMonthOpen);
+                      setIsYearOpen(false);
+                    }}
+                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.4)] backdrop-blur-md border border-[rgba(168,85,247,0.2)] hover:border-[var(--neon-purple)] hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
                   >
-                    <option value="">All Months</option>
-                    <option value="1">January</option>
-                    <option value="2">February</option>
-                    <option value="3">March</option>
-                    <option value="4">April</option>
-                    <option value="5">May</option>
-                    <option value="6">June</option>
-                    <option value="7">July</option>
-                    <option value="8">August</option>
-                    <option value="9">September</option>
-                    <option value="10">October</option>
-                    <option value="11">November</option>
-                    <option value="12">December</option>
-                  </select>
+                    <span>
+                      {selectedMonth
+                        ? ['January','February','March','April','May','June','July','August','September','October','November','December'][selectedMonth - 1]
+                        : "All Months"}
+                    </span>
+                  </button>
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                     <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-[rgba(139,92,246,0.18)] to-[rgba(59,130,246,0.18)] border border-[rgba(139,92,246,0.3)]">
-                      <CalendarDays className="w-4 h-4 text-[var(--neon-purple)]" />
+                      <Layers className="w-4 h-4 text-[var(--neon-purple)]" />
                     </div>
                   </div>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-blue)] transition-colors">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-[var(--text-tertiary)] group-hover:text-[var(--neon-purple)] transition-colors">
+                    <svg className={`w-4 h-4 transform transition-transform duration-200 ${isMonthOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
+                  
+                  {isMonthOpen && (
+                    <div className="absolute z-50 w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(168,85,247,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.15)] overflow-hidden transition-all max-h-60 overflow-y-auto">
+                      <div
+                        onClick={() => {
+                          setSelectedMonth(null);
+                          setIsMonthOpen(false);
+                        }}
+                        className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between ${
+                          selectedMonth === null ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
+                        }`}
+                      >
+                        <span>All Months</span>
+                        {selectedMonth === null && <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-purple)] shadow-[0_0_6px_var(--neon-purple)]" />}
+                      </div>
+                      {[
+                        { val: 1, label: 'January' },
+                        { val: 2, label: 'February' },
+                        { val: 3, label: 'March' },
+                        { val: 4, label: 'April' },
+                        { val: 5, label: 'May' },
+                        { val: 6, label: 'June' },
+                        { val: 7, label: 'July' },
+                        { val: 8, label: 'August' },
+                        { val: 9, label: 'September' },
+                        { val: 10, label: 'October' },
+                        { val: 11, label: 'November' },
+                        { val: 12, label: 'December' },
+                      ].map((month) => (
+                        <div
+                          key={month.val}
+                          onClick={() => {
+                            setSelectedMonth(month.val);
+                            setIsMonthOpen(false);
+                          }}
+                          className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between ${
+                            selectedMonth === month.val ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
+                          }`}
+                        >
+                          <span>{month.label}</span>
+                          {selectedMonth === month.val && <span className="w-1.5 h-1.5 rounded-full bg-[var(--neon-purple)] shadow-[0_0_6px_var(--neon-purple)]" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
