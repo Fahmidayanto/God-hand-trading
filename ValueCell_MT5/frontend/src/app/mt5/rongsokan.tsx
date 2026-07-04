@@ -19,6 +19,10 @@ import {
   TradesOverlayPrimitive,
   type TradeOverlayEntry,
 } from "@/components/valuecell/charts/trades-overlay-primitive";
+import {
+  StructureLinesPrimitive,
+  type StructureLineItem,
+} from "@/components/valuecell/charts/structure-lines-primitive";
 import MT5Footer from "./components/MT5Footer";
 import ChartToolbar from "./components/ChartToolbar";
 
@@ -170,6 +174,7 @@ export default function RongsokanPage() {
   const ema200SeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const structureSeriesRef = useRef<ISeriesApi<"Line">[]>([]); // Line series for structure
   const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
+  const structurePrimitiveRef = useRef<StructureLinesPrimitive | null>(null);
   const tradesPrimitiveRef = useRef<TradesOverlayPrimitive | null>(null);
   // ponytail: shares overlayGuardRef with structure, no separate guard needed
   
@@ -414,15 +419,14 @@ export default function RongsokanPage() {
           console.warn("Could not attach session zones primitive:", e);
         }
         
-        // Re-render structure labels with 50ms debounce when user pans/zooms
-        // Prevents DOM churn at 60fps (innerHTML='' + createElement per label per frame)
-        chart.timeScale().subscribeVisibleLogicalRangeChange(() => {
-          if (scrollLabelDebounceRef.current) clearTimeout(scrollLabelDebounceRef.current);
-          scrollLabelDebounceRef.current = setTimeout(
-            () => renderStructureLabelsOverlay(structureLabelsRef.current),
-            50
-          );
-        });
+        // Attach the structure lines primitive.
+        try {
+          const structPrimitive = new StructureLinesPrimitive();
+          (candlestickSeries as any).attachPrimitive(structPrimitive);
+          structurePrimitiveRef.current = structPrimitive;
+        } catch (e) {
+          console.warn("Could not attach structure lines primitive:", e);
+        }
 
         console.log('✅ Chart initialized successfully');
         console.log('chartRef.current:', !!chartRef.current);
@@ -1283,56 +1287,9 @@ export default function RongsokanPage() {
       return lo;
     };
 
-    // Clear existing structure series
-    structureSeriesRef.current.forEach(series => {
-      try {
-        chartRef.current?.removeSeries(series);
-      } catch (e) {
-        console.debug('Could not remove series:', e);
-      }
-    });
-    structureSeriesRef.current = [];
-    
-    // Get actual visible candle range from time scale
-    const timeScale = chartRef.current!.timeScale();
-    const visibleLogicalRange = timeScale.getVisibleLogicalRange();
-    
-    console.log('📅 Chart visible logical range:', visibleLogicalRange);
-    
-    // Get first visible candle timestamp
-    // We need to coordinate with the actual candle data loaded
-    let firstVisibleCandleTime: number | null = null;
-    try {
-      if (visibleLogicalRange) {
-        // Convert logical index to time coordinate
-        const leftIndex = Math.floor(visibleLogicalRange.from);
-        const timeAtIndex = timeScale.coordinateToTime(leftIndex);
-        if (timeAtIndex) {
-          firstVisibleCandleTime = typeof timeAtIndex === 'number' ? timeAtIndex : null;
-          console.log('📅 First visible candle time:', firstVisibleCandleTime, new Date((firstVisibleCandleTime || 0) * 1000).toISOString());
-        }
-      }
-    } catch (e) {
-      console.warn('Could not get first visible candle time:', e);
-    }
-
-    // Helper function to create horizontal line from timestamp
-    // lineType:
-    //   'HH'  - Higher High: starts at formation, stops when candle.high > price
-    //   'LL'  - Lower Low:   starts at formation, stops when candle.low < price
-    //   'BOS_CHOCH' - BoS/CHoCH: starts at level formation time, ends at break event time
-    //                  (line goes from LEFT → the break candle, not beyond)
-    // Collect label info here; will be rendered as HTML overlay on candlestick series
-    // (setMarkers does not exist in lightweight-charts v5)
-    const structureLabels: Array<{
-      time: number;
-      startTime: number;
-      endTime: number;
-      price: number;
-      color: string;
-      text: string;
-      isResistance: boolean;
-    }> = [];
+    // Clear primitive lines
+    structurePrimitiveRef.current?.setLines([]);
+    const linesToPrimitive: StructureLineItem[] = [];
 
     const createHorizontalLine = (
       price: number,
@@ -1448,56 +1405,17 @@ export default function RongsokanPage() {
           return false;
         }
         
-        const lineOptions = {
+        // Add to our linesToPrimitive array instead of creating a series!
+        linesToPrimitive.push({
+          price,
+          startTime: actualStartTime,
+          endTime: endTimeSeconds,
           color,
-          lineWidth: lineWidth as any,
+          lineWidth,
           lineStyle,
-          priceLineVisible: false,
-          lastValueVisible: false, // Remove right-side price badges to prevent overlap with candles
-          // No title — label is placed in the middle of the line via marker instead
-        };
-        
-        // Create line data from event time to end
-        const lineData: Array<{ time: number; value: number }> = [
-          { time: actualStartTime, value: price }, // Start point
-        ];
-        lineData.push({ time: endTimeSeconds, value: price }); // End point
-
-        const lineSeries = chartRef.current!.addSeries(LineSeries, lineOptions);
-        lineSeries.setData(lineData as any);
-
-        // Collect label info for HTML overlay in the middle of the line
-        // Use binary search to find nearest candle to midpoint — avoids O(n) scan
-        if (label && candleTimeArray.length > 0) {
-          const rawMidTime = Math.floor((actualStartTime + endTimeSeconds) / 2);
-          const midIdx = lowerBound(rawMidTime);
-          // Clamp to [actualStartTime, endTimeSeconds] range
-          const candidates: number[] = [];
-          if (midIdx > 0) candidates.push(candleTimeArray[midIdx - 1]);
-          if (midIdx < candleTimeArray.length) candidates.push(candleTimeArray[midIdx]);
-          if (midIdx + 1 < candleTimeArray.length) candidates.push(candleTimeArray[midIdx + 1]);
-          let nearestCandleTime = actualStartTime;
-          let nearestDist = Infinity;
-          for (const t of candidates) {
-            if (t < actualStartTime || t > endTimeSeconds) continue;
-            const dist = Math.abs(t - rawMidTime);
-            if (dist < nearestDist) {
-              nearestDist = dist;
-              nearestCandleTime = t;
-            }
-          }
-          structureLabels.push({
-            time: nearestCandleTime,
-            startTime: actualStartTime,
-            endTime: endTimeSeconds,
-            price,
-            color,
-            text: label,
-            isResistance: lineType !== 'LL',
-          });
-        }
-
-        structureSeriesRef.current.push(lineSeries);
+          label,
+          isResistance: lineType !== 'LL',
+        });
         return true;
       } catch (e) {
         console.error('Error creating line:', e);
@@ -1725,18 +1643,11 @@ export default function RongsokanPage() {
     // Hide progress popup
     setDrawLineProgress({ visible: false, percent: 100, current: totalLines, total: totalLines });
 
-    // Render all collected labels as HTML overlay on the chart container
-    renderStructureLabelsOverlay(structureLabels);
+    // Set lines to primitive at the end
+    structurePrimitiveRef.current?.setLines(linesToPrimitive);
 
     console.log('\n✅ ===== OVERLAY COMPLETE =====');
-    console.log('Lines added:', {
-      bos: bosAdded,
-      choch: chochAdded,
-      hh: hhAdded,
-      ll: llAdded,
-      total: bosAdded + chochAdded + hhAdded + llAdded,
-    });
-    console.log('Total line series:', structureSeriesRef.current.length);
+    console.log('Total structure lines parsed:', totalLines);
     
     overlayGuardRef.current = false;
   };
