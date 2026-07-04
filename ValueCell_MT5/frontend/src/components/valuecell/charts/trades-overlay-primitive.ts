@@ -23,6 +23,8 @@ const GREEN_BG = "rgba(34, 197, 94, 0.15)";
 const RED_BG = "rgba(239, 68, 68, 0.15)";
 
 class TradesPaneRenderer implements IPrimitivePaneRenderer {
+  private lastLoggedKey = "";
+
   constructor(private readonly source: TradesOverlayPrimitive) {}
 
   draw(target: {
@@ -58,11 +60,17 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
       const width = scope.bitmapSize.width;
       const height = scope.bitmapSize.height;
 
+      let count2026 = 0;
+      let skippedCount = 0;
+
       for (const trade of visibleTrades) {
         const exitTs = trade.exit_time_ts ?? this.source.lastCandleTime;
         if (exitTs === null) continue;
 
         const is2026Trade = new Date(trade.entry_time_ts * 1000).getFullYear() === 2026;
+        if (is2026Trade) {
+          count2026++;
+        }
         
         const x1 = timeScale.timeToCoordinate(trade.entry_time_ts as UTCTimestamp);
         let x2 = timeScale.timeToCoordinate(exitTs as UTCTimestamp);
@@ -91,47 +99,12 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
           const pixelDiff = barsCount * barSpacing;
           
           // Extrapolate x2 from x1
-          x2 = x1 + pixelDiff;
-          
-          if (is2026Trade) {
-            console.log('[TradesPrimitive] 2026 trade: Extrapolated x2 coordinate', { 
-              x1, 
-              x2, 
-              timeDiff,
-              timeDiffHours: (timeDiff / 3600).toFixed(2),
-              barsCount: barsCount.toFixed(2),
-              pixelDiff: pixelDiff.toFixed(2),
-              barSpacing,
-              timeframe: this.source.timeframe,
-              secondsPerBar,
-              entryTime: new Date(trade.entry_time_ts * 1000).toISOString(),
-              exitTime: new Date(exitTs * 1000).toISOString()
-            });
-          }
-        }
-        
-        if (is2026Trade) {
-          console.log('[TradesPrimitive] 2026 trade coords:', { 
-            entryTime: new Date(trade.entry_time_ts * 1000).toISOString(),
-            exitTime: exitTs ? new Date(exitTs * 1000).toISOString() : null,
-            entryTs: trade.entry_time_ts,
-            exitTs: exitTs,
-            x1, 
-            x2,
-            visibleFrom,
-            visibleTo,
-            visibleFromDate: new Date(visibleFrom * 1000).toISOString(),
-            visibleToDate: new Date(visibleTo * 1000).toISOString(),
-            lastCandleTime: this.source.lastCandleTime,
-            lastCandleDate: this.source.lastCandleTime ? new Date(this.source.lastCandleTime * 1000).toISOString() : null,
-            exitBeyondLastCandle: exitTs > (this.source.lastCandleTime || 0),
-            exitBeyondVisible: exitTs > visibleTo,
-          });
+          x2 = (x1 + pixelDiff) as any;
         }
         
         if (x1 === null || x2 === null) {
           if (is2026Trade) {
-            console.log('[TradesPrimitive] 2026 trade SKIP (null coords):', { entryTime: new Date(trade.entry_time_ts * 1000).toISOString(), x1, x2, exitTs });
+            skippedCount++;
           }
           continue;
         }
@@ -200,6 +173,15 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
       }
 
       ctx.setLineDash([]);
+
+      const active2026 = count2026 - skippedCount;
+      if (count2026 > 0) {
+        const logKey = `${active2026}_${skippedCount}`;
+        if (this.lastLoggedKey !== logKey) {
+          console.log(`✅ [TradesPrimitive] 2026 trades rendered: ${active2026} active, ${skippedCount} skipped`);
+          this.lastLoggedKey = logKey;
+        }
+      }
     });
   }
 }

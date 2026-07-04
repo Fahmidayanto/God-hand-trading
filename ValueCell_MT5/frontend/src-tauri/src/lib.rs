@@ -1,4 +1,5 @@
 mod backend;
+mod rongsokan_candles;
 mod system;
 
 use backend::BackendManager;
@@ -28,7 +29,10 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![get_client_id])
+        .invoke_handler(tauri::generate_handler![
+    get_client_id,
+    rongsokan_candles::get_rongsokan_candles,
+])
         .setup(|app| {
             let handle = app.handle().clone();
 

@@ -759,3 +759,23 @@ async def get_backtest_summary(
         return {"error": str(e)}
 
 
+@router.get("/backtest/monthly-trades")
+async def get_backtest_monthly_trades(
+    symbol: str = Query("XAUUSD"),
+    year: int = Query(..., description="Filter by year"),
+    month: int = Query(..., description="Filter by month (1-12)"),
+):
+    """
+    Get detailed trade list for a specific year and month from Backtest_Results CSV files.
+    """
+    try:
+        from app.services.performance_service import get_monthly_trades_from_csv
+
+        trades = get_monthly_trades_from_csv(symbol, year, month)
+        return {"data": trades, "count": len(trades)}
+
+    except Exception as e:
+        logger.error(f"Backtest monthly trades error: {e}", exc_info=True)
+        return {"error": str(e), "data": []}
+
+

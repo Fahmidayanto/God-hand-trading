@@ -62,7 +62,7 @@ const ACCENTS: Record<AccentKey, { border: string; bg: string; text: string; sha
 
 const ACCENT_CYCLE: AccentKey[] = ["purple", "cyan", "blue", "amber", "emerald", "ruby"];
 
-const timeframes = ["M15", "M30", "H1", "H4", "D1"];
+const timeframes = ["M1", "M15", "M30", "H1", "H4", "D1"];
 
 const timezoneOptions: Array<{ value: "utc" | "broker" | "local"; label: string; icon: string }> = [
   { value: "utc", label: "UTC", icon: "🌐" },
@@ -372,32 +372,24 @@ export default function ChartToolbar({
             {/* Load full history */}
             <div
               onClick={onLoadFullHistory}
-              className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs text-[var(--text-secondary)] transition-all cursor-pointer hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+              className={cn(
+                "flex items-center gap-2 px-2.5 py-2 rounded-md border text-xs transition-all cursor-pointer",
+                isFullHistoryLoaded
+                  ? "text-cyan-300 border-cyan-500/30 bg-cyan-500/15 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
+                  : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+              )}
               data-accent="ruby"
             >
               <span>📅</span>
               <span>Load full history</span>
+              {isFullHistoryLoaded && (
+                <span className="ml-auto text-[10px] font-semibold text-cyan-400/80 uppercase tracking-wider">Aktif</span>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Status chip */}
-        {dataMode === "loading" && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border animate-pulse" style={{ color: "var(--neon-amber)", borderColor: "rgba(251,191,36,0.3)", backgroundColor: "rgba(251,191,36,0.1)" }}>
-            <span>⏳</span>
-            <span>Loading history…</span>
-          </div>
-        )}
 
-        {dataMode !== "loading" && isFullHistoryLoaded && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border" style={{ color: "var(--neon-emerald)", borderColor: "rgba(16,185,129,0.3)", backgroundColor: "rgba(16,185,129,0.1)" }}>
-            <span>✅</span>
-            <span>Full History Cached</span>
-            {candlesCount > 0 && (
-              <span className="text-[10px] opacity-70">({candlesCount.toLocaleString()} candles)</span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

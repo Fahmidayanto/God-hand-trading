@@ -20,6 +20,23 @@ interface TableData {
   rows: Array<Record<string, any>>;
 }
 
+const formatDatabaseDate = (val: string): string => {
+  if (typeof val !== "string") return val;
+  if (val.includes("T")) {
+    const parts = val.split("T");
+    const datePart = parts[0];
+    let timePart = parts[1];
+    if (timePart.includes(".")) {
+      timePart = timePart.split(".")[0];
+    }
+    if (timePart.includes("Z")) {
+      timePart = timePart.replace("Z", "");
+    }
+    return `${datePart} ${timePart}`;
+  }
+  return val;
+};
+
 export default function Database() {
   const [activeTab, setActiveTab] = useState<"neon" | "lance">("neon");
   const [stats, setStats] = useState<Stats | null>(null);
@@ -291,11 +308,17 @@ export default function Database() {
                         <tr key={idx} className="hover:bg-slate-800/20">
                           {previewData.columns.map((col) => (
                             <td key={col} className="p-3 font-mono text-xs text-slate-300">
-                              {typeof row[col] === "boolean"
-                                ? String(row[col])
-                                : row[col] === null
-                                ? "NULL"
-                                : String(row[col])}
+                              {(() => {
+                                const val = row[col];
+                                if (val === null) return "NULL";
+                                if (typeof val === "boolean") return String(val);
+                                
+                                const colLower = col.toLowerCase();
+                                if (colLower === "time" || colLower.endsWith("_time") || colLower.endsWith("_at")) {
+                                  return formatDatabaseDate(String(val));
+                                }
+                                return String(val);
+                              })()}
                             </td>
                           ))}
                         </tr>

@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
 import { apiClient } from "@/lib/api-client";
 
 // AI Agents Types
@@ -228,10 +229,40 @@ export const useRongsokanChartData = (
   params.set("mode", mode);
   if (centerDate) params.set("center_date", centerDate);
 
+  const url = timeframe === "M1"
+    ? `/trading/chart/data?symbol=${symbol}&timeframe=M1&count=6000`
+    : `/trading/chart/rongsokan-data?${params.toString()}`;
+
   return useQuery({
     queryKey: ["trading", "rongsokan-chart-data", symbol, timeframe, fromDate, mode, centerDate ?? ""],
-    queryFn: () => apiClient.get<RongsokanChartDataResponse>(`/trading/chart/rongsokan-data?${params.toString()}`),
-    refetchInterval: mode === "recent" ? 30000 : false, // Only auto-refresh in recent mode
-    staleTime: mode === "recent" ? 30000 : 900000,
+    queryFn: () => apiClient.get<RongsokanChartDataResponse>(url),
+    refetchInterval: timeframe === "M1" ? 10000 : (mode === "recent" ? 30000 : false),
+    staleTime: timeframe === "M1" ? 10000 : (mode === "recent" ? 30000 : 900000),
+  });
+};
+
+export const useRongsokanTauriChartData = (
+  symbol: string = "XAUUSD",
+  timeframe: string = "M15",
+  fromDate: string,
+  mode: "quick" | "recent" | "full" | "window" = "quick",
+  centerDate?: string
+) => {
+  return useQuery({
+    queryKey: ["trading", "rongsokan-tauri-chart-data", symbol, timeframe, fromDate, mode, centerDate ?? ""],
+    queryFn: async () => {
+      const res = await invoke<RongsokanChartDataResponse>("get_rongsokan_candles", {
+        req: {
+          symbol,
+          timeframe,
+          mode,
+          from_date: fromDate,
+          center_date: centerDate,
+        },
+      });
+      return res;
+    },
+    refetchInterval: mode === "recent" || mode === "quick" ? 30000 : false,
+    staleTime: mode === "recent" || mode === "quick" ? 30000 : 900000,
   });
 };

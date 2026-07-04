@@ -448,3 +448,301 @@ def _sentiment_fallback() -> dict:
         "next_event_time":         None,
     }
 
+
+# ==============================================================================
+# Chatbot Stream & History Support
+# ==============================================================================
+import os
+import uuid
+import json
+import asyncio
+from collections import defaultdict
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+from google import genai
+from google.genai import types
+
+class AgentStreamRequest(BaseModel):
+    query: str
+    agent_name: str
+    conversation_id: str = ""
+
+# Cache to store history: conversation_id -> list of event dicts
+CHATBOT_HISTORY = defaultdict(list)
+
+def execute_neondb_query(sql_query: str) -> str:
+    """Safely execute SELECT query on NeonDB and return results formatted in Markdown."""
+    from app.core.database import get_db_conn, is_pool_ready
+    if not is_pool_ready():
+        return "Database pool is not initialized."
+
+    # Basic security checks
+    cleaned = sql_query.strip().lower()
+    if not cleaned.startswith("select"):
+        return "ERROR: Hanya query SELECT yang diizinkan untuk keamanan data."
+
+    # Check for modification keywords to prevent SQL Injection
+    forbidden = ["insert", "update", "delete", "drop", "alter", "create", "truncate", "replace", "grant", "revoke"]
+    for word in forbidden:
+        if word in cleaned:
+            return f"ERROR: Query mengandung kata terlarang '{word}'."
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(sql_query)
+                if cur.description:
+                    columns = [desc[0] for desc in cur.description]
+                    rows = cur.fetchall()
+                    if not rows:
+                        return "Query berhasil dieksekusi, tetapi tidak ada data yang ditemukan."
+                    
+                    # Format as a clean markdown table
+                    result_lines = []
+                    header = " | ".join(columns)
+                    separator = " | ".join(["---"] * len(columns))
+                    result_lines.append(header)
+                    result_lines.append(separator)
+                    
+                    for row in rows:
+                        row_strs = []
+                        for val in row:
+                            if val is None:
+                                row_strs.append("NULL")
+                            elif isinstance(val, (int, float)):
+                                row_strs.append(str(val))
+                            else:
+                                row_strs.append(str(val).replace("|", "\\|"))
+                        result_lines.append(" | ".join(row_strs))
+                    
+                    return "\n".join(result_lines)
+                else:
+                    return "Query berhasil dieksekusi tanpa hasil data."
+    except Exception as e:
+        return f"Database Error: {str(e)}"
+
+def generate_sql_query(user_query: str, client: genai.Client) -> str:
+    """Translate natural language user query to single clean SQL SELECT query using Gemini."""
+    system_prompt = (
+        "Kamu adalah penerjemah bahasa manusia ke query SQL PostgreSQL yang ahli.\n"
+        "Tabel yang tersedia di database:\n"
+        "1. `llhhbosdata_xauusd` - data market structure (kolom: id, type, direction_action, price, time, timeframe, status, previous_price, previous_time, csv_filename)\n"
+        "2. `backtest_results_xauusd` - data trade backtest (kolom: id, ticket, symbol, type, entry_price, exit_price, sl, tp, profit, spread_cost, commission, swap, net_profit, session, session_isdst, entry_time, exit_time, lot_size, magic_number, timeframe, status, reject_reason, csv_filename)\n"
+        "3. `sessionzone_xauusd` - data session zones (kolom: id, start_time, end_time, duration_bars, session, status, is_dst, open_price, high_price, low_price, close_price, range_points, csv_filename)\n"
+        "4. `marketdata_xauusd_m15`, `marketdata_xauusd_h1`, `marketdata_xauusd_h4` - data candlestick (kolom: time, open, high, low, close, volume, spread, ema200, csv_filename)\n\n"
+        "Tugasmu:\n"
+        "1. Jika user menanyakan tentang statistik, trade, market structure, candle, atau informasi apa pun yang ada di database, "
+        "tulis satu query SQL SELECT yang valid dan tepat untuk menjawab pertanyaannya.\n"
+        "2. Selalu gunakan LIMIT (maksimal LIMIT 50) agar data tidak terlalu besar.\n"
+        "3. Keluarkan HANYA satu baris query SQL tersebut. JANGAN gunakan markdown code block (seperti ```sql ... ```), jangan ada penjelasan teks, jangan ada karakter tambahan.\n"
+        "4. Jika pertanyaan user adalah percakapan biasa (misal: 'hallo', 'siapa kamu', 'terima kasih') atau tidak memerlukan data dari database, balas dengan HANYA satu kata: 'NO_QUERY'."
+    )
+    
+    try:
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=user_query,
+            config=types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.1,
+            )
+        )
+        sql = response.text.strip()
+        if sql.startswith("```"):
+            sql = sql.replace("```sql", "").replace("```", "").strip()
+        return sql
+    except Exception as e:
+        logger.error(f"Error generating SQL: {e}")
+        return "NO_QUERY"
+
+async def chatbot_event_generator(request: AgentStreamRequest):
+    # Dynamically load .env file to pick up any key modifications in runtime
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    conversation_id = request.conversation_id or str(uuid.uuid4())
+    thread_id = f"thread_{conversation_id}"
+    task_id = f"task_{conversation_id}"
+    
+    # 1. Send conversation_started event
+    started_event = {
+        "event": "conversation_started",
+        "data": {
+            "conversation_id": conversation_id,
+            "thread_id": thread_id,
+            "task_id": task_id
+        }
+    }
+    yield f"data: {json.dumps(started_event)}\n\n"
+    await asyncio.sleep(0.01)
+    
+    # 1.5 Send thread_started event (displays the user query bubble instantly)
+    user_item_id = str(uuid.uuid4())
+    thread_started_event = {
+        "event": "thread_started",
+        "data": {
+            "conversation_id": conversation_id,
+            "thread_id": thread_id,
+            "task_id": task_id,
+            "item_id": user_item_id,
+            "role": "user",
+            "component_type": "markdown",
+            "payload": {
+                "content": request.query
+            }
+        }
+    }
+    yield f"data: {json.dumps(thread_started_event)}\n\n"
+    await asyncio.sleep(0.01)
+    
+    # 2. Get API key and call Gemini
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    if not api_key:
+        error_event = {
+            "event": "system_failed",
+            "data": {
+                "conversation_id": conversation_id,
+                "thread_id": thread_id,
+                "task_id": task_id,
+                "payload": {
+                    "content": "Google API Key belum diset. Silakan masukkan GOOGLE_API_KEY di file .env."
+                }
+            }
+        }
+        yield f"data: {json.dumps(error_event)}\n\n"
+        return
+        
+    try:
+        # Initialize Gemini Client
+        client = genai.Client(api_key=api_key)
+        
+        # Step A: Translate human query to SQL if database information is required
+        sql_query = generate_sql_query(request.query, client)
+        db_results = ""
+        
+        if sql_query and sql_query.upper() != "NO_QUERY":
+            logger.info(f"[Chatbot SQL] Generated SQL: {sql_query}")
+            db_results = execute_neondb_query(sql_query)
+            logger.info(f"[Chatbot SQL] Result length: {len(db_results)}")
+            
+        # Step B: Generate streaming response based on query results
+        system_instruction = (
+            "Kamu adalah AI Chatbot Analisis Database NeonDB untuk platform trading MetaTrader 5.\n"
+            "Tugas utamamu adalah membantu pengguna memahami dan menganalisis data trading di database NeonDB.\n\n"
+            "ATURAN PENTING:\n"
+            "1. Fokus utama jawaban harus berdasarkan data dari database NeonDB yang disediakan di bawah.\n"
+            "2. JANGAN PERNAH berasumsi atau mengarang data jika tidak ada dalam hasil database.\n"
+            "3. Jika data tidak ditemukan, sampaikan secara jujur.\n"
+            "4. Jika pengguna menanyakan hal yang tidak berhubungan dengan database atau pasar trading MT5, "
+            "ingatkan dengan sopan bahwa kamu adalah asisten analisis database trading.\n"
+        )
+        
+        # Build prompt
+        prompt_content = f"Pertanyaan User: {request.query}\n\n"
+        if db_results:
+            prompt_content += f"Hasil Query SQL dari Database NeonDB:\n```\n{db_results}\n```\n"
+            prompt_content += f"Query SQL yang digunakan:\n`{sql_query}`\n\n"
+            prompt_content += "Instruksi: Analisis hasil query di atas dan jawab pertanyaan user secara mendalam dengan bahasa Indonesia yang ramah dan profesional."
+        else:
+            prompt_content += "Instruksi: Jawab pertanyaan user dengan ramah dalam bahasa Indonesia."
+            
+        item_id = str(uuid.uuid4())
+        full_response = ""
+        
+        # Stream from Gemini
+        response_stream = client.models.generate_content_stream(
+            model='gemini-2.5-flash',
+            contents=prompt_content,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.4,
+            )
+        )
+        
+        for chunk in response_stream:
+            text = chunk.text or ""
+            if text:
+                full_response += text
+                chunk_event = {
+                    "event": "message_chunk",
+                    "data": {
+                        "conversation_id": conversation_id,
+                        "thread_id": thread_id,
+                        "task_id": task_id,
+                        "item_id": item_id,
+                        "role": "assistant",
+                        "component_type": "markdown",
+                        "payload": {
+                            "content": text
+                        }
+                    }
+                }
+                yield f"data: {json.dumps(chunk_event)}\n\n"
+                await asyncio.sleep(0.01)
+                
+        # Send done event
+        done_event = {
+            "event": "done",
+            "data": {
+                "conversation_id": conversation_id,
+                "thread_id": thread_id,
+                "task_id": task_id
+            }
+        }
+        yield f"data: {json.dumps(done_event)}\n\n"
+        
+        # Save to history cache
+        user_msg = {
+            "event": "message",
+            "data": {
+                "conversation_id": conversation_id,
+                "thread_id": thread_id,
+                "task_id": task_id,
+                "item_id": user_item_id,
+                "role": "user",
+                "component_type": "markdown",
+                "payload": {
+                    "content": request.query
+                }
+            }
+        }
+        assistant_msg = {
+            "event": "message",
+            "data": {
+                "conversation_id": conversation_id,
+                "thread_id": thread_id,
+                "task_id": task_id,
+                "item_id": item_id,
+                "role": "assistant",
+                "component_type": "markdown",
+                "payload": {
+                    "content": full_response
+                }
+            }
+        }
+        CHATBOT_HISTORY[conversation_id].append(user_msg)
+        CHATBOT_HISTORY[conversation_id].append(assistant_msg)
+        
+    except Exception as e:
+        logger.error(f"Error in chatbot streaming: {e}")
+        error_event = {
+            "event": "system_failed",
+            "data": {
+                "conversation_id": conversation_id,
+                "thread_id": thread_id,
+                "task_id": task_id,
+                "payload": {
+                    "content": f"Terjadi kesalahan saat memproses query: {str(e)}"
+                }
+            }
+        }
+        yield f"data: {json.dumps(error_event)}\n\n"
+
+@router.post("/stream")
+async def stream_query_agent(request: AgentStreamRequest):
+    return StreamingResponse(
+        chatbot_event_generator(request),
+        media_type="text/event-stream"
+    )
+
+

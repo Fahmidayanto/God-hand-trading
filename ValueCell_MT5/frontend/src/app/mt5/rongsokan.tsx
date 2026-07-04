@@ -196,6 +196,9 @@ export default function RongsokanPage() {
   // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
   const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   
+  // Save center time when switching timeframes to maintain date focus and auto-scale zoom
+  const timeframeSwitchCenterTimeRef = useRef<number | null>(null);
+  
   // Update ref whenever chartTimezone changes
   useEffect(() => {
     console.log('📍 chartTimezone state changed:', {
@@ -342,9 +345,8 @@ export default function RongsokanPage() {
             borderColor: "rgba(100, 116, 139, 0.3)",
             timeVisible: true,
             secondsVisible: false,
-            rightOffset: 5,
             barSpacing: 8,
-            minBarSpacing: 4,
+            minBarSpacing: 0.01,
             fixLeftEdge: false,
             fixRightEdge: false,
             lockVisibleTimeRangeOnResize: false,
@@ -554,11 +556,67 @@ export default function RongsokanPage() {
         cacheFullHistory(activeTimeframe, processedCandles);
       }
       
-      // Restore viewport position after setData (prevents auto-scroll)
-      if (chartDataLoadedRef.current && currentVisibleRange && timeScale) {
-        setTimeout(() => {
-          timeScale.setVisibleRange(currentVisibleRange);
-        }, 0);
+      // Restore viewport position or align timeline after switching timeframes
+      if (timeScale && processedCandles.length > 0) {
+        if (timeframeSwitchCenterTimeRef.current != null) {
+          const targetTime = timeframeSwitchCenterTimeRef.current;
+          timeframeSwitchCenterTimeRef.current = null; // Clear Ref
+          
+          // Find the index of the closest candle to the previous center time
+          let closestIndex = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < processedCandles.length; i++) {
+            const diff = Math.abs(processedCandles[i].time - targetTime);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIndex = i;
+            }
+          }
+          
+          // Calculate how many candles are in 5 days for the active timeframe
+          let candlesPerDay = 96; // Default to M15 (24 * 4)
+          if (activeTimeframe === "H1") {
+            candlesPerDay = 24;
+          } else if (activeTimeframe === "H4") {
+            candlesPerDay = 6;
+          } else if (activeTimeframe === "D1" || activeTimeframe === "D") {
+            candlesPerDay = 1;
+          }
+          
+          const totalCandles = candlesPerDay * 5;
+          const halfCount = Math.max(15, Math.floor(totalCandles / 2)); // Minimum 15 candles
+          
+          const fromIndex = Math.max(0, closestIndex - halfCount);
+          const toIndex = Math.min(processedCandles.length - 1, closestIndex + halfCount);
+          
+          setTimeout(() => {
+            timeScale.setVisibleRange({
+              from: processedCandles[fromIndex].time as any,
+              to: processedCandles[toIndex].time as any,
+            });
+            // Reset right price scale option to auto-scale vertically
+            chartRef.current?.priceScale('right').applyOptions({
+              autoScale: true,
+            });
+          }, 0);
+        } else if (chartDataLoadedRef.current && currentVisibleRange) {
+          setTimeout(() => {
+            timeScale.setVisibleRange(currentVisibleRange);
+          }, 0);
+        } else if (!chartDataLoadedRef.current && processedCandles.length > 0) {
+          // First load zoom: show the most recent 250 candles
+          const count = Math.min(250, processedCandles.length);
+          const fromIndex = processedCandles.length - count;
+          setTimeout(() => {
+            timeScale.setVisibleRange({
+              from: processedCandles[fromIndex].time as any,
+              to: processedCandles[processedCandles.length - 1].time as any,
+            });
+            chartRef.current?.priceScale('right').applyOptions({
+              autoScale: true,
+            });
+          }, 0);
+        }
       }
       
       chartDataLoadedRef.current = true;
@@ -600,6 +658,7 @@ export default function RongsokanPage() {
     // ONLY refresh in recent mode AND only if user hasn't jumped to specific date
     // Disable auto-refresh when exploring historical data to prevent unwanted scrolling
     const chartInterval = setInterval(() => {
+      if (activeTimeframe === "M1") return; // Skip API polling when M1 TradingView widget is active
       if (chartRef.current && candlestickSeriesRef.current && dataMode === 'recent' && !isJumping) {
         // Only auto-refresh if we're truly in recent mode (last 6 months)
         // Don't refresh if user is exploring historical data via jump
@@ -854,6 +913,20 @@ export default function RongsokanPage() {
   };
   
   // Handle year change - jump to January of selected year
+  // Handle timeframe change - keep visible center date and reset zoom/auto-scale
+  const handleTimeframeChange = (newTimeframe: string) => {
+    if (chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      if (visibleRange) {
+        const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
+        timeframeSwitchCenterTimeRef.current = centerTime;
+        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+      }
+    }
+    setActiveTimeframe(newTimeframe);
+  };
+
   const handleYearChange = (newYear: string) => {
     setSelectedYear(newYear);
     setSelectedMonth("01"); // Reset to January when year changes
@@ -938,14 +1011,13 @@ export default function RongsokanPage() {
     if (!chartRef.current) return;
     const ts = chartRef.current.timeScale();
     const current = ts.options().barSpacing ?? 8;
-    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 4) });
+    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 0.01) });
   };
 
   const handleResetZoom = () => {
     if (!chartRef.current) return;
+    chartRef.current.priceScale('right').applyOptions({ autoScale: true });
     chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
-    const centerDate = `${selectedYear}-${selectedMonth}-01`;
-    focusChartOnDate(centerDate, 0, chartCandles);
   };
 
   // Guard to prevent concurrent executions
@@ -1146,18 +1218,27 @@ export default function RongsokanPage() {
     // Use provided candles or fall back to state (for effect-triggered calls)
     const candlesToUse = candles ?? chartCandles;
 
-    // Filter structure lines by timeframe.
-    // On M15 chart we only draw M15-derived lines to avoid H1/H4/D1 clutter;
-    // on higher timeframes we keep all lines for broader context.
     const shouldFilterByTimeframe = activeTimeframe === "M15";
     const filterByTimeframe = <T extends { timeframe?: string }>(items: T[] | undefined | null): T[] => {
       if (!items) return [];
       return shouldFilterByTimeframe ? items.filter((item) => item.timeframe === "M15") : items;
     };
-    const filteredBosLines = filterByTimeframe(structureLines.bos_lines);
-    const filteredChochLines = filterByTimeframe(structureLines.choch_lines);
-    const filteredHhPoints = filterByTimeframe(structureLines.hh_points);
-    const filteredLlPoints = filterByTimeframe(structureLines.ll_points);
+
+    // Filter structure lines by date to only draw visible/recent lines (prevents drawing thousands of off-screen lines)
+    const fromTimestamp = Date.parse(chartFromDate) / 1000;
+    const filterByDateRange = <T extends { timestamp: number }>(items: T[] | undefined | null): T[] => {
+      if (!items) return [];
+      const threshold = fromTimestamp - 7 * 24 * 3600; // 7-day padding
+      return items.filter((item) => {
+        const t = item.timestamp > 1e10 ? Math.floor(item.timestamp / 1000) : item.timestamp;
+        return t >= threshold;
+      });
+    };
+
+    const filteredBosLines = filterByDateRange(filterByTimeframe(structureLines.bos_lines));
+    const filteredChochLines = filterByDateRange(filterByTimeframe(structureLines.choch_lines));
+    const filteredHhPoints = filterByDateRange(filterByTimeframe(structureLines.hh_points));
+    const filteredLlPoints = filterByDateRange(filterByTimeframe(structureLines.ll_points));
 
     // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
     const candleTimeMap = new Map<number, ChartCandle>();
@@ -1407,39 +1488,51 @@ export default function RongsokanPage() {
     // - BoS/CHoCH Bullish at price X → the level is an HH (higher high) → search HH points
     // - BoS/CHoCH Bearish at price X → the level is an LL (lower low)  → search LL points
     // We keep the OLDEST (earliest) occurrence (first time that level was formed).
+    const PRICE_TOLERANCE_VAL = 0.05;
+    const getPriceBucket = (p: number) => Math.round(p / PRICE_TOLERANCE_VAL);
+
+    // Pre-group HH points by price bucket for O(1) lookup
+    const hhFormationMap = new Map<number, number>();
+    filteredHhPoints.forEach(point => {
+      const bucket = getPriceBucket(point.price);
+      const t = point.timestamp > 1e10 ? Math.floor(point.timestamp / 1000) : point.timestamp;
+      const existing = hhFormationMap.get(bucket);
+      if (existing === undefined || t < existing) {
+        hhFormationMap.set(bucket, t);
+      }
+    });
+
+    // Pre-group LL points by price bucket for O(1) lookup
+    const llFormationMap = new Map<number, number>();
+    filteredLlPoints.forEach(point => {
+      const bucket = getPriceBucket(point.price);
+      const t = point.timestamp > 1e10 ? Math.floor(point.timestamp / 1000) : point.timestamp;
+      const existing = llFormationMap.get(bucket);
+      if (existing === undefined || t < existing) {
+        llFormationMap.set(bucket, t);
+      }
+    });
+
+    // Helper: find when a price level was first formed in HH/LL data.
     const findLevelFormationTime = (
       levelPrice: number,
       direction: string, // 'BULLISH' or 'BEARISH'
     ): number | undefined => {
-      // Bullish BoS/CHoCH forms an HH level, so look in HH points
-      // Bearish BoS/CHoCH forms an LL level, so look in LL points
       const isBullish = direction === 'BULLISH';
-      const levelPoints = isBullish
-        ? (filteredHhPoints)
-        : (filteredLlPoints);
-
-      // Find the matching price level (allow small tolerance for floating point)
-      const tolerance = 0.05;
+      const bucket = getPriceBucket(levelPrice);
+      
       let matchTime: number | undefined;
-
-      for (const point of levelPoints) {
-        if (Math.abs(point.price - levelPrice) < tolerance) {
-          const pointTimeSec = point.timestamp > 10000000000
-            ? Math.floor(point.timestamp / 1000)
-            : point.timestamp;
-          // Keep the oldest (earliest) formation time
-          if (matchTime === undefined || pointTimeSec < matchTime) {
-            matchTime = pointTimeSec;
+      const mapToUse = isBullish ? hhFormationMap : llFormationMap;
+      
+      // Check target bucket and adjacent buckets for floating point tolerance
+      for (const b of [bucket - 1, bucket, bucket + 1]) {
+        const t = mapToUse.get(b);
+        if (t !== undefined) {
+          if (matchTime === undefined || t < matchTime) {
+            matchTime = t;
           }
         }
       }
-
-      if (matchTime !== undefined) {
-        console.log(`  🔍 Level ${levelPrice.toFixed(2)} formed at ${matchTime} (${new Date(matchTime * 1000).toISOString()}) [searched ${isBullish ? 'HH' : 'LL'} points]`);
-      } else {
-        console.log(`  ⚠️ Could not find formation time for level ${levelPrice.toFixed(2)} in ${isBullish ? 'HH' : 'LL'} points`);
-      }
-
       return matchTime;
     };
 
@@ -1604,6 +1697,18 @@ export default function RongsokanPage() {
     if (showStructure && structureLines) {
       console.log('🔄 useEffect: Triggering structure overlay');
       overlayMarketStructure(chartCandles);
+    } else {
+      // Clean up overlay lines
+      structureSeriesRef.current.forEach(series => {
+        try { chartRef.current?.removeSeries(series); } catch (e) {}
+      });
+      structureSeriesRef.current = [];
+      
+      // Clean up overlay HTML labels
+      const overlayEl = document.getElementById('structure-labels-overlay');
+      if (overlayEl) {
+        overlayEl.innerHTML = '';
+      }
     }
   }, [chartCandles, structureLines, activeTimeframe, showStructure]);
 
@@ -1794,7 +1899,7 @@ export default function RongsokanPage() {
               <ChartToolbar
                 title={<span className="text-xl font-semibold">🔋 XAUUSD {activeTimeframe} Chart</span>}
                 activeTimeframe={activeTimeframe}
-                onTimeframeChange={setActiveTimeframe}
+                onTimeframeChange={handleTimeframeChange}
                 selectedYear={selectedYear}
                 onYearChange={handleYearChange}
                 selectedMonth={selectedMonth}
@@ -1828,7 +1933,7 @@ export default function RongsokanPage() {
             <div
               ref={chartContainerRef}
               id="chart-container"
-              className="w-full rounded-xl overflow-hidden relative"
+              className="w-full rounded-xl overflow-hidden relative bg-slate-950/20"
               style={{ width: "100%", height: "700px" }}
             >
               <div

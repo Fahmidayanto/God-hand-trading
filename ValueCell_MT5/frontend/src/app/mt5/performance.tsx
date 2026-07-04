@@ -17,6 +17,8 @@ import {
   RotateCcw,
   DollarSign,
   ArrowDownRight,
+  X,
+  Loader2,
 } from "lucide-react";
 import MT5Footer from "./components/MT5Footer";
 import {
@@ -72,6 +74,32 @@ export default function PerformancePage() {
   const [summary, setSummary] = useState<{
     max_drawdown: number; profit_factor: number; win_rate: number;
   }>({ max_drawdown: 0, profit_factor: 0, win_rate: 0 });
+
+  // Pop-up states
+  const [selectedMonthTrades, setSelectedMonthTrades] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [isLoadingTrades, setIsLoadingTrades] = useState(false);
+
+  const handleMonthRowClick = async (year: number, monthNum: number, monthLabel: string) => {
+    setIsLoadingTrades(true);
+    setModalTitle(monthLabel);
+    setIsModalOpen(true);
+    setSelectedMonthTrades([]);
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${apiUrl}/performance/backtest/monthly-trades?year=${year}&month=${monthNum}`);
+      if (response.ok) {
+        const result = await response.json();
+        setSelectedMonthTrades(result.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading monthly trades:", error);
+    } finally {
+      setIsLoadingTrades(false);
+    }
+  };
 
   const particlesInit = async (engine: Engine) => {
     await loadSlim(engine);
@@ -785,9 +813,11 @@ export default function PerformancePage() {
                   monthlyPNL.map((month, idx) => (
                     <tr
                       key={idx}
-                      className="border-b border-[rgba(100,116,139,0.1)] hover:bg-[var(--glass-secondary)] transition-colors"
+                      onClick={() => handleMonthRowClick(month.year, month.month_num, month.month_label || `${month.month} ${month.year}`)}
+                      className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
+                      title="Klik untuk melihat detail transaksi"
                     >
-                      <td className="px-3 py-2 whitespace-nowrap">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
                       <td className="px-3 py-2 whitespace-nowrap mono">{month.executed_trades ?? month.trades ?? 0}</td>
                       <td
                         className={`px-3 py-2 whitespace-nowrap ${
@@ -828,6 +858,143 @@ export default function PerformancePage() {
         <MT5Footer />
         </div>
       </div>
+
+      {/* Monthly Trades Detail Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+            {/* Premium Gradient Top Accent Line */}
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+            
+            {/* Header */}
+            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
+                  <CalendarDays className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                    Detail Transaksi - {modalTitle}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Daftar transaksi yang ditutup pada bulan ini
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                title="Tutup"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {isLoadingTrades ? (
+                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <Loader2 className="size-8 text-cyan-500 animate-spin" />
+                  <span className="text-sm">Memuat data transaksi...</span>
+                </div>
+              ) : selectedMonthTrades.length === 0 ? (
+                <div className="py-20 text-center text-slate-400 text-sm italic">
+                  Tidak ada transaksi yang tercatat pada bulan ini.
+                </div>
+              ) : (
+                <>
+                  {/* Summary Dashboard Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
+                      <span className="text-2xl font-bold text-slate-200 mono">{selectedMonthTrades.length}</span>
+                    </div>
+                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
+                      <span className="text-2xl font-bold text-cyan-400 mono">
+                        {(() => {
+                          const wins = selectedMonthTrades.filter(t => t.net_profit > 0).length;
+                          return ((wins / selectedMonthTrades.length) * 100).toFixed(1);
+                        })()}%
+                      </span>
+                    </div>
+                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
+                      <span className={`text-2xl font-bold mono ${
+                        selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-emerald-400" : "text-rose-500"
+                      }`}>
+                        {selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "+" : ""}
+                        ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Trades Detail Table */}
+                  <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                          <tr>
+                            <th className="py-3 px-4">Ticket</th>
+                            <th className="py-3 px-4">Type</th>
+                            <th className="py-3 px-4 text-right">Lot</th>
+                            <th className="py-3 px-4 text-right">Entry Price</th>
+                            <th className="py-3 px-4 text-right">Exit Price</th>
+                            <th className="py-3 px-4 text-right">Net Profit</th>
+                            <th className="py-3 px-4">Entry Time</th>
+                            <th className="py-3 px-4">Exit Time</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                          {[...selectedMonthTrades]
+                            .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
+                            .map((trade) => {
+                              const isWin = trade.net_profit >= 0;
+                              return (
+                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors">
+                                  <td className="py-3 px-4 mono text-xs text-slate-400">#{trade.ticket}</td>
+                                  <td className="py-3 px-4">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                                      trade.type === "BUY" 
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                    }`}>
+                                      {trade.type}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-4 text-right mono">{trade.lot_size.toFixed(2)}</td>
+                                  <td className="py-3 px-4 text-right mono">${trade.entry_price.toFixed(2)}</td>
+                                  <td className="py-3 px-4 text-right mono">${trade.exit_price.toFixed(2)}</td>
+                                  <td className={`py-3 px-4 text-right mono font-semibold ${
+                                    isWin ? "text-emerald-400" : "text-rose-500"
+                                  }`}>
+                                    {isWin ? "+" : ""}${trade.net_profit.toFixed(2)}
+                                  </td>
+                                  <td className="py-3 px-4 text-xs text-slate-400">{trade.entry_time}</td>
+                                  <td className="py-3 px-4 text-xs text-slate-400">{trade.exit_time}</td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

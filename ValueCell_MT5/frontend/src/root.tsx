@@ -59,6 +59,7 @@ const queryClient = new QueryClient({
 import { AutoUpdateCheck } from "@/components/valuecell/app/auto-update-check";
 import { BackendHealthCheck } from "@/components/valuecell/app/backend-health-check";
 import { TrackerProvider } from "./provider/tracker-provider";
+import { FloatingChatbot } from "@/components/valuecell/app/floating-chatbot";
 
 export default function Root() {
   const location = useLocation();
@@ -86,6 +87,7 @@ export default function Root() {
                   <Outlet />
                 </main>
                 <Toaster />
+                <FloatingChatbot />
               </div>
             </SidebarProvider>
           </TrackerProvider>

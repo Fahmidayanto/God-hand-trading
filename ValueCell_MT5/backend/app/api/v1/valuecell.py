@@ -3,6 +3,7 @@ ValueCell compatibility endpoints
 Provides dummy endpoints for ValueCell frontend components that are not used in MT5 dashboard
 """
 from fastapi import APIRouter
+from app.api.v1.agents import CHATBOT_HISTORY
 
 router = APIRouter(prefix="/api/v1", tags=["valuecell"])
 
@@ -30,4 +31,19 @@ async def get_conversations():
         "success": True,
         "message": "No conversations",
         "data": {"conversations": []}
+    }
+
+
+@router.get("/conversations/{conversation_id}/history")
+async def get_conversation_history(conversation_id: str):
+    """
+    Get conversation history for chatbot widget
+    """
+    history = CHATBOT_HISTORY.get(conversation_id, [])
+    return {
+        "success": True,
+        "message": "Conversation history retrieved",
+        "data": {
+            "items": history
+        }
     }

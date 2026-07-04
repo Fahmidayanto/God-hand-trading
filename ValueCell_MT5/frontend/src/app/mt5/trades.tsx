@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { 
+import { CalendarDays, X, Loader2 } from "lucide-react";
+import {
   createChart, 
   type IChartApi, 
   type ISeriesApi,
@@ -111,6 +112,50 @@ export default function TradesPage() {
   });
 
   const [activeYear, setActiveYear] = useState<string>("2026");
+  
+  // Tab and Pop-up states for Monthly summary
+  const [activeBottomTab, setActiveBottomTab] = useState<'recent-trades' | 'monthly-summary'>('recent-trades');
+  const [monthlyPNL, setMonthlyPNL] = useState<any[]>([]);
+  const [selectedMonthTrades, setSelectedMonthTrades] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTitle, setModalTitle] = useState("");
+  const [isLoadingTrades, setIsLoadingTrades] = useState(false);
+  const [monthlySummaryYearFilter, setMonthlySummaryYearFilter] = useState<string>("2026");
+  const [monthlySummaryPerformanceFilter, setMonthlySummaryPerformanceFilter] = useState<'all' | 'profit' | 'loss'>('all');
+  const [isYearDropdownOpen, setIsYearDropdownOpen] = useState(false);
+
+  const handleMonthRowClick = async (year: number, monthNum: number, monthLabel: string) => {
+    setIsLoadingTrades(true);
+    setModalTitle(monthLabel);
+    setIsModalOpen(true);
+    setSelectedMonthTrades([]);
+    
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${apiUrl}/performance/backtest/monthly-trades?year=${year}&month=${monthNum}`);
+      if (response.ok) {
+        const result = await response.json();
+        setSelectedMonthTrades(result.data || []);
+      }
+    } catch (error) {
+      console.error("Error loading monthly trades:", error);
+    } finally {
+      setIsLoadingTrades(false);
+    }
+  };
+
+  const loadMonthlyPNL = async () => {
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+      const response = await fetch(`${apiUrl}/performance/monthly-pnl`);
+      if (response.ok) {
+        const res = await response.json();
+        setMonthlyPNL(res.data && Array.isArray(res.data) ? res.data : []);
+      }
+    } catch (error) {
+      console.error("Error loading monthly P&L:", error);
+    }
+  };
   // DISABLED: year/month dropdown
   // const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
   // const [availableMonths, setAvailableMonths] = useState<Array<{label: string, value: number}>>([]);
@@ -195,6 +240,9 @@ export default function TradesPage() {
   
   // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
   const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  
+  // Save center time when switching timeframes to maintain date focus and auto-scale zoom
+  const timeframeSwitchCenterTimeRef = useRef<number | null>(null);
   
   // Update ref whenever chartTimezone changes
   useEffect(() => {
@@ -333,9 +381,8 @@ export default function TradesPage() {
             borderColor: "rgba(100, 116, 139, 0.3)",
             timeVisible: true,
             secondsVisible: false,
-            rightOffset: 5,
             barSpacing: 8,
-            minBarSpacing: 4,
+            minBarSpacing: 0.01,
             fixLeftEdge: false,
             fixRightEdge: false,
             lockVisibleTimeRangeOnResize: false,
@@ -435,15 +482,28 @@ export default function TradesPage() {
 
   useEffect(() => {
     loadTradeHistory();
-    const interval = setInterval(loadTradeHistory, 10000);
+    loadMonthlyPNL();
+    const interval = setInterval(() => {
+      loadTradeHistory();
+      if (activeBottomTab === 'monthly-summary') {
+        loadMonthlyPNL();
+      }
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeBottomTab]);
+
+  useEffect(() => {
+    if (activeBottomTab === 'monthly-summary') {
+      loadMonthlyPNL();
+    }
+  }, [activeBottomTab]);
 
   useEffect(() => {
     // Auto-refresh chart data every 30 seconds (increased from 5s for performance)
     // ONLY refresh in recent mode AND only if user hasn't jumped to specific date
     // Disable auto-refresh when exploring historical data to prevent unwanted scrolling
     const chartInterval = setInterval(() => {
+      if (activeTimeframe === "M1") return; // Skip API polling when M1 TradingView widget is active
       if (chartRef.current && candlestickSeriesRef.current && dataMode === 'recent' && !isJumping) {
         // Only auto-refresh if we're truly in recent mode (last 6 months)
         // Don't refresh if user is exploring historical data via jump
@@ -493,6 +553,7 @@ export default function TradesPage() {
       console.log('⏭️ loadChartData: skipped (already loading)');
       return;
     }
+    const timeframe = timeframeOverride || activeTimeframe;
     isLoadingChartDataRef.current = true;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -500,9 +561,10 @@ export default function TradesPage() {
       // Determine mode and from_date
       const mode = loadMode || dataMode;
       const fromDate = mode === 'full' ? '2020-01-01' : chartFromDate;
-      const timeframe = timeframeOverride || activeTimeframe;
 
-      const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${timeframe}&from_date=${fromDate}&mode=${mode}`;
+      const chartUrl = timeframe === "M1"
+        ? `${apiUrl}/trading/chart/data?symbol=XAUUSD&timeframe=M1&count=6000`
+        : `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${timeframe}&from_date=${fromDate}&mode=${mode}`;
       console.log('🔄 Fetching chart data:', { mode, fromDate, url: chartUrl });
 
       const response = await fetch(chartUrl);
@@ -536,11 +598,68 @@ export default function TradesPage() {
             cacheFullHistory(timeframe, processedCandles);
           }
           
-          // Restore viewport position after setData (prevents auto-scroll)
-          if (chartDataLoadedRef.current && currentVisibleRange && timeScale && !forceRefresh) {
-            setTimeout(() => {
-              timeScale.setVisibleRange(currentVisibleRange);
-            }, 0);
+          // Restore viewport position or align timeline after switching timeframes
+          if (timeScale && processedCandles.length > 0) {
+            if (timeframeSwitchCenterTimeRef.current != null) {
+              const targetTime = timeframeSwitchCenterTimeRef.current;
+              timeframeSwitchCenterTimeRef.current = null; // Clear Ref
+              
+              // Find the index of the closest candle to the previous center time
+              let closestIndex = 0;
+              let minDiff = Infinity;
+              for (let i = 0; i < processedCandles.length; i++) {
+                const diff = Math.abs(processedCandles[i].time - targetTime);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  closestIndex = i;
+                }
+              }
+              
+              // Calculate how many candles are in 5 days for the active timeframe
+              let candlesPerDay = 96; // Default to M15 (24 * 4)
+              if (activeTimeframe === "H1") {
+                candlesPerDay = 24;
+              } else if (activeTimeframe === "H4") {
+                candlesPerDay = 6;
+              } else if (activeTimeframe === "D1" || activeTimeframe === "D") {
+                candlesPerDay = 1;
+              }
+              
+              const totalCandles = candlesPerDay * 5;
+              const halfCount = Math.max(15, Math.floor(totalCandles / 2)); // Minimum 15 candles
+              
+              const fromIndex = Math.max(0, closestIndex - halfCount);
+              const toIndex = Math.min(processedCandles.length - 1, closestIndex + halfCount);
+              
+              setTimeout(() => {
+                timeScale.setVisibleRange({
+                  from: processedCandles[fromIndex].time as any,
+                  to: processedCandles[toIndex].time as any,
+                });
+                // Reset right price scale option to auto-scale vertically
+                chartRef.current?.priceScale('right').applyOptions({
+                  autoScale: true,
+                });
+              }, 0);
+            } else if (chartDataLoadedRef.current && currentVisibleRange && !forceRefresh) {
+              setTimeout(() => {
+                timeScale.setVisibleRange(currentVisibleRange);
+              }, 0);
+            } else if (!chartDataLoadedRef.current && processedCandles.length > 0) {
+              // First load zoom: show the most recent 250 candles
+              const count = Math.min(250, processedCandles.length);
+              const fromIndex = processedCandles.length - count;
+              setTimeout(() => {
+                timeScale.setVisibleRange({
+                  from: processedCandles[fromIndex].time as any,
+                  to: processedCandles[processedCandles.length - 1].time as any,
+                });
+                chartRef.current?.priceScale('right').applyOptions({
+                  autoScale: true,
+                });
+              }, 0);
+              chartDataLoadedRef.current = true; // Mark as loaded to prevent subsequent zoom resets
+            }
           }
           
           // Update mode state if loading was triggered
@@ -593,6 +712,7 @@ export default function TradesPage() {
   
   // Load full history function with caching
   const loadFullHistory = async () => {
+    latestProgressRef.current = { percent: 0, step: 'Counting rows...', total: 0 };
     setLoadProgress({ visible: true, percent: 0, step: 'Counting rows...', total: 0 });
 
     const cacheKey = activeTimeframe;
@@ -799,6 +919,20 @@ export default function TradesPage() {
   };
   
   // Handle year change - jump to January of selected year
+  // Handle timeframe change - keep visible center date and reset zoom/auto-scale
+  const handleTimeframeChange = (newTimeframe: string) => {
+    if (chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      if (visibleRange) {
+        const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
+        timeframeSwitchCenterTimeRef.current = centerTime;
+        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+      }
+    }
+    setActiveTimeframe(newTimeframe);
+  };
+
   const handleYearChange = (newYear: string) => {
     setSelectedYear(newYear);
     setSelectedMonth("01"); // Reset to January when year changes
@@ -883,14 +1017,13 @@ export default function TradesPage() {
     if (!chartRef.current) return;
     const ts = chartRef.current.timeScale();
     const current = ts.options().barSpacing ?? 8;
-    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 4) });
+    ts.applyOptions({ barSpacing: Math.max(current / 1.2, 0.01) });
   };
 
   const handleResetZoom = () => {
     if (!chartRef.current) return;
+    chartRef.current.priceScale('right').applyOptions({ autoScale: true });
     chartRef.current.timeScale().applyOptions({ barSpacing: 8 });
-    const centerDate = `${selectedYear}-${selectedMonth}-01`;
-    focusChartOnDate(centerDate, 0, chartCandles);
   };
 
   // Guard to prevent concurrent executions
@@ -1046,18 +1179,27 @@ export default function TradesPage() {
     // Use provided candles or fall back to state (for effect-triggered calls)
     const candlesToUse = candles ?? chartCandles;
 
-    // Filter structure lines by timeframe.
-    // On M15 chart we only draw M15-derived lines to avoid H1/H4/D1 clutter;
-    // on higher timeframes we keep all lines for broader context.
     const shouldFilterByTimeframe = activeTimeframe === "M15";
     const filterByTimeframe = <T extends { timeframe?: string }>(items: T[] | undefined | null): T[] => {
       if (!items) return [];
       return shouldFilterByTimeframe ? items.filter((item) => item.timeframe === "M15") : items;
     };
-    const filteredBosLines = filterByTimeframe(structureLines.bos_lines);
-    const filteredChochLines = filterByTimeframe(structureLines.choch_lines);
-    const filteredHhPoints = filterByTimeframe(structureLines.hh_points);
-    const filteredLlPoints = filterByTimeframe(structureLines.ll_points);
+
+    // Filter structure lines by date to only draw visible/recent lines (prevents drawing thousands of off-screen lines)
+    const fromTimestamp = candlesToUse.length > 0 ? candlesToUse[0].time : Date.parse(chartFromDate) / 1000;
+    const filterByDateRange = <T extends { timestamp: number }>(items: T[] | undefined | null): T[] => {
+      if (!items) return [];
+      const threshold = fromTimestamp - 7 * 24 * 3600; // 7-day padding
+      return items.filter((item) => {
+        const t = item.timestamp > 1e10 ? Math.floor(item.timestamp / 1000) : item.timestamp;
+        return t >= threshold;
+      });
+    };
+
+    const filteredBosLines = filterByDateRange(filterByTimeframe(structureLines.bos_lines));
+    const filteredChochLines = filterByDateRange(filterByTimeframe(structureLines.choch_lines));
+    const filteredHhPoints = filterByDateRange(filterByTimeframe(structureLines.hh_points));
+    const filteredLlPoints = filterByDateRange(filterByTimeframe(structureLines.ll_points));
 
     // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
     const candleTimeMap = new Map<number, ChartCandle>();
@@ -1303,35 +1445,51 @@ export default function TradesPage() {
     // - BoS/CHoCH Bullish at price X → the level is an HH (higher high) → search HH points
     // - BoS/CHoCH Bearish at price X → the level is an LL (lower low)  → search LL points
     // We keep the OLDEST (earliest) occurrence (first time that level was formed).
+    const PRICE_TOLERANCE_VAL = 0.05;
+    const getPriceBucket = (p: number) => Math.round(p / PRICE_TOLERANCE_VAL);
+
+    // Pre-group HH points by price bucket for O(1) lookup
+    const hhFormationMap = new Map<number, number>();
+    filteredHhPoints.forEach(point => {
+      const bucket = getPriceBucket(point.price);
+      const t = point.timestamp > 1e10 ? Math.floor(point.timestamp / 1000) : point.timestamp;
+      const existing = hhFormationMap.get(bucket);
+      if (existing === undefined || t < existing) {
+        hhFormationMap.set(bucket, t);
+      }
+    });
+
+    // Pre-group LL points by price bucket for O(1) lookup
+    const llFormationMap = new Map<number, number>();
+    filteredLlPoints.forEach(point => {
+      const bucket = getPriceBucket(point.price);
+      const t = point.timestamp > 1e10 ? Math.floor(point.timestamp / 1000) : point.timestamp;
+      const existing = llFormationMap.get(bucket);
+      if (existing === undefined || t < existing) {
+        llFormationMap.set(bucket, t);
+      }
+    });
+
+    // Helper: find when a price level was first formed in HH/LL data.
     const findLevelFormationTime = (
       levelPrice: number,
       direction: string, // 'BULLISH' or 'BEARISH'
     ): number | undefined => {
-      // Bullish BoS/CHoCH forms an HH level, so look in HH points
-      // Bearish BoS/CHoCH forms an LL level, so look in LL points
       const isBullish = direction === 'BULLISH';
-      const levelPoints = isBullish
-        ? (filteredHhPoints)
-        : (filteredLlPoints);
-
-      // Find the matching price level (allow small tolerance for floating point)
-      const tolerance = 0.05;
+      const bucket = getPriceBucket(levelPrice);
+      
       let matchTime: number | undefined;
-
-      for (const point of levelPoints) {
-        if (Math.abs(point.price - levelPrice) < tolerance) {
-          const pointTimeSec = point.timestamp > 10000000000
-            ? Math.floor(point.timestamp / 1000)
-            : point.timestamp;
-          // Keep the oldest (earliest) formation time
-          if (matchTime === undefined || pointTimeSec < matchTime) {
-            matchTime = pointTimeSec;
+      const mapToUse = isBullish ? hhFormationMap : llFormationMap;
+      
+      // Check target bucket and adjacent buckets for floating point tolerance
+      for (const b of [bucket - 1, bucket, bucket + 1]) {
+        const t = mapToUse.get(b);
+        if (t !== undefined) {
+          if (matchTime === undefined || t < matchTime) {
+            matchTime = t;
           }
         }
       }
-
-      // No log
-
       return matchTime;
     };
 
@@ -1499,6 +1657,11 @@ export default function TradesPage() {
       });
       structureSeriesRef.current = [];
       structureLinesVersionRef.current = '';
+      
+      const overlayEl = document.getElementById('structure-labels-overlay');
+      if (overlayEl) {
+        overlayEl.innerHTML = '';
+      }
       return;
     }
 
@@ -1558,7 +1721,7 @@ export default function TradesPage() {
     }
   }, [showEMA200]);
 
-  // On first chart data load — set visible range to show all candles
+  // On first chart data load — mark as loaded (zoom range is handled by loadChartData)
   useEffect(() => {
     console.log('📏 ChartCandles effect: trigger', {
       chartRef: !!chartRef.current,
@@ -1569,15 +1732,12 @@ export default function TradesPage() {
     });
     if (!chartRef.current || chartCandles.length === 0 || chartDataLoadedRef.current) return;
     chartDataLoadedRef.current = true;
-    const ts = chartRef.current.timeScale();
-    const first = chartCandles[0].time;
-    const last = chartCandles[chartCandles.length - 1].time;
-    const pad = (last - first) * 0.02;
-    console.log('📏 ChartCandles effect: setting range', {
-      first: new Date(first * 1000).toISOString(),
-      last: new Date(last * 1000).toISOString(),
-    });
-    ts.setVisibleRange({ from: (first - pad) as any, to: (last + pad) as any });
+    // Disabled to prevent squashing/zooming out all history on refresh. The latest 250 candles zoom is managed by loadChartData.
+    // const ts = chartRef.current.timeScale();
+    // const first = chartCandles[0].time;
+    // const last = chartCandles[chartCandles.length - 1].time;
+    // const pad = (last - first) * 0.02;
+    // ts.setVisibleRange({ from: (first - pad) as any, to: (last + pad) as any });
   }, [chartCandles]);
 
   // Toggle trade entries overlay
@@ -1589,11 +1749,34 @@ export default function TradesPage() {
   useEffect(() => {
     if (!loadProgress.visible) return;
     let rafId: number;
+    let currentPercent = 0;
+    
     const sync = () => {
       setLoadProgress(prev => {
+        // Guard: don't update if modal already closed
+        if (!prev.visible) return prev;
+
         const l = latestProgressRef.current;
-        return l.percent !== prev.percent || l.step !== prev.step
-          ? { ...prev, ...l }
+        
+        let target = l.percent;
+        // If backend hasn't reported progress yet, creep from 0% up to 18% slowly
+        if (target <= 0) {
+          currentPercent = Math.min(18, currentPercent + 0.12);
+        } else {
+          currentPercent = currentPercent + (target - currentPercent) * 0.15;
+        }
+        
+        const displayVal = Math.min(100, Math.round(currentPercent));
+        const displayStep = l.step || prev.step || 'Counting rows...';
+        const displayTotal = l.total || prev.total || 0;
+
+        // Auto-close once interpolated value hits 100 and backend confirms done
+        if (displayVal >= 100 && target >= 100) {
+          return { visible: false, percent: 100, step: '', total: displayTotal };
+        }
+        
+        return displayVal !== prev.percent || displayStep !== prev.step || displayTotal !== prev.total
+          ? { visible: true, percent: displayVal, step: displayStep, total: displayTotal }
           : prev;
       });
       rafId = requestAnimationFrame(sync);
@@ -1641,6 +1824,16 @@ export default function TradesPage() {
 
   const changeTimeframe = (tf: string) => {
     console.log('🔄 Changing timeframe to:', tf);
+    
+    if (chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const visibleRange = timeScale.getVisibleRange();
+      if (visibleRange) {
+        const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
+        timeframeSwitchCenterTimeRef.current = centerTime;
+        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+      }
+    }
     
     // Check if we need to clear cache
     const previousTimeframe = activeTimeframe;
@@ -1920,7 +2113,8 @@ export default function TradesPage() {
           </div>
           <div 
             ref={chartContainerRef} 
-            className="w-full rounded-xl overflow-hidden relative" 
+            id="chart-container" 
+            className="w-full rounded-xl overflow-hidden relative bg-slate-950/20" 
             style={{ height: "700px" }}
           >
             <div 
@@ -1936,137 +2130,292 @@ export default function TradesPage() {
           </div>
         </div>
 
-        {/* Trades Table */}
-        <div className="glass-card">
-          <div className="flex justify-between items-center mb-6">
-            <span className="text-xl font-semibold">💼 Recent Trades</span>
-            
-            {/* Filter Tabs */}
-            <div className="flex gap-2">
-              {["all", "open", "closed", "profit", "loss"].map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => filterTrades(filter)}
-                  className={`px-4 py-2 rounded-lg text-sm transition-all capitalize ${
-                    activeFilter === filter
-                      ? "bg-[var(--neon-blue)] text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]"
-                      : "bg-[var(--glass-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Tab Switcher for Bottom Section */}
+        <div className="flex gap-4 mb-4">
+          <button
+            onClick={() => setActiveBottomTab('recent-trades')}
+            className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeBottomTab === 'recent-trades'
+                ? "bg-[var(--neon-blue)] text-white shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+            }`}
+          >
+            <span>💼</span> Recent Trades
+          </button>
+          <button
+            onClick={() => setActiveBottomTab('monthly-summary')}
+            className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeBottomTab === 'monthly-summary'
+                ? "bg-[var(--neon-blue)] text-white shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+            }`}
+          >
+            <span>📋</span> Monthly Summary
+          </button>
+        </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[rgba(100,116,139,0.2)]">
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Trade ID
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Symbol
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Type
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Entry
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Exit
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Lot Size
-                  </th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    P&L
-                  </th>
-                  <th className="text-center py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
-                    Time
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTrades.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={9}
-                      className="text-center py-12 text-[var(--text-tertiary)]"
-                    >
-                      No trades found
-                    </td>
+        {activeBottomTab === 'recent-trades' ? (
+          <div className="glass-card">
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-xl font-semibold">💼 Recent Trades</span>
+              
+              {/* Filter Tabs */}
+              <div className="flex gap-2">
+                {["all", "open", "closed", "profit", "loss"].map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => filterTrades(filter)}
+                    className={`px-4 py-2 rounded-lg text-sm transition-all capitalize ${
+                      activeFilter === filter
+                        ? "bg-[var(--neon-blue)] text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]"
+                        : "bg-[var(--glass-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[rgba(100,116,139,0.2)]">
+                    <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Trade ID
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Symbol
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Type
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Entry
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Exit
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Lot Size
+                    </th>
+                    <th className="text-right py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      P&L
+                    </th>
+                    <th className="text-center py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Status
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs uppercase tracking-wider text-[var(--text-tertiary)]">
+                      Time
+                    </th>
                   </tr>
-                ) : (
-                  filteredTrades.map((trade) => (
-                    <tr
-                      key={trade.trade_id}
-                      className="border-b border-[rgba(100,116,139,0.1)] hover:bg-[var(--bg-elevated)] transition-colors"
-                    >
-                      <td className="py-3 px-4 mono text-xs">
-                        {trade.trade_id.substring(0, 8)}...
-                      </td>
-                      <td className="py-3 px-4 font-medium">
-                        {trade.symbol}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                            trade.type === "BUY"
-                              ? "bg-[rgba(16,185,129,0.2)] text-[var(--neon-emerald)]"
-                              : "bg-[rgba(239,68,68,0.2)] text-[var(--neon-ruby)]"
-                          }`}
-                        >
-                          {trade.type}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right mono">
-                        {trade.entry_price.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 text-right mono">
-                        {trade.exit_price ? trade.exit_price.toFixed(2) : "-"}
-                      </td>
-                      <td className="py-3 px-4 text-right mono">
-                        {trade.lot_size.toFixed(2)}
-                      </td>
-                      <td className="py-3 px-4 text-right mono">
-                        <span
-                          className={`font-semibold ${
-                            trade.pnl >= 0 ? "positive" : "negative"
-                          }`}
-                        >
-                          {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                            trade.status === "OPEN"
-                              ? "bg-[rgba(251,191,36,0.2)] text-[var(--neon-amber)]"
-                              : trade.pnl >= 0
-                              ? "bg-[rgba(16,185,129,0.2)] text-[var(--neon-emerald)]"
-                              : "bg-[rgba(239,68,68,0.2)] text-[var(--neon-ruby)]"
-                          }`}
-                        >
-                          {trade.status}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-[var(--text-tertiary)]">
-                        {new Date(trade.open_time).toLocaleString()}
+                </thead>
+                <tbody>
+                  {filteredTrades.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="text-center py-12 text-[var(--text-tertiary)]"
+                      >
+                        No trades found
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredTrades.map((trade) => (
+                      <tr
+                        key={trade.trade_id}
+                        className="border-b border-[rgba(100,116,139,0.1)] hover:bg-[var(--bg-elevated)] transition-colors"
+                      >
+                        <td className="py-3 px-4 mono text-xs">
+                          {trade.trade_id.substring(0, 8)}...
+                        </td>
+                        <td className="py-3 px-4 font-medium">
+                          {trade.symbol}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                              trade.type === "BUY"
+                                ? "bg-[rgba(16,185,129,0.2)] text-[var(--neon-emerald)]"
+                                : "bg-[rgba(239,68,68,0.2)] text-[var(--neon-ruby)]"
+                            }`}
+                          >
+                            {trade.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right mono">
+                          {trade.entry_price.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right mono">
+                          {trade.exit_price ? trade.exit_price.toFixed(2) : "-"}
+                        </td>
+                        <td className="py-3 px-4 text-right mono">
+                          {trade.lot_size.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4 text-right mono">
+                          <span
+                            className={`font-semibold ${
+                              trade.pnl >= 0 ? "positive" : "negative"
+                            }`}
+                          >
+                            {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                              trade.status === "OPEN"
+                                ? "bg-[rgba(251,191,36,0.2)] text-[var(--neon-amber)]"
+                                : trade.pnl >= 0
+                                ? "bg-[rgba(16,185,129,0.2)] text-[var(--neon-emerald)]"
+                                : "bg-[rgba(239,68,68,0.2)] text-[var(--neon-ruby)]"
+                            }`}
+                          >
+                            {trade.status}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-[var(--text-tertiary)]">
+                          {new Date(trade.open_time).toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="glass-card">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl font-semibold">📋 Monthly Performance Summary</h2>
+              
+              {/* Filter Controls (Year Dropdown & Profit/Loss Tabs mixed with glassmorphism) */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Year Select Dropdown (Custom Glassmorphism) */}
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 font-medium">Tahun:</span>
+                    <button
+                      onClick={() => setIsYearDropdownOpen((prev) => !prev)}
+                      className="flex items-center justify-between gap-2 bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none hover:bg-cyan-500/15 transition-all cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.1)] min-w-[75px]"
+                    >
+                      <span>{monthlySummaryYearFilter}</span>
+                      <span className="text-[10px] text-cyan-400">▼</span>
+                    </button>
+                  </div>
+
+                  {isYearDropdownOpen && (
+                    <>
+                      {/* Invisible backdrop click handler to close dropdown */}
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setIsYearDropdownOpen(false)}
+                      />
+                      <div className="absolute right-0 mt-1.5 w-24 bg-slate-900/90 border border-slate-800 rounded-lg shadow-2xl backdrop-blur-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        {availableYears.map((year) => (
+                          <button
+                            key={year}
+                            onClick={() => {
+                              setMonthlySummaryYearFilter(year);
+                              setIsYearDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 font-medium cursor-pointer ${
+                              monthlySummaryYearFilter === year ? "text-cyan-400 bg-cyan-500/5" : "text-slate-300"
+                            }`}
+                          >
+                            {year}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Performance Status Tabs */}
+                <div className="flex bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+                  {(['all', 'profit', 'loss'] as const).map((perfFilter) => (
+                    <button
+                      key={perfFilter}
+                      onClick={() => setMonthlySummaryPerformanceFilter(perfFilter)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                        monthlySummaryPerformanceFilter === perfFilter
+                          ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+                      }`}
+                    >
+                      {perfFilter === 'all' ? 'Semua' : perfFilter === 'profit' ? 'Profit Only' : 'Loss Only'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-hidden">
+              <table className="w-full border-collapse text-sm">
+                <thead className="bg-slate-900/30 border-b border-slate-800/60">
+                  <tr>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Month</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Trades</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Win Rate</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Profit</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Loss</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Net P&L</th>
+                    <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Return %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    const filteredMonthlyPNL = monthlyPNL.filter((month) => {
+                      if (monthlySummaryYearFilter !== "all" && String(month.year) !== monthlySummaryYearFilter) {
+                        return false;
+                      }
+                      const netProfit = month.net_profit ?? 0;
+                      if (monthlySummaryPerformanceFilter === "profit" && netProfit <= 0) {
+                        return false;
+                      }
+                      if (monthlySummaryPerformanceFilter === "loss" && netProfit >= 0) {
+                        return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredMonthlyPNL.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={7} className="px-4 py-12 text-center text-slate-400 italic">
+                            Tidak ada ringkasan bulanan yang cocok dengan kriteria filter.
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredMonthlyPNL.map((month, idx) => (
+                      <tr
+                        key={idx}
+                        onClick={() => handleMonthRowClick(month.year, month.month_num, month.month_label || `${month.month} ${month.year}`)}
+                        className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
+                        title="Klik untuk melihat detail transaksi"
+                      >
+                        <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap mono">{month.executed_trades ?? month.trades ?? 0}</td>
+                        <td className={`px-4 py-3.5 whitespace-nowrap ${(month.win_rate ?? 0) >= 60 ? "positive" : "neutral"}`}>{(month.win_rate ?? 0).toFixed(1)}%</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold positive">{(month.profit ?? 0).toFixed(2)}</td>
+                        <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold negative">{(month.loss ?? 0).toFixed(2)}</td>
+                        <td className={`px-4 py-3.5 whitespace-nowrap mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "positive" : "negative"}`}>
+                          {(month.net_profit ?? 0) >= 0 ? "+" : ""}{(month.net_profit ?? 0).toFixed(2)}
+                        </td>
+                        <td className={`px-4 py-3.5 whitespace-nowrap mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "positive" : "negative"}`}>
+                          {((month.net_profit ?? 0) / 1000 * 100).toFixed(2)}%
+                        </td>
+                      </tr>
+                    ));
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         </div>
 
         {/* Progress popup for Load Full History */}
@@ -2087,9 +2436,146 @@ export default function TradesPage() {
               </div>
               <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
                   style={{ width: `${loadProgress.percent}%` }}
                 />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Monthly Trades Detail Modal */}
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
+            <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+              {/* Premium Gradient Top Accent Line */}
+              <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
+              
+              {/* Header */}
+              <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
+                    <CalendarDays className="size-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                      Detail Transaksi - {modalTitle}
+                    </h3>
+                    <p className="text-xs text-slate-400">
+                      Daftar transaksi yang ditutup pada bulan ini
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                  title="Tutup"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+
+              {/* Content Area */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                {isLoadingTrades ? (
+                  <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                    <Loader2 className="size-8 text-cyan-500 animate-spin" />
+                    <span className="text-sm">Memuat data transaksi...</span>
+                  </div>
+                ) : selectedMonthTrades.length === 0 ? (
+                  <div className="py-20 text-center text-slate-400 text-sm italic">
+                    Tidak ada transaksi yang tercatat pada bulan ini.
+                  </div>
+                ) : (
+                  <>
+                    {/* Summary Dashboard Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
+                        <span className="text-2xl font-bold text-slate-200 mono">{selectedMonthTrades.length}</span>
+                      </div>
+                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
+                        <span className="text-2xl font-bold text-cyan-400 mono">
+                          {(() => {
+                            const wins = selectedMonthTrades.filter(t => t.net_profit > 0).length;
+                            return ((wins / selectedMonthTrades.length) * 100).toFixed(1);
+                          })()}%
+                        </span>
+                      </div>
+                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                        <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
+                        <span className={`text-2xl font-bold mono ${
+                          selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-emerald-400" : "text-rose-500"
+                        }`}>
+                          {selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "+" : ""}
+                          ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Trades Detail Table */}
+                    <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                            <tr>
+                              <th className="py-3 px-4">Ticket</th>
+                              <th className="py-3 px-4">Type</th>
+                              <th className="py-3 px-4 text-right">Lot</th>
+                              <th className="py-3 px-4 text-right">Entry Price</th>
+                              <th className="py-3 px-4 text-right">Exit Price</th>
+                              <th className="py-3 px-4 text-right">Net Profit</th>
+                              <th className="py-3 px-4">Entry Time</th>
+                              <th className="py-3 px-4">Exit Time</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                            {[...selectedMonthTrades]
+                              .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
+                              .map((trade) => {
+                                const isWin = trade.net_profit >= 0;
+                                return (
+                                  <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors">
+                                    <td className="py-3 px-4 mono text-xs text-slate-400">#{trade.ticket}</td>
+                                    <td className="py-3 px-4">
+                                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                                        trade.type === "BUY" 
+                                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                          : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                      }`}>
+                                        {trade.type}
+                                      </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-right mono">{trade.lot_size.toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right mono">${trade.entry_price.toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right mono">${trade.exit_price.toFixed(2)}</td>
+                                    <td className={`py-3 px-4 text-right mono font-semibold ${
+                                      isWin ? "text-emerald-400" : "text-rose-500"
+                                    }`}>
+                                      {isWin ? "+" : ""}${trade.net_profit.toFixed(2)}
+                                    </td>
+                                    <td className="py-3 px-4 text-xs text-slate-400">{trade.entry_time}</td>
+                                    <td className="py-3 px-4 text-xs text-slate-400">{trade.exit_time}</td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+              
+              {/* Footer */}
+              <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+                <button
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                >
+                  Tutup
+                </button>
               </div>
             </div>
           </div>

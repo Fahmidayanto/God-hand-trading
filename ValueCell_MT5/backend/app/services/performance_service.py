@@ -768,3 +768,80 @@ def get_backtest_summary_from_csv(symbol: str = "XAUUSD", year: Optional[int] = 
     except Exception as e:
         logger.error(f"Error reading backtest summary CSV: {e}", exc_info=True)
         return {}
+
+
+def get_monthly_trades_from_csv(symbol: str = "XAUUSD", year: int = None, month: int = None) -> List[Dict]:
+    """
+    Get detailed trade list for a specific year and month from Backtest_Results CSV files.
+    """
+    import csv
+    from pathlib import Path
+    
+    trades = []
+    if not year or not month:
+        return []
+        
+    try:
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        backtest_dir = project_root / "Backtest_result"
+        
+        if not backtest_dir.exists():
+            logger.warning(f"Backtest directory not found: {backtest_dir}")
+            return []
+            
+        pattern = f"Backtest_Results_{symbol}_*.csv"
+        matching_files = list(backtest_dir.glob(pattern))
+        
+        # Filter files by year
+        files_to_process = []
+        for f in matching_files:
+            try:
+                parts = f.stem.split('_')
+                if len(parts) >= 4:
+                    date_parts = parts[-1].split('-')
+                    if len(date_parts) >= 1 and date_parts[0].isdigit():
+                        file_year = int(date_parts[0])
+                        if file_year == year:
+                            files_to_process.append(f)
+            except (ValueError, IndexError):
+                continue
+                
+        for csv_file in files_to_process:
+            with open(csv_file, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    if row.get('Status', '').upper() == 'REJECTED':
+                        continue
+                        
+                    exit_time_str = row.get('ExitTime', '')
+                    if not exit_time_str or exit_time_str == '1970.01.01 00:00:00':
+                        continue
+                        
+                    try:
+                        exit_dt = datetime.strptime(exit_time_str, '%Y.%m.%d %H:%M:%S')
+                        if exit_dt.year == year and exit_dt.month == month:
+                            trades.append({
+                                "ticket": row.get("Ticket", ""),
+                                "symbol": row.get("Symbol", symbol),
+                                "type": row.get("Type", ""),
+                                "entry_price": float(row.get("EntryPrice", 0) or 0),
+                                "exit_price": float(row.get("ExitPrice", 0) or 0),
+                                "sl": float(row.get("SL", 0) or 0),
+                                "tp": float(row.get("TP", 0) or 0),
+                                "net_profit": float(row.get("Net_Profit", 0) or 0),
+                                "session": row.get("Session", ""),
+                                "entry_time": row.get("EntryTime", ""),
+                                "exit_time": row.get("ExitTime", ""),
+                                "lot_size": float(row.get("LotSize", 0) or 0),
+                            })
+                    except (ValueError, TypeError, KeyError):
+                        continue
+                        
+        # Sort trades by exit time descending (most recent first)
+        trades.sort(key=lambda t: t.get("exit_time", ""), reverse=True)
+        return trades
+        
+    except Exception as e:
+        logger.error(f"Error reading backtest results for monthly trades: {e}", exc_info=True)
+        return []
+
