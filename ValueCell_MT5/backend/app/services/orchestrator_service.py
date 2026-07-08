@@ -144,7 +144,7 @@ def _fallback_decision() -> Dict[str, Any]:
 
 
 def _fetch_recent_structures(symbol: str = "XAUUSD", count: int = 50) -> List[Dict]:
-    """Fetch recent structure events from realtime_structures table."""
+    """Fetch recent structure events from llhhbosdata_xauusd table."""
     from app.core.database import get_db_conn, is_pool_ready
     if not is_pool_ready():
         logger.debug("[OrchestratorService] DB pool not ready, cannot fetch structures")
@@ -154,13 +154,13 @@ def _fetch_recent_structures(symbol: str = "XAUUSD", count: int = 50) -> List[Di
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT event_type, direction, price, timestamp
-                    FROM realtime_structures
-                    WHERE symbol = %s
-                    ORDER BY timestamp DESC
+                    SELECT type, direction_action, price, time
+                    FROM llhhbosdata_xauusd
+                    WHERE timeframe = 'M15' AND status IN ('Accepted', 'Confirmed')
+                    ORDER BY time DESC, id DESC
                     LIMIT %s
                     """,
-                    (symbol, count)
+                    (count,)
                 )
                 rows = cur.fetchall()
         
@@ -175,7 +175,7 @@ def _fetch_recent_structures(symbol: str = "XAUUSD", count: int = 50) -> List[Di
             })
         # Reverse to chronological order (oldest -> newest)
         events.reverse()
-        logger.debug(f"[OrchestratorService] Fetched {len(events)} structures from DB")
+        logger.debug(f"[OrchestratorService] Fetched {len(events)} structures from llhhbosdata_xauusd")
         return events
     except Exception as exc:
         logger.warning(f"[OrchestratorService] Failed to fetch structures: {exc}")
@@ -298,7 +298,7 @@ def build_agent_decision(
             "ml_prediction":    _dump("ml_prediction"),
             "risk_analysis":    _dump("risk_management"),
             "sentiment":        _dump("sentiment"),
-            "consensus_score":  round(result.get("final_confidence", 0.0), 4),
+            "consensus_score":  round(float(result.get("final_confidence", 0.0)), 4),
             "final_decision":   result.get("final_signal", "HOLD"),
             "trade_executed":   False,
         }

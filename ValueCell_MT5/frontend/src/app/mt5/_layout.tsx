@@ -8,6 +8,7 @@ import Performance from "./performance";
 import Agents from "./agents";
 import Settings from "./settings";
 import Database from "./database";
+import ReplayTrades from "./replay";
 
 const pages = [
   { path: "/mt5", Component: Dashboard },
@@ -17,6 +18,7 @@ const pages = [
   { path: "/mt5/agents", Component: Agents },
   { path: "/mt5/settings", Component: Settings },
   { path: "/mt5/database", Component: Database },
+  { path: "/mt5/replay", Component: ReplayTrades },
 ];
 
 export default function MT5Layout() {

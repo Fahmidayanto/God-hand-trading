@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Particles from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { Engine } from "@tsparticles/engine";
 import {
   Wallet,
   TrendingUp,
@@ -119,10 +117,6 @@ export default function PerformancePage() {
     } finally {
       setIsLoadingTrades(false);
     }
-  };
-
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine);
   };
 
   useEffect(() => {
@@ -346,7 +340,6 @@ export default function PerformancePage() {
     >
       <Particles
         id="tsparticles-performance"
-        init={particlesInit}
         options={{
             background: { color: { value: "transparent" } },
             fpsLimit: 60,

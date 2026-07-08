@@ -11,6 +11,7 @@ export default function MT5Sidebar() {
     { path: "/mt5/agents", label: "Agents", icon: "🤖" },
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },
     { path: "/mt5/database", label: "DB Inspector", icon: "💾" },
+    { path: "/mt5/replay", label: "Replay Trades", icon: "🎬" },
   ];
 
   const isActive = (path: string) => {

@@ -972,3 +972,207 @@ async def get_session_zones(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
         )
+
+
+@router.get("/replay/months")
+async def get_replay_months():
+    """
+    Get list of available years and months from the marketdata table in NeonDB.
+    """
+    from app.core.database import get_db_conn, is_pool_ready
+
+    if not is_pool_ready():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT EXTRACT(YEAR FROM time)::int AS y,
+                                    EXTRACT(MONTH FROM time)::int AS m
+                    FROM marketdata_xauusd_m15
+                    ORDER BY y, m
+                    """
+                )
+                month_rows = cur.fetchall()
+
+        return [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
+
+    except Exception as e:
+        logger.error(f"Replay months error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+@router.get("/replay")
+async def get_replay_data(
+    year_from: int = Query(..., description="Start year"),
+    month_from: int = Query(..., ge=1, le=12, description="Start month (1-12)"),
+    year_to: int = Query(..., description="End year"),
+    month_to: int = Query(..., ge=1, le=12, description="End month (1-12)"),
+    timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
+):
+    """
+    Fetch replay data for a custom date range from NeonDB.
+    Returns M15 candles (with EMA200), LLHH/BoS structure events, and backtest trades.
+    """
+    from datetime import date, timezone
+    from app.core.database import get_db_conn, is_pool_ready
+
+    def _ts(dt) -> int:
+        """Convert naive datetime (stored as UTC in DB) to UTC unix timestamp."""
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+
+    if not is_pool_ready():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    # Validate date range
+    try:
+        date_from = date(year_from, month_from, 1)
+        # Last day of end month
+        import calendar
+        last_day = calendar.monthrange(year_to, month_to)[1]
+        date_to = date(year_to, month_to, last_day)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date range: {e}")
+
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="Start date must be before end date")
+
+    table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
+    candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                # Fetch candles
+                cur.execute(
+                    f"""
+                    SELECT time, open, high, low, close, volume, ema200
+                    FROM {candle_table}
+                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    ORDER BY time ASC
+                    """,
+                    (date_from, date_to),
+                )
+                candle_rows = cur.fetchall()
+
+                # Fetch LLHH/BoS structure events
+                cur.execute(
+                    """
+                    SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time
+                    FROM llhhbosdata_xauusd
+                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    AND timeframe = %s
+                    ORDER BY time ASC
+                    """,
+                    (date_from, date_to, timeframe.upper()),
+                )
+                structure_rows = cur.fetchall()
+
+                # Fetch backtest trades
+                cur.execute(
+                    """
+                    SELECT ticket, type, entry_price, exit_price, sl, tp,
+                           net_profit, session, entry_time, exit_time, lot_size
+                    FROM backtest_results_xauusd
+                    WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s
+                    ORDER BY entry_time ASC
+                    """,
+                    (date_from, date_to),
+                )
+                trade_rows = cur.fetchall()
+
+                # Fetch available months for the dropdown
+                cur.execute(
+                    """
+                    SELECT DISTINCT EXTRACT(YEAR FROM time)::int AS y,
+                                    EXTRACT(MONTH FROM time)::int AS m
+                    FROM marketdata_xauusd_m15
+                    ORDER BY y, m
+                    """
+                )
+                month_rows = cur.fetchall()
+
+        candles = [
+            {
+                "time": _ts(r[0]),
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+                "volume": int(r[5]),
+                "ema200": float(r[6]) if r[6] is not None else None,
+            }
+            for r in candle_rows
+        ]
+
+        structures = [
+            {
+                "type": r[0].strip() if r[0] else "",
+                "direction": r[1].strip() if r[1] else "",
+                "price": float(r[2]) if r[2] else 0.0,
+                "time": _ts(r[3]),
+                "timeframe": r[4],
+                "status": r[5],
+                "previous_price": float(r[6]) if r[6] else None,
+                "previous_time": _ts(r[7]),
+            }
+            for r in structure_rows
+        ]
+
+        trades = [
+            {
+                "ticket": r[0],
+                "type": r[1],
+                "entry_price": float(r[2]) if r[2] else None,
+                "exit_price": float(r[3]) if r[3] else None,
+                "sl": float(r[4]) if r[4] else None,
+                "tp": float(r[5]) if r[5] else None,
+                "net_profit": float(r[6]) if r[6] else None,
+                "session": r[7],
+                "entry_time": _ts(r[8]),
+                "exit_time": _ts(r[9]),
+                "lot_size": float(r[10]) if r[10] else None,
+            }
+            for r in trade_rows
+        ]
+
+        available_months = [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
+
+        logger.info(
+            f"[Replay] Fetched {len(candles)} candles, {len(structures)} structures, "
+            f"{len(trades)} trades for {date_from} → {date_to}"
+        )
+
+        return {
+            "candles": candles,
+            "structures": structures,
+            "trades": trades,
+            "available_months": available_months,
+            "meta": {
+                "timeframe": timeframe.upper(),
+                "date_from": str(date_from),
+                "date_to": str(date_to),
+                "total_candles": len(candles),
+                "total_structures": len(structures),
+                "total_trades": len(trades),
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Replay data fetch error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+

@@ -6,11 +6,11 @@
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │         MetaTrader 5 Terminal (Live Market Data)                │    │
-│  │  • OHLCV bars forming (M15/H1/H4)                              │    │
+│  │  • OHLCV bars forming (M15/H1/H4)                               │    │
 │  │  • Price updates every tick                                     │    │
 │  └────────────────────────────────┬────────────────────────────────┘    │
-│                                   │                                    │ 
-│                                   ▼                                    │ 
+│                                   │                                     │ 
+│                                   ▼                                     │ 
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  Dev_Bot_v11.cs (MQL5 EA)                                       │    │
 │  │  (Active - Deteksi + Trading)                                   │    │
@@ -20,10 +20,10 @@
 │  │  • Export 8 CSV per M15 close                                   │    │
 │  │  • Visual markers on chart                                      │    │
 │  │  • Trading execution (Buy/Sell)                                 │    │
-│  └────────────────────────────────┬───────────────────────────────┘    │
-│                                   │                                    │ 
-│         Export .csv (Backtest_result - symlink dari MQL5/Files)        │ 
-│                                   ▼                                    │ 
+│  └────────────────────────────────┬────────────────────────────────┘    │
+│                                   │                                     │ 
+│         Export .csv (Backtest_result - symlink dari MQL5/Files)         │ 
+│                                   ▼                                     │ 
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  Backtest_result/                                               │    │
 │  │  ├── Backtest_Results_*.csv     ├── MarketData_M15_*.csv        │    │
@@ -31,9 +31,9 @@
 │  │  ├── LLHHBOSData_*.csv          ├── MarketData_H4_*.csv         │    │
 │  │  ├── MarketStructure_*.csv      └── SessionZone_*.csv           │    │
 │  └────────────────────────────────┬────────────────────────────────┘    │
-│                                   │                                    │
-│                      CSV Watcher Service (ON) 📁                       │
-│                                   ▼                                    │
+│                                   │                                     │
+│                      CSV Watcher Service (ON) 📁                          
+│                                   ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │  Pemetaan File CSV ke NeonDB:                                   │    │
 │  │  ├── LLHHBOSData_*.csv       ──> Tabel: llhhbosdata_xauusd      │    │
@@ -44,8 +44,8 @@
 │  │  ├── SessionZone_*.csv       ──> Tabel: sessionzone_xauusd      │    │
 │  │  └── Status Load             ──> Tabel: csv_load_log            │    │
 │  └────────────────────────────────┬────────────────────────────────┘    │
-│                                   │                                    │
-│                                   ▼                                    │
+│                                   │                                     │
+│                                   ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
 │  │                 KNOWLEDGE BASE (Storage)                        │    │
 │  │  ┌───────────────────────────────────────────────────────────┐  │    │
@@ -56,34 +56,34 @@
 │  │  │  • trade_outcomes (ML training data)                      │  │    │
 │  │  └───────────────────────────────────────────────────────────┘  │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
-│                                   ▼                                    │
+│                                   ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                    ORCHESTRATOR AGENT                          │    │
-│  │  (Coordinator - receives market data & triggers discussion)    │    │
+│  │                    ORCHESTRATOR AGENT                           │    │
+│  │  (Coordinator - receives market data & triggers discussion)     │    │
 │  └────────────────┬──────────────────────────┬─────────────────────┘    │
-│                   │                          │                        │ 
-│         ┌─────────┴─────────┬────────────────┴────────┬───────────┐    │
-│         ▼                   ▼                         ▼           ▼    │
-│  ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓  ┏━━━━━━━┓  │
-│  ┃  MARKET     ┃    ┃  ML MODEL   ┃    ┃   RISK      ┃  ┃ SENT. ┃  │
-│  ┃ STRUCTURE   ┃    ┃ PREDICTION  ┃    ┃ MANAGEMENT  ┃  ┃ AGENT ┃  │
-│  ┃   AGENT     ┃    ┃   AGENT     ┃    ┃   AGENT     ┃  ┃       ┃  │
-│  ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛  ┗━━━━━━━┛  │
-│         │                   │                         │           │    │
-│         └─────────┬─────────┴────────────────┬────────┴───────────┘    │
-│                   ▼                          ▼                        │ 
+│                   │                          │                          │ 
+│         ┌─────────┴─────────┬────────────────┴────────┬───────────┐     │
+│         ▼                   ▼                         ▼           ▼     │
+│  ┏━━━━━━━━━━━━━┓    ┏━━━━━━━━━━━━━┓            ┏━━━━━━━━━━━━━┓┏━━━━━━━┓ │
+│  ┃  MARKET     ┃    ┃  ML MODEL   ┃            ┃   RISK      ┃┃ SENT. ┃ │
+│  ┃ STRUCTURE   ┃    ┃ PREDICTION  ┃            ┃ MANAGEMENT  ┃┃ AGENT ┃ │
+│  ┃   AGENT     ┃    ┃   AGENT     ┃            ┃   AGENT     ┃┃       ┃ │
+│  ┗━━━━━━━━━━━━━┛    ┗━━━━━━━━━━━━━┛            ┗━━━━━━━━━━━━━┛┗━━━━━━━┛ │
+│         │                   │                         │           │     │
+│         └─────────┬─────────┴────────────────┬────────┴───────────┘     │
+│                   ▼                          ▼                          │ 
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                    CONSENSUS ENGINE                            │    │
-│  │  • Weighted voting system                                      │    │
-│  │  • Conflict resolution logic                                   │    │
-│  │  • Confidence aggregation                                      │    │
+│  │                    CONSENSUS ENGINE                             │    │
+│  │  • Weighted voting system                                       │    │
+│  │  • Conflict resolution logic                                    │    │
+│  │  • Confidence aggregation                                       │    │
 │  └────────────────────────────────┬────────────────────────────────┘    │
-│                                   ▼                                   │ 
+│                                   ▼                                     │ 
 │  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                   EXECUTION AGENT                              │    │
-│  │  • Order monitoring / logging                                  │    │
-│  │  • Position management                                         │    │
-│  │  • Risk controls (max position size, daily loss limit)         │    │
+│  │                   EXECUTION AGENT                               │    │
+│  │  • Order monitoring / logging                                   │    │
+│  │  • Position management                                          │    │
+│  │  • Risk controls (max position size, daily loss limit)          │    │
 │  └─────────────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```

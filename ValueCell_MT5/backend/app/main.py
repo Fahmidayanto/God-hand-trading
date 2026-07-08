@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs, database
+from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs, database, scenarios
 from app.config import get_settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -46,7 +46,7 @@ async def lifespan(app: FastAPI):
     watcher = None
     try:
         from app.core.database import init_db_pool
-        db_ready = init_db_pool(minconn=1, maxconn=5)
+        db_ready = init_db_pool(minconn=1, maxconn=20)
         if db_ready:
             logger.info("[DB] [OK] Neon PostgreSQL pool ready")
 
@@ -59,6 +59,7 @@ async def lifespan(app: FastAPI):
             # Start Track 2 CSV Watcher Service
             from app.services.csv_watcher_service import CSVWatcherService
             watcher = CSVWatcherService(check_interval_seconds=5)
+            app.state.watcher = watcher
             watcher.start()
             logger.info("[Watcher] [OK] CSV Watcher Service started")
         else:
@@ -206,6 +207,12 @@ app.include_router(
     database.router,
     prefix=f"{settings.API_V1_PREFIX}/database",
     tags=["Database"],
+)
+
+app.include_router(
+    scenarios.router,
+    prefix=f"{settings.API_V1_PREFIX}/scenarios",
+    tags=["Scenarios"],
 )
 
 # ValueCell legacy endpoints (for backward compatibility)

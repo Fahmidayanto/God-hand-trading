@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import Particles from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { Engine } from "@tsparticles/engine";
 import MT5Footer from "./components/MT5Footer";
 
 interface Agent {
@@ -73,10 +71,6 @@ export default function AgentsPage() {
     confidence: 0,
     threshold: 40,
   });
-
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine);
-  };
 
   useEffect(() => {
     loadAgentsData();
@@ -151,7 +145,6 @@ export default function AgentsPage() {
     >
       <Particles
         id="tsparticles-agents"
-        init={particlesInit}
         options={{
             background: { color: { value: "transparent" } },
             fpsLimit: 60,

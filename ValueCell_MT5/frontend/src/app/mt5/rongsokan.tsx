@@ -8,8 +8,6 @@ import {
   LineStyle,
 } from "lightweight-charts";
 import Particles from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { Engine } from "@tsparticles/engine";
 import { useRongsokanMarketStructureLines, useSessionZones, useRongsokanBacktestTrades, useRongsokanChartData, type BacktestTrade } from "@/api/mt5_agents";
 import {
   SessionZonesPrimitive,
@@ -310,10 +308,6 @@ export default function RongsokanPage() {
     const windowStart = new Date(`${centerDate}T00:00:00Z`);
     windowStart.setUTCMonth(windowStart.getUTCMonth() - 3);
     return windowStart.toISOString().split('T')[0];
-  };
-
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine);
   };
 
   useEffect(() => {
@@ -1741,7 +1735,6 @@ export default function RongsokanPage() {
     >
       <Particles
         id="tsparticles-rongsokan"
-        init={particlesInit}
         options={{
           background: { color: { value: "transparent" } },
           fpsLimit: 60,

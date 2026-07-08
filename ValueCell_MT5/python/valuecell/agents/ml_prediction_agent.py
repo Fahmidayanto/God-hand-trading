@@ -1,14 +1,12 @@
 """
 ML Prediction Agent - Entry Filter Model
 
-This agent uses a trained XGBoost model (92.6% accuracy) to predict
+This agent uses a trained entry-filter model to predict
 whether a market structure signal should be taken or filtered out.
 
 Model Details:
 - Type: XGBoost Binary Classifier
 - Features: 19 (market structure, H1 trend, price action, time/session)
-- Accuracy: 92.6%
-- F1-Score: 79.3%
 - Optimal Threshold: 0.7
 """
 
@@ -16,7 +14,6 @@ import os
 import joblib
 import json
 import pandas as pd
-import numpy as np
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
@@ -144,7 +141,10 @@ class MLPredictionAgent:
             
             # Prepare feature array (in correct order)
             feature_names = self.metadata["feature_names"]
-            feature_array = np.array([features[name] for name in feature_names]).reshape(1, -1)
+            feature_array = pd.DataFrame(
+                [[features[name] for name in feature_names]],
+                columns=feature_names,
+            )
             
             # Scale features
             feature_scaled = self.scaler.transform(feature_array)
@@ -305,9 +305,12 @@ class MLPredictionAgent:
             "name": self.name,
             "version": self.version,
             "type": "ml_prediction",
-            "description": "Entry filter model using XGBoost (92.6% accuracy)",
+            "description": (
+                "Entry filter model using "
+                f"{self.metadata.get('model_type', 'ML classifier')}"
+            ),
             "model_info": {
-                "type": "XGBoost",
+                "type": self.metadata.get("model_type", "ML classifier"),
                 "n_features": self.metadata.get("n_features", 0),
                 "accuracy": self.metadata.get("cv_accuracy_mean", 0),
                 "f1_score": self.metadata.get("cv_f1_mean", 0),

@@ -549,13 +549,15 @@ class Track1Pipeline:
         """Synchronous cycle executed in a thread pool executor."""
         self._cycle += 1
         cycle_start = datetime.utcnow()
-        logger.info(f"[Track1] Cycle {self._cycle} start at {cycle_start.isoformat()}")
+        # logger.info(f"[Track1] Cycle {self._cycle} start at {cycle_start.isoformat()}")
 
         try:
-            from app.services.orchestrator_service import run_orchestrator_from_db
-            run_orchestrator_from_db("XAUUSD")
+            # Scheduled orchestrator run disabled to reduce logs; triggered on-demand via CSV Watcher structure events
+            # from app.services.orchestrator_service import run_orchestrator_from_db
+            # run_orchestrator_from_db("XAUUSD")
             
             elapsed = (datetime.utcnow() - cycle_start).total_seconds()
-            logger.info(f"[Track1] Cycle {self._cycle} completed in {elapsed:.1f}s")
+            # logger.info(f"[Track1] Cycle {self._cycle} completed in {elapsed:.1f}s")
+            pass
         except Exception as exc:
             logger.error(f"[Track1] DB cycle error: {exc}", exc_info=True)

@@ -20,6 +20,16 @@ interface TableData {
   rows: Array<Record<string, any>>;
 }
 
+interface CsvSyncStatusItem {
+  filename: string;
+  table_name: string;
+  local_rows: number;
+  db_rows: number;
+  status: string;
+  loaded_at: string | null;
+  is_up_to_date: boolean;
+}
+
 const formatDatabaseDate = (val: string): string => {
   if (typeof val !== "string") return val;
   if (val.includes("T")) {
@@ -38,14 +48,26 @@ const formatDatabaseDate = (val: string): string => {
 };
 
 export default function Database() {
-  const [activeTab, setActiveTab] = useState<"neon" | "lance">("neon");
+  const [activeTab, setActiveTab] = useState<"neon" | "lance" | "sync">("neon");
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedTable, setSelectedTable] = useState<string>("llhhbosdata_xauusd");
   const [previewCache, setPreviewCache] = useState<Record<string, TableData>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [autoSync, setAutoSync] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ visible: false, percent: 0, step: "" });
   const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Sync monitor states
+  const [syncData, setSyncData] = useState<CsvSyncStatusItem[]>([]);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncSearch, setSyncSearch] = useState("");
+  const [syncFilter, setSyncFilter] = useState<"all" | "synced" | "pending" | "unsynced">("all");
+
+  // Sync diff modal states
+  const [selectedDiffFile, setSelectedDiffFile] = useState<string | null>(null);
+  const [diffData, setDiffData] = useState<{ type: string; count: number; columns: string[]; rows: any[] } | null>(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
 
   const TABLES_METADATA = [
     { value: "llhhbosdata_xauusd", label: "llhhbosdata_xauusd (Swing Events)" },
@@ -69,6 +91,42 @@ export default function Database() {
       setStats(data);
     } catch (err: any) {
       console.error(err);
+    }
+  };
+
+  const fetchSyncStatus = async (showLoading = true) => {
+    if (showLoading) {
+      setSyncLoading(true);
+    }
+    try {
+      const res = await fetch(`${API_BASE}/sync-status`);
+      if (!res.ok) throw new Error("Failed to fetch sync status");
+      const data = await res.json();
+      setSyncData(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      if (showLoading) {
+        setSyncLoading(false);
+      }
+    }
+  };
+
+  const handleOpenDiff = async (filename: string) => {
+    setSelectedDiffFile(filename);
+    setDiffLoading(true);
+    setDiffData(null);
+    setDiffError(null);
+    try {
+      const res = await fetch(`${API_BASE}/sync-diff?filename=${filename}`);
+      if (!res.ok) throw new Error("Failed to fetch sync diff");
+      const data = await res.json();
+      setDiffData(data);
+    } catch (err: any) {
+      console.error(err);
+      setDiffError(err.message || "Failed to load sync difference detail");
+    } finally {
+      setDiffLoading(false);
     }
   };
 
@@ -101,29 +159,113 @@ export default function Database() {
   useEffect(() => {
     if (activeTab === "neon") {
       fetchTablePreview(selectedTable);
+    } else if (activeTab === "sync") {
+      fetchSyncStatus();
     }
   }, [selectedTable, activeTab]);
 
-  // Interval for AutoSync
+  // 1. Check once on mount / tab switch to detect if backend is currently syncing
   useEffect(() => {
-    if (!autoSync) return;
-    const interval = setInterval(() => {
-      fetchStats();
-      if (activeTab === "neon") {
-        fetchTablePreview(selectedTable, true); // Silent background update
+    const checkInitialSync = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/sync-progress`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.is_syncing) {
+          setSyncProgress({
+            visible: true,
+            percent: data.percent,
+            step: data.step
+          });
+        }
+      } catch (err) {
+        console.error("Error checking initial sync:", err);
       }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [autoSync, selectedTable, activeTab]);
+    };
+    
+    if (activeTab === "sync") {
+      checkInitialSync();
+    }
+  }, [activeTab]);
+
+  // 2. Poll sync progress from backend ONLY when modal popup is visible
+  useEffect(() => {
+    if (!syncProgress.visible) return;
+    
+    let intervalId: any;
+    
+    const checkProgress = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/sync-progress`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.is_syncing) {
+          setSyncProgress({
+            visible: true,
+            percent: data.percent,
+            step: data.step
+          });
+        } else {
+          // Sync finished: reload data, show 100% and auto-close
+          fetchStats();
+          if (activeTab === "sync") fetchSyncStatus(false);
+          else fetchTablePreview(selectedTable, true);
+          
+          setSyncProgress({ visible: true, percent: 100, step: "Synchronized successfully!" });
+          
+          setTimeout(() => {
+            setSyncProgress({ visible: false, percent: 0, step: "" });
+          }, 800);
+        }
+      } catch (err) {
+        console.error("Error fetching sync progress:", err);
+      }
+    };
+
+    intervalId = setInterval(checkProgress, 1000); // Poll every 1 second
+
+    return () => clearInterval(intervalId);
+  }, [syncProgress.visible, activeTab, selectedTable]);
+
+  const handleManualSync = async () => {
+    setSyncProgress({ visible: true, percent: 0, step: "Triggering sync..." });
+    try {
+      const res = await fetch(`${API_BASE}/sync`, { method: "POST" });
+      if (!res.ok) throw new Error("Sync failed");
+    } catch (err) {
+      console.error(err);
+      setSyncProgress({ visible: true, percent: 0, step: "Error during synchronization" });
+      setTimeout(() => {
+        setSyncProgress(prev => ({ ...prev, visible: false }));
+      }, 2000);
+    }
+  };
 
   const handleRefresh = () => {
     fetchStats();
     if (activeTab === "neon") {
       fetchTablePreview(selectedTable, false); // force loading spinner
+    } else if (activeTab === "sync") {
+      fetchSyncStatus();
     }
   };
 
   const previewData = previewCache[selectedTable] || null;
+
+  const filteredSyncData = syncData.filter(item => {
+    const matchesSearch = item.filename.toLowerCase().includes(syncSearch.toLowerCase()) || 
+                          item.table_name.toLowerCase().includes(syncSearch.toLowerCase());
+    
+    if (syncFilter === "synced") {
+      return matchesSearch && item.is_up_to_date;
+    } else if (syncFilter === "pending") {
+      return matchesSearch && !item.is_up_to_date && item.status !== "not_synced";
+    } else if (syncFilter === "unsynced") {
+      return matchesSearch && item.status === "not_synced";
+    }
+    return matchesSearch;
+  });
 
   return (
     <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "hidden" }} className="db-inspector-scroll">
@@ -157,14 +299,11 @@ export default function Database() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setAutoSync(!autoSync)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 border ${
-              autoSync
-                ? "bg-emerald-600/20 text-emerald-400 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-pulse"
-                : "bg-slate-800/40 text-slate-400 hover:text-slate-200 border-slate-700/50 hover:bg-slate-800/80"
-            }`}
+            onClick={handleManualSync}
+            disabled={syncProgress.visible}
+            className="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-600/30 disabled:opacity-50 rounded-lg text-sm font-semibold transition-all flex items-center gap-2"
           >
-            ⏱️ Auto-Sync: {autoSync ? "ON" : "OFF"}
+            ⚡ Sync Now
           </button>
           <button
             onClick={handleRefresh}
@@ -197,6 +336,16 @@ export default function Database() {
           }`}
         >
           LanceDB (Vector Database)
+        </button>
+        <button
+          onClick={() => setActiveTab("sync")}
+          className={`px-4 py-2 font-semibold text-sm rounded-lg transition-all ${
+            activeTab === "sync"
+              ? "text-emerald-400 bg-emerald-500/10 shadow-[0_0_10px_rgba(16,185,129,0.15)]"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          CSV vs NeonDB (Sync Monitor)
         </button>
       </div>
 
@@ -365,6 +514,293 @@ export default function Database() {
               </p>
             </div>
           )}
+        </div>
+      )}
+
+      {/* SYNC MONITOR CONTENT */}
+      {activeTab === "sync" && (
+        <div>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md">
+              <span className="text-xs uppercase text-slate-500 font-semibold tracking-wider">Total CSV Files</span>
+              <h3 className="text-2xl font-bold text-slate-100 mt-1">
+                {syncData.length} <span className="text-xs font-normal text-slate-500">files</span>
+              </h3>
+            </div>
+            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md">
+              <span className="text-xs uppercase text-slate-500 font-semibold tracking-wider">Synced (Up to date)</span>
+              <h3 className="text-2xl font-bold text-emerald-400 mt-1">
+                {syncData.filter(d => d.is_up_to_date).length} <span className="text-xs font-normal text-slate-500">files</span>
+              </h3>
+            </div>
+            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md">
+              <span className="text-xs uppercase text-slate-500 font-semibold tracking-wider">Pending updates</span>
+              <h3 className="text-2xl font-bold text-amber-400 mt-1">
+                {syncData.filter(d => !d.is_up_to_date && d.status !== 'not_synced').length} <span className="text-xs font-normal text-slate-500">files</span>
+              </h3>
+            </div>
+            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md">
+              <span className="text-xs uppercase text-slate-500 font-semibold tracking-wider">Not Synced</span>
+              <h3 className="text-2xl font-bold text-slate-400 mt-1">
+                {syncData.filter(d => d.status === 'not_synced').length} <span className="text-xs font-normal text-slate-500">files</span>
+              </h3>
+            </div>
+          </div>
+
+          {/* Controls: Search and Filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-5 bg-slate-900/20 border border-slate-800/60 p-4 rounded-xl backdrop-blur-sm">
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <span className="text-sm text-slate-400 font-medium whitespace-nowrap">🔍 Search:</span>
+              <input
+                type="text"
+                placeholder="Search CSV files or tables..."
+                value={syncSearch}
+                onChange={(e) => setSyncSearch(e.target.value)}
+                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 px-4 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all text-sm font-semibold hover:bg-slate-900 shadow-inner w-full md:min-w-[280px]"
+              />
+            </div>
+            <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+              {["all", "synced", "pending", "unsynced"].map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setSyncFilter(type as any)}
+                  className={`px-3 py-1.5 text-xs rounded-lg border font-semibold uppercase transition-all whitespace-nowrap ${
+                    syncFilter === type
+                      ? "bg-blue-600/20 text-blue-400 border-blue-500/40 shadow-[0_0_10px_rgba(59,130,246,0.1)]"
+                      : "bg-slate-800/40 text-slate-400 border-slate-700/30 hover:text-slate-200 hover:bg-slate-800/80"
+                  }`}
+                >
+                  {type === "all" ? "All Files" : type === "synced" ? "Synced" : type === "pending" ? "Pending" : "Not Synced"}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Data Comparison Table */}
+          <div className="bg-slate-900/30 border border-slate-700/30 rounded-xl overflow-hidden backdrop-blur-md">
+            {syncLoading && syncData.length === 0 && <div className="p-8 text-center text-slate-400">Comparing CSV and Database logs...</div>}
+            {(!syncLoading || syncData.length > 0) && (
+              <div className="overflow-auto max-h-[500px] db-inspector-scroll">
+                <table className="w-full border-collapse text-sm text-left">
+                  <thead>
+                    <tr className="bg-slate-950/70 border-b border-slate-700/40">
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs">CSV Filename</th>
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs">Target Table</th>
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs text-right">Local Rows (CSV)</th>
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs text-right">DB Rows (Neon)</th>
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs text-center">Status</th>
+                      <th className="p-3 text-slate-400 font-semibold uppercase text-xs">Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/40">
+                    {filteredSyncData.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-slate-500">
+                          No matching files found.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredSyncData.map((item) => (
+                        <tr
+                          key={item.filename}
+                          onClick={() => handleOpenDiff(item.filename)}
+                          className="hover:bg-slate-800/30 transition-all cursor-pointer"
+                        >
+                          <td className="p-3 font-medium text-slate-200 max-w-[300px] truncate" title={item.filename}>
+                            {item.filename}
+                          </td>
+                          <td className="p-3 font-mono text-xs text-blue-400">
+                            {item.table_name}
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-300">
+                            {item.local_rows.toLocaleString()}
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-300">
+                            {item.db_rows.toLocaleString()}
+                          </td>
+                          <td className="p-3 text-center">
+                            {item.is_up_to_date ? (
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full tracking-wider uppercase">
+                                Synced
+                              </span>
+                            ) : item.status === "not_synced" ? (
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/30 rounded-full tracking-wider uppercase">
+                                Not Synced
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-full tracking-wider uppercase animate-pulse">
+                                Pending Sync
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-slate-400 font-mono text-xs">
+                            {item.loaded_at ? formatDatabaseDate(item.loaded_at) : "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SYNC DIFF MODAL DIALOG */}
+      {selectedDiffFile && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in-50 duration-200">
+          <div className="fixed inset-0" onClick={() => setSelectedDiffFile(null)} />
+          <div className="relative bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-950/40">
+              <div>
+                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <span>📊 Sync Difference Detail</span>
+                  {diffData?.type === "csv_extra" && (
+                    <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded font-semibold uppercase">
+                      Pending Import
+                    </span>
+                  )}
+                  {diffData?.type === "db_extra" && (
+                    <span className="text-xs bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded font-semibold uppercase">
+                      Extra DB Rows
+                    </span>
+                  )}
+                  {diffData?.type === "synced" && (
+                    <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-semibold uppercase">
+                      Synced
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5 truncate max-w-[600px]" title={selectedDiffFile}>
+                  File: {selectedDiffFile}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedDiffFile(null)}
+                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-slate-800/40 hover:bg-slate-800 rounded-lg h-8 w-8 flex items-center justify-center"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 p-6 overflow-y-auto min-h-[300px] flex flex-col justify-between">
+              {diffLoading && (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 gap-3 py-16">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-semibold">Scanning files and comparing rows...</span>
+                </div>
+              )}
+
+              {!diffLoading && diffError && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="bg-red-500/10 border border-red-500/20 text-red-300 p-4 rounded-xl text-sm text-center max-w-lg">
+                    <div className="font-bold mb-1">Gagal memuat detail perbandingan</div>
+                    <div>{diffError}</div>
+                  </div>
+                </div>
+              )}
+
+              {!diffLoading && !diffError && diffData && (
+                <div className="space-y-4 flex-1 flex flex-col">
+                  {/* Summary Banner */}
+                  {diffData.type === "csv_extra" && (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-4 rounded-xl text-sm flex flex-col gap-1">
+                      <span className="font-bold">⚠️ Temuan Selisih: Data Baru di CSV</span>
+                      <span>
+                        Terdapat <strong>{diffData.count.toLocaleString()} baris</strong> yang hanya ada di CSV dan tidak ada di NeonDB. Tabel di bawah hanya menampilkan selisih tersebut:
+                      </span>
+                    </div>
+                  )}
+                  {diffData.type === "db_extra" && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 p-4 rounded-xl text-sm flex flex-col gap-1">
+                      <span className="font-bold">ℹ️ Temuan Selisih: Data Lebih Banyak di Database</span>
+                      <span>
+                        Terdapat <strong>{diffData.count.toLocaleString()} baris</strong> yang hanya ada di NeonDB dan tidak ada di CSV lokal. Tabel di bawah hanya menampilkan selisih tersebut:
+                      </span>
+                    </div>
+                  )}
+                  {diffData.type === "synced" && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-4 rounded-xl text-sm flex flex-col gap-1 text-center py-10">
+                      <span className="font-bold text-lg">✅ Sinkronisasi Sempurna</span>
+                      <span>Tidak ada baris yang hanya muncul di salah satu sisi. CSV dan NeonDB sudah sama untuk file ini.</span>
+                    </div>
+                  )}
+
+                  {/* Diff Table */}
+                  {diffData.count > 0 && (
+                    <div className="border border-slate-700/30 rounded-xl overflow-hidden bg-slate-950/40 flex-1 min-h-[250px] max-h-[400px] flex flex-col">
+                      <div className="overflow-auto flex-1 db-inspector-scroll">
+                        <table className="w-full border-collapse text-left text-xs">
+                          <thead>
+                            <tr className="bg-slate-950 sticky top-0 border-b border-slate-800 z-10">
+                              <th className="p-2.5 text-slate-500 font-bold uppercase text-[10px] w-12 text-center">Row</th>
+                              {diffData.columns.map((col) => (
+                                <th key={col} className="p-2.5 text-slate-400 font-semibold uppercase text-[10px] whitespace-nowrap">
+                                  {col}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-900/40">
+                            {diffData.rows.map((row, idx) => (
+                              <tr key={idx} className="hover:bg-slate-900/60 font-mono">
+                                <td className="p-2 text-center text-slate-600 bg-slate-950/10">{idx + 1}</td>
+                                {diffData.columns.map((col) => {
+                                  const val = row[col];
+                                  return (
+                                    <td key={col} className="p-2 text-slate-300 max-w-[200px] truncate" title={String(val)}>
+                                      {val === null ? "NULL" : String(val)}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end px-6 py-4 border-t border-slate-800 bg-slate-950/30 gap-3">
+              <button
+                onClick={() => setSelectedDiffFile(null)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Progress popup for Sync Now */}
+      {syncProgress.visible && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[9999] backdrop-blur-sm animate-in fade-in duration-100">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-6 shadow-2xl w-96">
+            <div className="text-center mb-4">
+              <div className="text-emerald-400 font-semibold text-sm mb-2">
+                🔄 Syncing CSV to NeonDB
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">
+                {syncProgress.percent}%
+              </div>
+              <div className="text-xs text-slate-400">{syncProgress.step}</div>
+            </div>
+            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-200"
+                style={{ width: `${syncProgress.percent}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
       </div>

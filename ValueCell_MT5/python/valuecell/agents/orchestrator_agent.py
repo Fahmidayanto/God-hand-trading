@@ -150,83 +150,107 @@ class OrchestratorAgent:
                 )
                 agent_results["market_structure"] = ms_result
                 logger.info(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")
-            
-            # === STEP 2: ML Prediction Validation ===
-            if "ml_prediction" in self.agents and agent_results.get("market_structure"):
-                logger.info("🤖 Step 2: ML Prediction Validation...")
-                
-                # Only validate if market structure gave a signal or pre_signal warm-up is active
-                ms_signal = agent_results["market_structure"]["signal"]
-                pre_signal = agent_results["market_structure"].get("pre_signal")
-                is_warmup = ms_signal == "HOLD" and pre_signal is not None
-                
-                if ms_signal in ["BUY", "SELL"] or is_warmup:
-                    target_signal = ms_signal
-                    if is_warmup:
-                        pre_dir = pre_signal.get("direction", "Bullish")
-                        target_signal = "BUY" if pre_dir == "Bullish" else "SELL"
-                        logger.info(f"   → Warm-up mode activated for {target_signal}")
-
-                    ml_result = self.agents["ml_prediction"].analyze(
-                        market_data={
-                            "current_bar": market_data["current_bar"],
-                            "structure_events": market_data.get("structure_events", []),
-                            "h1_data": market_data.get("h1_data"),
-                            "m15_history": market_data.get("m15_history")
-                        },
-                        structure_signal=target_signal,
-                        symbol=symbol,
-                        timeframe=timeframe
-                    )
-                    agent_results["ml_prediction"] = ml_result
-                    if is_warmup:
-                        logger.info(f"   → Warm-up ML Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
-                    else:
-                        logger.info(f"   → Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
-                else:
-                    logger.info(f"   → Skipped (MS signal: {ms_signal})")
-            
-            # === STEP 3: Sentiment Analysis ===
-            if "sentiment" in self.agents and agent_results.get("market_structure"):
-                logger.info("📰 Step 3: Sentiment Analysis...")
-                
-                ms_result = agent_results["market_structure"]
-                ml_result = agent_results.get("ml_prediction")
-                
-                # Check for pre_signal warmup
+                # === STEP 2 & 3: ML Validation & Sentiment Analysis ===
+            ms_result = agent_results.get("market_structure")
+            if ms_result:
                 ms_signal = ms_result["signal"]
                 pre_signal = ms_result.get("pre_signal")
                 is_warmup = ms_signal == "HOLD" and pre_signal is not None
                 
-                base_confidence = ms_result["confidence"]
-                base_signal = ms_signal
+                run_ml = "ml_prediction" in self.agents and (ms_signal in ["BUY", "SELL"] or is_warmup)
+                run_sent = "sentiment" in self.agents
                 
-                if is_warmup:
-                    pre_dir = pre_signal.get("direction", "Bullish")
-                    base_signal = "BUY" if pre_dir == "Bullish" else "SELL"
-                    base_confidence = pre_signal.get("initial_confidence", 0.40)
+                if is_warmup and run_ml and run_sent:
+                    logger.info("⚡ Warm-up mode: Executing ML Agent and Sentiment Agent in PARALLEL...")
                     
-                if ml_result:
-                    # In normal or warmup mode, ML overrides if it ran
-                    base_confidence = ml_result["confidence"]
-                    base_signal = ml_result["signal"]
-                
-                if base_signal in ["BUY", "SELL"]:
-                    sentiment_result = self.agents["sentiment"].analyze(
-                        signal=base_signal,
-                        confidence=base_confidence,
-                        current_time=market_data["current_bar"]["time"],
-                        news_headlines=market_data.get("news_headlines"),
-                        upcoming_events=market_data.get("upcoming_events"),
-                        symbol=symbol
-                    )
+                    pre_dir = pre_signal.get("direction", "Bullish")
+                    warmup_signal = "BUY" if pre_dir == "Bullish" else "SELL"
+                    warmup_conf = pre_signal.get("initial_confidence", 0.40)
+                    
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                        # Submit ML Agent
+                        future_ml = executor.submit(
+                            self.agents["ml_prediction"].analyze,
+                            market_data={
+                                "current_bar": market_data["current_bar"],
+                                "structure_events": market_data.get("structure_events", []),
+                                "h1_data": market_data.get("h1_data"),
+                                "m15_history": market_data.get("m15_history")
+                            },
+                            structure_signal=warmup_signal,
+                            symbol=symbol,
+                            timeframe=timeframe
+                        )
+                        
+                        # Submit Sentiment Agent
+                        future_sent = executor.submit(
+                            self.agents["sentiment"].analyze,
+                            signal=warmup_signal,
+                            confidence=warmup_conf,
+                            current_time=market_data["current_bar"]["time"],
+                            news_headlines=market_data.get("news_headlines"),
+                            upcoming_events=market_data.get("upcoming_events"),
+                            symbol=symbol
+                        )
+                        
+                        # Gather results
+                        ml_result = future_ml.result()
+                        sentiment_result = future_sent.result()
+                        
+                    agent_results["ml_prediction"] = ml_result
                     agent_results["sentiment"] = sentiment_result
-                    if is_warmup:
-                        logger.info(f"   → Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
-                    else:
-                        logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    
+                    logger.info(f"   → Parallel Warm-up ML Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                    logger.info(f"   → Parallel Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    
                 else:
-                    logger.info(f"   → Skipped (signal: {base_signal})")
+                    # Sequential mode (Normal mode or if one of the agents is disabled)
+                    # --- STEP 2: ML Prediction Validation ---
+                    ml_result = None
+                    if run_ml:
+                        logger.info("🤖 Step 2: ML Prediction Validation...")
+                        target_signal = ms_signal
+                        ml_result = self.agents["ml_prediction"].analyze(
+                            market_data={
+                                "current_bar": market_data["current_bar"],
+                                "structure_events": market_data.get("structure_events", []),
+                                "h1_data": market_data.get("h1_data"),
+                                "m15_history": market_data.get("m15_history")
+                            },
+                            structure_signal=target_signal,
+                            symbol=symbol,
+                            timeframe=timeframe
+                        )
+                        agent_results["ml_prediction"] = ml_result
+                        logger.info(f"   → Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                    elif "ml_prediction" in self.agents:
+                        logger.info(f"   → Skipped ML (MS signal: {ms_signal})")
+                        
+                    # --- STEP 3: Sentiment Analysis ---
+                    if run_sent:
+                        logger.info("📰 Step 3: Sentiment Analysis...")
+                        base_signal = ms_signal
+                        base_confidence = ms_result["confidence"]
+                        
+                        if ml_result:
+                            # ML overrides if it ran
+                            base_confidence = ml_result["confidence"]
+                            base_signal = ml_result["signal"]
+                            
+                        if base_signal in ["BUY", "SELL"]:
+                            sentiment_result = self.agents["sentiment"].analyze(
+                                signal=base_signal,
+                                confidence=base_confidence,
+                                current_time=market_data["current_bar"]["time"],
+                                news_headlines=market_data.get("news_headlines"),
+                                upcoming_events=market_data.get("upcoming_events"),
+                                symbol=symbol
+                            )
+                            agent_results["sentiment"] = sentiment_result
+                            logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                        else:
+                            logger.info(f"   → Skipped Sentiment (signal: {base_signal})")pped (signal: {base_signal})")
             
             # === STEP 4: Calculate Consensus ===
             logger.info("⚖️ Step 4: Calculating Consensus...")

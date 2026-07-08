@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     PGUSER: str = ""
     PGPASSWORD: str = ""
     PGSSLMODE: str = "require"
+    CSV_WATCH_PATH: str = ""
 
     # Track 1 pipeline
     TRACK1_INTERVAL_SECONDS: int = 60   # How often to sync data (seconds)

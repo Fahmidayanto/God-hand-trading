@@ -84,6 +84,11 @@ class CSVWatcherService:
         # In-memory cache of file metadata: {file_path: (mtime, size)}
         self._file_metadata: Dict[Path, tuple] = {}
         
+        # ponytail: Sync monitoring variables
+        self.is_syncing = False
+        self.sync_percent = 0
+        self.sync_step = "Idle"
+        
         logger.info(f"📊 {self.name} initialized. Target directory: {self.backtest_dir}")
 
     def start(self):
@@ -134,13 +139,8 @@ class CSVWatcherService:
         except Exception as e:
             logger.error(f"❌ Error during initial historical scan: {e}", exc_info=True)
 
-        # Phase 2: Active Watcher Loop
-        while self._running:
-            try:
-                self._check_for_updates()
-            except Exception as e:
-                logger.error(f"❌ Error in check loop: {e}", exc_info=True)
-            time.sleep(self.check_interval)
+        # ponytail: disable continuous loop, run only once on startup
+        self._running = False
 
     def _scan_and_load_all(self):
         """Scans the directory and processes every CSV file."""
@@ -148,25 +148,43 @@ class CSVWatcherService:
             logger.warning(f"⚠️ Directory {self.backtest_dir} does not exist. Skipping initial scan.")
             return
 
+        # ponytail: set sync status tracking
+        self.is_syncing = True
+        self.sync_percent = 0
+        self.sync_step = "Scanning directory..."
+
         # Find all relevant CSV files
         csv_files = list(self.backtest_dir.glob("*.csv"))
-        logger.info(f"🔍 Found {len(csv_files)} CSV files in {self.backtest_dir}")
+        valid_files = [fp for fp in csv_files if self._map_filename_to_table(fp.name)]
+        total = len(valid_files)
 
-        for file_path in csv_files:
-            file_name = file_path.name
-            
-            # Map filename to table name
-            table_name = self._map_filename_to_table(file_name)
-            if not table_name:
-                continue
+        logger.info(f"🔍 Found {total} valid CSV files to sync in {self.backtest_dir}")
 
-            # Update cache metadata to current state
-            mtime = file_path.stat().st_mtime
-            size = file_path.stat().st_size
-            self._file_metadata[file_path] = (mtime, size)
+        if total == 0:
+            self.is_syncing = False
+            self.sync_percent = 100
+            self.sync_step = "No files to sync"
+            return
 
-            # Process the file
-            self._process_file_incrementally(file_path, table_name)
+        try:
+            for idx, file_path in enumerate(valid_files):
+                file_name = file_path.name
+                table_name = self._map_filename_to_table(file_name)
+
+                self.sync_step = f"Syncing {file_name} ({idx + 1}/{total})"
+                self.sync_percent = int((idx / total) * 100)
+
+                # Update cache metadata to current state
+                mtime = file_path.stat().st_mtime
+                size = file_path.stat().st_size
+                self._file_metadata[file_path] = (mtime, size)
+
+                # Process the file
+                self._process_file_incrementally(file_path, table_name)
+        finally:
+            self.is_syncing = False
+            self.sync_percent = 100
+            self.sync_step = "Sync complete"
 
     def _check_for_updates(self):
         """Scans directory and checks if mtime or size of any file has changed."""
@@ -248,7 +266,10 @@ class CSVWatcherService:
                 lines = f.readlines()
                 
             total_lines = len(lines)
-            if total_lines <= last_line:
+            if total_lines < last_line:
+                logger.info(f"🔄 File {filename} was truncated or replaced (total lines {total_lines} < last loaded {last_line}). Resetting load cursor to 0.")
+                last_line = 0
+            elif total_lines == last_line:
                 # No new lines to process
                 return
                 
@@ -596,10 +617,22 @@ class CSVWatcherService:
                                 
                         self._recalculate_session_patterns(cur)
 
-            # Trigger hybrid orchestrator run
-            if table_name in ("llhhbosdata_xauusd", "backtest_results_xauusd"):
+            # Trigger hybrid orchestrator run only on specific structure patterns (CHoCH, HH, LL, BoS) or trade outcomes
+            should_trigger = False
+            if table_name == "llhhbosdata_xauusd":
+                # Check if any new structure row contains CHoCH, HH, LL, or BoS
+                trigger_types = ["CHOCH", "HH", "LL", "BOS"]
+                for row in parsed_rows:
+                    row_type = str(row.get("type", "")).upper()
+                    if any(t in row_type for t in trigger_types):
+                        should_trigger = True
+                        break
+            elif table_name == "backtest_results_xauusd":
+                should_trigger = True
+
+            if should_trigger:
                 try:
-                    logger.info(f"⚡ Hybrid trigger: new records loaded in {table_name}. Executing orchestrator decision...")
+                    logger.info(f"⚡ Hybrid trigger: new event in {table_name}. Executing orchestrator decision...")
                     from app.services.orchestrator_service import run_orchestrator_from_db
                     run_orchestrator_from_db("XAUUSD")
                 except Exception as trigger_err:

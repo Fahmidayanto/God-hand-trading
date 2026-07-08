@@ -9,8 +9,6 @@ import {
   LineStyle,
 } from "lightweight-charts";
 import Particles from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { Engine } from "@tsparticles/engine";
 import { useMarketStructureLines, useSessionZones, useBacktestTrades, type BacktestTrade } from "@/api/mt5_agents";
 import {
   SessionZonesPrimitive,
@@ -46,6 +44,22 @@ type ChartCandle = {
   low: number;
   close: number;
   ema200?: number;
+};
+
+const getActualLotSize = (t: any): number => {
+  const entry = t.entry_price ?? 0;
+  const exit = t.exit_price ?? 0;
+  const netProfit = t.net_profit ?? 0;
+  const priceDiff = Math.abs(exit - entry);
+
+  if (priceDiff > 0.01) {
+    const calculatedLot = Math.abs(netProfit) / (priceDiff * 100);
+    const roundedLot = Math.round(calculatedLot * 100) / 100;
+    if (roundedLot >= 0.01 && roundedLot <= 50.0) {
+      return roundedLot;
+    }
+  }
+  return t.lot_size ?? 0.05;
 };
 
 export default function TradesPage() {
@@ -346,10 +360,6 @@ export default function TradesPage() {
     const windowStart = new Date(`${centerDate}T00:00:00Z`);
     windowStart.setUTCMonth(windowStart.getUTCMonth() - 3);
     return windowStart.toISOString().split('T')[0];
-  };
-
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine);
   };
 
   useEffect(() => {
@@ -1847,7 +1857,6 @@ export default function TradesPage() {
     >
       <Particles
         id="tsparticles-trades"
-        init={particlesInit}
         options={{
           background: { color: { value: "transparent" } },
           fpsLimit: 60,
@@ -2278,7 +2287,15 @@ export default function TradesPage() {
                         >
                           <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
                           <td className="px-4 py-3.5 whitespace-nowrap mono">{month.executed_trades ?? month.trades ?? 0}</td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap ${(month.win_rate ?? 0) >= 60 ? "positive" : "neutral"}`}>{(month.win_rate ?? 0).toFixed(1)}%</td>
+                          <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${
+                            (month.win_rate ?? 0) > 50
+                              ? "positive"
+                              : (month.win_rate ?? 0) === 50
+                              ? "text-white"
+                              : "negative"
+                          }`}>
+                            {(month.win_rate ?? 0).toFixed(1)}%
+                          </td>
                           <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold positive">{(month.profit ?? 0).toFixed(2)}</td>
                           <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold negative">{(month.loss ?? 0).toFixed(2)}</td>
                           <td className={`px-4 py-3.5 whitespace-nowrap mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "positive" : "negative"}`}>
@@ -2449,7 +2466,7 @@ export default function TradesPage() {
                                         {trade.type}
                                       </span>
                                     </td>
-                                    <td className="py-3 px-4 text-right mono">{trade.lot_size.toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right mono">{(getActualLotSize(trade)).toFixed(2)}</td>
                                     <td className="py-3 px-4 text-right mono">${trade.entry_price.toFixed(2)}</td>
                                     <td className="py-3 px-4 text-right mono">${trade.exit_price.toFixed(2)}</td>
                                     <td className={`py-3 px-4 text-right mono font-semibold ${isWin ? "text-emerald-400" : "text-rose-500"

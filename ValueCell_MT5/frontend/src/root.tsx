@@ -1,6 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
+import { ParticlesProvider } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
+import type { Engine } from "@tsparticles/engine";
 import "@/i18n";
 import AppSidebar from "@/components/valuecell/app/app-sidebar";
 import { useLanguage } from "@/store/settings-store";
@@ -65,35 +68,41 @@ export default function Root() {
   const location = useLocation();
   const isMT5 = location.pathname.startsWith("/mt5");
 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        enableColorScheme
-        storageKey="godhand-theme"
-      >
-        <BackendHealthCheck>
-          <TrackerProvider>
-            <SidebarProvider>
-              <div className="fixed flex size-full overflow-hidden">
-                {!isMT5 && <AppSidebar />}
+  const particlesInit = async (engine: Engine) => {
+    await loadSlim(engine);
+  };
 
-                <main
-                  className="relative flex flex-1 overflow-hidden"
-                  id="main-content"
-                >
-                  <Outlet />
-                </main>
-                <Toaster />
-                <FloatingChatbot />
-              </div>
-            </SidebarProvider>
-          </TrackerProvider>
-          <AutoUpdateCheck />
-        </BackendHealthCheck>
-      </ThemeProvider>
-    </QueryClientProvider>
+  return (
+    <ParticlesProvider init={particlesInit}>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          enableColorScheme
+          storageKey="godhand-theme"
+        >
+          <BackendHealthCheck>
+            <TrackerProvider>
+              <SidebarProvider>
+                <div className="fixed flex size-full overflow-hidden">
+                  {!isMT5 && <AppSidebar />}
+
+                  <main
+                    className="relative flex flex-1 overflow-hidden"
+                    id="main-content"
+                  >
+                    <Outlet />
+                  </main>
+                  <Toaster />
+                  <FloatingChatbot />
+                </div>
+              </SidebarProvider>
+            </TrackerProvider>
+            <AutoUpdateCheck />
+          </BackendHealthCheck>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ParticlesProvider>
   );
 }

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import Particles from "@tsparticles/react";
-import { loadSlim } from "@tsparticles/slim";
-import type { Engine } from "@tsparticles/engine";
 import MT5Footer from "./components/MT5Footer";
 
 interface Settings {
@@ -63,10 +61,6 @@ const defaultSettings: Settings = {
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [activeTheme, setActiveTheme] = useState("dark");
-
-  const particlesInit = async (engine: Engine) => {
-    await loadSlim(engine);
-  };
 
   useEffect(() => {
     loadSettings();
@@ -132,7 +126,6 @@ export default function SettingsPage() {
       {settings.appearance.particles && (
         <Particles
           id="tsparticles-settings"
-          init={particlesInit}
           options={{
             background: { color: { value: "transparent" } },
             fpsLimit: 60,

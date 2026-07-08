@@ -734,7 +734,6 @@
                         <li>llhhbosdata_xauusd</li>
                         <li>backtest_results_xauusd</li>
                         <li>marketdata_xauusd_m15</li>
-                        <li>sessionzone_xauusd</li>
                     </ul>
                 </div>
             </div>
@@ -811,7 +810,7 @@
                         <div class="card-icon">🛡️</div>
                         <div>
                             <div class="card-title" style="font-size: 0.9rem;">Risk Management</div>
-                            <p style="font-size: 0.65rem; color: var(--text-secondary)">Veto Power (15%)</p>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary)">Post-Consensus Veto</p>
                         </div>
                     </div>
                     <div class="card-content" style="font-size: 0.75rem;">
@@ -934,6 +933,10 @@
                         <span class="meta-label">Metode Sinkronisasi (Opsi B)</span>
                         <span class="meta-value">Data dibaca dari NeonDB (relational), divalidasi dan dihitung EMA200/ATR-nya oleh Pandas, kemudian di-insert ke LanceDB secara real-time.</span>
                     </li>
+                    <li>
+                        <span class="meta-label">Akses Read</span>
+                        <span class="meta-value">Hanya ditulisi (write-only) oleh Watcher. Saat ini tidak dibaca langsung oleh Orchestrator dalam pengambilan keputusan real-time.</span>
+                    </li>
                 </ul>
             </div>
 
@@ -983,8 +986,8 @@
                 <p class="panel-text">Penjaga gerbang manajemen modal dan rasio keuntungan-kerugian (Risk/Reward).</p>
                 <ul class="meta-list">
                     <li>
-                        <span class="meta-label">Bobot Vote</span>
-                        <span class="meta-value">15% dari total konsensus.</span>
+                        <span class="meta-label">Peran Sizing</span>
+                        <span class="meta-value">Menentukan lot size berdasarkan risk percentage. Tidak masuk dalam penjumlahan voting konsensus.</span>
                     </li>
                     <li>
                         <span class="meta-label">Hak Istimewa</span>
@@ -1014,11 +1017,11 @@
                 <ul class="meta-list">
                     <li>
                         <span class="meta-label">Rumus Konsensus</span>
-                        <span class="meta-value">Skor = (MS * 0.25) + (ML * 0.40) + (Risk * 0.15) + (Sent * 0.20)</span>
+                        <span class="meta-value">Skor = (MS * 0.25 + ML * 0.40 + Sent * 0.20) / 0.85</span>
                     </li>
                     <li>
                         <span class="meta-label">Ambang Batas</span>
-                        <span class="meta-value">Diperlukan minimal skor <strong>60%</strong> (0.60) untuk menyetujui transaksi (BUY/SELL). Jika di bawah itu, keputusan akhir adalah HOLD.</span>
+                        <span class="meta-value">Diperlukan minimal skor <strong>60%</strong> (0.60) dari bobot total (0.85) untuk menyetujui transaksi (BUY/SELL) dan meneruskannya ke Risk Management Agent. Jika di bawah itu, keputusan akhir adalah HOLD.</span>
                     </li>
                 </ul>
             </div>
@@ -1055,11 +1058,11 @@
             // Sub-Agents -> Consensus Engine
             { from: "node-ms-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
             { from: "node-ml-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
-            { from: "node-risk-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
             { from: "node-sentiment-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
 
-            // Consensus -> Execution
-            { from: "node-consensus", fromPort: "right", to: "node-execution", toPort: "left" }
+            // Consensus -> Risk Management (Veto Check) -> Execution
+            { from: "node-consensus", fromPort: "top", to: "node-risk-agent", toPort: "bottom" },
+            { from: "node-risk-agent", fromPort: "right", to: "node-execution", toPort: "left" }
         ];
 
         let connections = [...defaultConnections];
