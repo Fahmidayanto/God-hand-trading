@@ -79,6 +79,48 @@ def forward_walk_outcome(
     """Walk forward from signal_time to decide if TP or SL hits first."""
     if signal not in ("BUY", "SELL"):
         return {"outcome": "NONE", "outcome_bar": None}
+
+
+def compute_metrics(
+    signals: List[Dict[str, Any]],
+    backtest_trades: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    from collections import Counter
+
+    total = len(signals)
+    buy = sum(1 for s in signals if s["signal"] == "BUY")
+    sell = sum(1 for s in signals if s["signal"] == "SELL")
+    wins = sum(1 for s in signals if s["outcome"] == "TP")
+    losses = sum(1 for s in signals if s["outcome"] == "SL")
+    decided = wins + losses
+    win_rate = (wins / decided) if decided else 0.0
+    avg_conf = (sum(s["confidence"] for s in signals) / total) if total else 0.0
+    bt_sorted = sorted(
+        [t for t in backtest_trades if t.get("entry_time") is not None],
+        key=lambda t: t["entry_time"],
+    )
+    matched = 0
+    for s in signals:
+        for t in bt_sorted:
+            if abs(t["entry_time"] - s["time"]) <= 4 * 3600:
+                bt_dir = "BUY" if str(t.get("type", "")).upper() == "BUY" else "SELL"
+                if bt_dir == s["signal"]:
+                    matched += 1
+                break
+    agreement_rate = (matched / total) if total else 0.0
+    avg_consensus = Counter(s.get("consensus", "") for s in signals).most_common(1)[0][0] if total else ""
+    return {
+        "total_signals": total,
+        "buy": buy,
+        "sell": sell,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": win_rate,
+        "avg_confidence": avg_conf,
+        "avg_consensus": avg_consensus,
+        "matched_backtest_trades": matched,
+        "agreement_rate": agreement_rate,
+    }
     future = [c for c in candles if c["time"] > signal_time]
     for c in future[:max_bars]:
         high = float(c["high"])
