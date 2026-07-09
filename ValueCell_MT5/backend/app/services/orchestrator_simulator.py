@@ -141,8 +141,8 @@ def get_orchestrator():
     """Build the SEPARATE simulation orchestrator instance.
 
     Same OrchestratorAgent code as live, but its own instance + config.
-    Sentiment disabled by default (may require an LLM); enable once the
-    backend environment provides it.
+    Sentiment is ENABLED so all four agents (Market Structure, ML Filter,
+    Sentiment, Risk Manager) actually run during the simulation.
     """
     from valuecell.agents.orchestrator_agent import OrchestratorAgent
     return OrchestratorAgent(
