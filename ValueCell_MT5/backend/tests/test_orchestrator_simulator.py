@@ -56,3 +56,31 @@ def test_compute_metrics():
     assert abs(m["avg_confidence"] - 0.7) < 1e-9
     assert m["matched_backtest_trades"] == 2
     assert abs(m["agreement_rate"] - (2 / 3)) < 1e-9
+
+import app.services.orchestrator_simulator as sim_mod
+
+class FakeOrchestrator:
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+        return {
+            "approved": True,
+            "final_signal": "BUY",
+            "final_confidence": 0.8,
+            "consensus_level": "strong",
+            "sl_tp": {"sl_price": 98.0, "tp_price": 105.0},
+            "position_sizing": {"lot_size": 0.1},
+        }
+
+def test_run_simulation_mocked(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(10)]
+    events = [{"type": "BOS", "direction": "bullish", "price": 101.0,
+               "time": candles[3]["time"], "timeframe": "M15", "status": "active",
+               "previous_price": 100.0, "previous_time": candles[2]["time"]}]
+    result = sim_mod.run_simulation(candles, events, [], symbol="XAUUSD", timeframe="M15")
+    assert len(result["signals"]) == 1
+    sig = result["signals"][0]
+    assert sig["signal"] == "BUY"
+    assert sig["outcome"] in ("TP", "SL", "NONE")
+    assert "win_rate" in result["metrics"]

@@ -79,6 +79,82 @@ def forward_walk_outcome(
     """Walk forward from signal_time to decide if TP or SL hits first."""
     if signal not in ("BUY", "SELL"):
         return {"outcome": "NONE", "outcome_bar": None}
+    future = [c for c in candles if c["time"] > signal_time]
+    for c in future[:max_bars]:
+        high = float(c["high"])
+        low = float(c["low"])
+        if signal == "BUY":
+            if sl is not None and low <= sl:
+                return {"outcome": "SL", "outcome_bar": c["time"]}
+            if tp is not None and high >= tp:
+                return {"outcome": "TP", "outcome_bar": c["time"]}
+        else:
+            if sl is not None and high >= sl:
+                return {"outcome": "SL", "outcome_bar": c["time"]}
+            if tp is not None and low <= tp:
+                return {"outcome": "TP", "outcome_bar": c["time"]}
+    return {"outcome": "NONE", "outcome_bar": None}
+
+
+def get_orchestrator():
+    """Build the SEPARATE simulation orchestrator instance.
+
+    Same OrchestratorAgent code as live, but its own instance + config.
+    Sentiment disabled by default (may require an LLM); enable once the
+    backend environment provides it.
+    """
+    from valuecell.agents.orchestrator_agent import OrchestratorAgent
+    return OrchestratorAgent(
+        enable_market_structure=True,
+        enable_ml_prediction=True,
+        enable_risk_management=True,
+        enable_sentiment=False,
+        consensus_threshold=0.60,
+    )
+
+
+def run_simulation(
+    candles: List[Dict[str, Any]],
+    structure_events: List[Dict[str, Any]],
+    backtest_trades: List[Dict[str, Any]],
+    symbol: str = "XAUUSD",
+    timeframe: str = "M15",
+) -> Dict[str, Any]:
+    orch = get_orchestrator()
+    signals: List[Dict[str, Any]] = []
+    for ev in structure_events:
+        ev_time = ev.get("time")
+        if ev_time is None:
+            continue
+        try:
+            md = reconstruct_market_data(candles, ev_time, structure_events)
+        except Exception as e:
+            logger.warning(f"sim: skip event {ev_time}: {e}")
+            continue
+        try:
+            result = orch.analyze(market_data=md, symbol=symbol, timeframe=timeframe)
+        except Exception as e:
+            logger.warning(f"sim: orchestrator failed at {ev_time}: {e}")
+            continue
+        if not result.get("approved") or result.get("final_signal") not in ("BUY", "SELL"):
+            continue
+        sig = result["final_signal"]
+        sl = (result.get("sl_tp") or {}).get("sl_price")
+        tp = (result.get("sl_tp") or {}).get("tp_price")
+        outcome = forward_walk_outcome(candles, ev_time, sig, sl, tp)
+        signals.append({
+            "time": ev_time,
+            "signal": sig,
+            "confidence": float(result.get("final_confidence", 0.0)),
+            "consensus": result.get("consensus_level", ""),
+            "sl": sl,
+            "tp": tp,
+            "lot": (result.get("position_sizing") or {}).get("lot_size"),
+            "outcome": outcome["outcome"],
+            "outcome_bar": outcome["outcome_bar"],
+        })
+    metrics = compute_metrics(signals, backtest_trades)
+    return {"signals": signals, "metrics": metrics}
 
 
 def compute_metrics(
