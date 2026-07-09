@@ -197,18 +197,3 @@ def compute_metrics(
         "matched_backtest_trades": matched,
         "agreement_rate": agreement_rate,
     }
-    future = [c for c in candles if c["time"] > signal_time]
-    for c in future[:max_bars]:
-        high = float(c["high"])
-        low = float(c["low"])
-        if signal == "BUY":
-            if sl is not None and low <= sl:
-                return {"outcome": "SL", "outcome_bar": c["time"]}
-            if tp is not None and high >= tp:
-                return {"outcome": "TP", "outcome_bar": c["time"]}
-        else:
-            if sl is not None and high >= sl:
-                return {"outcome": "SL", "outcome_bar": c["time"]}
-            if tp is not None and low <= tp:
-                return {"outcome": "TP", "outcome_bar": c["time"]}
-    return {"outcome": "NONE", "outcome_bar": None}
