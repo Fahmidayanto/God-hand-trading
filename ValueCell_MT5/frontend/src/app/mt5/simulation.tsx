@@ -584,6 +584,28 @@ function AgentPanel({ frame }: { frame: SimFrame | null }) {
           </div>
         );
       })}
+
+      {/* Overall Consensus summary (matches dashboard "Agent Consensus") */}
+      <div style={{ marginTop: "16px", padding: "16px", background: "rgba(31,41,55,0.3)", borderRadius: "12px" }}>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-sm text-[var(--text-primary)]">Overall Consensus</span>
+          <span className="text-base font-bold" style={{ color: finalSignalColor }}>{frame.final_signal}</span>
+        </div>
+        <div className="progress-bar" style={{ marginTop: "12px" }}>
+          <div
+            className="progress-fill"
+            style={{
+              width: `${Math.min(100, Math.max(0, (frame.consensus_confidence ?? 0) * 100))}%`,
+              background: "linear-gradient(90deg, var(--neon-amber), var(--neon-ruby))",
+            }}
+          ></div>
+        </div>
+        <div className="text-xs text-[var(--text-tertiary)] mt-2">
+          {frame.consensus_level
+            ? `${frame.consensus_level} (${Math.round((frame.consensus_confidence ?? 0) * 100)}%)`
+            : "—"}
+        </div>
+      </div>
     </div>
   );
 }
@@ -2054,9 +2076,6 @@ export default function SimulationOfDead() {
           <p className="text-sm text-[var(--text-secondary)] mt-2">🧠 Orchestrator Simulation: No signals.</p>
         )}
 
-        {/* ── Orchestrator Agents (cursor-following) ── */}
-        {replayData && activeFrame && <AgentPanel frame={activeFrame} />}
-
         {/* ── Error ── */}
         {loadError && (
           <div className="px-4 py-3 rounded bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
@@ -2682,6 +2701,9 @@ export default function SimulationOfDead() {
             </table>
           </div>
         </div>
+
+        {/* ── Orchestrator Agents (cursor-following) — 100% copy of dashboard "Agent Consensus", placed at bottom of Monthly Performance Summary ── */}
+        {replayData && activeFrame && <AgentPanel frame={activeFrame} />}
       </div>
 
 
