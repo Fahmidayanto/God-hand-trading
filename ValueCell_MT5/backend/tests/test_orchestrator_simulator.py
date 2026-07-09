@@ -70,6 +70,13 @@ class FakeOrchestrator:
             "final_signal": "BUY",
             "final_confidence": 0.8,
             "consensus_level": "strong",
+            "agent_results": {
+                "market_structure": {"signal": "BUY", "confidence": 0.7},
+                "ml_prediction": {"signal": "BUY", "confidence": 0.8},
+                "sentiment": {"final_signal": "BUY", "confidence": 0.75,
+                              "confidence_adjustment": 0.05, "filtered": False},
+                "risk_management": {"signal": "BUY", "confidence": 0.8, "approved": True},
+            },
             "sl_tp": {"sl_price": 98.0, "tp_price": 105.0},
             "position_sizing": {"lot_size": 0.1},
         }
@@ -88,6 +95,28 @@ def test_run_simulation_mocked(monkeypatch):
     assert sig["signal"] == "BUY"
     assert sig["outcome"] in ("TP", "SL", "NONE")
     assert "win_rate" in result["metrics"]
+    # Frame capture (new requirement).
+    assert len(result["frames"]) >= 1
+    assert set(result["frames"][0]["agents"].keys()) == {
+        "market_structure", "ml_prediction", "sentiment", "risk_management"}
+    assert result["frames"][0]["agents"]["market_structure"]["status"] == "fired"
+    assert result["frames"][0]["agents"]["risk_management"]["approved"] is True
+
+
+def test_run_simulation_filters_trigger_types(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(10)]
+    types = ["LH", "HL", "BOS"]
+    events = [{"type": t, "direction": "bullish", "price": 101.0,
+               "time": candles[3 + i]["time"], "timeframe": "M15", "status": "active",
+               "previous_price": 100.0, "previous_time": candles[2 + i]["time"]}
+              for i, t in enumerate(types)]
+    result = sim_mod.run_simulation(candles, events, [], symbol="XAUUSD", timeframe="M15")
+    # Only BOS is a trigger type; LH and HL must be filtered out.
+    assert len(result["frames"]) == 1
+    assert result["frames"][0]["event_type"] == "BOS"
 
 
 def test_run_simulation_caps_events(monkeypatch):
@@ -111,7 +140,14 @@ class FakeOrchestrator:
     def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
         return {"approved": True, "final_signal": "BUY", "final_confidence": 0.8,
                 "consensus_level": "strong", "sl_tp": {"sl_price": 98.0, "tp_price": 105.0},
-                "position_sizing": {"lot_size": 0.1}}
+                "position_sizing": {"lot_size": 0.1},
+                "agent_results": {
+                    "market_structure": {"signal": "BUY", "confidence": 0.7},
+                    "ml_prediction": {"signal": "BUY", "confidence": 0.8},
+                    "sentiment": {"final_signal": "BUY", "confidence": 0.75,
+                                  "confidence_adjustment": 0.05, "filtered": False},
+                    "risk_management": {"signal": "BUY", "confidence": 0.8, "approved": True},
+                }}
 
 def test_simulate_endpoint(monkeypatch):
     monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
@@ -148,3 +184,5 @@ def test_simulate_endpoint(monkeypatch):
     assert "signals" in body and "metrics" in body
     assert isinstance(body["signals"], list)
     assert "win_rate" in body["metrics"]
+    assert "frames" in body
+    assert isinstance(body["frames"], list)

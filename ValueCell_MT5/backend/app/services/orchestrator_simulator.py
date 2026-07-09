@@ -13,6 +13,10 @@ if _PYTHON_DIR not in sys.path:
 from loguru import logger
 
 
+# Orchestrator fires only on these structure-event types (confirmed design).
+TRIGGER_TYPES = {"CHOCH", "HH", "LL", "BOS"}
+
+
 def _to_dt(ts: int) -> datetime:
     return datetime.fromtimestamp(ts, tz=timezone.utc)
 
@@ -95,6 +99,44 @@ def forward_walk_outcome(
     return {"outcome": "NONE", "outcome_bar": None}
 
 
+def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
+    """Summarize each agent's status for one structure event, for the UI panel."""
+    is_error = bool(result.get("error"))
+
+    def view(key: str) -> Dict[str, Any]:
+        r = (result.get("agent_results") or {}).get(key)
+        if is_error:
+            return {"status": "error", "signal": None, "confidence": 0.0,
+                    "approved": None, "filtered": None, "adjustment": None}
+        if r is None:
+            return {"status": "skipped", "signal": None, "confidence": 0.0,
+                    "approved": None, "filtered": None, "adjustment": None}
+        return {
+            "status": "fired",
+            "signal": r.get("signal") or r.get("final_signal"),
+            "confidence": r.get("confidence", 0.0),
+            "approved": r.get("approved"),
+            "filtered": r.get("filtered"),
+            "adjustment": r.get("confidence_adjustment"),
+        }
+
+    return {
+        "event_time": ev.get("time"),
+        "event_type": ev.get("type"),
+        "event_direction": ev.get("direction"),
+        "agents": {
+            "market_structure": view("market_structure"),
+            "ml_prediction": view("ml_prediction"),
+            "sentiment": view("sentiment"),
+            "risk_management": view("risk_management"),
+        },
+        "final_signal": result.get("final_signal"),
+        "approved": result.get("approved"),
+        "consensus_level": result.get("consensus_level"),
+        "consensus_confidence": result.get("final_confidence"),
+    }
+
+
 def get_orchestrator():
     """Build the SEPARATE simulation orchestrator instance.
 
@@ -107,7 +149,7 @@ def get_orchestrator():
         enable_market_structure=True,
         enable_ml_prediction=True,
         enable_risk_management=True,
-        enable_sentiment=False,
+        enable_sentiment=True,
         consensus_threshold=0.60,
     )
 
@@ -133,6 +175,9 @@ def run_simulation(
         )
         structure_events = structure_events[:max_events]
 
+    # Keep only structure-event types the orchestrator should react to.
+    structure_events = [e for e in structure_events if (e.get("type") or "").upper() in TRIGGER_TYPES]
+
     # Build the base DataFrame ONCE (datetime index, sorted) instead of
     # reconstructing the full frame on every structure event.
     base_df = pd.DataFrame(candles)
@@ -145,6 +190,7 @@ def run_simulation(
     base_df = base_df.sort_values("time").reset_index(drop=True)
 
     signals: List[Dict[str, Any]] = []
+    frames: List[Dict[str, Any]] = []
     for ev in structure_events:
         ev_time = ev.get("time")
         if ev_time is None:
@@ -159,6 +205,7 @@ def run_simulation(
         except Exception as e:
             logger.warning(f"sim: orchestrator failed at {ev_time}: {e}")
             continue
+        frames.append(_build_frame(ev, result))
         if not result.get("approved") or result.get("final_signal") not in ("BUY", "SELL"):
             continue
         sig = result["final_signal"]
@@ -177,7 +224,7 @@ def run_simulation(
             "outcome_bar": outcome["outcome_bar"],
         })
     metrics = compute_metrics(signals, backtest_trades)
-    return {"signals": signals, "metrics": metrics}
+    return {"signals": signals, "metrics": metrics, "frames": frames}
 
 
 def compute_metrics(
