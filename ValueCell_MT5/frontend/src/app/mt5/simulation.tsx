@@ -938,13 +938,29 @@ export default function SimulationOfDead() {
           });
         }
       }
+
+      // Orchestrator simulation signals
+      for (const sig of simSignals) {
+        if (sig.time <= lastCandle.time) {
+          const isBuy = sig.signal === "BUY";
+          markers.push({
+            time: sig.time as any,
+            position: isBuy ? "belowBar" : "aboveBar",
+            color: isBuy ? "#22c55e" : "#ef4444",
+            shape: isBuy ? "arrowUp" : "arrowDown",
+            text: sig.signal,
+            size: 1,
+          });
+        }
+      }
+
       markersPluginRef.current?.setMarkers(markers);
     } else {
       markersPluginRef.current?.setMarkers([]);
       structurePrimitiveRef.current?.setLines([]);
       tradesPrimitiveRef.current?.setTrades([]);
     }
-  }, []);
+  }, [simSignals]);
 
   // ── Load Data ────────────────────────────────────────────────────────────
 
@@ -1160,6 +1176,21 @@ export default function SimulationOfDead() {
           shape: "circle",
           text: "", // Remove text label completely to avoid layout clutter
           size: 0.6,
+        });
+      }
+    }
+
+    // Orchestrator simulation signals
+    for (const sig of simSignals) {
+      if (sig.time <= candle.time) {
+        const isBuy = sig.signal === "BUY";
+        markers.push({
+          time: sig.time as any,
+          position: isBuy ? "belowBar" : "aboveBar",
+          color: isBuy ? "#22c55e" : "#ef4444",
+          shape: isBuy ? "arrowUp" : "arrowDown",
+          text: sig.signal,
+          size: 1,
         });
       }
     }
@@ -1508,7 +1539,7 @@ export default function SimulationOfDead() {
     setActivePositions(activePosList);
 
     return idx + 1;
-  }, [strategyParams]);
+  }, [strategyParams, simSignals]);
 
   // ── Playback controls (continued) ──
 
