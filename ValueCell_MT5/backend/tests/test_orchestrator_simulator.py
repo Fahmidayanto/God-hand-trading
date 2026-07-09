@@ -84,3 +84,57 @@ def test_run_simulation_mocked(monkeypatch):
     assert sig["signal"] == "BUY"
     assert sig["outcome"] in ("TP", "SL", "NONE")
     assert "win_rate" in result["metrics"]
+
+from app.main import app
+from fastapi.testclient import TestClient
+
+class FakeOrchestrator:
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+        return {"approved": True, "final_signal": "BUY", "final_confidence": 0.8,
+                "consensus_level": "strong", "sl_tp": {"sl_price": 98.0, "tp_price": 105.0},
+                "position_sizing": {"lot_size": 0.1}}
+
+def test_simulate_endpoint(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
+
+    class FakeCursor:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def execute(self, *a, **k): pass
+        def fetchall(self):
+            return [
+                ().__class__ and None  # placeholder removed below
+            ]
+    # Simpler: return tailored rows per query via side-effect
+    candle_rows = [(__import__("datetime").datetime(2024,1,1,0,0), 100,102,98,101,10,100.0)]
+    struct_rows = [("BOS","bullish",101.0,__import__("datetime").datetime(2024,1,1,0,0),"M15","active",100.0,__import__("datetime").datetime(2024,1,1,0,0))]
+    trade_rows = [("T1","BUY",100.0,105.0,98.0,200.0,2.0,"Asia",__import__("datetime").datetime(2024,1,1,0,0),__import__("datetime").datetime(2024,1,1,1,0),0.1)]
+    seq = {"n": 0}
+    def fake_execute(self, q, params=None):
+        seq["n"] += 1
+        if "marketdata" in q:
+            self._rows = candle_rows
+        elif "llhhbos" in q:
+            self._rows = struct_rows
+        else:
+            self._rows = trade_rows
+    def fake_fetchall(self):
+        return self._rows
+    FakeCursor.execute = fake_execute
+    FakeCursor.fetchall = fake_fetchall
+
+    class FakeConn:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def cursor(self): return FakeCursor()
+    monkeypatch.setattr("app.core.database.get_db_conn", lambda: FakeConn())
+    monkeypatch.setattr("app.core.database.is_pool_ready", lambda: True)
+
+    client = TestClient(app)
+    r = client.get("/api/v1/trading/simulate", params={
+        "year_from": 2024, "month_from": 1, "year_to": 2024, "month_to": 1, "timeframe": "M15"})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert "signals" in body and "metrics" in body
+    assert isinstance(body["signals"], list)
+    assert "win_rate" in body["metrics"]
