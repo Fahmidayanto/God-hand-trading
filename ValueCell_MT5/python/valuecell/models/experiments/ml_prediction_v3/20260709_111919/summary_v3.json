@@ -1,0 +1,117 @@
+{
+  "version": "v3_20260709_111919",
+  "created_at": "2026-07-09T11:21:11.922108",
+  "model_type": "RandomForestClassifier",
+  "winner_name": "RandomForest_d3_n100",
+  "training_script": "train_ml_prediction_v3.py",
+  "source_backtest_dir": "D:\\Project\\Project MT5\\Backtest_result",
+  "run_dir": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3\\20260709_111919",
+  "dataset_path": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3\\20260709_111919\\dataset_v3.csv",
+  "n_samples_total": 360,
+  "label_counts": {
+    "1": 184,
+    "0": 176
+  },
+  "label_sources": {
+    "csv": 360
+  },
+  "source_counts": {
+    "EXECUTED": 360
+  },
+  "skipped": {
+    "missing_files": 0,
+    "rejected_skipped": 288,
+    "no_label": 0,
+    "missing_bar": 0,
+    "candidates_total": 648,
+    "label_from_csv": 360,
+    "label_from_forward": 0
+  },
+  "metrics": {
+    "feature_columns": [
+      "init_risk_points",
+      "h1_ext_atr_14_pct",
+      "atr_14_pct",
+      "h1_atr_14",
+      "h1_atr_14_pct",
+      "h1_ext_atr_14",
+      "initial_rr",
+      "is_overlap",
+      "momentum_5_atr",
+      "distance_to_session_low_atr",
+      "momentum_3_atr",
+      "minutes_from_session_open",
+      "session_priority",
+      "body_ratio_ea",
+      "price_position_session_range",
+      "distance_to_session_high_atr",
+      "session_range_points",
+      "h4_ema200_distance_pct",
+      "h4_ema200_distance_atr",
+      "session_is_dst_NO"
+    ],
+    "n_features": 20,
+    "winner_name": "RandomForest_d3_n100",
+    "cv_auc_mean": 0.6237419617419617,
+    "cv_auc_std": 0.10358140852827398,
+    "cv_f1_mean": 0.6072789115646258,
+    "cv_f1_std": 0.1023078993957087,
+    "train": {
+      "accuracy": 0.7480916030534351,
+      "precision": 0.7536231884057971,
+      "recall": 0.7647058823529411,
+      "f1": 0.7591240875912408,
+      "auc": 0.8590686274509804
+    },
+    "validation": {
+      "accuracy": 0.6153846153846154,
+      "precision": 0.875,
+      "recall": 0.22580645161290322,
+      "f1": 0.358974358974359,
+      "auc": 0.6555977229601518
+    },
+    "test": {
+      "accuracy": 0.45454545454545453,
+      "precision": 0.42857142857142855,
+      "recall": 0.17647058823529413,
+      "f1": 0.25,
+      "auc": 0.36213235294117646
+    },
+    "rows": {
+      "train": 262,
+      "validation": 65,
+      "test": 33,
+      "total": 360
+    },
+    "top_features": {
+      "price_position_session_range": 0.09760944058847476,
+      "init_risk_points": 0.07607930550202861,
+      "h1_atr_14": 0.07381860220324953,
+      "h1_ext_atr_14_pct": 0.07319464172922169,
+      "atr_14_pct": 0.07120162718411872,
+      "momentum_5_atr": 0.0670589231301908,
+      "h1_ext_atr_14": 0.06394855907143271,
+      "h4_ema200_distance_atr": 0.06274579907824367,
+      "h1_atr_14_pct": 0.05758198912120759,
+      "distance_to_session_high_atr": 0.05333439649591627,
+      "distance_to_session_low_atr": 0.049887172474278596,
+      "momentum_3_atr": 0.04733913740848892,
+      "h4_ema200_distance_pct": 0.043331794616356945,
+      "session_range_points": 0.042493853811165175,
+      "initial_rr": 0.04106767198386477,
+      "body_ratio_ea": 0.03281553716012641,
+      "minutes_from_session_open": 0.027213168832177913,
+      "session_priority": 0.01428353635206913,
+      "is_overlap": 0.0026622055890717076,
+      "session_is_dst_NO": 0.0023326376683161345
+    }
+  },
+  "best_validation_threshold": {
+    "split": "validation_2025",
+    "threshold": 0.55,
+    "candidates": 65,
+    "accepted": 4,
+    "winrate": 1.0,
+    "profit_factor": Infinity
+  }
+}

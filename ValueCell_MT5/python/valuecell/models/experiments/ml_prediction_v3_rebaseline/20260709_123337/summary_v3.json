@@ -1,0 +1,117 @@
+{
+  "version": "v3_20260709_123337",
+  "created_at": "2026-07-09T12:40:39.520531",
+  "model_type": "RandomForestClassifier",
+  "winner_name": "RandomForest_d3_n300_leaf12_featsqrt",
+  "training_script": "train_ml_prediction_v3.py",
+  "source_backtest_dir": "D:\\Project\\Project MT5\\Backtest_result",
+  "run_dir": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3_rebaseline\\20260709_123337",
+  "dataset_path": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3_rebaseline\\20260709_123337\\dataset_v3.csv",
+  "n_samples_total": 360,
+  "label_counts": {
+    "1": 184,
+    "0": 176
+  },
+  "label_sources": {
+    "csv": 360
+  },
+  "source_counts": {
+    "EXECUTED": 360
+  },
+  "skipped": {
+    "missing_files": 0,
+    "rejected_skipped": 288,
+    "no_label": 0,
+    "missing_bar": 0,
+    "candidates_total": 648,
+    "label_from_csv": 360,
+    "label_from_forward": 0
+  },
+  "metrics": {
+    "feature_columns": [
+      "init_risk_points",
+      "atr_14_pct",
+      "h1_atr_14_pct",
+      "is_overlap",
+      "h1_atr_14",
+      "spread_to_atr_ratio",
+      "momentum_5_atr",
+      "initial_rr",
+      "session_priority",
+      "h1_ext_atr_14_pct",
+      "h1_ext_atr_14",
+      "price_position_session_range",
+      "distance_to_session_high_atr",
+      "momentum_3_atr",
+      "distance_to_session_low_atr",
+      "h4_ema200_distance_pct",
+      "body_ratio_ea",
+      "minutes_from_session_open",
+      "session_zone_name_London_NewYork_Overlap",
+      "h4_ema200_distance_atr"
+    ],
+    "n_features": 20,
+    "winner_name": "RandomForest_d3_n300_leaf12_featsqrt",
+    "cv_auc_mean": 0.6335873015873015,
+    "cv_auc_std": 0.09295669846662755,
+    "cv_f1_mean": 0.6055706243160388,
+    "cv_f1_std": 0.092118173616132,
+    "train": {
+      "accuracy": 0.7366412213740458,
+      "precision": 0.7596899224806202,
+      "recall": 0.7205882352941176,
+      "f1": 0.7396226415094339,
+      "auc": 0.8213118580765639
+    },
+    "validation": {
+      "accuracy": 0.6461538461538462,
+      "precision": 1.0,
+      "recall": 0.25806451612903225,
+      "f1": 0.41025641025641024,
+      "auc": 0.6925996204933587
+    },
+    "test": {
+      "accuracy": 0.48484848484848486,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "auc": 0.6029411764705882
+    },
+    "rows": {
+      "train": 262,
+      "validation": 65,
+      "test": 33,
+      "total": 360
+    },
+    "top_features": {
+      "spread_to_atr_ratio": 0.08634688125331519,
+      "init_risk_points": 0.07786305976258791,
+      "h1_atr_14_pct": 0.07101755218533341,
+      "distance_to_session_high_atr": 0.07075509179287384,
+      "h1_atr_14": 0.07045632504785364,
+      "price_position_session_range": 0.07025420936593214,
+      "atr_14_pct": 0.07023949808470098,
+      "momentum_5_atr": 0.06328449868342181,
+      "h1_ext_atr_14": 0.06244637654974447,
+      "h4_ema200_distance_pct": 0.05598516635058982,
+      "h1_ext_atr_14_pct": 0.054389435697466224,
+      "initial_rr": 0.05036798202717702,
+      "momentum_3_atr": 0.048507685557711865,
+      "h4_ema200_distance_atr": 0.04742541891360601,
+      "body_ratio_ea": 0.03362858244959765,
+      "distance_to_session_low_atr": 0.031220621461477648,
+      "minutes_from_session_open": 0.020903168336400706,
+      "session_priority": 0.00823060102871523,
+      "is_overlap": 0.004499583633359497,
+      "session_zone_name_London_NewYork_Overlap": 0.0021782618181349703
+    }
+  },
+  "best_validation_threshold": {
+    "split": "validation_2025",
+    "threshold": 0.5,
+    "candidates": 65,
+    "accepted": 8,
+    "winrate": 1.0,
+    "profit_factor": Infinity
+  }
+}

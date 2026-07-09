@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router";
+﻿import { Link, useLocation } from "react-router";
 
 export default function MT5Sidebar() {
   const location = useLocation();
@@ -12,6 +12,7 @@ export default function MT5Sidebar() {
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },
     { path: "/mt5/database", label: "DB Inspector", icon: "💾" },
     { path: "/mt5/replay", label: "Replay Trades", icon: "🎬" },
+    { path: "/mt5/simulation", label: "Simulation of Dead", icon: "💀" },
   ];
 
   const isActive = (path: string) => {

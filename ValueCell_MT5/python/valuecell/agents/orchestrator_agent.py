@@ -201,7 +201,9 @@ class OrchestratorAgent:
                     agent_results["ml_prediction"] = ml_result
                     agent_results["sentiment"] = sentiment_result
                     
-                    logger.info(f"   → Parallel Warm-up ML Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                    ml_prob = ml_result.get("probability", ml_result.get("expected_rr", 0.0))
+                    prob_label = "Expected R:R" if "expected_rr" in ml_result else "Probability"
+                    logger.info(f"   → Parallel Warm-up ML Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
                     logger.info(f"   → Parallel Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
                     
                 else:
@@ -223,7 +225,9 @@ class OrchestratorAgent:
                             timeframe=timeframe
                         )
                         agent_results["ml_prediction"] = ml_result
-                        logger.info(f"   → Signal: {ml_result['signal']} | Probability: {ml_result['probability']:.3f}")
+                        ml_prob = ml_result.get("probability", ml_result.get("expected_rr", 0.0))
+                        prob_label = "Expected R:R" if "expected_rr" in ml_result else "Probability"
+                        logger.info(f"   → Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
                     elif "ml_prediction" in self.agents:
                         logger.info(f"   → Skipped ML (MS signal: {ms_signal})")
                         
@@ -250,7 +254,7 @@ class OrchestratorAgent:
                             agent_results["sentiment"] = sentiment_result
                             logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
                         else:
-                            logger.info(f"   → Skipped Sentiment (signal: {base_signal})")pped (signal: {base_signal})")
+                            logger.info(f"   → Skipped Sentiment (signal: {base_signal})")
             
             # === STEP 4: Calculate Consensus ===
             logger.info("⚖️ Step 4: Calculating Consensus...")
@@ -260,39 +264,123 @@ class OrchestratorAgent:
             if "risk_management" in self.agents and consensus["approved"] and consensus["final_signal"] in ["BUY", "SELL"]:
                 logger.info("💼 Step 5: Risk Management Calculation...")
                 
-                risk_result = self.agents["risk_management"].analyze(
-                    signal=consensus["final_signal"],
-                    confidence=consensus["final_confidence"],
-                    entry_price=market_data["current_bar"]["close"],
-                    atr=market_data.get("atr", 7.0),
-                    current_time=market_data["current_bar"]["time"],
-                    session=market_data.get("session", "Other"),
-                    symbol=symbol
-                )
-                agent_results["risk_management"] = risk_result
+                # Check if v5 regression results are available
+                ml_res = agent_results.get("ml_prediction")
+                is_v5 = ml_res and ml_res.get("model_type") == "regression_v5"
                 
-                # Update consensus with risk decision
-                if risk_result["approved"]:
-                    consensus["risk_approved"] = True
-                    consensus["position_sizing"] = {
-                        "lot_size": risk_result["lot_size"],
-                        "risk_pct": risk_result["risk_pct"],
-                        "risk_usd": risk_result["risk_usd"]
-                    }
-                    consensus["sl_tp"] = {
-                        "entry_price": risk_result["entry_price"],
-                        "sl_price": risk_result["sl_price"],
-                        "tp_price": risk_result["tp_price"],
-                        "sl_distance_pips": risk_result["sl_distance_pips"],
-                        "tp_distance_pips": risk_result["tp_distance_pips"],
-                        "rr_ratio": risk_result["rr_ratio"]
-                    }
-                    logger.info(f"   → Approved: Lot {risk_result['lot_size']:.2f} | SL {risk_result['sl_price']:.2f} | TP {risk_result['tp_price']:.2f}")
+                if is_v5:
+                    expected_rr = ml_res["expected_rr"]
+                    predicted_mfe = ml_res["predicted_mfe"]
+                    predicted_mae = ml_res["predicted_mae"]
+                    
+                    sl_dist = predicted_mae / 100.0
+                    tp_dist = predicted_mfe / 100.0
+                    sl_pips = predicted_mae / 10.0
+                    
+                    entry_price = float(market_data["current_bar"]["close"])
+                    if consensus["final_signal"] == "BUY":
+                        sl_price = entry_price - sl_dist
+                        tp_price = entry_price + tp_dist
+                    else:
+                        sl_price = entry_price + sl_dist
+                        tp_price = entry_price - tp_dist
+                        
+                    rm = self.agents["risk_management"]
+                    
+                    # Calculate dynamic lot multiplier based on expected_rr
+                    if expected_rr >= 1.8:
+                        mult = 4.0
+                    elif expected_rr >= 1.5:
+                        mult = 2.4
+                    elif expected_rr >= 1.2:
+                        mult = 1.6
+                    else:
+                        mult = 1.0
+                        
+                    # Standard analyze call to validate risk and get baseline lot sizing
+                    risk_result = rm.analyze(
+                        signal=consensus["final_signal"],
+                        confidence=consensus["final_confidence"],
+                        entry_price=entry_price,
+                        atr=market_data.get("atr", 7.0),
+                        current_time=market_data["current_bar"]["time"],
+                        session=market_data.get("session", "Other"),
+                        symbol=symbol
+                    )
+                    
+                    if risk_result["approved"]:
+                        # Multiply lot size by multiplier and clamp to max_lot
+                        raw_lot = risk_result["lot_size"] * mult
+                        lot_size = max(rm.min_lot, min(rm.max_lot, raw_lot))
+                        
+                        actual_risk_usd = lot_size * sl_pips * rm.pip_value_per_lot
+                        actual_risk_pct = (actual_risk_usd / rm.account_balance) * 100 if rm.account_balance > 0 else 0
+                        
+                        consensus["risk_approved"] = True
+                        consensus["position_sizing"] = {
+                            "lot_size": round(lot_size, 2),
+                            "risk_pct": round(actual_risk_pct, 2),
+                            "risk_usd": round(actual_risk_usd, 2),
+                            "multiplier": mult,
+                        }
+                        consensus["sl_tp"] = {
+                            "entry_price": entry_price,
+                            "sl_price": round(sl_price, 2),
+                            "tp_price": round(tp_price, 2),
+                            "sl_distance_pips": round(sl_pips, 1),
+                            "tp_distance_pips": round(predicted_mfe / 10.0, 1),
+                            "rr_ratio": round(expected_rr, 2)
+                        }
+                        
+                        agent_results["risk_management"] = {
+                            "approved": True,
+                            "lot_size": round(lot_size, 2),
+                            "sl_price": round(sl_price, 2),
+                            "tp_price": round(tp_price, 2),
+                            "rr_ratio": round(expected_rr, 2),
+                            "note": f"v5 dynamic parameters: Expected R:R={expected_rr:.2f} (mult: {mult}x)",
+                        }
+                        
+                        logger.info(f"   → v5 Approved: Lot {lot_size:.2f} (mult: {mult}x) | SL {sl_price:.2f} | TP {tp_price:.2f}")
+                    else:
+                        consensus["approved"] = False
+                        consensus["risk_approved"] = False
+                        consensus["final_signal"] = "HOLD"
+                        logger.info(f"   → Rejected by risk management (v5)")
                 else:
-                    consensus["approved"] = False
-                    consensus["risk_approved"] = False
-                    consensus["final_signal"] = "HOLD"
-                    logger.info(f"   → Rejected by risk management")
+                    # Standard v4 risk management behavior
+                    risk_result = self.agents["risk_management"].analyze(
+                        signal=consensus["final_signal"],
+                        confidence=consensus["final_confidence"],
+                        entry_price=market_data["current_bar"]["close"],
+                        atr=market_data.get("atr", 7.0),
+                        current_time=market_data["current_bar"]["time"],
+                        session=market_data.get("session", "Other"),
+                        symbol=symbol
+                    )
+                    agent_results["risk_management"] = risk_result
+                    
+                    if risk_result["approved"]:
+                        consensus["risk_approved"] = True
+                        consensus["position_sizing"] = {
+                            "lot_size": risk_result["lot_size"],
+                            "risk_pct": risk_result["risk_pct"],
+                            "risk_usd": risk_result["risk_usd"]
+                        }
+                        consensus["sl_tp"] = {
+                            "entry_price": risk_result["entry_price"],
+                            "sl_price": risk_result["sl_price"],
+                            "tp_price": risk_result["tp_price"],
+                            "sl_distance_pips": risk_result["sl_distance_pips"],
+                            "tp_distance_pips": risk_result["tp_distance_pips"],
+                            "rr_ratio": risk_result["rr_ratio"]
+                        }
+                        logger.info(f"   → Approved: Lot {risk_result['lot_size']:.2f} | SL {risk_result['sl_price']:.2f} | TP {risk_result['tp_price']:.2f}")
+                    else:
+                        consensus["approved"] = False
+                        consensus["risk_approved"] = False
+                        consensus["final_signal"] = "HOLD"
+                        logger.info(f"   → Rejected by risk management")
             
             # === Build Final Response ===
             execution_time = (datetime.now() - start_time).total_seconds()

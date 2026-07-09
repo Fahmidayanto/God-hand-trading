@@ -28,6 +28,7 @@ export default [
       route("/settings", "app/mt5/settings.tsx"),
       route("/database", "app/mt5/database.tsx"),
       route("/replay", "app/mt5/replay.tsx"),
+      route("/simulation", "app/mt5/simulation.tsx"),
     ]),
   ]),
   

@@ -42,6 +42,10 @@ struct BacktestTrade
     bool      is_dst;        // true = trade entry saat broker dalam mode DST (GMT+3)
     string    status;        // "EXECUTED" atau "REJECTED"
     string    reject_reason; // Alasan jika ditolak, "N/A" jika dieksekusi
+    double    body_ratio;
+    double    body_ratio_min;
+    bool      body_ratio_passed;
+    string    body_ratio_mode;
     double    initial_sl;
     double    initial_tp;
     double    final_sl;
@@ -270,6 +274,27 @@ double CalculateRewardPoints(string type, double entryPrice, double tpPrice)
     return (entryPrice - tpPrice) / _Point;
 }
 
+double g_LastBodyRatio = 0;
+double g_LastBodyRatioMin = 0;
+bool   g_LastBodyRatioPassed = false;
+string g_LastBodyRatioMode = "N/A";
+
+void ResetLastBodyRatioMetrics()
+{
+    g_LastBodyRatio = 0;
+    g_LastBodyRatioMin = 0;
+    g_LastBodyRatioPassed = false;
+    g_LastBodyRatioMode = "N/A";
+}
+
+void SetLastBodyRatioMetrics(double ratio, double minRatio, bool passed, string mode)
+{
+    g_LastBodyRatio = ratio;
+    g_LastBodyRatioMin = minRatio;
+    g_LastBodyRatioPassed = passed;
+    g_LastBodyRatioMode = mode;
+}
+
 //+------------------------------------------------------------------+
 //| Simpan trade yang sudah ditutup ke array global                   |
 //+------------------------------------------------------------------+
@@ -284,7 +309,9 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
                       bool trailing_modified = false, int trailing_count = 0,
                       bool tp_expanded = false, int tp_expand_count = 0,
                       double max_favorable_points = 0, double max_adverse_points = 0,
-                      string close_reason = "")
+                      string close_reason = "",
+                      double body_ratio = 0, double body_ratio_min = 0,
+                      bool body_ratio_passed = false, string body_ratio_mode = "N/A")
 {
     for (int i = 0; i < g_TradeCount; i++)
     {
@@ -319,6 +346,10 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
     g_BacktestTrades[g_TradeCount].is_dst       = IsServerInDST(entry_time);
     g_BacktestTrades[g_TradeCount].status       = "EXECUTED";
     g_BacktestTrades[g_TradeCount].reject_reason = "N/A";
+    g_BacktestTrades[g_TradeCount].body_ratio        = body_ratio;
+    g_BacktestTrades[g_TradeCount].body_ratio_min    = body_ratio_min;
+    g_BacktestTrades[g_TradeCount].body_ratio_passed = body_ratio_passed;
+    g_BacktestTrades[g_TradeCount].body_ratio_mode   = body_ratio_mode;
 
     if(initial_sl == 0) initial_sl = sl;
     if(initial_tp == 0) initial_tp = tp;
@@ -377,6 +408,20 @@ void RecordRejectedToBacktestTrades(string type, double price, string reason)
     g_BacktestTrades[g_TradeCount].is_dst        = IsServerInDST(TimeCurrent());
     g_BacktestTrades[g_TradeCount].status        = "REJECTED";
     g_BacktestTrades[g_TradeCount].reject_reason = reason;
+    if(reason == "Body Ratio Filter")
+    {
+        g_BacktestTrades[g_TradeCount].body_ratio        = g_LastBodyRatio;
+        g_BacktestTrades[g_TradeCount].body_ratio_min    = g_LastBodyRatioMin;
+        g_BacktestTrades[g_TradeCount].body_ratio_passed = g_LastBodyRatioPassed;
+        g_BacktestTrades[g_TradeCount].body_ratio_mode   = g_LastBodyRatioMode;
+    }
+    else
+    {
+        g_BacktestTrades[g_TradeCount].body_ratio        = 0;
+        g_BacktestTrades[g_TradeCount].body_ratio_min    = 0;
+        g_BacktestTrades[g_TradeCount].body_ratio_passed = false;
+        g_BacktestTrades[g_TradeCount].body_ratio_mode   = "N/A";
+    }
     g_BacktestTrades[g_TradeCount].initial_sl            = 0;
     g_BacktestTrades[g_TradeCount].initial_tp            = 0;
     g_BacktestTrades[g_TradeCount].final_sl              = 0;
@@ -567,6 +612,7 @@ void ExportBacktestToCSV()
                   "Session", "Session_IsDST",
                   "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
                   "Status", "Reject_Reason",
+                  "BodyRatio", "BodyRatioMin", "BodyRatioPassed", "BodyRatioMode",
                   "InitialSL", "InitialTP", "FinalSL", "FinalTP",
                   "InitialRiskPoints", "InitialRewardPoints",
                   "FinalRiskPoints", "FinalRewardPoints",
@@ -633,6 +679,10 @@ void ExportBacktestToCSV()
                   g_BacktestTrades[i].timeframe,
                   g_BacktestTrades[i].status,
                   g_BacktestTrades[i].reject_reason,
+                  DoubleToString(g_BacktestTrades[i].body_ratio, 2),
+                  DoubleToString(g_BacktestTrades[i].body_ratio_min, 2),
+                  g_BacktestTrades[i].body_ratio_passed ? "YES" : "NO",
+                  g_BacktestTrades[i].body_ratio_mode,
                   DoubleToString(g_BacktestTrades[i].initial_sl, _Digits),
                   DoubleToString(g_BacktestTrades[i].initial_tp, _Digits),
                   DoubleToString(g_BacktestTrades[i].final_sl, _Digits),
@@ -2218,6 +2268,10 @@ struct TradeRecord_M15
     int       tp_expand_count;
     double    max_favorable_points;
     double    max_adverse_points;
+    double    body_ratio;
+    double    body_ratio_min;
+    bool      body_ratio_passed;
+    string    body_ratio_mode;
 };
 
 TradeRecord_M15 currentBuyTrade_M15;   // Untuk posisi buy aktif M15
@@ -2241,6 +2295,18 @@ void InitTrailingSummary_M15(TradeRecord_M15 &tradeRec, double sl, double tp)
     tradeRec.tp_expand_count      = 0;
     tradeRec.max_favorable_points = 0;
     tradeRec.max_adverse_points   = 0;
+    tradeRec.body_ratio           = 0;
+    tradeRec.body_ratio_min       = 0;
+    tradeRec.body_ratio_passed    = false;
+    tradeRec.body_ratio_mode      = "N/A";
+}
+
+void ApplyBodyRatioSummary_M15(TradeRecord_M15 &tradeRec)
+{
+    tradeRec.body_ratio        = g_LastBodyRatio;
+    tradeRec.body_ratio_min    = g_LastBodyRatioMin;
+    tradeRec.body_ratio_passed = g_LastBodyRatioPassed;
+    tradeRec.body_ratio_mode   = g_LastBodyRatioMode;
 }
 
 void UpdateExcursion_M15(TradeRecord_M15 &tradeRec, double bid, double ask)
@@ -4859,7 +4925,9 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
                              tradeRec.trailing_modified, tradeRec.trailing_count,
                              tradeRec.tp_expanded, tradeRec.tp_expand_count,
                              tradeRec.max_favorable_points, tradeRec.max_adverse_points,
-                             exitType);
+                             exitType,
+                             tradeRec.body_ratio, tradeRec.body_ratio_min,
+                             tradeRec.body_ratio_passed, tradeRec.body_ratio_mode);
                         
             // Reset trade record
             tradeRec.ticket = 0;
@@ -5040,7 +5108,11 @@ bool IsH4ConfirmedBearish()
 bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
 {
     // Jika filter dinonaktifkan total, selalu izinkan entry
-    if (!EnableBodyRatioFilter) return true;
+    if (!EnableBodyRatioFilter)
+    {
+        SetLastBodyRatioMetrics(0, 0, true, "DISABLED");
+        return true;
+    }
 
     double bodySize   = MathAbs(rates[1].close - rates[1].open); // bar[1] = confirmed closed bar
     double totalRange = rates[1].high - rates[1].low;
@@ -5060,6 +5132,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
     // ================================================================
     double effectiveMinBR = MinBodyRatio; // Default: threshold ketat (40%)
     string overrideReason = "";
+    string bodyRatioMode = "STRICT";
 
     if (Enable_H4_BR_Override)
     {
@@ -5105,6 +5178,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                 if (absGapPct > H4_MaxStretch_Pct)
                 {
                     effectiveMinBR = MinBodyRatio;
+                    bodyRatioMode = "H4_STRETCHED_STRICT";
                     overrideReason = StringFormat("RULE_A: H4 Gap=%.2f%% > %.1f%% (stretched) → strict BR %.0f%%",
                                                   h4GapPct, H4_MaxStretch_Pct, effectiveMinBR * 100);
                 }
@@ -5116,12 +5190,14 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                     if (h4AlignedWithTrade && momAlignedWithTrade)
                     {
                         effectiveMinBR = H4_TrendMinBody; // Longgarkan ke 15%
+                        bodyRatioMode = "H4_ADAPTIVE_TREND";
                         overrideReason = StringFormat("RULE_B: H4 Gap=%.2f%% moderate+mom=%.1f aligned → override BR min %.0f%%",
                                                       h4GapPct, h4Mom16h, effectiveMinBR * 100);
                     }
                     else
                     {
                         effectiveMinBR = MinBodyRatio;
+                        bodyRatioMode = "H4_MODERATE_STRICT";
                         overrideReason = StringFormat("RULE_B: H4 Gap=%.2f%% moderate tapi mom/direction tidak aligned → strict BR %.0f%%",
                                                       h4GapPct, effectiveMinBR * 100);
                     }
@@ -5131,6 +5207,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                 else
                 {
                     effectiveMinBR = MinBodyRatio;
+                    bodyRatioMode = "H4_NEAR_EMA_STRICT";
                     overrideReason = StringFormat("ZONE_C: H4 Gap=%.2f%% near EMA (sideways) → strict BR %.0f%%",
                                                   h4GapPct, effectiveMinBR * 100);
                 }
@@ -5155,6 +5232,9 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
     // KEPUTUSAN FINAL BERDASARKAN EFFECTIVE THRESHOLD
     // ================================================================
     bool isStrong = (bodyRatio >= effectiveMinBR);
+    if (BodyRatio_LogOnly)
+        bodyRatioMode = bodyRatioMode + "_LOG_ONLY";
+    SetLastBodyRatioMetrics(bodyRatio, effectiveMinBR, isStrong, bodyRatioMode);
 
     if (!isStrong)
     {
@@ -6981,6 +7061,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             rates_M15[0].close > ema200_M15 &&
             entryCountBuy_M15 < MaxEntriesPerCycle_M15)
         {
+            ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
@@ -7067,6 +7148,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentBuyTrade_M15.session = GetCurrentSession();
                     currentBuyTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
+                    ApplyBodyRatioSummary_M15(currentBuyTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
                     int buyTradeIndex = -1;
@@ -7195,6 +7277,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             rates_M15[0].close < ema200_M15 &&
             entryCountSell_M15 < MaxEntriesPerCycle_M15)
         {
+            ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
@@ -7289,6 +7372,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentSellTrade_M15.session = GetCurrentSession();
                     currentSellTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
+                    ApplyBodyRatioSummary_M15(currentSellTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
                     int sellTradeIndex = -1;

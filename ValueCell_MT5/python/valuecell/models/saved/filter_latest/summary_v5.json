@@ -1,0 +1,110 @@
+{
+  "version": "v5_20260709_134559",
+  "created_at": "2026-07-09T13:49:04.800629",
+  "training_script": "train_ml_prediction_v5.py",
+  "n_samples_total": 360,
+  "mfe_winner_name": "RandomForest_d5_n200_leaf15_f15",
+  "mfe_features": [
+    "h4_ema200_distance_pct",
+    "spread_to_atr_ratio",
+    "body_ratio_ea",
+    "distance_to_session_high_atr",
+    "h4_atr_14",
+    "h1_atr_14_pct",
+    "h1_ext_ema200_distance_atr",
+    "price_position_session_range",
+    "session_is_dst_NO",
+    "momentum_3_atr",
+    "h4_ema200_distance_atr",
+    "h1_ext_ema200_distance_pct",
+    "h4_vol_ratio",
+    "minutes_from_session_open",
+    "spread_pct"
+  ],
+  "mfe_metrics": {
+    "train": {
+      "r2": 0.331796846768461,
+      "mae": 1110.70797899683,
+      "y_mean": 2347.4580152671756,
+      "y_pred_mean": 2345.827646883292,
+      "y_std": 1674.2415438856706
+    },
+    "validation": {
+      "r2": 0.04452603661856325,
+      "mae": 1782.4499757725039,
+      "y_mean": 3152.6615384615384,
+      "y_pred_mean": 2486.26916717076,
+      "y_std": 2171.0386862982996
+    },
+    "test": {
+      "r2": 0.05320464639954392,
+      "mae": 1236.5960425650967,
+      "y_mean": 2672.5454545454545,
+      "y_pred_mean": 2384.1826435768653,
+      "y_std": 1676.5933296962082
+    }
+  },
+  "mae_winner_name": "Ridge_alpha10.0_f10",
+  "mae_features": [
+    "spread_to_atr_ratio",
+    "momentum_3_atr",
+    "price_position_session_range",
+    "momentum_5_atr",
+    "minutes_to_session_close",
+    "atr_14_pct",
+    "init_risk_points",
+    "session_priority",
+    "day_of_week",
+    "distance_to_session_high_atr"
+  ],
+  "mae_metrics": {
+    "train": {
+      "r2": 0.16540647166083167,
+      "mae": 883.2390302874919,
+      "y_mean": 1990.2900763358778,
+      "y_pred_mean": 1990.2900763358775,
+      "y_std": 1093.7296519472502
+    },
+    "validation": {
+      "r2": 0.07159145902770003,
+      "mae": 884.6875236437795,
+      "y_mean": 2022.8153846153846,
+      "y_pred_mean": 2080.8159439407373,
+      "y_std": 1074.52736546568
+    },
+    "test": {
+      "r2": -0.09052640049213445,
+      "mae": 1034.6902698877464,
+      "y_mean": 1856.4848484848485,
+      "y_pred_mean": 2259.919590750241,
+      "y_std": 1188.824028221064
+    }
+  },
+  "optimal_rr_threshold": 1.08,
+  "best_validation_threshold": {
+    "split": "validation_2025",
+    "rr_threshold": 1.08,
+    "candidates": 65,
+    "accepted": 33,
+    "accepted_rate": 0.5076923076923077,
+    "winrate": 0.6363636363636364,
+    "net_profit": 3618.5899999999997,
+    "avg_net_profit": 109.65424242424241,
+    "profit_factor": 3.10996501457726,
+    "max_drawdown": -309.8599999999997,
+    "expectancy": 109.65424242424241
+  },
+  "test_metrics_at_optimal_threshold": {
+    "split": "test_2026",
+    "rr_threshold": 1.08,
+    "candidates": 33,
+    "accepted": 14,
+    "accepted_rate": 0.42424242424242425,
+    "winrate": 0.6428571428571429,
+    "net_profit": 1137.73,
+    "avg_net_profit": 81.26642857142858,
+    "profit_factor": 2.5147718648896937,
+    "max_drawdown": -451.2900000000001,
+    "expectancy": 81.26642857142858
+  }
+}

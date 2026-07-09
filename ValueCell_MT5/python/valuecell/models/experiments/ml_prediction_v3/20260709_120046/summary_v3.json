@@ -1,0 +1,118 @@
+{
+  "version": "v3_20260709_120046",
+  "created_at": "2026-07-09T12:08:10.828872",
+  "model_type": "LogisticRegression",
+  "winner_name": "LogisticRegression_C0.01",
+  "training_script": "train_ml_prediction_v3.py",
+  "source_backtest_dir": "D:\\Project\\Project MT5\\Backtest_result",
+  "run_dir": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3\\20260709_120046",
+  "dataset_path": "D:\\Project\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\experiments\\ml_prediction_v3\\20260709_120046\\dataset_v3.csv",
+  "n_samples_total": 362,
+  "label_counts": {
+    "1": 191,
+    "0": 171
+  },
+  "label_sources": {
+    "csv": 327,
+    "forward_sim": 35
+  },
+  "source_counts": {
+    "EXECUTED": 362
+  },
+  "skipped": {
+    "missing_files": 0,
+    "rejected_skipped": 403,
+    "no_label": 0,
+    "missing_bar": 0,
+    "candidates_total": 765,
+    "label_from_csv": 327,
+    "label_from_forward": 35
+  },
+  "metrics": {
+    "feature_columns": [
+      "h1_ext_atr_14_pct",
+      "init_risk_points",
+      "is_overlap",
+      "atr_14_pct",
+      "h1_atr_14_pct",
+      "h1_atr_14",
+      "initial_rr",
+      "atr_14",
+      "h1_ext_atr_14",
+      "price_position_session_range",
+      "spread_to_atr_ratio",
+      "session_priority",
+      "distance_to_session_low_atr",
+      "momentum_5_atr",
+      "spread",
+      "h4_atr_14_pct",
+      "session_is_dst_NO",
+      "h4_ema200_distance_pct",
+      "h4_atr_14",
+      "momentum_3_atr"
+    ],
+    "n_features": 20,
+    "winner_name": "LogisticRegression_C0.01",
+    "cv_auc_mean": 0.6291770451770452,
+    "cv_auc_std": 0.05696527969321491,
+    "cv_f1_mean": 0.6112498125656021,
+    "cv_f1_std": 0.04269393800436736,
+    "train": {
+      "accuracy": 0.6526717557251909,
+      "precision": 0.6859504132231405,
+      "recall": 0.6102941176470589,
+      "f1": 0.6459143968871596,
+      "auc": 0.679796918767507
+    },
+    "validation": {
+      "accuracy": 0.6153846153846154,
+      "precision": 1.0,
+      "recall": 0.1935483870967742,
+      "f1": 0.32432432432432434,
+      "auc": 0.6176470588235294
+    },
+    "test": {
+      "accuracy": 0.3142857142857143,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "auc": 0.44696969696969696
+    },
+    "rows": {
+      "train": 262,
+      "validation": 65,
+      "test": 35,
+      "total": 362
+    },
+    "top_features": {
+      "spread_to_atr_ratio": 0.11286529280896389,
+      "init_risk_points": 0.10743014365658567,
+      "price_position_session_range": 0.09625379094443104,
+      "momentum_3_atr": 0.07039271534517351,
+      "initial_rr": 0.05546597460849741,
+      "momentum_5_atr": 0.05512205714539401,
+      "h4_atr_14": 0.05239857498842018,
+      "h1_atr_14": 0.04997610073810666,
+      "h1_ext_atr_14": 0.04997610073810666,
+      "atr_14": 0.032096231290565685,
+      "spread": 0.03164357220451349,
+      "is_overlap": 0.025664453052583056,
+      "distance_to_session_low_atr": 0.023350480905903963,
+      "h4_ema200_distance_pct": 0.018772869149439025,
+      "atr_14_pct": 0.009469578314247362,
+      "session_priority": 0.007737724088081045,
+      "h4_atr_14_pct": 0.003351357494954752,
+      "h1_ext_atr_14_pct": 0.0028375608059811883,
+      "h1_atr_14_pct": 0.0028375608059811883,
+      "session_is_dst_NO": 0.0016752554974936655
+    }
+  },
+  "best_validation_threshold": {
+    "split": "validation_2025",
+    "threshold": 0.5,
+    "candidates": 65,
+    "accepted": 6,
+    "winrate": 1.0,
+    "profit_factor": Infinity
+  }
+}

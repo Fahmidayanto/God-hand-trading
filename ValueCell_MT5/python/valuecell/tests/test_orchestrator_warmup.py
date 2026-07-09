@@ -109,7 +109,7 @@ def test_warmup_triggered_on_pending_setup():
     orchestrator.agents["sentiment"].analyze.assert_called_once()
     args_sent, kwargs_sent = orchestrator.agents["sentiment"].analyze.call_args
     assert kwargs_sent.get("signal") == "BUY"
-    assert kwargs_sent.get("confidence") == 0.75  # from ML confidence
+    assert kwargs_sent.get("confidence") == 0.40  # from pre_signal initial_confidence in parallel execution
     
     # Risk management should not be called since consensus is HOLD/not approved
     orchestrator.agents["risk_management"].analyze.assert_not_called()

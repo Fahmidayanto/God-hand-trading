@@ -1,0 +1,98 @@
+{
+  "version": "v5_20260709_133913",
+  "created_at": "2026-07-09T13:40:21.806412",
+  "training_script": "train_ml_prediction_v5.py",
+  "n_samples_total": 360,
+  "mfe_winner_name": "Ridge",
+  "mfe_features": [
+    "h4_ema200_distance_pct",
+    "spread_to_atr_ratio",
+    "distance_to_session_high_atr",
+    "body_ratio_ea",
+    "h1_ext_ema200_distance_atr",
+    "h4_atr_14",
+    "momentum_3_atr",
+    "h1_atr_14_pct",
+    "price_position_session_range",
+    "session_is_dst_NO",
+    "h4_ema200_distance_atr",
+    "session_range_points",
+    "distance_to_session_low_atr",
+    "h1_ext_ema200_distance_pct",
+    "spread_pct",
+    "minutes_from_session_open",
+    "atr_14_pct",
+    "minutes_to_session_close",
+    "init_risk_pct",
+    "h4_vol_ratio"
+  ],
+  "mfe_metrics": {
+    "train": {
+      "r2": 0.10904059980155745,
+      "mae": 1279.6191733916964,
+      "y_mean": 2347.4580152671756,
+      "y_pred_mean": 2347.4580152671756,
+      "y_std": 1674.2415438856706
+    },
+    "validation": {
+      "r2": 0.09599350922415806,
+      "mae": 1782.3305694450944,
+      "y_mean": 3152.6615384615384,
+      "y_pred_mean": 2776.3329109838255,
+      "y_std": 2171.0386862982996
+    },
+    "test": {
+      "r2": -0.3713735559142821,
+      "mae": 1488.577336318982,
+      "y_mean": 2672.5454545454545,
+      "y_pred_mean": 3192.359205525929,
+      "y_std": 1676.5933296962082
+    }
+  },
+  "mae_winner_name": "RandomForestRegressor",
+  "mae_features": [
+    "spread_to_atr_ratio",
+    "momentum_3_atr",
+    "price_position_session_range",
+    "momentum_5_atr",
+    "minutes_to_session_close",
+    "session_priority",
+    "h1_atr_14_pct",
+    "h1_ext_ema200_distance_atr",
+    "distance_to_session_high_atr",
+    "init_risk_points",
+    "atr_14_pct",
+    "session_is_dst_NO",
+    "day_of_week",
+    "session_range_points",
+    "vol_ratio",
+    "h4_vol_ratio",
+    "h1_ext_ema200_distance_pct",
+    "spread_pct",
+    "distance_to_session_low_atr",
+    "body_ratio"
+  ],
+  "mae_metrics": {
+    "train": {
+      "r2": 0.5245543966687412,
+      "mae": 664.2396470026896,
+      "y_mean": 1990.2900763358778,
+      "y_pred_mean": 1991.6479538659987,
+      "y_std": 1093.7296519472502
+    },
+    "validation": {
+      "r2": 0.10999581501899769,
+      "mae": 883.0471875976142,
+      "y_mean": 2022.8153846153846,
+      "y_pred_mean": 2107.444756793177,
+      "y_std": 1074.52736546568
+    },
+    "test": {
+      "r2": 0.10186117084324886,
+      "mae": 1011.4328599433136,
+      "y_mean": 1856.4848484848485,
+      "y_pred_mean": 2013.3969944405144,
+      "y_std": 1188.824028221064
+    }
+  }
+}
