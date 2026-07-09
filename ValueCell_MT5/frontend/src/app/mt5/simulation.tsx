@@ -1781,6 +1781,15 @@ export default function SimulationOfDead() {
               accent="purple"
             />
 
+            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={orchestratorEnabled}
+                onChange={(e) => setOrchestratorEnabled(e.target.checked)}
+              />
+              Run Orchestrator
+            </label>
+
             <button
               onClick={handleLoad}
               disabled={isLoading}
@@ -1826,6 +1835,24 @@ export default function SimulationOfDead() {
                 {new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")}
               </span>
             )}
+          </div>
+        )}
+
+        {/* ── Orchestrator Simulation ── */}
+        {simLoading && (
+          <p className="text-sm text-[var(--text-secondary)] mt-2">⏳ Running Orchestrator Simulation…</p>
+        )}
+        {simMetrics && (
+          <div className="mt-3 p-3 rounded-lg bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]">
+            <p className="text-sm font-semibold text-[var(--neon-blue)] mb-2">🧠 Orchestrator Simulation</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
+              <span>Total signals: <strong className="text-[var(--text-primary)]">{simMetrics.total_signals}</strong></span>
+              <span>Win rate: <strong className="text-[var(--text-primary)]">{(simMetrics.win_rate * 100).toFixed(1)}%</strong></span>
+              <span>BUY / SELL: <strong className="text-[var(--text-primary)]">{simMetrics.buy} / {simMetrics.sell}</strong></span>
+              <span>Wins / Losses: <strong className="text-[var(--text-primary)]">{simMetrics.wins} / {simMetrics.losses}</strong></span>
+              <span>Avg confidence: <strong className="text-[var(--text-primary)]">{(simMetrics.avg_confidence * 100).toFixed(1)}%</strong></span>
+              <span>Agreement w/ backtest: <strong className="text-[var(--text-primary)]">{(simMetrics.agreement_rate * 100).toFixed(1)}%</strong></span>
+            </div>
           </div>
         )}
 
