@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   createChart,
   createSeriesMarkers,
@@ -422,6 +422,172 @@ const simulateTrailingSLTP = (
   };
 };
 
+// ── Agent Panel (cursor-following orchestrator frames) ─────────────────────────
+
+interface SimAgentState {
+  status: "fired" | "skipped" | "error";
+  signal: string | null;
+  confidence: number;
+  approved?: boolean | null;
+  filtered?: boolean | null;
+  adjustment?: number | null;
+}
+
+interface SimFrame {
+  event_time: number;
+  event_type: string;
+  event_direction: string;
+  agents: {
+    market_structure: SimAgentState;
+    ml_prediction: SimAgentState;
+    sentiment: SimAgentState;
+    risk_management: SimAgentState;
+  };
+  final_signal: string;
+  approved: boolean;
+  consensus_level: string;
+  consensus_confidence: number;
+}
+
+const AGENT_PANEL_DEFS = [
+  { key: "market_structure" as const, name: "Market Structure Agent", icon: "🏗️", color: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)" },
+  { key: "ml_prediction" as const, name: "ML Filter Agent", icon: "🧠", color: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)" },
+  { key: "sentiment" as const, name: "Sentiment Agent", icon: "📰", color: "var(--neon-emerald)", bg: "rgba(16,185,129,0.2)" },
+  { key: "risk_management" as const, name: "Risk Manager", icon: "🛡️", color: "var(--neon-amber)", bg: "rgba(251,191,36,0.2)" },
+];
+
+function AgentSignalBadge({ status, signal }: { status: string; signal: string | null }) {
+  if (status === "error") {
+    return (
+      <span
+        className="px-2 py-0.5 rounded-full text-xs font-semibold"
+        style={{ background: "rgba(239,68,68,0.2)", color: "var(--neon-ruby)", border: "1px solid rgba(239,68,68,0.4)" }}
+      >
+        ERROR
+      </span>
+    );
+  }
+  if (status === "skipped") {
+    return (
+      <span
+        className="px-2 py-0.5 rounded-full text-xs font-semibold"
+        style={{ background: "rgba(148,163,184,0.2)", color: "var(--text-tertiary)", border: "1px solid rgba(148,163,184,0.3)" }}
+      >
+        SKIPPED
+      </span>
+    );
+  }
+  const signalColor =
+    signal === "BUY" ? "var(--neon-emerald)" : signal === "SELL" ? "var(--neon-ruby)" : "var(--text-secondary)";
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-xs font-semibold"
+      style={{ background: "rgba(148,163,184,0.15)", color: signalColor, border: "1px solid rgba(148,163,184,0.3)" }}
+    >
+      {signal ?? "HOLD"}
+    </span>
+  );
+}
+
+function AgentPanel({ frame }: { frame: SimFrame | null }) {
+  if (!frame) return null;
+
+  const directionEmoji = frame.event_direction === "bullish" ? "🐂" : frame.event_direction === "bearish" ? "🐻" : "";
+  const finalSignalColor =
+    frame.final_signal === "BUY" ? "var(--neon-emerald)" : frame.final_signal === "SELL" ? "var(--neon-ruby)" : "var(--text-secondary)";
+
+  return (
+    <div className="glass-card mt-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 style={{ fontSize: "18px", fontWeight: 600 }}>🤖 Orchestrator Agents (Live)</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-[var(--text-tertiary)]">
+            Event: {frame.event_type} {directionEmoji}
+          </span>
+          <span
+            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+            style={{ background: "rgba(148,163,184,0.15)", color: finalSignalColor, border: "1px solid rgba(148,163,184,0.3)" }}
+          >
+            {frame.final_signal}
+          </span>
+          <span
+            className="px-2 py-0.5 rounded-full text-xs font-semibold"
+            style={{
+              background: frame.approved ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
+              color: frame.approved ? "var(--neon-emerald)" : "var(--neon-ruby)",
+              border: `1px solid ${frame.approved ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
+            }}
+          >
+            {frame.approved ? "✓ Approved" : "✗ Declined"}
+          </span>
+        </div>
+      </div>
+
+      {AGENT_PANEL_DEFS.map((def) => {
+        const agent = frame.agents[def.key] as SimAgentState | undefined;
+        if (!agent) return null;
+        return (
+          <div key={def.key} className="agent-row">
+            <div className="agent-info">
+              <div className="agent-icon" style={{ background: def.bg, borderColor: def.color }}>
+                {def.icon}
+              </div>
+              <div className="agent-details">
+                <div className="agent-name">{def.name}</div>
+                <div className="agent-signal">
+                  <AgentSignalBadge status={agent.status} signal={agent.signal ?? null} />
+                  {def.key === "risk_management" && agent.status === "fired" && (
+                    <span
+                      className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
+                      style={{
+                        background: agent.approved ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
+                        color: agent.approved ? "var(--neon-emerald)" : "var(--neon-ruby)",
+                        border: `1px solid ${agent.approved ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
+                      }}
+                    >
+                      {agent.approved ? "✓ Approved" : "✗ Declined"}
+                    </span>
+                  )}
+                  {def.key === "sentiment" && agent.status === "fired" && (
+                    <>
+                      <span
+                        className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
+                        style={{
+                          background: agent.filtered ? "rgba(251,191,36,0.2)" : "rgba(16,185,129,0.2)",
+                          color: agent.filtered ? "var(--neon-amber)" : "var(--neon-emerald)",
+                          border: `1px solid ${agent.filtered ? "rgba(251,191,36,0.4)" : "rgba(16,185,129,0.4)"}`,
+                        }}
+                      >
+                        {agent.filtered ? "Filtered" : "Passed"}
+                      </span>
+                      {agent.adjustment != null && (
+                        <span className="ml-2 text-xs text-[var(--text-tertiary)]">
+                          {agent.adjustment >= 0 ? "+" : ""}{agent.adjustment.toFixed(2)}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div style={{ minWidth: "100px" }}>
+              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "4px" }}>
+                Confidence
+              </div>
+              <div className="progress-bar" style={{ width: "100px" }}>
+                <div
+                  className="progress-fill"
+                  style={{ width: `${(agent.confidence ?? 0) * 100}%`, background: `linear-gradient(90deg, ${def.color}, rgba(148,163,184,0.4))` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function SimulationOfDead() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -449,6 +615,7 @@ export default function SimulationOfDead() {
   const [orchestratorEnabled, setOrchestratorEnabled] = useState<boolean>(true);
   const [simSignals, setSimSignals] = useState<any[]>([]);
   const [simMetrics, setSimMetrics] = useState<any | null>(null);
+  const [simFrames, setSimFrames] = useState<any[]>([]);
   const [simLoading, setSimLoading] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1058,10 +1225,12 @@ export default function SimulationOfDead() {
             const simData = await simRes.json();
             setSimSignals(simData.signals ?? []);
             setSimMetrics(simData.metrics ?? null);
+            setSimFrames(simData.frames ?? []);
           } else {
             console.warn("Orchestrator simulation failed:", simRes.status);
             setSimSignals([]);
             setSimMetrics(null);
+            setSimFrames([]);
           }
         } catch (e) {
           if ((e as any)?.name !== "AbortError") {
@@ -1069,6 +1238,7 @@ export default function SimulationOfDead() {
           }
           setSimSignals([]);
           setSimMetrics(null);
+          setSimFrames([]);
         } finally {
           clearTimeout(timeoutId);
           setSimLoading(false);
@@ -1076,10 +1246,14 @@ export default function SimulationOfDead() {
       } else {
         setSimSignals([]);
         setSimMetrics(null);
+        setSimFrames([]);
       }
     } catch (err: unknown) {
       clearInterval(interval);
       setLoadError(err instanceof Error ? err.message : "Gagal memuat data");
+      setSimSignals([]);
+      setSimMetrics(null);
+      setSimFrames([]);
     } finally {
       setIsLoading(false);
       setLoadProgress(prev => ({ ...prev, visible: false }));
@@ -1603,6 +1777,16 @@ export default function SimulationOfDead() {
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
   const currentCandle = replayData?.candles[Math.max(0, currentIndex - 1)];
 
+  const activeFrame = useMemo(() => {
+    if (!simFrames || simFrames.length === 0 || !currentCandle) return null;
+    let found: any = null;
+    for (const f of simFrames) {
+      if ((f.event_time ?? 0) <= currentCandle.time) found = f;
+      else break;
+    }
+    return found;
+  }, [simFrames, currentCandle]);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -1869,6 +2053,9 @@ export default function SimulationOfDead() {
         {simMetrics && simMetrics.total_signals === 0 && (
           <p className="text-sm text-[var(--text-secondary)] mt-2">🧠 Orchestrator Simulation: No signals.</p>
         )}
+
+        {/* ── Orchestrator Agents (cursor-following) ── */}
+        {replayData && activeFrame && <AgentPanel frame={activeFrame} />}
 
         {/* ── Error ── */}
         {loadError && (
