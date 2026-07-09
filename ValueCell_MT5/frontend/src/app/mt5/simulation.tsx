@@ -444,7 +444,7 @@ interface SimFrame {
     risk_management: SimAgentState;
   };
   final_signal: string;
-  approved: boolean;
+  approved: boolean | null;
   consensus_level: string;
   consensus_confidence: number;
 }
@@ -577,7 +577,7 @@ function AgentPanel({ frame }: { frame: SimFrame | null }) {
               <div className="progress-bar" style={{ width: "100px" }}>
                 <div
                   className="progress-fill"
-                  style={{ width: `${(agent.confidence ?? 0) * 100}%`, background: `linear-gradient(90deg, ${def.color}, rgba(148,163,184,0.4))` }}
+                  style={{ width: `${Math.min(100, Math.max(0, (agent.confidence ?? 0) * 100))}%`, background: `linear-gradient(90deg, ${def.color}, rgba(148,163,184,0.4))` }}
                 ></div>
               </div>
             </div>
@@ -615,7 +615,7 @@ export default function SimulationOfDead() {
   const [orchestratorEnabled, setOrchestratorEnabled] = useState<boolean>(true);
   const [simSignals, setSimSignals] = useState<any[]>([]);
   const [simMetrics, setSimMetrics] = useState<any | null>(null);
-  const [simFrames, setSimFrames] = useState<any[]>([]);
+  const [simFrames, setSimFrames] = useState<SimFrame[]>([]);
   const [simLoading, setSimLoading] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1225,7 +1225,7 @@ export default function SimulationOfDead() {
             const simData = await simRes.json();
             setSimSignals(simData.signals ?? []);
             setSimMetrics(simData.metrics ?? null);
-            setSimFrames(simData.frames ?? []);
+            setSimFrames((simData.frames ?? []) as SimFrame[]);
           } else {
             console.warn("Orchestrator simulation failed:", simRes.status);
             setSimSignals([]);
@@ -1779,7 +1779,7 @@ export default function SimulationOfDead() {
 
   const activeFrame = useMemo(() => {
     if (!simFrames || simFrames.length === 0 || !currentCandle) return null;
-    let found: any = null;
+    let found: SimFrame | null = null;
     for (const f of simFrames) {
       if ((f.event_time ?? 0) <= currentCandle.time) found = f;
       else break;

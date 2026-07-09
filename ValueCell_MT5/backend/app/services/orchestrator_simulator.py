@@ -164,19 +164,26 @@ def run_simulation(
 ) -> Dict[str, Any]:
     orch = get_orchestrator()
 
+    # Keep only structure-event types the orchestrator should react to.
+    structure_events = [e for e in structure_events if (e.get("type") or "").upper() in TRIGGER_TYPES]
+
     # Cap the number of structure events processed so the simulation always
     # returns in bounded time even for very wide date ranges. Processing
     # every event would run the (ML-heavy) orchestrator once per event and
-    # can take minutes, which makes the caller hang.
+    # can take minutes, which makes the caller hang. The cap applies to the
+    # already-filtered trigger list (orchestrator runs only happen on trigger
+    # events), so non-trigger events never count against it.
     if max_events > 0 and len(structure_events) > max_events:
         logger.warning(
-            f"sim: {len(structure_events)} structure events exceed cap {max_events}; "
+            f"sim: {len(structure_events)} trigger events exceed cap {max_events}; "
             f"processing the first {max_events} only"
         )
         structure_events = structure_events[:max_events]
 
-    # Keep only structure-event types the orchestrator should react to.
-    structure_events = [e for e in structure_events if (e.get("type") or "").upper() in TRIGGER_TYPES]
+    # No (trigger) events to simulate -> nothing to run the orchestrator on.
+    if not structure_events:
+        metrics = compute_metrics([], backtest_trades)
+        return {"signals": [], "metrics": metrics, "frames": []}
 
     # Build the base DataFrame ONCE (datetime index, sorted) instead of
     # reconstructing the full frame on every structure event.
@@ -204,6 +211,15 @@ def run_simulation(
             result = orch.analyze(market_data=md, symbol=symbol, timeframe=timeframe)
         except Exception as e:
             logger.warning(f"sim: orchestrator failed at {ev_time}: {e}")
+            err_result = {
+                "error": str(e),
+                "agent_results": {},
+                "final_signal": "HOLD",
+                "approved": False,
+                "consensus_level": "no_consensus",
+                "final_confidence": 0.0,
+            }
+            frames.append(_build_frame(ev, err_result))
             continue
         frames.append(_build_frame(ev, result))
         if not result.get("approved") or result.get("final_signal") not in ("BUY", "SELL"):
@@ -224,6 +240,7 @@ def run_simulation(
             "outcome_bar": outcome["outcome_bar"],
         })
     metrics = compute_metrics(signals, backtest_trades)
+    frames.sort(key=lambda f: f["event_time"])
     return {"signals": signals, "metrics": metrics, "frames": frames}
 
 

@@ -123,15 +123,91 @@ def test_run_simulation_caps_events(monkeypatch):
     monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
     candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
                 "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
-               for i in range(50)]
+                for i in range(50)]
     events = [{"type": "BOS", "direction": "bullish", "price": 101.0,
-               "time": candles[3 + i]["time"], "timeframe": "M15", "status": "active",
-               "previous_price": 100.0, "previous_time": candles[2 + i]["time"]}
-              for i in range(10)]
+                "time": candles[3 + i]["time"], "timeframe": "M15", "status": "active",
+                "previous_price": 100.0, "previous_time": candles[2 + i]["time"]}
+               for i in range(10)]
     # With max_events=3 only the first 3 events should produce signals (orchestrator
     # approves every event), bounding the work regardless of total event count.
     result = sim_mod.run_simulation(candles, events, [], max_events=3)
     assert len(result["signals"]) == 3
+
+
+class SkippedOrchestrator:
+    """Returns approved=True but with no per-agent results (all agents skipped)."""
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+        return {
+            "approved": True,
+            "final_signal": "BUY",
+            "final_confidence": 0.8,
+            "consensus_level": "strong",
+            "agent_results": {},
+        }
+
+
+def test_build_frame_skipped(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: SkippedOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(10)]
+    events = [{"type": "BOS", "direction": "bullish", "price": 101.0,
+                "time": candles[3]["time"], "timeframe": "M15", "status": "active",
+                "previous_price": 100.0, "previous_time": candles[2]["time"]}]
+    result = sim_mod.run_simulation(candles, events, [], symbol="XAUUSD", timeframe="M15")
+    assert len(result["frames"]) == 1
+    frame = result["frames"][0]
+    for key in ("market_structure", "ml_prediction", "sentiment", "risk_management"):
+        assert frame["agents"][key]["status"] == "skipped"
+
+
+class ErrorOrchestrator:
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+        raise RuntimeError("boom")
+
+
+def test_build_frame_error(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: ErrorOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(10)]
+    events = [{"type": "BOS", "direction": "bullish", "price": 101.0,
+                "time": candles[3]["time"], "timeframe": "M15", "status": "active",
+                "previous_price": 100.0, "previous_time": candles[2]["time"]}]
+    result = sim_mod.run_simulation(candles, events, [], symbol="XAUUSD", timeframe="M15")
+    assert len(result["frames"]) >= 1
+    assert result["frames"][0]["agents"]["market_structure"]["status"] == "error"
+
+
+def test_run_simulation_empty():
+    result = sim_mod.run_simulation([], [], [])
+    assert result["frames"] == []
+    assert result["signals"] == []
+
+
+def test_run_simulation_cap_after_filter(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(20)]
+    # 4 non-trigger (LH) events followed by 3 trigger (BOS) events. With
+    # max_events=5, the cap must apply to the filtered trigger list, so all 3
+    # BOS frames must survive (not 0 from capping raw, not all 4 LH dropped).
+    events = [
+        {"type": "LH", "direction": "bearish", "price": 101.0,
+         "time": candles[1 + i]["time"], "timeframe": "M15", "status": "active",
+         "previous_price": 100.0, "previous_time": candles[i]["time"]}
+        for i in range(4)
+    ]
+    events += [
+        {"type": "BOS", "direction": "bullish", "price": 101.0,
+         "time": candles[6 + i]["time"], "timeframe": "M15", "status": "active",
+         "previous_price": 100.0, "previous_time": candles[5 + i]["time"]}
+        for i in range(3)
+    ]
+    result = sim_mod.run_simulation(candles, events, [], max_events=5)
+    assert len(result["frames"]) == 3
+    assert all(f["event_type"] == "BOS" for f in result["frames"])
 
 from app.main import app
 from fastapi.testclient import TestClient
