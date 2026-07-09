@@ -446,6 +446,10 @@ export default function SimulationOfDead() {
 
   const [replayData, setReplayData] = useState<ReplayData | null>(null);
   const [allReplayData, setAllReplayData] = useState<Record<string, ReplayData>>({});
+  const [orchestratorEnabled, setOrchestratorEnabled] = useState<boolean>(true);
+  const [simSignals, setSimSignals] = useState<any[]>([]);
+  const [simMetrics, setSimMetrics] = useState<any | null>(null);
+  const [simLoading, setSimLoading] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState({
@@ -1018,6 +1022,34 @@ export default function SimulationOfDead() {
         currentData.candles.forEach(c => map.set(c.time, c));
         candleTimeMapRef.current = map;
       }
+
+      if (orchestratorEnabled) {
+        setSimLoading(true);
+        try {
+          const simRes = await fetch(
+            `${BASE_URL}/trading/simulate?year_from=${yearFrom}&month_from=${monthFrom}` +
+            `&year_to=${yearTo}&month_to=${monthTo}&timeframe=${activeTimeframe}`
+          );
+          if (simRes.ok) {
+            const simData = await simRes.json();
+            setSimSignals(simData.signals ?? []);
+            setSimMetrics(simData.metrics ?? null);
+          } else {
+            console.warn("Orchestrator simulation failed:", simRes.status);
+            setSimSignals([]);
+            setSimMetrics(null);
+          }
+        } catch (e) {
+          console.warn("Orchestrator simulation error:", e);
+          setSimSignals([]);
+          setSimMetrics(null);
+        } finally {
+          setSimLoading(false);
+        }
+      } else {
+        setSimSignals([]);
+        setSimMetrics(null);
+      }
     } catch (err: unknown) {
       clearInterval(interval);
       setLoadError(err instanceof Error ? err.message : "Gagal memuat data");
@@ -1025,7 +1057,7 @@ export default function SimulationOfDead() {
       setIsLoading(false);
       setLoadProgress(prev => ({ ...prev, visible: false }));
     }
-  }, [yearFrom, monthFrom, yearTo, monthTo, isPlaying, activeTimeframe]);
+  }, [yearFrom, monthFrom, yearTo, monthTo, isPlaying, activeTimeframe, orchestratorEnabled]);
 
   const handleTimeframeChange = useCallback((tf: string) => {
     if (isPlaying) stopPlayback();
