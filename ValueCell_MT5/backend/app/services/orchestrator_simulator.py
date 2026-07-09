@@ -118,8 +118,20 @@ def run_simulation(
     backtest_trades: List[Dict[str, Any]],
     symbol: str = "XAUUSD",
     timeframe: str = "M15",
+    max_events: int = 300,
 ) -> Dict[str, Any]:
     orch = get_orchestrator()
+
+    # Cap the number of structure events processed so the simulation always
+    # returns in bounded time even for very wide date ranges. Processing
+    # every event would run the (ML-heavy) orchestrator once per event and
+    # can take minutes, which makes the caller hang.
+    if max_events > 0 and len(structure_events) > max_events:
+        logger.warning(
+            f"sim: {len(structure_events)} structure events exceed cap {max_events}; "
+            f"processing the first {max_events} only"
+        )
+        structure_events = structure_events[:max_events]
 
     # Build the base DataFrame ONCE (datetime index, sorted) instead of
     # reconstructing the full frame on every structure event.

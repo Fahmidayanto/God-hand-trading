@@ -89,6 +89,21 @@ def test_run_simulation_mocked(monkeypatch):
     assert sig["outcome"] in ("TP", "SL", "NONE")
     assert "win_rate" in result["metrics"]
 
+
+def test_run_simulation_caps_events(monkeypatch):
+    monkeypatch.setattr(sim_mod, "get_orchestrator", lambda: FakeOrchestrator())
+    candles = [{"time": 1_700_000_000 + i * 60, "open": 100 + i, "high": 102 + i,
+                "low": 98 + i, "close": 101 + i, "volume": 10, "ema200": 100.0}
+               for i in range(50)]
+    events = [{"type": "BOS", "direction": "bullish", "price": 101.0,
+               "time": candles[3 + i]["time"], "timeframe": "M15", "status": "active",
+               "previous_price": 100.0, "previous_time": candles[2 + i]["time"]}
+              for i in range(10)]
+    # With max_events=3 only the first 3 events should produce signals (orchestrator
+    # approves every event), bounding the work regardless of total event count.
+    result = sim_mod.run_simulation(candles, events, [], max_events=3)
+    assert len(result["signals"]) == 3
+
 from app.main import app
 from fastapi.testclient import TestClient
 

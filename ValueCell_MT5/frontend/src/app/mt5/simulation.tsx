@@ -1039,12 +1039,20 @@ export default function SimulationOfDead() {
         candleTimeMapRef.current = map;
       }
 
+      // Close the "Loading Replay Data" popup as soon as replay data is ready.
+      // The orchestrator simulation below runs independently (see simLoading),
+      // so a slow/large simulation must NOT block the popup from closing.
+      setLoadProgress(prev => ({ ...prev, visible: false }));
+
       if (orchestratorEnabled) {
         setSimLoading(true);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
         try {
           const simRes = await fetch(
             `${BASE_URL}/trading/simulate?year_from=${yearFrom}&month_from=${monthFrom}` +
-            `&year_to=${yearTo}&month_to=${monthTo}&timeframe=${activeTimeframe}`
+            `&year_to=${yearTo}&month_to=${monthTo}&timeframe=${activeTimeframe}`,
+            { signal: controller.signal }
           );
           if (simRes.ok) {
             const simData = await simRes.json();
@@ -1056,10 +1064,13 @@ export default function SimulationOfDead() {
             setSimMetrics(null);
           }
         } catch (e) {
-          console.warn("Orchestrator simulation error:", e);
+          if ((e as any)?.name !== "AbortError") {
+            console.warn("Orchestrator simulation error:", e);
+          }
           setSimSignals([]);
           setSimMetrics(null);
         } finally {
+          clearTimeout(timeoutId);
           setSimLoading(false);
         }
       } else {
