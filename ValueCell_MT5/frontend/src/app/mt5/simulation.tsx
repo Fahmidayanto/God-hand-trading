@@ -638,6 +638,7 @@ export default function SimulationOfDead() {
   const [simSignals, setSimSignals] = useState<any[]>([]);
   const [simMetrics, setSimMetrics] = useState<any | null>(null);
   const [simFrames, setSimFrames] = useState<SimFrame[]>([]);
+  const [simError, setSimError] = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -1235,8 +1236,9 @@ export default function SimulationOfDead() {
 
       if (orchestratorEnabled) {
         setSimLoading(true);
+        setSimError(null);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        const timeoutId = setTimeout(() => controller.abort(), 180000);
         try {
           const simRes = await fetch(
             `${BASE_URL}/trading/simulate?year_from=${yearFrom}&month_from=${monthFrom}` +
@@ -1249,14 +1251,21 @@ export default function SimulationOfDead() {
             setSimMetrics(simData.metrics ?? null);
             setSimFrames((simData.frames ?? []) as SimFrame[]);
           } else {
-            console.warn("Orchestrator simulation failed:", simRes.status);
+            const detail = await simRes.text().catch(() => "");
+            const msg = `Orchestrator simulation failed (HTTP ${simRes.status})${detail ? ": " + detail.slice(0, 200) : ""}`;
+            console.warn(msg);
+            setSimError(msg);
             setSimSignals([]);
             setSimMetrics(null);
             setSimFrames([]);
           }
         } catch (e) {
           if ((e as any)?.name !== "AbortError") {
-            console.warn("Orchestrator simulation error:", e);
+            const msg = `Orchestrator simulation error: ${(e as any)?.message ?? e}`;
+            console.warn(msg);
+            setSimError(msg);
+          } else {
+            setSimError("Orchestrator simulation timed out (>180s). Try a smaller date range.");
           }
           setSimSignals([]);
           setSimMetrics(null);
@@ -1269,6 +1278,7 @@ export default function SimulationOfDead() {
         setSimSignals([]);
         setSimMetrics(null);
         setSimFrames([]);
+        setSimError(null);
       }
     } catch (err: unknown) {
       clearInterval(interval);
@@ -2058,6 +2068,11 @@ export default function SimulationOfDead() {
         {/* ── Orchestrator Simulation ── */}
         {simLoading && (
           <p className="text-sm text-[var(--text-secondary)] mt-2">⏳ Running Orchestrator Simulation…</p>
+        )}
+        {simError && (
+          <div className="mt-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
+            ⚠️ {simError}
+          </div>
         )}
         {simMetrics && simMetrics.total_signals > 0 && (
           <div className="mt-3 p-3 rounded-lg bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]">

@@ -143,15 +143,27 @@ def get_orchestrator():
     Same OrchestratorAgent code as live, but its own instance + config.
     Sentiment is ENABLED so all four agents (Market Structure, ML Filter,
     Sentiment, Risk Manager) actually run during the simulation.
+
+    Defensive: if building with sentiment enabled raises (e.g. a missing
+    dependency or bad config in the backend environment), fall back to a
+    sentiment-disabled instance so the whole simulation does not 500.
     """
     from valuecell.agents.orchestrator_agent import OrchestratorAgent
-    return OrchestratorAgent(
+
+    base_kwargs = dict(
         enable_market_structure=True,
         enable_ml_prediction=True,
         enable_risk_management=True,
-        enable_sentiment=True,
         consensus_threshold=0.60,
     )
+    try:
+        return OrchestratorAgent(enable_sentiment=True, **base_kwargs)
+    except Exception as e:
+        logger.warning(
+            f"sim: sentiment-enabled orchestrator failed to build ({e}); "
+            f"falling back to sentiment-disabled instance"
+        )
+        return OrchestratorAgent(enable_sentiment=False, **base_kwargs)
 
 
 def run_simulation(
