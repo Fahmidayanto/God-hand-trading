@@ -960,7 +960,7 @@ export default function SimulationOfDead() {
       structurePrimitiveRef.current?.setLines([]);
       tradesPrimitiveRef.current?.setTrades([]);
     }
-  }, [simSignals]);
+  }, [simSignals, replayData, currentIndex]);
 
   // ── Load Data ────────────────────────────────────────────────────────────
 
@@ -1842,7 +1842,7 @@ export default function SimulationOfDead() {
         {simLoading && (
           <p className="text-sm text-[var(--text-secondary)] mt-2">⏳ Running Orchestrator Simulation…</p>
         )}
-        {simMetrics && (
+        {simMetrics && simMetrics.total_signals > 0 && (
           <div className="mt-3 p-3 rounded-lg bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]">
             <p className="text-sm font-semibold text-[var(--neon-blue)] mb-2">🧠 Orchestrator Simulation</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
@@ -1854,6 +1854,9 @@ export default function SimulationOfDead() {
               <span>Agreement w/ backtest: <strong className="text-[var(--text-primary)]">{(simMetrics.agreement_rate * 100).toFixed(1)}%</strong></span>
             </div>
           </div>
+        )}
+        {simMetrics && simMetrics.total_signals === 0 && (
+          <p className="text-sm text-[var(--text-secondary)] mt-2">🧠 Orchestrator Simulation: No signals.</p>
         )}
 
         {/* ── Error ── */}

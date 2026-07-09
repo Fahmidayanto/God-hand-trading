@@ -4,6 +4,7 @@ import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.core.mt5_manager import MT5Manager
@@ -1263,7 +1264,9 @@ async def get_simulation_data(
     ]
 
     try:
-        result = run_simulation(candles, structure_events, backtest_trades, symbol="XAUUSD", timeframe=timeframe)
+        result = await run_in_threadpool(
+            run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe
+        )
     except Exception as e:
         logger.error(f"Simulation run error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

@@ -18,24 +18,21 @@ def _to_dt(ts: int) -> datetime:
 
 
 def reconstruct_market_data(
-    candles: List[Dict[str, Any]],
+    df: pd.DataFrame,
     event_time: int,
     structure_events: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """Build the market_data dict the orchestrator expects, as of event_time.
 
     Mirrors trading_system.TradingSystem._fetch_market_data but from history.
+    `df` is the prebuilt base DataFrame (datetime index, sorted) produced once
+    by `run_simulation`; this function only slices/filters it for `event_time`.
     """
-    df = pd.DataFrame(candles)
-    df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
-    if "tick_volume" not in df.columns and "volume" in df.columns:
-        df["tick_volume"] = df["volume"]
     df = df[df["time"] <= _to_dt(event_time)].copy()
     if df.empty:
         raise ValueError("No candles up to event_time")
-    if "ema200" not in df.columns or df["ema200"].isna().all():
-        df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
-    df["high_low"] = df["high"] - df["low"]
+    if "tick_volume" not in df.columns and "volume" in df.columns:
+        df["tick_volume"] = df["volume"]
     atr = float(df["high_low"].tail(14).mean())
     current = df.iloc[-1]
     current_bar = {
@@ -46,12 +43,14 @@ def reconstruct_market_data(
         "close": float(current["close"]),
         "volume": int(current["tick_volume"]) if "tick_volume" in df.columns else int(current["volume"]),
     }
+    # Non-overlapping session partition. Overlaps resolved by preferring the
+    # market that is open: London over Asia (7-9), NewYork over London (13-16).
     hour = current["time"].hour
-    if 7 <= hour < 16:
-        session = "London"
-    elif 13 <= hour < 22:
+    if 13 <= hour < 22:
         session = "NewYork"
-    elif 0 <= hour < 9:
+    elif 7 <= hour < 16:
+        session = "London"
+    elif 0 <= hour < 7:
         session = "Asia"
     else:
         session = "Sydney"
@@ -121,13 +120,25 @@ def run_simulation(
     timeframe: str = "M15",
 ) -> Dict[str, Any]:
     orch = get_orchestrator()
+
+    # Build the base DataFrame ONCE (datetime index, sorted) instead of
+    # reconstructing the full frame on every structure event.
+    base_df = pd.DataFrame(candles)
+    base_df["time"] = pd.to_datetime(base_df["time"], unit="s", utc=True)
+    if "tick_volume" not in base_df.columns and "volume" in base_df.columns:
+        base_df["tick_volume"] = base_df["volume"]
+    if "ema200" not in base_df.columns or base_df["ema200"].isna().all():
+        base_df["ema200"] = base_df["close"].ewm(span=200, adjust=False).mean()
+    base_df["high_low"] = base_df["high"] - base_df["low"]
+    base_df = base_df.sort_values("time").reset_index(drop=True)
+
     signals: List[Dict[str, Any]] = []
     for ev in structure_events:
         ev_time = ev.get("time")
         if ev_time is None:
             continue
         try:
-            md = reconstruct_market_data(candles, ev_time, structure_events)
+            md = reconstruct_market_data(base_df, ev_time, structure_events)
         except Exception as e:
             logger.warning(f"sim: skip event {ev_time}: {e}")
             continue
@@ -179,8 +190,10 @@ def compute_metrics(
     for s in signals:
         for t in bt_sorted:
             if abs(t["entry_time"] - s["time"]) <= 4 * 3600:
-                bt_dir = "BUY" if str(t.get("type", "")).upper() == "BUY" else "SELL"
-                if bt_dir == s["signal"]:
+                bt_type = str(t.get("type", "")).upper()
+                # Only count agreement for explicitly valid backtest directions;
+                # malformed/None types are skipped (neither BUY nor SELL).
+                if bt_type == s["signal"]:
                     matched += 1
                 break
     agreement_rate = (matched / total) if total else 0.0

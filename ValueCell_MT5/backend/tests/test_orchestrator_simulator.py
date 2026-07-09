@@ -1,6 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from app.services.orchestrator_simulator import reconstruct_market_data
+import pandas as pd
 
 def _candles():
     base = 1_700_000_000
@@ -12,7 +13,10 @@ def _candles():
 
 def test_reconstruct_market_data():
     candles = _candles()
-    md = reconstruct_market_data(candles, candles[-1]["time"], [])
+    df = pd.DataFrame(candles)
+    df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
+    df["high_low"] = df["high"] - df["low"]
+    md = reconstruct_market_data(df, candles[-1]["time"], [])
     assert "df" in md and "current_bar" in md
     assert md["current_bar"]["close"] == candles[-1]["close"]
     assert md["atr"] > 0
@@ -100,28 +104,19 @@ def test_simulate_endpoint(monkeypatch):
     class FakeCursor:
         def __enter__(self): return self
         def __exit__(self, *a): return False
-        def execute(self, *a, **k): pass
+        # Route: execute() stores rows for the current query; fetchall() returns them.
+        def execute(self, q, params=None):
+            if "marketdata" in q:
+                self._rows = candle_rows
+            elif "llhhbos" in q:
+                self._rows = struct_rows
+            else:
+                self._rows = trade_rows
         def fetchall(self):
-            return [
-                ().__class__ and None  # placeholder removed below
-            ]
-    # Simpler: return tailored rows per query via side-effect
+            return self._rows
     candle_rows = [(__import__("datetime").datetime(2024,1,1,0,0), 100,102,98,101,10,100.0)]
     struct_rows = [("BOS","bullish",101.0,__import__("datetime").datetime(2024,1,1,0,0),"M15","active",100.0,__import__("datetime").datetime(2024,1,1,0,0))]
     trade_rows = [("T1","BUY",100.0,105.0,98.0,200.0,2.0,"Asia",__import__("datetime").datetime(2024,1,1,0,0),__import__("datetime").datetime(2024,1,1,1,0),0.1)]
-    seq = {"n": 0}
-    def fake_execute(self, q, params=None):
-        seq["n"] += 1
-        if "marketdata" in q:
-            self._rows = candle_rows
-        elif "llhhbos" in q:
-            self._rows = struct_rows
-        else:
-            self._rows = trade_rows
-    def fake_fetchall(self):
-        return self._rows
-    FakeCursor.execute = fake_execute
-    FakeCursor.fetchall = fake_fetchall
 
     class FakeConn:
         def __enter__(self): return self
