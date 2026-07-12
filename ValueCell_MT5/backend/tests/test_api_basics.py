@@ -39,3 +39,13 @@ def test_agents_consensus_endpoint(client):
     data = response.json()
     assert "consensus" in data
     assert "agents" in data
+
+
+def test_clear_replay_cache(client):
+    """Test clear replay cache endpoint."""
+    response = client.post("/api/v1/trading/replay/clear-cache")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert "Replay cache cleared" in data["message"]
+

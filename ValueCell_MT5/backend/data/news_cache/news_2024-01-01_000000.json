@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold holds near record highs as safe haven demand persists amid global recession fears",
+            "timestamp": "2023-12-31T20:15:00"
+        },
+        {
+            "headline": "US Dollar weakens as markets price in dovish Fed pivot following cooling inflation data",
+            "timestamp": "2023-12-31T21:45:00"
+        },
+        {
+            "headline": "Treasury yields dip to multi-month lows, boosting non-yielding Gold appeal ahead of new year",
+            "timestamp": "2023-12-31T23:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "ISM Manufacturing PMI",
+            "impact": "high",
+            "time": "2024-01-01T15:00:00"
+        },
+        {
+            "event": "JOLTS Job Openings",
+            "impact": "medium",
+            "time": "2024-01-01T15:00:00"
+        }
+    ]
+}

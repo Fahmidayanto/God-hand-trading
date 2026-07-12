@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to new highs as safe haven demand intensifies amid recession fears",
+            "timestamp": "2026-01-06T13:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed officials signal dovish pivot on inflation targets",
+            "timestamp": "2026-01-06T14:45:00"
+        },
+        {
+            "headline": "Treasury yield curve inversion deepens, boosting gold appeal against hawkish rhetoric",
+            "timestamp": "2026-01-06T15:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC Meeting Minutes",
+            "impact": "high",
+            "time": "2026-01-06T19:00:00"
+        },
+        {
+            "event": "Consumer Credit Change",
+            "impact": "medium",
+            "time": "2026-01-06T21:30:00"
+        }
+    ]
+}

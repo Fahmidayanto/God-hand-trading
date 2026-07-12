@@ -55,7 +55,7 @@ async def get_agent_consensus():
                 )
             )
         
-        logger.info(f"[API] Returning consensus: {consensus_data['consensus']} ({consensus_data['confidence']:.1f}%)")
+        logger.debug(f"[API] Returning consensus: {consensus_data['consensus']} ({consensus_data['confidence']:.1f}%)")
         
         consensus = AgentConsensus(
             consensus=consensus_data['consensus'],
@@ -233,7 +233,7 @@ async def get_market_structure():
             logger.warning("[API] No market structure data available")
             structure = reader._get_fallback_structure()
         
-        logger.info(f"[API] Returning market structure: {structure['phase_name']} - {structure['direction']}")
+        logger.debug(f"[API] Returning market structure: {structure['phase_name']} - {structure['direction']}")
         
         return JSONResponse(content=structure)
     
@@ -278,7 +278,7 @@ async def get_market_structure_lines(from_date: str = "2020-01-01", to_date: str
         reader = MarketStructureLinesReader()
         lines = reader.get_market_structure_lines(from_date=from_date, to_date=to_date)
         
-        logger.info(
+        logger.debug(
             f"[API] Returning {lines['total_points']} structure points "
             f"({from_date} to {to_date or 'now'})"
         )

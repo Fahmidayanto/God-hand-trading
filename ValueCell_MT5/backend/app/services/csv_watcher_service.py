@@ -139,8 +139,14 @@ class CSVWatcherService:
         except Exception as e:
             logger.error(f"❌ Error during initial historical scan: {e}", exc_info=True)
 
-        # ponytail: disable continuous loop, run only once on startup
-        self._running = False
+        # Option B: Active Watcher Loop (periodically check for updates)
+        logger.info(f"👀 Option B: Starting active directory watcher. Interval: {self.check_interval}s...")
+        while self._running:
+            try:
+                self._check_for_updates()
+            except Exception as e:
+                logger.error(f"❌ Error checking CSV updates: {e}", exc_info=True)
+            time.sleep(self.check_interval)
 
     def _scan_and_load_all(self):
         """Scans the directory and processes every CSV file."""
@@ -378,6 +384,25 @@ class CSVWatcherService:
                     "timeframe": row.get("Timeframe", "M15").strip(),
                     "status": row.get("Status", "").strip(),
                     "reject_reason": row.get("Reject_Reason", "").strip(),
+                    "body_ratio": parse_float(row.get("BodyRatio")),
+                    "body_ratio_min": parse_float(row.get("BodyRatioMin")),
+                    "body_ratio_passed": row.get("BodyRatioPassed", "NO").strip(),
+                    "body_ratio_mode": row.get("BodyRatioMode", "").strip(),
+                    "initial_sl": parse_float(row.get("InitialSL")),
+                    "initial_tp": parse_float(row.get("InitialTP")),
+                    "final_sl": parse_float(row.get("FinalSL")),
+                    "final_tp": parse_float(row.get("FinalTP")),
+                    "initial_risk_points": parse_int(row.get("InitialRiskPoints")),
+                    "initial_reward_points": parse_int(row.get("InitialRewardPoints")),
+                    "final_risk_points": parse_int(row.get("FinalRiskPoints")),
+                    "final_reward_points": parse_int(row.get("FinalRewardPoints")),
+                    "trailing_modified": row.get("TrailingModified", "NO").strip(),
+                    "trailing_count": parse_int(row.get("TrailingCount")),
+                    "tp_expanded": row.get("TPExpanded", "NO").strip(),
+                    "tp_expand_count": parse_int(row.get("TPExpandCount")),
+                    "max_favorable_points": parse_int(row.get("MaxFavorablePoints")),
+                    "max_adverse_points": parse_int(row.get("MaxAdversePoints")),
+                    "close_reason": row.get("CloseReason", "").strip(),
                     "csv_filename": filename
                 }
                 
@@ -462,6 +487,7 @@ class CSVWatcherService:
         try:
             if table_name == "llhhbosdata_xauusd":
                 logger.info(f"🔄 Syncing {len(parsed_rows)} structures from NeonDB to LanceDB...")
+                patterns_to_add = []
                 with get_db_conn() as conn:
                     with conn.cursor() as cur:
                         for row in parsed_rows:
@@ -472,13 +498,19 @@ class CSVWatcherService:
                                 SELECT 
                                     s.type, s.direction_action, s.price, s.time, s.timeframe, s.status,
                                     COALESCE(m15.ema200, h1.ema200, h4.ema200, s.price) as ema200,
-                                    r.net_profit, r.session, r.entry_price, r.exit_price, r.entry_time, r.exit_time
+                                    r.net_profit, r.session, r.entry_price, r.exit_price, r.entry_time, r.exit_time, r.status,
+                                    (
+                                        SELECT type FROM llhhbosdata_xauusd 
+                                        WHERE timeframe = s.timeframe AND time < s.time AND UPPER(type) IN ('CHOCH', 'BOS')
+                                        ORDER BY time DESC 
+                                        LIMIT 1
+                                    ) as prior_baseline
                                 FROM llhhbosdata_xauusd s
                                 LEFT JOIN marketdata_xauusd_m15 m15 ON s.time = m15.time AND s.timeframe = 'M15'
                                 LEFT JOIN marketdata_xauusd_h1 h1 ON s.time = h1.time AND s.timeframe = 'H1'
                                 LEFT JOIN marketdata_xauusd_h4 h4 ON s.time = h4.time AND s.timeframe = 'H4'
                                 LEFT JOIN backtest_results_xauusd r ON r.symbol = 'XAUUSD' AND r.timeframe = s.timeframe AND r.type = %s 
-                                    AND r.entry_time >= s.time AND r.entry_time <= s.time + interval '1 hour'
+                                    AND r.entry_time >= s.time AND r.entry_time <= s.time + interval '5 days'
                                 WHERE s.time = %s AND s.timeframe = %s AND s.type = %s AND s.price = %s
                                 LIMIT 1
                             """
@@ -486,7 +518,7 @@ class CSVWatcherService:
                             db_row = cur.fetchone()
                             
                             if db_row:
-                                s_type, s_dir, s_price, s_time, s_tf, s_status, ema200, net_profit, session, entry_pr, exit_pr, t_entry, t_exit = db_row
+                                s_type, s_dir, s_price, s_time, s_tf, s_status, ema200, net_profit, session, entry_pr, exit_pr, t_entry, t_exit, r_status, prior_baseline = db_row
                                 
                                 event_type = "BoS"
                                 if "choch" in s_type.lower():
@@ -497,13 +529,14 @@ class CSVWatcherService:
                                     event_type = "LL"
                                     
                                 direction = "Bullish" if is_bullish else "Bearish"
+                                prior_choch = prior_baseline is not None and prior_baseline.upper() == "CHOCH"
                                 
                                 outcome = "PENDING"
                                 profit_pips = 0.0
                                 duration_minutes = 0
                                 norm_session = "London"
                                 
-                                if net_profit is not None:
+                                if net_profit is not None and str(r_status).upper() != "REJECTED":
                                     outcome = "WIN" if float(net_profit) > 0 else "LOSS"
                                     entry_pr = float(entry_pr or 0)
                                     exit_pr = float(exit_pr or 0)
@@ -536,20 +569,31 @@ class CSVWatcherService:
                                     "price": float(s_price),
                                     "ema200": float(ema200),
                                     "session": norm_session,
+                                    "prior_choch": prior_choch,
                                     "outcome": outcome,
                                     "profit_pips": profit_pips,
                                     "duration_minutes": duration_minutes
                                 }
                                 
-                                self.lancedb.add_structure_pattern(pattern_dict)
+                                patterns_to_add.append(pattern_dict)
+                
+                # Perform high-performance batch write
+                if patterns_to_add:
+                    self.lancedb.add_structure_patterns_batch(patterns_to_add)
                                 
             elif table_name == "backtest_results_xauusd":
                 logger.info(f"🔄 Syncing {len(parsed_rows)} trade outcomes from NeonDB to LanceDB...")
+                trades_to_add = []
                 with get_db_conn() as conn:
                     with conn.cursor() as cur:
                         for row in parsed_rows:
                             query = """
-                                SELECT ticket, symbol, type, entry_price, exit_price, net_profit, session, entry_time, exit_time, timeframe, status
+                                SELECT ticket, symbol, type, entry_price, exit_price, net_profit, session, entry_time, exit_time, timeframe, status,
+                                       body_ratio, body_ratio_min, body_ratio_passed, body_ratio_mode,
+                                       initial_sl, initial_tp, final_sl, final_tp,
+                                       initial_risk_points, initial_reward_points, final_risk_points, final_reward_points,
+                                       trailing_modified, trailing_count, tp_expanded, tp_expand_count,
+                                       max_favorable_points, max_adverse_points, close_reason
                                 FROM backtest_results_xauusd
                                 WHERE entry_time = %s AND ticket = %s AND type = %s
                                 LIMIT 1
@@ -558,19 +602,26 @@ class CSVWatcherService:
                             db_row = cur.fetchone()
                             
                             if db_row:
-                                ticket, symbol, t_type, entry_pr, exit_pr, net_profit, session, t_entry, t_exit, tf, status = db_row
+                                (ticket, symbol, t_type, entry_pr, exit_pr, net_profit, session, t_entry, t_exit, tf, status,
+                                 body_ratio, body_ratio_min, body_ratio_passed, body_ratio_mode,
+                                 initial_sl, initial_tp, final_sl, final_tp,
+                                 initial_risk_points, initial_reward_points, final_risk_points, final_reward_points,
+                                 trailing_modified, trailing_count, tp_expanded, tp_expand_count,
+                                 max_favorable_points, max_adverse_points, close_reason) = db_row
                                 
                                 entry_pr = float(entry_pr or 0)
                                 exit_pr = float(exit_pr or 0)
                                 net_profit = float(net_profit or 0)
                                 
                                 pips = 0.0
-                                if str(t_type) == "BUY":
-                                    pips = (exit_pr - entry_pr) * 10.0
+                                if str(status).upper() != "REJECTED":
+                                    if str(t_type) == "BUY":
+                                        pips = (exit_pr - entry_pr) * 10.0
+                                    else:
+                                        pips = (entry_pr - exit_pr) * 10.0
+                                    outcome = "WIN" if net_profit > 0 else "LOSS"
                                 else:
-                                    pips = (entry_pr - exit_pr) * 10.0
-                                    
-                                outcome = "WIN" if net_profit > 0 else "LOSS"
+                                    outcome = "PENDING"
                                 
                                 try:
                                     duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
@@ -610,11 +661,33 @@ class CSVWatcherService:
                                     "outcome": outcome,
                                     "structure_event": structure_event,
                                     "session": self._normalize_session(session),
-                                    "consensus_score": 0.80
+                                    "consensus_score": 0.80,
+                                    "body_ratio": float(body_ratio) if body_ratio is not None else None,
+                                    "body_ratio_min": float(body_ratio_min) if body_ratio_min is not None else None,
+                                    "body_ratio_passed": body_ratio_passed,
+                                    "body_ratio_mode": body_ratio_mode,
+                                    "initial_sl": float(initial_sl) if initial_sl is not None else None,
+                                    "initial_tp": float(initial_tp) if initial_tp is not None else None,
+                                    "final_sl": float(final_sl) if final_sl is not None else None,
+                                    "final_tp": float(final_tp) if final_tp is not None else None,
+                                    "initial_risk_points": initial_risk_points,
+                                    "initial_reward_points": initial_reward_points,
+                                    "final_risk_points": final_risk_points,
+                                    "final_reward_points": final_reward_points,
+                                    "trailing_modified": trailing_modified,
+                                    "trailing_count": trailing_count,
+                                    "tp_expanded": tp_expanded,
+                                    "tp_expand_count": tp_expand_count,
+                                    "max_favorable_points": max_favorable_points,
+                                    "max_adverse_points": max_adverse_points,
+                                    "close_reason": close_reason
                                 }
                                 
-                                self.lancedb.add_trade_outcome(trade_dict)
+                                trades_to_add.append(trade_dict)
                                 
+                        if trades_to_add:
+                            self.lancedb.add_trade_outcomes_batch(trades_to_add)
+                            
                         self._recalculate_session_patterns(cur)
 
             # Trigger hybrid orchestrator run only on specific structure patterns (CHoCH, HH, LL, BoS) or trade outcomes

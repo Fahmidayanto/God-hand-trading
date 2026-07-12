@@ -35,7 +35,7 @@ def get_activity_log_service(
     
     if _activity_log_service is None:
         _activity_log_service = ActivityLogService(mt5_manager=mt5, cache_size=200)
-        logger.info("[ActivityLogsAPI] ActivityLogService initialized")
+        logger.debug("[ActivityLogsAPI] ActivityLogService initialized")
     
     return _activity_log_service
 

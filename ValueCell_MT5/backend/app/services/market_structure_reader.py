@@ -24,7 +24,7 @@ class MarketStructureReader:
         backend_dir = Path(__file__).parent.parent.parent
         project_root = backend_dir.parent
         self.backtest_dir = project_root.parent / "Backtest_result"
-        logger.info(f"[MarketStructureReader] Backtest dir: {self.backtest_dir}")
+        logger.debug(f"[MarketStructureReader] Backtest dir: {self.backtest_dir}")
 
         # Allow caller to override broker offset; fall back to config if available
         if broker_offset_hours is not None:
@@ -58,7 +58,7 @@ class MarketStructureReader:
                 return self._get_fallback_structure()
 
             structure = self._build_structure_state(events)
-            logger.info(
+            logger.debug(
                 f"[MarketStructureReader] {structure['phase_name']} | "
                 f"{structure['direction']} | BoS={structure['bos_price']:.2f}"
             )
@@ -147,7 +147,7 @@ class MarketStructureReader:
                 "take_profit": round(take_profit, 2),
                 "timestamp": structure.get("last_updated", datetime.now(timezone.utc).isoformat()),
             }
-            logger.info(
+            logger.debug(
                 f"[MarketStructureReader] Signal: {signal} conf={confidence:.0%} "
                 f"entry={entry_price:.2f} sl={stop_loss:.2f} tp={take_profit:.2f}"
             )
@@ -176,7 +176,7 @@ class MarketStructureReader:
                 match = re.search(r'(\d{4}-\d{2}-\d{2})', path.stem)
                 return match.group(1) if match else '0000-00-00'
             latest = max(csv_files, key=extract_date)
-            logger.info(f"[MarketStructureReader] Using file: {latest.name} (date: {extract_date(latest)})")
+            logger.debug(f"[MarketStructureReader] Using file: {latest.name} (date: {extract_date(latest)})")
             return latest
         except Exception as e:
             logger.error(f"[MarketStructureReader] Error finding CSV: {e}")
@@ -303,7 +303,7 @@ class MarketStructureReader:
 
             # Sort oldest → newest
             events.sort(key=lambda e: e["time"])
-            logger.info(f"[MarketStructureReader] Parsed {len(events)} events from {csv_path.name}")
+            logger.debug(f"[MarketStructureReader] Parsed {len(events)} events from {csv_path.name}")
             return events
 
         except Exception as e:

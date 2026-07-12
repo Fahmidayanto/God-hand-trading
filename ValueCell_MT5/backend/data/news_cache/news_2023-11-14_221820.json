@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as softer CPI data fuels dovish Fed expectations and sends Treasury yields tumbling",
+            "timestamp": "2023-11-14T18:45:00"
+        },
+        {
+            "headline": "US Dollar weakens broadly after inflation report cools, reducing recession fears and safe haven demand for greenback",
+            "timestamp": "2023-11-14T19:30:00"
+        },
+        {
+            "headline": "XAUUSD tests key resistance as hawkish Fed bets unwind following surprise drop in core inflation metrics",
+            "timestamp": "2023-11-14T20:15:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC Member Speech",
+            "impact": "medium",
+            "time": "2023-11-15T01:00:00"
+        },
+        {
+            "event": "Crude Oil Inventories",
+            "impact": "medium",
+            "time": "2023-11-15T03:30:00"
+        }
+    ]
+}

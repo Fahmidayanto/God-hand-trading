@@ -40,7 +40,8 @@ class PatternMatcher:
         session: str,
         timeframe: str = "M15",
         limit: int = 20,
-        min_similarity: float = 0.7
+        min_similarity: float = 0.7,
+        prior_choch: bool = False,
     ) -> Dict[str, Any]:
         """
         Find similar historical patterns and calculate statistics.
@@ -73,7 +74,8 @@ class PatternMatcher:
                 "ema200": ema200,
                 "session": session,
                 "timeframe": timeframe,
-                "symbol": "XAUUSD"
+                "symbol": "XAUUSD",
+                "prior_choch": prior_choch,
             }
             
             # Search similar patterns
@@ -94,10 +96,12 @@ class PatternMatcher:
                     "reasoning": "No similar historical patterns found"
                 }
             
-            # Calculate statistics
-            wins = sum(1 for p in similar_patterns if p.get("outcome") == "WIN")
+            # Calculate statistics (exclude PENDING from win rate calculation)
             total = len(similar_patterns)
-            win_rate = wins / total if total > 0 else 0.0
+            wins = sum(1 for p in similar_patterns if p.get("outcome") == "WIN")
+            losses = sum(1 for p in similar_patterns if p.get("outcome") == "LOSS")
+            completed_trades = wins + losses
+            win_rate = wins / completed_trades if completed_trades > 0 else 0.0
             
             # Calculate average profit (only winning trades)
             winning_trades = [p for p in similar_patterns if p.get("outcome") == "WIN"]
@@ -106,14 +110,14 @@ class PatternMatcher:
                 if winning_trades else 0.0
             )
             
-            # Generate recommendation
+            # Generate recommendation (based on completed trades for statistical significance)
             recommendation, confidence = self._generate_recommendation(
-                win_rate, avg_profit, total
+                win_rate, avg_profit, completed_trades
             )
             
             # Generate reasoning
             reasoning = self._generate_reasoning(
-                event_type, direction, win_rate, avg_profit, total, session
+                event_type, direction, win_rate, avg_profit, total, completed_trades, session
             )
             
             result = {
@@ -121,6 +125,7 @@ class PatternMatcher:
                 "win_rate": win_rate,
                 "avg_profit": avg_profit,
                 "total_count": total,
+                "completed_count": completed_trades,
                 "recommendation": recommendation,
                 "confidence": confidence,
                 "reasoning": reasoning
@@ -128,9 +133,8 @@ class PatternMatcher:
             
             logger.info(
                 f"Pattern match: {event_type} {direction} | "
-                f"Win rate: {win_rate:.1%} | "
+                f"Win rate (completed: {completed_trades}/{total}): {win_rate:.1%} | "
                 f"Avg profit: {avg_profit:.1f} pips | "
-                f"Count: {total} | "
                 f"Rec: {recommendation}"
             )
             
@@ -190,16 +194,19 @@ class PatternMatcher:
         win_rate: float,
         avg_profit: float,
         total: int,
+        completed: int,
         session: str
     ) -> str:
         """Generate human-readable reasoning"""
         
         reasoning_parts = [
             f"Historical analysis: {event_type} {direction} in {session} session.",
-            f"Found {total} similar patterns with {win_rate:.1%} win rate.",
+            f"Found {total} similar patterns (completed: {completed}, win rate: {win_rate:.1%}).",
         ]
         
-        if win_rate >= 0.75:
+        if completed == 0:
+            reasoning_parts.append("No completed trades found for this setup in history.")
+        elif win_rate >= 0.75:
             reasoning_parts.append(f"Excellent historical performance (avg profit: {avg_profit:.1f} pips).")
         elif win_rate >= 0.60:
             reasoning_parts.append(f"Good historical performance (avg profit: {avg_profit:.1f} pips).")
@@ -208,8 +215,8 @@ class PatternMatcher:
         else:
             reasoning_parts.append(f"Poor historical performance (avg profit: {avg_profit:.1f} pips).")
         
-        if total < 5:
-            reasoning_parts.append("Note: Limited historical data, treat with caution.")
+        if completed < 5:
+            reasoning_parts.append("Note: Limited historical trade data, treat with caution.")
         
         return " ".join(reasoning_parts)
     

@@ -230,9 +230,10 @@
   .glass-card {
     background: var(--glass-primary);
     backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid var(--glass-border);
     border-radius: 16px;
-    box-shadow: 
+    box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.4),
       inset 0 1px 1px rgba(255, 255, 255, 0.05);
     transition: all 0.3s ease;
@@ -240,9 +241,49 @@
 
   .glass-card:hover {
     border-color: rgba(59, 130, 246, 0.4);
-    box-shadow: 
+    box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.4),
       0 0 24px rgba(59, 130, 246, 0.2);
+  }
+
+  /* Compact glass — for inline control bars, chips, sub-panels. */
+  .glass-chip {
+    background: var(--glass-secondary);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: 1px solid rgba(100, 116, 139, 0.25);
+    border-radius: 12px;
+    box-shadow:
+      0 4px 16px rgba(0, 0, 0, 0.3),
+      inset 0 1px 1px rgba(255, 255, 255, 0.04);
+    transition: all 0.25s ease;
+  }
+
+  .glass-chip:hover {
+    border-color: rgba(139, 92, 246, 0.35);
+  }
+
+  /* Glass table header — translucent header above the row data. */
+  .glass-header {
+    background: rgba(10, 14, 39, 0.55);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    border-bottom: 1px solid rgba(100, 116, 139, 0.3);
+  }
+
+  /* Neon glow used by primary action (e.g. Apply button) — purple to match accent token. */
+  .neon-glow-purple {
+    box-shadow:
+      0 0 12px rgba(139, 92, 246, 0.35),
+      0 0 4px rgba(139, 92, 246, 0.25),
+      inset 0 1px 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .neon-glow-purple:hover {
+    box-shadow:
+      0 0 18px rgba(139, 92, 246, 0.55),
+      0 0 6px rgba(139, 92, 246, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.12);
   }
 
   .pulse-dot {

@@ -30,7 +30,7 @@ class StructureCollector:
             backtest_dir = backend_dir / ".." / ".." / "Backtest_result"
         
         self.backtest_dir = Path(backtest_dir).resolve()
-        logger.info(f"[StructureCollector] Backtest dir: {self.backtest_dir}")
+        logger.debug(f"[StructureCollector] Backtest dir: {self.backtest_dir}")
         
         # Cache for parsed events
         self._cached_events: List[ActivityLog] = []
@@ -179,7 +179,7 @@ class StructureCollector:
             
             # Limit to recent files for performance (last 3 files)
             csv_files = sorted(csv_files, reverse=True)[:3]
-            logger.info(f"[StructureCollector] Processing {len(csv_files)} files")
+            logger.debug(f"[StructureCollector] Processing {len(csv_files)} files")
             
             # Parse each file
             all_logs: List[ActivityLog] = []
@@ -198,7 +198,7 @@ class StructureCollector:
             # Apply limit
             logs = all_logs[:limit]
             
-            logger.info(f"[StructureCollector] Collected {len(logs)} structure events")
+            logger.debug(f"[StructureCollector] Collected {len(logs)} structure events")
             return logs
         
         except Exception as e:

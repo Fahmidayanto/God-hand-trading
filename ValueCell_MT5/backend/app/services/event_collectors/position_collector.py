@@ -166,7 +166,7 @@ class PositionCollector:
                     logger.warning(f"[PositionCollector] Error parsing deal: {e}")
                     continue
             
-            logger.info(f"[PositionCollector] Collected {len(logs)} position events")
+            logger.debug(f"[PositionCollector] Collected {len(logs)} position events")
             return logs
         
         except Exception as e:

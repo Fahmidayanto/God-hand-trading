@@ -84,19 +84,26 @@ def _row_to_dict(row):
     return {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in zip(keys, row)}
 
 
+_scenarios_table_initialized = False
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("")
 @router.get("/")
 async def list_scenarios():
     """List all saved strategy scenarios."""
+    global _scenarios_table_initialized
     from app.core.database import get_db_conn, is_pool_ready
     if not is_pool_ready():
         raise HTTPException(status_code=503, detail="Database not ready")
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
-                _ensure_table(cur)
+                if not _scenarios_table_initialized:
+                    _ensure_table(cur)
+                    conn.commit()
+                    _scenarios_table_initialized = True
                 cur.execute("SELECT * FROM strategy_scenarios ORDER BY created_at DESC")
                 rows = cur.fetchall()
         return [_row_to_dict(r) for r in rows]
@@ -109,13 +116,17 @@ async def list_scenarios():
 @router.post("/", status_code=201)
 async def save_scenario(body: ScenarioCreate):
     """Save a new strategy scenario."""
+    global _scenarios_table_initialized
     from app.core.database import get_db_conn, is_pool_ready
     if not is_pool_ready():
         raise HTTPException(status_code=503, detail="Database not ready")
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
-                _ensure_table(cur)
+                if not _scenarios_table_initialized:
+                    _ensure_table(cur)
+                    conn.commit()
+                    _scenarios_table_initialized = True
                 cur.execute("""
                     INSERT INTO strategy_scenarios
                         (name, trailing_distance, tp_trigger, tp_ekspansi, max_ekspansi,

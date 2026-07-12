@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to record highs as safe haven demand intensifies amid recession fears",
+            "timestamp": "2026-01-14T14:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed minutes reveal dovish shift on inflation targets",
+            "timestamp": "2026-01-14T15:30:00"
+        },
+        {
+            "headline": "Treasury yield curve inversion deepens, boosting gold appeal against hawkish rhetoric",
+            "timestamp": "2026-01-14T16:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Retail Sales",
+            "impact": "high",
+            "time": "2026-01-14T19:30:00"
+        },
+        {
+            "event": "Industrial Production",
+            "impact": "medium",
+            "time": "2026-01-14T21:00:00"
+        }
+    ]
+}

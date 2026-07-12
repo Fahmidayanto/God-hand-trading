@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to record highs as safe haven demand intensifies amid recession fears and rising inflation expectations",
+            "timestamp": "2026-01-08T21:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed officials signal a dovish pivot, sending Treasury yields lower and boosting XAUUSD",
+            "timestamp": "2026-01-08T22:45:00"
+        },
+        {
+            "headline": "Market volatility spikes as geopolitical tensions escalate; investors flee to gold while hawkish commentary from ECB limits USD gains",
+            "timestamp": "2026-01-08T23:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Consumer Price Index (CPI)",
+            "impact": "high",
+            "time": "2026-01-09T03:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "high",
+            "time": "2026-01-09T05:00:00"
+        }
+    ]
+}

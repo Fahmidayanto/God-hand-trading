@@ -50,7 +50,7 @@ class ActivityLogService:
         self._cache: Deque[ActivityLog] = deque(maxlen=cache_size)
         self._last_update: Optional[datetime] = None
         
-        logger.info("[ActivityLogService] Initialized with cache size: {cache_size}")
+        logger.debug("[ActivityLogService] Initialized with cache size: {cache_size}")
         
         # Log initialization
         self.system_collector.log_info(
@@ -142,7 +142,7 @@ class ActivityLogService:
             self._cache.extend(all_logs)
             self._last_update = datetime.now()
             
-            logger.info(
+            logger.debug(
                 f"[ActivityLogService] Returned {len(all_logs)} logs "
                 f"(structure={len(structure_logs)}, "
                 f"positions={len(position_logs)}, system={len(system_logs)})"

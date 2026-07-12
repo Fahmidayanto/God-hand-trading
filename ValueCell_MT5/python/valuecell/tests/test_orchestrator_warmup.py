@@ -113,3 +113,85 @@ def test_warmup_triggered_on_pending_setup():
     
     # Risk management should not be called since consensus is HOLD/not approved
     orchestrator.agents["risk_management"].analyze.assert_not_called()
+
+
+def test_warmup_results_caching_and_reuse():
+    """Test that ML & Sentiment results are cached during warmup and reused in subsequent analyses until reset."""
+    orchestrator = OrchestratorAgent(
+        enable_market_structure=True,
+        enable_ml_prediction=True,
+        enable_risk_management=True,
+        enable_sentiment=True,
+        consensus_threshold=0.60
+    )
+
+    # Mock agents
+    orchestrator.agents["market_structure"].analyze = MagicMock(side_effect=[
+        # 1. Warmup initial event (HH)
+        {
+            "signal": "HOLD",
+            "confidence": 0.40,
+            "phase": "PENDING_SETUP",
+            "pre_signal": {
+                "direction": "Bullish",
+                "initial_confidence": 0.40,
+                "status": "PENDING_SETUP - menunggu BoS"
+            }
+        },
+        # 2. Intermediate event (LL) - still in warmup
+        {
+            "signal": "HOLD",
+            "confidence": 0.40,
+            "phase": "PENDING_SETUP",
+            "pre_signal": {
+                "direction": "Bullish",
+                "initial_confidence": 0.40,
+                "status": "PENDING_SETUP - menunggu BoS"
+            }
+        },
+        # 3. Reset event - setup invalidated
+        {
+            "signal": "HOLD",
+            "confidence": 0.30,
+            "phase": "IDLE",
+            "pre_signal": None
+        }
+    ])
+
+    orchestrator.agents["ml_prediction"].analyze = MagicMock(return_value={
+        "signal": "BUY",
+        "confidence": 0.75,
+        "probability": 0.75,
+        "reasoning": "ML matches historical structures"
+    })
+    orchestrator.agents["sentiment"].analyze = MagicMock(return_value={
+        "final_signal": "BUY",
+        "final_confidence": 0.80,
+        "confidence_adjustment": 0.05,
+        "filtered": False
+    })
+    orchestrator.agents["risk_management"].analyze = MagicMock()
+
+    market_data = {
+        "df": None,
+        "current_bar": {"time": 123456789, "close": 2300.0},
+        "session": "London"
+    }
+
+    # First run (HH) - should run ML and Sentiment analysis once
+    result1 = orchestrator.analyze(market_data, symbol="XAUUSD", timeframe="M15")
+    assert orchestrator._latest_warmup_results is not None
+    orchestrator.agents["ml_prediction"].analyze.assert_called_once()
+    orchestrator.agents["sentiment"].analyze.assert_called_once()
+
+    # Second run (LL) - should reuse cache, NOT run ML and Sentiment again
+    result2 = orchestrator.analyze(market_data, symbol="XAUUSD", timeframe="M15")
+    assert orchestrator._latest_warmup_results is not None
+    # Call count should still be 1 (meaning it was not called again)
+    assert orchestrator.agents["ml_prediction"].analyze.call_count == 1
+    assert orchestrator.agents["sentiment"].analyze.call_count == 1
+
+    # Third run (Reset) - should clear the cache
+    result3 = orchestrator.analyze(market_data, symbol="XAUUSD", timeframe="M15")
+    assert orchestrator._latest_warmup_results is None
+

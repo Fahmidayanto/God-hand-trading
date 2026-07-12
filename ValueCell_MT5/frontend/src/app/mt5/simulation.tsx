@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { cn } from "@/lib/utils";
 import {
   createChart,
   createSeriesMarkers,
@@ -80,6 +81,8 @@ const SPEED_MAP: Record<string, number> = {
   "5x": 50,
   "10x": 20,
 };
+
+const INITIAL_BALANCE = 1000.00;
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -175,7 +178,7 @@ function CustomSelect<T extends string | number>({
     <div ref={containerRef} className="relative select-none z-[100] group">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all cursor-pointer whitespace-nowrap outline-none"
+        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap outline-none"
         style={{
           backgroundColor: c.bg,
           borderColor: c.border,
@@ -188,7 +191,7 @@ function CustomSelect<T extends string | number>({
 
       {isOpen && (
         <div
-          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110]"
+          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110] transition-all origin-top-right animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out"
         >
           {options.map((opt) => {
             const active = opt === value;
@@ -199,7 +202,7 @@ function CustomSelect<T extends string | number>({
                   onChange(opt);
                   setIsOpen(false);
                 }}
-                className="px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer text-[var(--text-secondary,#cbd5e1)] hover:bg-[var(--bg-elevated,rgba(255,255,255,0.05))] hover:text-white"
+                className="px-2.5 py-2 rounded-md border border-transparent text-xs transition-all duration-150 active:scale-[0.98] cursor-pointer text-[var(--text-secondary,#cbd5e1)] hover:bg-[var(--bg-elevated,rgba(255,255,255,0.05))] hover:text-white"
                 style={
                   active
                     ? {
@@ -431,6 +434,8 @@ interface SimAgentState {
   approved?: boolean | null;
   filtered?: boolean | null;
   adjustment?: number | null;
+  reasoning?: string | null;
+  meta?: Record<string, any> | null;
 }
 
 interface SimFrame {
@@ -447,6 +452,31 @@ interface SimFrame {
   approved: boolean | null;
   consensus_level: string;
   consensus_confidence: number;
+  // Trade execution context — populated by backend _build_frame when the
+  // orchestrator approves a BUY/SELL signal. Consumed by TradesOverlayPrimitive
+  // (via setAgentTrades) to draw SL/TP zones and entry line on the chart.
+  sl_tp?: {
+    entry_price?: number;
+    sl_price?: number;
+    tp_price?: number;
+    sl_distance_pips?: number;
+    tp_distance_pips?: number;
+    rr_ratio?: number;
+  } | null;
+  position_sizing?: {
+    lot_size?: number;
+    risk_pct?: number;
+    risk_usd?: number;
+    multiplier?: number;
+  } | null;
+  event_price?: number;
+  // Sentiment debug context — only populated by the single-event endpoint
+  // (trading.py:simulate-event). Consumed by the modal's News & Calendar block.
+  debug_news?: Array<{ headline?: string; timestamp?: string }>;
+  debug_events?: Array<{ event?: string; impact?: string; time?: string }>;
+  // Counter-swing flag: frontend should NOT update Agent Consensus panel
+  // when true — keeps warm-up values from the setup swing event visible.
+  is_counter_swing?: boolean;
 }
 
 const AGENT_PANEL_DEFS = [
@@ -456,159 +486,7 @@ const AGENT_PANEL_DEFS = [
   { key: "risk_management" as const, name: "Risk Manager", icon: "🛡️", color: "var(--neon-amber)", bg: "rgba(251,191,36,0.2)" },
 ];
 
-function AgentSignalBadge({ status, signal }: { status: string; signal: string | null }) {
-  if (status === "error") {
-    return (
-      <span
-        className="px-2 py-0.5 rounded-full text-xs font-semibold"
-        style={{ background: "rgba(239,68,68,0.2)", color: "var(--neon-ruby)", border: "1px solid rgba(239,68,68,0.4)" }}
-      >
-        ERROR
-      </span>
-    );
-  }
-  if (status === "skipped") {
-    return (
-      <span
-        className="px-2 py-0.5 rounded-full text-xs font-semibold"
-        style={{ background: "rgba(148,163,184,0.2)", color: "var(--text-tertiary)", border: "1px solid rgba(148,163,184,0.3)" }}
-      >
-        SKIPPED
-      </span>
-    );
-  }
-  const signalColor =
-    signal === "BUY" ? "var(--neon-emerald)" : signal === "SELL" ? "var(--neon-ruby)" : "var(--text-secondary)";
-  return (
-    <span
-      className="px-2 py-0.5 rounded-full text-xs font-semibold"
-      style={{ background: "rgba(148,163,184,0.15)", color: signalColor, border: "1px solid rgba(148,163,184,0.3)" }}
-    >
-      {signal ?? "HOLD"}
-    </span>
-  );
-}
-
-function AgentPanel({ frame }: { frame: SimFrame | null }) {
-  if (!frame) return null;
-
-  const directionEmoji = frame.event_direction === "bullish" ? "🐂" : frame.event_direction === "bearish" ? "🐻" : "";
-  const finalSignalColor =
-    frame.final_signal === "BUY" ? "var(--neon-emerald)" : frame.final_signal === "SELL" ? "var(--neon-ruby)" : "var(--text-secondary)";
-
-  return (
-    <div className="glass-card mt-4">
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 style={{ fontSize: "18px", fontWeight: 600 }}>🤖 Orchestrator Agents (Live)</h2>
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-[var(--text-tertiary)]">
-            Event: {frame.event_type} {directionEmoji}
-          </span>
-          <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{ background: "rgba(148,163,184,0.15)", color: finalSignalColor, border: "1px solid rgba(148,163,184,0.3)" }}
-          >
-            {frame.final_signal}
-          </span>
-          <span
-            className="px-2 py-0.5 rounded-full text-xs font-semibold"
-            style={{
-              background: frame.approved ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
-              color: frame.approved ? "var(--neon-emerald)" : "var(--neon-ruby)",
-              border: `1px solid ${frame.approved ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
-            }}
-          >
-            {frame.approved ? "✓ Approved" : "✗ Declined"}
-          </span>
-        </div>
-      </div>
-
-      {AGENT_PANEL_DEFS.map((def) => {
-        const agent = frame.agents[def.key] as SimAgentState | undefined;
-        if (!agent) return null;
-        return (
-          <div key={def.key} className="agent-row">
-            <div className="agent-info">
-              <div className="agent-icon" style={{ background: def.bg, borderColor: def.color }}>
-                {def.icon}
-              </div>
-              <div className="agent-details">
-                <div className="agent-name">{def.name}</div>
-                <div className="agent-signal">
-                  <AgentSignalBadge status={agent.status} signal={agent.signal ?? null} />
-                  {def.key === "risk_management" && agent.status === "fired" && (
-                    <span
-                      className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-                      style={{
-                        background: agent.approved ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)",
-                        color: agent.approved ? "var(--neon-emerald)" : "var(--neon-ruby)",
-                        border: `1px solid ${agent.approved ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
-                      }}
-                    >
-                      {agent.approved ? "✓ Approved" : "✗ Declined"}
-                    </span>
-                  )}
-                  {def.key === "sentiment" && agent.status === "fired" && (
-                    <>
-                      <span
-                        className="ml-2 px-2 py-0.5 rounded-full text-xs font-semibold"
-                        style={{
-                          background: agent.filtered ? "rgba(251,191,36,0.2)" : "rgba(16,185,129,0.2)",
-                          color: agent.filtered ? "var(--neon-amber)" : "var(--neon-emerald)",
-                          border: `1px solid ${agent.filtered ? "rgba(251,191,36,0.4)" : "rgba(16,185,129,0.4)"}`,
-                        }}
-                      >
-                        {agent.filtered ? "Filtered" : "Passed"}
-                      </span>
-                      {agent.adjustment != null && (
-                        <span className="ml-2 text-xs text-[var(--text-tertiary)]">
-                          {agent.adjustment >= 0 ? "+" : ""}{agent.adjustment.toFixed(2)}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div style={{ minWidth: "100px" }}>
-              <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "4px" }}>
-                Confidence
-              </div>
-              <div className="progress-bar" style={{ width: "100px" }}>
-                <div
-                  className="progress-fill"
-                  style={{ width: `${Math.min(100, Math.max(0, (agent.confidence ?? 0) * 100))}%`, background: `linear-gradient(90deg, ${def.color}, rgba(148,163,184,0.4))` }}
-                ></div>
-              </div>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Overall Consensus summary (matches dashboard "Agent Consensus") */}
-      <div style={{ marginTop: "16px", padding: "16px", background: "rgba(31,41,55,0.3)", borderRadius: "12px" }}>
-        <div className="flex items-center justify-between">
-          <span className="font-semibold text-sm text-[var(--text-primary)]">Overall Consensus</span>
-          <span className="text-base font-bold" style={{ color: finalSignalColor }}>{frame.final_signal}</span>
-        </div>
-        <div className="progress-bar" style={{ marginTop: "12px" }}>
-          <div
-            className="progress-fill"
-            style={{
-              width: `${Math.min(100, Math.max(0, (frame.consensus_confidence ?? 0) * 100))}%`,
-              background: "linear-gradient(90deg, var(--neon-amber), var(--neon-ruby))",
-            }}
-          ></div>
-        </div>
-        <div className="text-xs text-[var(--text-tertiary)] mt-2">
-          {frame.consensus_level
-            ? `${frame.consensus_level} (${Math.round((frame.consensus_confidence ?? 0) * 100)}%)`
-            : "—"}
-        </div>
-      </div>
-    </div>
-  );
-}
+// ── Types for simulation helper ──────────────────────────────────────────────
 
 export default function SimulationOfDead() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -636,10 +514,20 @@ export default function SimulationOfDead() {
   const [allReplayData, setAllReplayData] = useState<Record<string, ReplayData>>({});
   const [orchestratorEnabled, setOrchestratorEnabled] = useState<boolean>(true);
   const [simSignals, setSimSignals] = useState<any[]>([]);
+  const [agentTrades, setAgentTrades] = useState<any[]>([]);
   const [simMetrics, setSimMetrics] = useState<any | null>(null);
   const [simFrames, setSimFrames] = useState<SimFrame[]>([]);
   const [simError, setSimError] = useState<string | null>(null);
   const [simLoading, setSimLoading] = useState<boolean>(false);
+  const [simFramesMap, setSimFramesMap] = useState<Record<string, SimFrame>>({});
+  const [isFrameLoading, setIsFrameLoading] = useState<boolean>(false);
+  const [activeFrame, setActiveFrame] = useState<SimFrame | null>(null);
+  const activeFrameAbortControllerRef = useRef<AbortController | null>(null);
+  // ponytail: limit concurrent simulate-event fetches — drop excess, not queue
+  const activeSimFetchesRef = useRef<number>(0);
+  const pendingSimTimesRef = useRef<Set<string>>(new Set());
+  const completedSimTimesRef = useRef<Set<string>>(new Set());
+  const MAX_SIM_FETCHES = 3;
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState({
@@ -682,7 +570,85 @@ export default function SimulationOfDead() {
   const [modalTitle, setModalTitle] = useState("");
   const [isLoadingTrades, setIsLoadingTrades] = useState(false);
   const [selectedMonthTrades, setSelectedMonthTrades] = useState<any[]>([]);
+  const [selectedAgent, setSelectedAgent] = useState<any>(null);
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
+  const [selectedPattern, setSelectedPattern] = useState<any>(null);
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+
+  const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
+    if (!data) return;
+    const limit = Math.min(targetIdx, data.candles.length);
+
+    // 1. Prepare candles array
+    const chartCandles = data.candles.slice(0, limit).map(c => ({
+      time: c.time as any,
+      open: c.open,
+      high: c.high,
+      low: c.low,
+      close: c.close,
+    }));
+    candleSeriesRef.current?.setData(chartCandles);
+
+    // 2. Prepare EMA200 array
+    const chartEMA = data.candles.slice(0, limit)
+      .filter(c => c.ema200 !== null)
+      .map(c => ({
+        time: c.time as any,
+        value: c.ema200,
+      }));
+    emaSeriesRef.current?.setData(chartEMA as any);
+
+    // 3. Update structure markers
+    if (limit > 0) {
+      const lastCandle = data.candles[limit - 1];
+      const markers: any[] = [];
+      for (const s of data.structures) {
+        if (s.time <= lastCandle.time) {
+          const color = STRUCTURE_COLORS[s.type?.toUpperCase()] ?? "#94a3b8";
+          const typeUpper = s.type?.toUpperCase() ?? "";
+          const dirLower = s.direction?.toLowerCase() ?? "";
+
+          let position: "aboveBar" | "belowBar";
+          if (typeUpper === "HH" || typeUpper === "LH") {
+            position = "aboveBar";
+          } else if (typeUpper === "HL" || typeUpper === "LL") {
+            position = "belowBar";
+          } else {
+            position = dirLower.includes("bear") ? "aboveBar" : "belowBar";
+          }
+
+          markers.push({
+            time: s.time as any,
+            position,
+            color,
+            shape: "arrowDown",
+            text: typeUpper,
+          });
+        }
+      }
+
+      // Orchestrator simulation signals
+      for (const sig of simSignals) {
+        if (sig.time <= lastCandle.time) {
+          const isBuy = sig.signal === "BUY";
+          markers.push({
+            time: sig.time as any,
+            position: isBuy ? "belowBar" : "aboveBar",
+            color: isBuy ? "#22c55e" : "#ef4444",
+            shape: isBuy ? "arrowUp" : "arrowDown",
+            text: sig.signal,
+            size: 1,
+          });
+        }
+      }
+
+      markersPluginRef.current?.setMarkers(markers);
+    } else {
+      markersPluginRef.current?.setMarkers([]);
+      structurePrimitiveRef.current?.setLines([]);
+      tradesPrimitiveRef.current?.setTrades([]);
+    }
+  }, [simSignals, replayData, currentIndex]);
 
   const stopPlayback = useCallback(() => {
     if (timerRef.current) {
@@ -694,18 +660,35 @@ export default function SimulationOfDead() {
 
   const handleStop = useCallback(() => {
     stopPlayback();
-    setReplayData(null);
     setCurrentIndex(0);
     setRunningProfit(0);
     setTradeStats({ total: 0, wins: 0, losses: 0 });
     setActivePositions([]);
+    setAgentTrades([]);
+    setSimFramesMap({});
+    setIsFrameLoading(false);
+    setActiveFrame(null);
+    completedSimTimesRef.current.clear();
+    pendingSimTimesRef.current.clear();
+    if (activeFrameAbortControllerRef.current) {
+      activeFrameAbortControllerRef.current.abort();
+      activeFrameAbortControllerRef.current = null;
+    }
 
-    // Clear chart series
-    candleSeriesRef.current?.setData([]);
-    emaSeriesRef.current?.setData([]);
-    structurePrimitiveRef.current?.setLines([]);
-    tradesPrimitiveRef.current?.setTrades([]);
-  }, [stopPlayback]);
+    // Clear backend replay cache when stop is clicked
+    fetch(`${BASE_URL}/trading/replay/clear-cache`, { method: "POST" })
+      .catch(err => console.error("Failed to clear replay cache:", err));
+
+    if (replayData) {
+      setChartDataToIndex(0, replayData);
+    } else {
+      // Clear chart series
+      candleSeriesRef.current?.setData([]);
+      emaSeriesRef.current?.setData([]);
+      structurePrimitiveRef.current?.setLines([]);
+      tradesPrimitiveRef.current?.setTrades([]);
+    }
+  }, [stopPlayback, replayData, setChartDataToIndex]);
 
   const yearOptions = Array.from({ length: currentYear - 2018 + 1 }, (_, i) => 2018 + i);
 
@@ -906,7 +889,7 @@ export default function SimulationOfDead() {
     fetch(`${BASE_URL}/scenarios`)
       .then(r => r.ok ? r.json() : [])
       .then(setScenarios)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // Re-simulate active positions and chart markers whenever strategy parameters change
@@ -922,102 +905,110 @@ export default function SimulationOfDead() {
     let losses = 0;
     const activePosList: any[] = [];
 
-    for (const t of replayData.trades) {
+    for (const t of agentTrades) {
       const entryTs = t.entry_time ?? 0;
       if (entryTs <= candle.time) {
         total++;
-        const exitTs = t.exit_time;
+        const typeLower = t.type.toLowerCase();
+        const lotSize = t.lot_size;
+        const entryPrice = t.entry_price;
+        const slPrice = t.sl;
+        const tpPrice = t.tp;
 
-        const actualLot = getActualLotSize(t);
-        const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
+        // Check candles since entryTs up to current candle.time
+        const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+        
+        let isClosed = false;
+        let exitPrice = null;
+        let exitTime = null;
+        let tradeProfit = 0;
 
-        const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-        const dynamicLevels = simulateTrailingSLTP(t, replayData.candles, simTime, strategyParams);
-        const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-
-        if (dynamicLevels.isClosedSimulated || isClosedOriginal) {
-          // Closed trade: use net profit (scaled or simulated)
-          let tradeProfit = 0;
-          if (dynamicLevels.isClosedSimulated) {
-            const entryPrice = t.entry_price ?? 0;
-            const exitPrice = dynamicLevels.exitPriceSimulated ?? entryPrice;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              tradeProfit = (exitPrice - entryPrice) * lotSize * 100;
-            } else {
-              tradeProfit = (entryPrice - exitPrice) * lotSize * 100;
+        for (const c of activeCandles) {
+          if (typeLower === "buy") {
+            if (slPrice !== null && c.low <= slPrice) {
+              isClosed = true;
+              exitPrice = slPrice;
+              exitTime = c.time;
+              break;
+            }
+            if (tpPrice !== null && c.high >= tpPrice) {
+              isClosed = true;
+              exitPrice = tpPrice;
+              exitTime = c.time;
+              break;
             }
           } else {
-            tradeProfit = t.net_profit ?? 0;
-            if (strategyParams.lot_override > 0 && actualLot > 0) {
-              tradeProfit = (tradeProfit * strategyParams.lot_override) / actualLot;
+            if (slPrice !== null && c.high >= slPrice) {
+              isClosed = true;
+              exitPrice = slPrice;
+              exitTime = c.time;
+              break;
             }
+            if (tpPrice !== null && c.low <= tpPrice) {
+              isClosed = true;
+              exitPrice = tpPrice;
+              exitTime = c.time;
+              break;
+            }
+          }
+        }
+
+        if (isClosed && exitTime !== null) {
+          // Closed trade
+          if (typeLower === "buy") {
+            tradeProfit = ((exitPrice ?? entryPrice) - entryPrice) * lotSize * 100;
+          } else {
+            tradeProfit = (entryPrice - (exitPrice ?? entryPrice)) * lotSize * 100;
           }
           profit += tradeProfit;
           if (tradeProfit > 0) wins++;
-          else if (tradeProfit < 0) losses++;
-        } else {
-          // Open trade: calculate running floating PnL
-          const entryPrice = t.entry_price ?? 0;
-          const typeLower = t.type.toLowerCase();
+          else losses++;
 
+          // ponytail: keep closed trades in list with status flag, don't drop on close
+          activePosList.push({
+            ticket: t.ticket,
+            type: t.type,
+            lot_size: lotSize,
+            entry_price: entryPrice,
+            current_price: exitPrice ?? entryPrice,
+            sl: slPrice,
+            tp: tpPrice,
+            original_sl: slPrice,
+            original_tp: tpPrice,
+            status: tradeProfit >= 0 ? "Closed - Win" : "Closed - Loss",
+            pnl: tradeProfit,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
+          });
+        } else {
+          // Open trade (active position)
+          const currentClose = candle.close;
           let floatingPnL = 0;
           if (typeLower === "buy") {
-            floatingPnL = (candle.close - entryPrice) * lotSize * 100;
-          } else if (typeLower === "sell") {
-            floatingPnL = (entryPrice - candle.close) * lotSize * 100;
+            floatingPnL = (currentClose - entryPrice) * lotSize * 100;
+          } else {
+            floatingPnL = (entryPrice - currentClose) * lotSize * 100;
           }
           profit += floatingPnL;
-
-          // Calculate initial levels
-          const initialSL = t.sl ?? (typeLower === "buy" ? entryPrice - strategyParams.trailing_distance : entryPrice + strategyParams.trailing_distance);
-          const initialTP = t.tp ?? (typeLower === "buy" ? entryPrice + 30.00 : entryPrice - 30.00);
-
-          // Determine status flags
-          const isBEActive = dynamicLevels.beTriggered;
-          const isTPExpanded = dynamicLevels.tp !== null && Math.abs(dynamicLevels.tp - initialTP) > 0.01;
-          const isSLTrailing = dynamicLevels.sl !== null && Math.abs(dynamicLevels.sl - initialSL) > 0.01;
-
-          let statusText = "Normal";
-          if (isBEActive && isTPExpanded) {
-            statusText = "BE + TP Expanded";
-          } else if (isBEActive) {
-            statusText = "Break-Even";
-          } else if (isTPExpanded) {
-            statusText = "TP Expanded";
-          } else if (isSLTrailing) {
-            statusText = "Trailing";
-          }
-
-          // Compute trigger prices
-          const beTriggerPrice = strategyParams.enable_breakeven
-            ? (typeLower === "buy" ? entryPrice + strategyParams.breakeven_trigger : entryPrice - strategyParams.breakeven_trigger)
-            : null;
-
-          const isTPMaxed = strategyParams.max_ekspansi > 0 && dynamicLevels.expansionCount >= strategyParams.max_ekspansi;
-          const tpTriggerPrice = isTPMaxed
-            ? null
-            : (dynamicLevels.tp !== null
-                ? (typeLower === "buy" ? dynamicLevels.tp - strategyParams.tp_trigger : dynamicLevels.tp + strategyParams.tp_trigger)
-                : null
-              );
 
           activePosList.push({
             ticket: t.ticket,
             type: t.type,
             lot_size: lotSize,
             entry_price: entryPrice,
-            current_price: candle.close,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: initialSL,
-            original_tp: initialTP,
-            status: statusText,
+            current_price: currentClose,
+            sl: slPrice,
+            tp: tpPrice,
+            original_sl: slPrice,
+            original_tp: tpPrice,
+            status: "Running",
             pnl: floatingPnL,
-            be_trigger_price: beTriggerPrice,
-            is_be_active: isBEActive,
-            tp_trigger_price: tpTriggerPrice,
-            is_tp_maxed: isTPMaxed,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
           });
         }
       }
@@ -1029,128 +1020,76 @@ export default function SimulationOfDead() {
 
     // Also update chart markers
     if (tradesPrimitiveRef.current) {
-      const mapped = replayData.trades
+      const mapped = agentTrades
         .filter(t => (t.entry_time ?? 0) <= candle.time)
         .map(t => {
           const entryTs = t.entry_time ?? 0;
-          const exitTs = t.exit_time;
-          const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-          const dynamicLevels = simulateTrailingSLTP(t, replayData.candles, simTime, strategyParams);
+          const typeLower = t.type.toLowerCase();
+          const lotSize = t.lot_size;
+          const entryPrice = t.entry_price;
+          const slPrice = t.sl;
+          const tpPrice = t.tp;
 
-          const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-          const isClosed = dynamicLevels.isClosedSimulated || isClosedOriginal;
-          const finalExitPrice = (dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? t.entry_price)
-            : (isClosedOriginal ? t.exit_price : t.entry_price)) ?? 0;
-          const finalExitTs = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitTimeSimulated ?? null)
-            : (isClosedOriginal ? exitTs : null);
+          // Check if closed at or before candle.time
+          const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+          let isClosed = false;
+          let exitPrice = null;
+          let exitTime = null;
+          let finalProfit = 0;
 
-          // Calculate profit
-          let finalProfit = t.net_profit ?? 0;
-          const actualLot = getActualLotSize(t);
-          if (strategyParams.lot_override > 0 && actualLot > 0) {
-            finalProfit = (finalProfit * strategyParams.lot_override) / actualLot;
-          }
-          if (dynamicLevels.isClosedSimulated) {
-            const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
+          for (const c of activeCandles) {
             if (typeLower === "buy") {
-              finalProfit = (finalExitPrice - entryPrice) * lotSize * 100;
+              if (slPrice !== null && c.low <= slPrice) {
+                isClosed = true;
+                exitPrice = slPrice;
+                exitTime = c.time;
+                break;
+              }
+              if (tpPrice !== null && c.high >= tpPrice) {
+                isClosed = true;
+                exitPrice = tpPrice;
+                exitTime = c.time;
+                break;
+              }
             } else {
-              finalProfit = (entryPrice - finalExitPrice) * lotSize * 100;
+              if (slPrice !== null && c.high >= slPrice) {
+                isClosed = true;
+                exitPrice = slPrice;
+                exitTime = c.time;
+                break;
+              }
+              if (tpPrice !== null && c.low <= tpPrice) {
+                isClosed = true;
+                exitPrice = tpPrice;
+                exitTime = c.time;
+                break;
+              }
+            }
+          }
+
+          if (isClosed && exitTime !== null) {
+            if (typeLower === "buy") {
+              finalProfit = ((exitPrice ?? entryPrice) - entryPrice) * lotSize * 100;
+            } else {
+              finalProfit = (entryPrice - (exitPrice ?? entryPrice)) * lotSize * 100;
             }
           }
 
           return {
             type: t.type,
-            entry_price: t.entry_price ?? 0,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
+            entry_price: entryPrice,
+            sl: slPrice,
+            tp: tpPrice,
             profit: finalProfit,
             entry_time_ts: entryTs,
-            exit_time_ts: isClosed ? finalExitTs : null,
+            exit_time_ts: isClosed ? exitTime : null,
           };
         });
       tradesPrimitiveRef.current.setTrades(mapped);
     }
-  }, [strategyParams, replayData, currentIndex]);
+  }, [strategyParams, replayData, currentIndex, agentTrades]);
 
-  const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
-    if (!data) return;
-    const limit = Math.min(targetIdx, data.candles.length);
-    
-    // 1. Prepare candles array
-    const chartCandles = data.candles.slice(0, limit).map(c => ({
-      time: c.time as any,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }));
-    candleSeriesRef.current?.setData(chartCandles);
 
-    // 2. Prepare EMA200 array
-    const chartEMA = data.candles.slice(0, limit)
-      .filter(c => c.ema200 !== null)
-      .map(c => ({
-        time: c.time as any,
-        value: c.ema200,
-      }));
-    emaSeriesRef.current?.setData(chartEMA as any);
-
-    // 3. Update structure markers
-    if (limit > 0) {
-      const lastCandle = data.candles[limit - 1];
-      const markers: any[] = [];
-      for (const s of data.structures) {
-        if (s.time <= lastCandle.time) {
-          const color = STRUCTURE_COLORS[s.type?.toUpperCase()] ?? "#94a3b8";
-          const typeUpper = s.type?.toUpperCase() ?? "";
-          const dirLower = s.direction?.toLowerCase() ?? "";
-
-          let position: "aboveBar" | "belowBar";
-          if (typeUpper === "HH" || typeUpper === "LH") {
-            position = "aboveBar";
-          } else if (typeUpper === "HL" || typeUpper === "LL") {
-            position = "belowBar";
-          } else {
-            position = dirLower.includes("bear") ? "aboveBar" : "belowBar";
-          }
-
-          markers.push({
-            time: s.time as any,
-            position,
-            color,
-            shape: "arrowDown",
-            text: typeUpper,
-          });
-        }
-      }
-
-      // Orchestrator simulation signals
-      for (const sig of simSignals) {
-        if (sig.time <= lastCandle.time) {
-          const isBuy = sig.signal === "BUY";
-          markers.push({
-            time: sig.time as any,
-            position: isBuy ? "belowBar" : "aboveBar",
-            color: isBuy ? "#22c55e" : "#ef4444",
-            shape: isBuy ? "arrowUp" : "arrowDown",
-            text: sig.signal,
-            size: 1,
-          });
-        }
-      }
-
-      markersPluginRef.current?.setMarkers(markers);
-    } else {
-      markersPluginRef.current?.setMarkers([]);
-      structurePrimitiveRef.current?.setLines([]);
-      tradesPrimitiveRef.current?.setTrades([]);
-    }
-  }, [simSignals, replayData, currentIndex]);
 
   // ── Load Data ────────────────────────────────────────────────────────────
 
@@ -1234,58 +1173,28 @@ export default function SimulationOfDead() {
       // so a slow/large simulation must NOT block the popup from closing.
       setLoadProgress(prev => ({ ...prev, visible: false }));
 
-      if (orchestratorEnabled) {
-        setSimLoading(true);
-        setSimError(null);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000);
-        try {
-          const simRes = await fetch(
-            `${BASE_URL}/trading/simulate?year_from=${yearFrom}&month_from=${monthFrom}` +
-            `&year_to=${yearTo}&month_to=${monthTo}&timeframe=${activeTimeframe}`,
-            { signal: controller.signal }
-          );
-          if (simRes.ok) {
-            const simData = await simRes.json();
-            setSimSignals(simData.signals ?? []);
-            setSimMetrics(simData.metrics ?? null);
-            setSimFrames((simData.frames ?? []) as SimFrame[]);
-          } else {
-            const detail = await simRes.text().catch(() => "");
-            const msg = `Orchestrator simulation failed (HTTP ${simRes.status})${detail ? ": " + detail.slice(0, 200) : ""}`;
-            console.warn(msg);
-            setSimError(msg);
-            setSimSignals([]);
-            setSimMetrics(null);
-            setSimFrames([]);
-          }
-        } catch (e) {
-          if ((e as any)?.name !== "AbortError") {
-            const msg = `Orchestrator simulation error: ${(e as any)?.message ?? e}`;
-            console.warn(msg);
-            setSimError(msg);
-          } else {
-            setSimError("Orchestrator simulation timed out (>180s). Try a smaller date range.");
-          }
-          setSimSignals([]);
-          setSimMetrics(null);
-          setSimFrames([]);
-        } finally {
-          clearTimeout(timeoutId);
-          setSimLoading(false);
-        }
-      } else {
-        setSimSignals([]);
-        setSimMetrics(null);
-        setSimFrames([]);
-        setSimError(null);
+      setSimFramesMap({});
+      setActiveFrame(null);
+      setIsFrameLoading(false);
+      if (activeFrameAbortControllerRef.current) {
+        activeFrameAbortControllerRef.current.abort();
+        activeFrameAbortControllerRef.current = null;
       }
+      setSimSignals([]);
+      setAgentTrades([]);
+      setSimMetrics(null);
+      setSimFrames([]);
+      setSimError(null);
     } catch (err: unknown) {
       clearInterval(interval);
       setLoadError(err instanceof Error ? err.message : "Gagal memuat data");
       setSimSignals([]);
+      setAgentTrades([]);
       setSimMetrics(null);
       setSimFrames([]);
+      setSimFramesMap({});
+      setActiveFrame(null);
+      setIsFrameLoading(false);
     } finally {
       setIsLoading(false);
       setLoadProgress(prev => ({ ...prev, visible: false }));
@@ -1309,6 +1218,7 @@ export default function SimulationOfDead() {
     const newData = allReplayData[tf];
     if (newData) {
       setReplayData(newData);
+      setAgentTrades([]);
       candleTimeArrayRef.current = newData.candles.map(c => c.time);
       const map = new Map<number, ReplayCandle>();
       newData.candles.forEach(c => map.set(c.time, c));
@@ -1593,51 +1503,69 @@ export default function SimulationOfDead() {
 
     // Update trades overlay
     if (tradesPrimitiveRef.current) {
-      const entries: TradeOverlayEntry[] = data.trades
-        .filter(t => {
-          const entryTs = t.entry_time ?? 0;
-          return entryTs <= candle.time;
-        })
+      const entries: TradeOverlayEntry[] = agentTrades
+        .filter(t => (t.entry_time ?? 0) <= candle.time)
         .map(t => {
           const entryTs = t.entry_time ?? 0;
-          const exitTs = t.exit_time;
-          const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-          const dynamicLevels = simulateTrailingSLTP(t, data.candles, simTime, strategyParams);
+          const typeLower = t.type.toLowerCase();
+          const lotSize = t.lot_size;
+          const entryPrice = t.entry_price;
+          const slPrice = t.sl;
+          const tpPrice = t.tp;
 
-          const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-          const isClosed = dynamicLevels.isClosedSimulated || isClosedOriginal;
-          const finalExitPrice = (dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? t.entry_price)
-            : (isClosedOriginal ? t.exit_price : t.entry_price)) ?? 0;
-          const finalExitTs = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitTimeSimulated ?? null)
-            : (isClosedOriginal ? exitTs : null);
+          // Check if closed at or before candle.time
+          const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+          let isClosed = false;
+          let exitPrice = null;
+          let exitTime = null;
+          let finalProfit = 0;
 
-          // Calculate profit
-          let finalProfit = t.net_profit ?? 0;
-          const actualLot = getActualLotSize(t);
-          if (strategyParams.lot_override > 0 && actualLot > 0) {
-            finalProfit = (finalProfit * strategyParams.lot_override) / actualLot;
-          }
-          if (dynamicLevels.isClosedSimulated) {
-            const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
+          for (const c of activeCandles) {
             if (typeLower === "buy") {
-              finalProfit = (finalExitPrice - entryPrice) * lotSize * 100;
+              if (slPrice !== null && c.low <= slPrice) {
+                isClosed = true;
+                exitPrice = slPrice;
+                exitTime = c.time;
+                break;
+              }
+              if (tpPrice !== null && c.high >= tpPrice) {
+                isClosed = true;
+                exitPrice = tpPrice;
+                exitTime = c.time;
+                break;
+              }
             } else {
-              finalProfit = (entryPrice - finalExitPrice) * lotSize * 100;
+              if (slPrice !== null && c.high >= slPrice) {
+                isClosed = true;
+                exitPrice = slPrice;
+                exitTime = c.time;
+                break;
+              }
+              if (tpPrice !== null && c.low <= tpPrice) {
+                isClosed = true;
+                exitPrice = tpPrice;
+                exitTime = c.time;
+                break;
+              }
+            }
+          }
+
+          if (isClosed && exitTime !== null) {
+            if (typeLower === "buy") {
+              finalProfit = ((exitPrice ?? entryPrice) - entryPrice) * lotSize * 100;
+            } else {
+              finalProfit = (entryPrice - (exitPrice ?? entryPrice)) * lotSize * 100;
             }
           }
 
           return {
             type: t.type,
-            entry_price: t.entry_price ?? 0,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
+            entry_price: entryPrice,
+            sl: slPrice,
+            tp: tpPrice,
             profit: finalProfit,
             entry_time_ts: entryTs,
-            exit_time_ts: isClosed ? finalExitTs : null,
+            exit_time_ts: isClosed ? exitTime : null,
           };
         });
       tradesPrimitiveRef.current.setTrades(entries);
@@ -1651,102 +1579,110 @@ export default function SimulationOfDead() {
     let wins = 0;
     let losses = 0;
     const activePosList: any[] = [];
-    for (const t of data.trades) {
+    for (const t of agentTrades) {
       const entryTs = t.entry_time ?? 0;
       if (entryTs <= candle.time) {
         total++;
-        const exitTs = t.exit_time;
+        const typeLower = t.type.toLowerCase();
+        const lotSize = t.lot_size;
+        const entryPrice = t.entry_price;
+        const slPrice = t.sl;
+        const tpPrice = t.tp;
 
-        const actualLot = getActualLotSize(t);
-        const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
+        // Check candles since entryTs up to current candle.time
+        const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+        
+        let isClosed = false;
+        let exitPrice = null;
+        let exitTime = null;
+        let tradeProfit = 0;
 
-        const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-        const dynamicLevels = simulateTrailingSLTP(t, data.candles, simTime, strategyParams);
-        const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-
-        if (dynamicLevels.isClosedSimulated || isClosedOriginal) {
-          // Closed trade: use net profit (scaled or simulated)
-          let tradeProfit = 0;
-          if (dynamicLevels.isClosedSimulated) {
-            const entryPrice = t.entry_price ?? 0;
-            const exitPrice = dynamicLevels.exitPriceSimulated ?? entryPrice;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              tradeProfit = (exitPrice - entryPrice) * lotSize * 100;
-            } else {
-              tradeProfit = (entryPrice - exitPrice) * lotSize * 100;
+        for (const c of activeCandles) {
+          if (typeLower === "buy") {
+            if (slPrice !== null && c.low <= slPrice) {
+              isClosed = true;
+              exitPrice = slPrice;
+              exitTime = c.time;
+              break;
+            }
+            if (tpPrice !== null && c.high >= tpPrice) {
+              isClosed = true;
+              exitPrice = tpPrice;
+              exitTime = c.time;
+              break;
             }
           } else {
-            tradeProfit = t.net_profit ?? 0;
-            if (strategyParams.lot_override > 0 && actualLot > 0) {
-              tradeProfit = (tradeProfit * strategyParams.lot_override) / actualLot;
+            if (slPrice !== null && c.high >= slPrice) {
+              isClosed = true;
+              exitPrice = slPrice;
+              exitTime = c.time;
+              break;
             }
+            if (tpPrice !== null && c.low <= tpPrice) {
+              isClosed = true;
+              exitPrice = tpPrice;
+              exitTime = c.time;
+              break;
+            }
+          }
+        }
+
+        if (isClosed && exitTime !== null) {
+          // Closed trade
+          if (typeLower === "buy") {
+            tradeProfit = ((exitPrice ?? entryPrice) - entryPrice) * lotSize * 100;
+          } else {
+            tradeProfit = (entryPrice - (exitPrice ?? entryPrice)) * lotSize * 100;
           }
           profit += tradeProfit;
           if (tradeProfit > 0) wins++;
-          else if (tradeProfit < 0) losses++;
-        } else {
-          // Open trade: calculate running floating PnL
-          const entryPrice = t.entry_price ?? 0;
-          const typeLower = t.type.toLowerCase();
+          else losses++;
 
+          // ponytail: keep closed trades in list with status flag, don't drop on close
+          activePosList.push({
+            ticket: t.ticket,
+            type: t.type,
+            lot_size: lotSize,
+            entry_price: entryPrice,
+            current_price: exitPrice ?? entryPrice,
+            sl: slPrice,
+            tp: tpPrice,
+            original_sl: slPrice,
+            original_tp: tpPrice,
+            status: tradeProfit >= 0 ? "Closed - Win" : "Closed - Loss",
+            pnl: tradeProfit,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
+          });
+        } else {
+          // Open trade (active position)
+          const currentClose = candle.close;
           let floatingPnL = 0;
           if (typeLower === "buy") {
-            floatingPnL = (candle.close - entryPrice) * lotSize * 100;
-          } else if (typeLower === "sell") {
-            floatingPnL = (entryPrice - candle.close) * lotSize * 100;
+            floatingPnL = (currentClose - entryPrice) * lotSize * 100;
+          } else {
+            floatingPnL = (entryPrice - currentClose) * lotSize * 100;
           }
           profit += floatingPnL;
-
-          // Calculate initial levels
-          const initialSL = t.sl ?? (typeLower === "buy" ? entryPrice - strategyParams.trailing_distance : entryPrice + strategyParams.trailing_distance);
-          const initialTP = t.tp ?? (typeLower === "buy" ? entryPrice + 30.00 : entryPrice - 30.00);
-
-          // Determine status flags
-          const isBEActive = dynamicLevels.beTriggered;
-          const isTPExpanded = dynamicLevels.tp !== null && Math.abs(dynamicLevels.tp - initialTP) > 0.01;
-          const isSLTrailing = dynamicLevels.sl !== null && Math.abs(dynamicLevels.sl - initialSL) > 0.01;
-
-          let statusText = "Normal";
-          if (isBEActive && isTPExpanded) {
-            statusText = "BE + TP Expanded";
-          } else if (isBEActive) {
-            statusText = "Break-Even";
-          } else if (isTPExpanded) {
-            statusText = "TP Expanded";
-          } else if (isSLTrailing) {
-            statusText = "Trailing";
-          }
-
-          // Compute trigger prices
-          const beTriggerPrice = strategyParams.enable_breakeven
-            ? (typeLower === "buy" ? entryPrice + strategyParams.breakeven_trigger : entryPrice - strategyParams.breakeven_trigger)
-            : null;
-
-          const isTPMaxed = strategyParams.max_ekspansi > 0 && dynamicLevels.expansionCount >= strategyParams.max_ekspansi;
-          const tpTriggerPrice = isTPMaxed
-            ? null
-            : (dynamicLevels.tp !== null
-                ? (typeLower === "buy" ? dynamicLevels.tp - strategyParams.tp_trigger : dynamicLevels.tp + strategyParams.tp_trigger)
-                : null
-              );
 
           activePosList.push({
             ticket: t.ticket,
             type: t.type,
             lot_size: lotSize,
             entry_price: entryPrice,
-            current_price: candle.close,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: initialSL,
-            original_tp: initialTP,
-            status: statusText,
+            current_price: currentClose,
+            sl: slPrice,
+            tp: tpPrice,
+            original_sl: slPrice,
+            original_tp: tpPrice,
+            status: "Running",
             pnl: floatingPnL,
-            be_trigger_price: beTriggerPrice,
-            is_be_active: isBEActive,
-            tp_trigger_price: tpTriggerPrice,
-            is_tp_maxed: isTPMaxed,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
           });
         }
       }
@@ -1756,7 +1692,7 @@ export default function SimulationOfDead() {
     setActivePositions(activePosList);
 
     return idx + 1;
-  }, [strategyParams, simSignals]);
+  }, [strategyParams, simSignals, agentTrades, replayData]);
 
   // ── Playback controls (continued) ──
 
@@ -1809,15 +1745,140 @@ export default function SimulationOfDead() {
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
   const currentCandle = replayData?.candles[Math.max(0, currentIndex - 1)];
 
-  const activeFrame = useMemo(() => {
-    if (!simFrames || simFrames.length === 0 || !currentCandle) return null;
-    let found: SimFrame | null = null;
-    for (const f of simFrames) {
-      if ((f.event_time ?? 0) <= currentCandle.time) found = f;
-      else break;
+  // Fetch and update activeFrame dynamically
+  useEffect(() => {
+    if (!replayData || !currentCandle || !orchestratorEnabled) {
+      setActiveFrame(null);
+      return;
     }
-    return found;
-  }, [simFrames, currentCandle]);
+
+    // Find the latest structure event that occurred at or before the current candle
+    const triggerEvents = replayData.structures.filter(
+      s => s.time <= currentCandle.time && ["CHOCH", "HH", "LL", "BOS"].includes(s.type.toUpperCase())
+    );
+
+    if (triggerEvents.length === 0) {
+      setActiveFrame(null);
+      return;
+    }
+
+    // The most recent event
+    const latestEvent = triggerEvents[triggerEvents.length - 1];
+    const latestType = latestEvent.type.toUpperCase();
+
+    // Orchestrator triggers on CHOCH, BOS, or HH/LL that appear AFTER a CHoCH.
+    const hasPriorChoch = triggerEvents.some(
+      s => s.type.toUpperCase() === "CHOCH" && s.time < latestEvent.time
+    );
+    const isHHorLL = ["HH", "LL"].includes(latestType);
+    const isChochOrBos = ["CHOCH", "BOS"].includes(latestType);
+    const shouldTrigger = isChochOrBos || (isHHorLL && hasPriorChoch);
+
+    if (!shouldTrigger) {
+      // No valid trigger — clear frame only if it's stale
+      if (activeFrame && activeFrame.event_time !== latestEvent.time) setActiveFrame(null);
+      return;
+    }
+
+    const cacheKey = `${latestEvent.time}_${latestEvent.type}`;
+
+    // Check Ref cache (synchronous) to avoid duplicate fetching during render races
+    if (completedSimTimesRef.current.has(cacheKey)) {
+      const cached = simFramesMap[cacheKey];
+      if (cached && !cached.is_counter_swing && activeFrame !== cached) {
+        setActiveFrame(cached);
+      }
+      return;
+    }
+
+    // Check cache
+    if (simFramesMap[cacheKey]) {
+      if (!simFramesMap[cacheKey].is_counter_swing) {
+        setActiveFrame(simFramesMap[cacheKey]);
+      }
+      return;
+    }
+
+    // Not in cache, fetch it if it's the exact current candle time (so we trigger it exactly when it forms)
+    // or if we just jumped to a new index and need the active frame
+    if (latestEvent.time === currentCandle.time || !activeFrame || activeFrame.event_time !== latestEvent.time) {
+      // Skip if already fetching this same event time
+      if (pendingSimTimesRef.current.has(cacheKey)) return;
+      // Drop if too many concurrent requests
+      if (activeSimFetchesRef.current >= MAX_SIM_FETCHES) return;
+
+      // Abort previous fetch
+      if (activeFrameAbortControllerRef.current) {
+        activeFrameAbortControllerRef.current.abort();
+      }
+
+      const controller = new AbortController();
+      activeFrameAbortControllerRef.current = controller;
+      setIsFrameLoading(true);
+      activeSimFetchesRef.current += 1;
+      pendingSimTimesRef.current.add(cacheKey);
+
+      const url = `${BASE_URL}/trading/simulate-event?time=${latestEvent.time}&timeframe=${activeTimeframe}&type=${latestEvent.type}`;
+      fetch(url, { signal: controller.signal })
+        .then(res => {
+          if (!res.ok) throw new Error("Failed to fetch event simulation");
+          return res.json();
+        })
+        .then(frame => {
+          completedSimTimesRef.current.add(cacheKey);
+          setSimFramesMap(prev => ({ ...prev, [cacheKey]: frame }));
+          // Counter-swing events (e.g. LL after Bullish CHoCH+HH, HH after Bearish CHoCH+LL)
+          // should NOT update the Agent Consensus panel — keep warm-up values frozen.
+          if (!frame?.is_counter_swing) {
+            setActiveFrame(frame);
+          }
+          setIsFrameLoading(false);
+
+          // Add marker and dynamic position when a new tradeable signal is approved by agent
+          if (frame && frame.approved && ["BUY", "SELL"].includes(frame.final_signal)) {
+            setSimSignals(prev => {
+              if (prev.some(s => s.time === frame.event_time)) return prev;
+              return [...prev, {
+                time: frame.event_time,
+                signal: frame.final_signal,
+              }];
+            });
+
+            setAgentTrades(prev => {
+              if (prev.some(t => t.entry_time === frame.event_time)) return prev;
+              const slVal = frame.sl_tp?.sl_price || null;
+              const tpVal = frame.sl_tp?.tp_price || null;
+              const lotVal = frame.position_sizing?.lot_size || 0.01;
+              const entryVal = frame.sl_tp?.entry_price || frame.event_price || 0.0;
+              
+              return [...prev, {
+                ticket: prev.length + 1,
+                type: frame.final_signal,
+                entry_time: frame.event_time,
+                entry_price: entryVal,
+                sl: slVal,
+                tp: tpVal,
+                lot_size: lotVal,
+                exit_time: null,
+                exit_price: null,
+                net_profit: null,
+                is_agent_trade: true,
+              }];
+            });
+          }
+        })
+        .catch(err => {
+          if (err.name !== "AbortError") {
+            console.error("Simulation event fetch error:", err);
+            setIsFrameLoading(false);
+          }
+        })
+        .finally(() => {
+          activeSimFetchesRef.current -= 1;
+          pendingSimTimesRef.current.delete(cacheKey);
+        });
+    }
+  }, [currentCandle, replayData, activeTimeframe, simFramesMap, orchestratorEnabled, activeFrame]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -1836,7 +1897,7 @@ export default function SimulationOfDead() {
         </h1>
 
         {/* Filter controls + Playback Controls */}
-        <div className="flex items-center gap-4 flex-wrap flex-1 justify-end ml-4">
+        <div className="flex items-center gap-2 flex-nowrap flex-1 justify-end ml-4 min-w-0 overflow-x-auto whitespace-nowrap">
           {/* If replayData is loaded, render playback controls FIRST! */}
           {replayData && (
             <>
@@ -1844,7 +1905,7 @@ export default function SimulationOfDead() {
               <button
                 onClick={handlePrev}
                 disabled={isPlaying || currentIndex <= 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all disabled:opacity-40 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
                 style={{
                   background: "rgba(167,139,250,0.15)",
                   color: "#a78bfa",
@@ -1859,7 +1920,7 @@ export default function SimulationOfDead() {
               <button
                 onClick={isPlaying ? stopPlayback : startPlayback}
                 disabled={currentIndex >= totalCandles}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
                 style={{
                   background: isPlaying ? "rgba(248,113,113,0.15)" : "rgba(34,211,238,0.15)",
                   color: isPlaying ? "#f87171" : "#22d3ee",
@@ -1874,7 +1935,7 @@ export default function SimulationOfDead() {
               <button
                 onClick={handleNext}
                 disabled={isPlaying || currentIndex >= totalCandles}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all disabled:opacity-40"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
                 style={{
                   background: "rgba(167,139,250,0.15)",
                   color: "#a78bfa",
@@ -1888,7 +1949,7 @@ export default function SimulationOfDead() {
               {/* Stop */}
               <button
                 onClick={handleStop}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all hover:bg-[rgba(239,68,68,0.2)] cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 hover:bg-[rgba(239,68,68,0.2)] cursor-pointer"
                 style={{
                   background: "rgba(239,68,68,0.12)",
                   color: "#ef4444",
@@ -1902,27 +1963,32 @@ export default function SimulationOfDead() {
               {/* Speed */}
               <div className="flex items-center gap-1.5 ml-1">
                 <span className="text-xs text-[var(--text-secondary,#94a3b8)]">Speed:</span>
-                {(["1x", "2x", "3x", "5x", "10x"] as const).map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setSpeed(s)}
-                    className="px-2 py-1 rounded text-xs font-mono transition-all"
-                    style={{
-                      background: speed === s ? "rgba(34,211,238,0.2)" : "rgba(30,41,59,0.6)",
-                      color: speed === s ? "#22d3ee" : "#94a3b8",
-                      border: `1px solid ${speed === s ? "rgba(34,211,238,0.4)" : "rgba(100,116,139,0.2)"}`,
-                    }}
-                  >
-                    {s}
-                  </button>
-                ))}
+                <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-lg overflow-hidden">
+                  {(["1x", "2x", "3x", "5x", "10x"] as const).map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setSpeed(s)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-md text-xs font-mono transition-all duration-200 active:scale-95 cursor-pointer",
+                        speed === s
+                          ? "bg-[rgba(34,211,238,0.25)] text-[#22d3ee] border border-cyan-500/30"
+                          : "text-slate-400 hover:text-white"
+                      )}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Progress Bar */}
               <div className="flex items-center gap-2 w-32 ml-1">
                 <div className="flex-1 h-1.5 rounded-full bg-[rgba(100,116,139,0.15)] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all"
+                    className={cn(
+                      "h-full rounded-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all duration-300",
+                      isPlaying && "animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.4)]"
+                    )}
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -1950,21 +2016,22 @@ export default function SimulationOfDead() {
             </>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Timeframe selector (tiru 100% dari page trades) */}
             <div className="flex items-center gap-2 mr-2">
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary,#94a3b8)]">Timeframe</span>
-              <div className="inline-flex bg-[rgba(15,23,42,0.6)] border border-slate-800 rounded-lg overflow-hidden">
+              <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-lg overflow-hidden">
                 {["M15", "H1", "H4"].map((tf) => (
                   <button
                     key={tf}
                     disabled={isLoading}
                     onClick={() => handleTimeframeChange(tf)}
-                    className={`bg-transparent border-0 border-r border-slate-800 last:border-r-0 px-2.5 py-1.5 text-xs font-semibold transition-all hover:bg-slate-800/40 hover:text-white cursor-pointer disabled:opacity-40 ${
+                    className={cn(
+                      "px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-40",
                       tf === activeTimeframe
-                        ? "!bg-[rgba(6,182,212,0.18)] !text-cyan-400 border-l border-r border-cyan-500/35"
-                        : "text-slate-400"
-                    }`}
+                        ? "bg-[rgba(6,182,212,0.2)] text-cyan-400 border border-cyan-500/25"
+                        : "text-slate-400 hover:text-white"
+                    )}
                   >
                     {tf}
                   </button>
@@ -2008,19 +2075,38 @@ export default function SimulationOfDead() {
               accent="purple"
             />
 
-            <label className="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={orchestratorEnabled}
-                onChange={(e) => setOrchestratorEnabled(e.target.checked)}
-              />
-              Run Orchestrator
-            </label>
+            {/* Custom Switch Toggle "Run Orchestrator" */}
+            <div className="flex items-center gap-2 mr-2">
+              <button
+                type="button"
+                onClick={() => setOrchestratorEnabled(!orchestratorEnabled)}
+                className={cn(
+                  "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out outline-none focus:outline-none",
+                  orchestratorEnabled ? "bg-cyan-500" : "bg-slate-700"
+                )}
+                style={{
+                  boxShadow: orchestratorEnabled ? "0 0 10px rgba(6,182,212,0.4)" : "none"
+                }}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out",
+                    orchestratorEnabled ? "translate-x-4" : "translate-x-0"
+                  )}
+                />
+              </button>
+              <span
+                onClick={() => setOrchestratorEnabled(!orchestratorEnabled)}
+                className="text-xs font-semibold text-[var(--text-secondary,#94a3b8)] cursor-pointer select-none hover:text-white transition-colors"
+              >
+                Run Orchestrator
+              </span>
+            </div>
 
             <button
               onClick={handleLoad}
               disabled={isLoading}
-              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 active:scale-95 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
               style={
                 replayData
                   ? {
@@ -2047,20 +2133,74 @@ export default function SimulationOfDead() {
         {/* ── Stats Bar ── */}
         {replayData && (
           <div
-            className="flex items-center gap-6 px-6 py-2 text-xs border border-slate-800/80 rounded-lg bg-[rgba(15,23,42,0.6)]"
+            className="flex items-center justify-between gap-4 px-5 py-2.5 border border-slate-800/80 rounded-xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
           >
-            <span className="text-[var(--text-secondary,#94a3b8)]">
-              {replayData.meta.date_from} → {replayData.meta.date_to}
-            </span>
-            <span>Candles: <span className="text-cyan-400 font-mono">{currentIndex}/{totalCandles}</span></span>
-            <span>PnL: <span className={`font-mono font-bold ${runningProfit >= 0 ? "text-green-400" : "text-red-400"}`}>{runningProfit >= 0 ? "+" : ""}{runningProfit.toFixed(2)}</span></span>
-            <span>Trades: <span className="text-cyan-400 font-mono">{tradeStats.total}</span></span>
-            <span>W: <span className="text-green-400 font-mono">{tradeStats.wins}</span></span>
-            <span>L: <span className="text-red-400 font-mono">{tradeStats.losses}</span></span>
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Date Range */}
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Rentang Tanggal</span>
+                <span className="text-xs font-semibold text-slate-300">
+                  {replayData.meta.date_from} → {replayData.meta.date_to}
+                </span>
+              </div>
+
+              <div className="w-px h-4 bg-slate-800/60 self-center" />
+
+              {/* Candles */}
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Lilin (Candles)</span>
+                <span className="text-xs font-semibold text-slate-300 font-mono">
+                  <span className="text-cyan-400">{currentIndex}</span>/{totalCandles}
+                </span>
+              </div>
+
+              <div className="w-px h-4 bg-slate-800/60 self-center" />
+
+              {/* PnL */}
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Total P&L</span>
+                <span className={cn(
+                  "inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold font-mono border",
+                  runningProfit > 0
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                    : runningProfit < 0
+                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                      : "bg-slate-800/40 text-slate-400 border-slate-800/60"
+                )}>
+                  {runningProfit >= 0 ? "+" : ""}{runningProfit.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="w-px h-4 bg-slate-800/60 self-center" />
+
+              {/* Balance */}
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Saldo (Balance)</span>
+                <span className={cn(
+                  "text-xs font-bold font-mono",
+                  (INITIAL_BALANCE + runningProfit) >= INITIAL_BALANCE ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  ${(INITIAL_BALANCE + runningProfit).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="w-px h-4 bg-slate-800/60 self-center" />
+
+              {/* Trades */}
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Transaksi (Trades)</span>
+                <span className="text-xs font-semibold text-slate-200 font-mono">
+                  {tradeStats.total} <span className="text-slate-500 text-[10px] ml-1">({tradeStats.wins}W / {tradeStats.losses}L)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Current Playhead Time */}
             {currentCandle && (
-              <span className="ml-auto text-[var(--text-secondary,#94a3b8)] font-mono">
-                {new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")}
-              </span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/8 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.1)] text-xs font-semibold text-purple-300 font-mono">
+                <span>🕒</span>
+                <span>{new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")}</span>
+              </div>
             )}
           </div>
         )}
@@ -2122,7 +2262,7 @@ export default function SimulationOfDead() {
                   <span className="text-slate-500">O</span>
                   <span className={hoveredInfo.close! >= hoveredInfo.open! ? "text-green-400" : "text-red-400"}>
                     {hoveredInfo.open.toFixed(2)}
-              </span>
+                  </span>
                 </span>
               )}
               {hoveredInfo.high !== null && (
@@ -2161,9 +2301,97 @@ export default function SimulationOfDead() {
           />
         </div>
 
+        {/* ── Agent Consensus (100% Copy of Dashboard Layout, bound to activeFrame) ── */}
+        <div className="glass-card mt-4">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: 0 }}>🤖 Agent Consensus</h2>
+            {isFrameLoading && (
+              <span className="text-xs text-cyan-400 animate-pulse flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
+                <Loader2 className="size-3 animate-spin" />
+                Calculating...
+              </span>
+            )}
+          </div>
+
+          {replayData && activeFrame ? (
+            <>
+              {AGENT_PANEL_DEFS.map((def) => {
+                const agent = activeFrame.agents[def.key] as SimAgentState | undefined;
+                if (!agent) return null;
+                const prediction = agent.signal || 'HOLD';
+                const confidence = agent.confidence ?? 0;
+
+                return (
+                  <div
+                    key={def.key}
+                    className="agent-row hover:bg-slate-800/30 cursor-pointer rounded-xl p-1.5 transition-all duration-200"
+                    onClick={() => {
+                      setSelectedAgent({
+                        key: def.key,
+                        name: def.name,
+                        icon: def.icon,
+                        color: def.color,
+                        bg: def.bg,
+                        ...agent
+                      });
+                      setIsAgentModalOpen(true);
+                    }}
+                  >
+                    <div className="agent-info">
+                      <div className="agent-icon" style={{ background: def.bg, borderColor: def.color }}>
+                        {def.icon}
+                      </div>
+                      <div className="agent-details">
+                        <div className="agent-name">{def.name}</div>
+                        <div className="agent-signal">
+                          Signal: <span className="neon-text">{prediction}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ minWidth: '100px' }}>
+                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
+                        Confidence
+                      </div>
+                      <div className="progress-bar" style={{ width: '100px' }}>
+                        <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, confidence * 100))}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Consensus Summary */}
+              <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(31, 41, 55, 0.3)', borderRadius: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 600 }}>Overall Consensus</span>
+                  <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--neon-amber)' }}>
+                    {activeFrame.final_signal || 'HOLD'}
+                  </span>
+                </div>
+                <div className="progress-bar" style={{ marginTop: '12px' }}>
+                  <div
+                    className="progress-fill"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (activeFrame.consensus_confidence ?? 0) * 100))}%`,
+                      background: 'linear-gradient(90deg, var(--neon-amber), var(--neon-ruby))'
+                    }}
+                  ></div>
+                </div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-2">
+                  {activeFrame.consensus_level
+                    ? `${activeFrame.consensus_level} (${Math.round((activeFrame.consensus_confidence ?? 0) * 100)}%)`
+                    : "—"}
+                </div>
+              </div>
+            </>
+          ) : (
+            <p style={{ color: 'var(--text-secondary)' }}>No consensus data available (Start replay to view)</p>
+          )}
+        </div>
+
         {/* ── Strategy Params Panel ── */}
         {replayData && (
-          <div 
+          <div
             className="rounded-xl p-5 border transition-all duration-300 flex-shrink-0"
             style={{
               background: "rgba(15, 23, 42, 0.45)",
@@ -2231,7 +2459,7 @@ export default function SimulationOfDead() {
                                     setStrategyParams({ ...DEFAULT_STRATEGY_PARAMS });
                                   }
                                 }
-                              } catch {}
+                              } catch { }
                             }}
                             className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer text-[10px] font-bold"
                             title="Hapus skenario"
@@ -2423,7 +2651,7 @@ export default function SimulationOfDead() {
                             setScenarios(prev => [saved, ...prev]);
                             setScenarioName("");
                           }
-                        } catch {}
+                        } catch { }
                       }}
                       className="px-4 py-2 rounded-lg text-xs font-bold border cursor-pointer transition-all disabled:opacity-40"
                       style={{
@@ -2456,12 +2684,12 @@ export default function SimulationOfDead() {
           <div className="glass-card flex-shrink-0">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
-              ⚡ Daftar Posisi Aktif
+              ⚡ Daftar Posisi
             </h2>
-            
+
             {activePositions.length === 0 ? (
               <div className="py-8 text-center text-slate-400 text-sm bg-slate-900/20 rounded-lg border border-slate-800/40">
-                Tidak ada posisi aktif saat ini
+                Tidak ada posisi saat ini
               </div>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-slate-800/50">
@@ -2498,17 +2726,20 @@ export default function SimulationOfDead() {
                         badgeClass = "bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]";
                       } else if (pos.status === "Trailing") {
                         badgeClass = "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]";
+                      } else if (pos.status === "Closed - Win") {
+                        badgeClass = "bg-green-500/15 text-green-400 border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.15)]";
+                      } else if (pos.status === "Closed - Loss") {
+                        badgeClass = "bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]";
                       }
 
                       return (
                         <tr key={pos.ticket} className="hover:bg-slate-800/20 transition-colors">
                           <td className="py-3.5 px-4 font-mono text-slate-400">#{pos.ticket}</td>
                           <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
-                              isBuy
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            }`}>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${isBuy
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              }`}>
                               {pos.type}
                             </span>
                           </td>
@@ -2564,9 +2795,8 @@ export default function SimulationOfDead() {
                               {pos.status}
                             </span>
                           </td>
-                          <td className={`py-3.5 px-4 text-right font-mono font-bold text-sm ${
-                            isWin ? "text-emerald-400" : "text-rose-500"
-                          }`}>
+                          <td className={`py-3.5 px-4 text-right font-mono font-bold text-sm ${isWin ? "text-emerald-400" : "text-rose-500"
+                            }`}>
                             {isWin ? "+" : ""}${pos.pnl.toFixed(2)}
                           </td>
                         </tr>
@@ -2692,13 +2922,12 @@ export default function SimulationOfDead() {
                         {month.month_label || `${month.month ?? "N/A"}-${month.year ?? ""}`}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono">{month.executed_trades ?? month.trades ?? 0}</td>
-                      <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${
-                        (month.win_rate ?? 0) > 50
-                          ? "text-green-400"
-                          : (month.win_rate ?? 0) === 50
+                      <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${(month.win_rate ?? 0) > 50
+                        ? "text-green-400"
+                        : (month.win_rate ?? 0) === 50
                           ? "text-white"
                           : "text-red-400"
-                      }`}>
+                        }`}>
                         {(month.win_rate ?? 0).toFixed(1)}%
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-green-400">{(month.profit ?? 0).toFixed(2)}</td>
@@ -2716,30 +2945,36 @@ export default function SimulationOfDead() {
             </table>
           </div>
         </div>
-
-        {/* ── Orchestrator Agents (cursor-following) — 100% copy of dashboard "Agent Consensus", placed at bottom of Monthly Performance Summary ── */}
-        {replayData && activeFrame && <AgentPanel frame={activeFrame} />}
       </div>
 
 
       {/* Progress popup for Loading Replay Data */}
       {loadProgress.visible && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200]">
-          <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
-            <div className="text-center mb-4">
-              <div className="text-purple-300 font-semibold text-sm mb-2">
-                📅 Loading Replay Data
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[200] animate-in fade-in duration-300">
+          <div 
+            className="bg-slate-900/90 border border-purple-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(168,85,247,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+            style={{ transformStyle: "preserve-3d" }}
+          >
+            <div className="flex flex-col items-center justify-center text-center mb-5">
+              <div className="relative flex items-center justify-center w-12 h-12 mb-3 bg-purple-500/10 rounded-full border border-purple-500/25 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
               </div>
-              <div className="text-3xl font-bold text-white mb-1">
+              <div className="text-purple-300 font-semibold text-xs tracking-wider uppercase mb-1">
+                Loading Replay Data
+              </div>
+              <div className="text-3xl font-mono font-bold text-white mb-1 shadow-sm">
                 {loadProgress.percent}%
               </div>
-              <div className="text-xs text-gray-400">{loadProgress.step}</div>
+              <div className="text-[10px] font-medium text-slate-400 max-w-[240px] truncate">{loadProgress.step}</div>
             </div>
-            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+            <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-150"
+                className="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(168,85,247,0.5)] relative overflow-hidden"
                 style={{ width: `${loadProgress.percent}%` }}
-              />
+              >
+                {/* cylindrical light reflection gloss overlay */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.15),transparent)]" />
+              </div>
             </div>
           </div>
         </div>
@@ -2878,6 +3113,332 @@ export default function SimulationOfDead() {
             <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Agent Detail Pop-up Modal ── */}
+      {isAgentModalOpen && selectedAgent && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-[96vw] max-w-[96vw] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[135vh] h-[135vh] animate-in zoom-in-95 duration-200 relative">
+            {/* Premium Gradient Top Accent Line */}
+            <div
+              className="absolute top-0 left-0 w-full h-[3px]"
+              style={{ background: `linear-gradient(90deg, ${selectedAgent.color}, #6366f1)` }}
+            />
+
+            {/* Header */}
+            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2.5 rounded-xl text-lg border"
+                  style={{ background: selectedAgent.bg, borderColor: selectedAgent.color }}
+                >
+                  {selectedAgent.icon}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                    {selectedAgent.name}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Detail analisis dan kondisi agen saat simulasi dibentuk
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                title="Tutup"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Agent Status and Confidence Card */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">Signal & Status</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl font-bold text-slate-200">
+                      {selectedAgent.signal || "HOLD"}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ${selectedAgent.status === "fired"
+                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                      : selectedAgent.status === "skipped"
+                        ? "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                      }`}>
+                      {selectedAgent.status}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">Confidence Level</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl font-bold font-mono text-cyan-400">
+                      {Math.round((selectedAgent.confidence ?? 0) * 100)}%
+                    </span>
+                    <div className="flex-1 progress-bar h-2 bg-slate-950/80 rounded-full overflow-hidden">
+                      <div
+                        className="progress-fill h-full bg-cyan-500"
+                        style={{ width: `${Math.min(100, Math.max(0, (selectedAgent.confidence ?? 0) * 100))}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Specific Metadata Panel (e.g. LanceDB Pattern Matching for Market Structure) */}
+              {selectedAgent.meta && (selectedAgent.meta.win_rate !== undefined || selectedAgent.meta.pattern_count !== undefined) && (
+                <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-4">
+                  <h4 className="text-sm font-semibold text-slate-300">📊 Database LanceDB Pattern Matching</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-xs text-slate-400">Pola Serupa Terdeteksi</div>
+                      <div className="text-lg font-bold font-mono text-slate-200 mt-1">
+                        {selectedAgent.meta.pattern_count ?? 0} pola
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-400">Win Rate Pola Historis</div>
+                      <div className={`text-lg font-bold font-mono mt-1 ${selectedAgent.meta.win_rate >= 0.60
+                        ? "text-emerald-400"
+                        : selectedAgent.meta.win_rate >= 0.45
+                          ? "text-cyan-400"
+                          : "text-rose-400"
+                        }`}>
+                        {((selectedAgent.meta.win_rate ?? 0) * 100).toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Matching Patterns List */}
+                  {selectedAgent.meta.patterns && selectedAgent.meta.patterns.length > 0 && (
+                    <div className="pt-4 border-t border-slate-800/80 space-y-2">
+                      <div className="text-xs font-semibold text-slate-400">10 Pola Historis Paling Mirip (Top 10):</div>
+                      <div className="border border-slate-800/80 rounded-lg overflow-hidden bg-slate-950/40 text-xs">
+                        <div className="overflow-x-auto max-h-[580px]">
+                          <table className="w-full text-left">
+                            <thead className="bg-slate-900/40 border-b border-slate-800/80 text-slate-400 font-semibold sticky top-0 backdrop-blur">
+                              <tr>
+                                <th className="py-2 px-3">Waktu (Timestamp)</th>
+                                <th className="py-2 px-3">Sesi</th>
+                                <th className="py-2 px-3 text-right">Hasil</th>
+                                <th className="py-2 px-3 text-right">Profit</th>
+                                <th className="py-2 px-3 text-right">Kemiripan</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                              {selectedAgent.meta.patterns.map((p: any, idx: number) => {
+                                const isWin = p.outcome?.toUpperCase() === "WIN";
+                                return (
+                                  <tr
+                                    key={idx}
+                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                                    onClick={() => setSelectedPattern(p)}
+                                  >
+                                    <td className="py-2 px-3 font-mono text-[11px] text-slate-400">
+                                      {p.timestamp ? p.timestamp.replace("T", " ").substring(0, 19) : "-"}
+                                    </td>
+                                    <td className="py-2 px-3">{p.session || "-"}</td>
+                                    <td className="py-2 px-3 text-right">
+                                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${isWin
+                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/10"
+                                        : p.outcome?.toUpperCase() === "LOSS"
+                                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/10"
+                                          : "bg-slate-500/10 text-slate-400 border border-slate-500/10"
+                                        }`}>
+                                        {p.outcome || "PENDING"}
+                                      </span>
+                                    </td>
+                                    <td className={`py-2 px-3 text-right font-mono font-semibold ${isWin ? "text-emerald-400" : "text-rose-500"}`}>
+                                      {isWin ? "+" : ""}{(p.profit_pips ?? 0).toFixed(1)} pips
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-mono text-cyan-400">
+                                      {((p.similarity ?? 0) * 100).toFixed(1)}%
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Nested Pattern Detail Popup ─────────────────────────────── */}
+              {selectedPattern && (
+                <div
+                  className="fixed inset-0 z-[200] flex items-center justify-center"
+                  onClick={() => setSelectedPattern(null)}
+                >
+                  <div
+                    className="relative bg-[#0a0f1c] border border-slate-700/60 rounded-2xl p-6 shadow-2xl w-80 space-y-4"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => setSelectedPattern(null)}
+                      className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                    <div className="text-sm font-semibold text-slate-200">Detail Pola Historis</div>
+                    <div className="text-[11px] font-mono text-slate-500">
+                      {selectedPattern.timestamp ? selectedPattern.timestamp.replace("T", " ").substring(0, 19) : "-"}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Entry Price</div>
+                        <div className="font-mono font-semibold text-slate-200">
+                          {selectedPattern.price != null ? Number(selectedPattern.price).toFixed(2) : "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Direction</div>
+                        <div className={`font-semibold ${
+                          (selectedPattern.direction || "").toLowerCase().includes("bull") ? "text-emerald-400" : "text-rose-400"
+                        }`}>
+                          {selectedPattern.direction || "-"}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Sesi</div>
+                        <div className="text-slate-200">{selectedPattern.session || "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Status</div>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider ${
+                          selectedPattern.outcome?.toUpperCase() === "WIN"
+                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            : selectedPattern.outcome?.toUpperCase() === "LOSS"
+                              ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                        }`}>
+                          {selectedPattern.outcome || "PENDING"}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Profit</div>
+                        <div className={`font-mono font-semibold ${
+                          selectedPattern.outcome?.toUpperCase() === "WIN" ? "text-emerald-400" : "text-rose-500"
+                        }`}>
+                          {selectedPattern.outcome?.toUpperCase() === "WIN" ? "+" : ""}
+                          {(selectedPattern.profit_pips ?? 0).toFixed(1)} pips
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-500 mb-0.5">Kemiripan</div>
+                        <div className="font-mono font-semibold text-cyan-400">
+                          {((selectedPattern.similarity ?? 0) * 100).toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sentiment Agent News & Calendar Block */}
+              {selectedAgent.key === "sentiment" && activeFrame && (
+                <div className="space-y-4">
+                  {/* News Headlines */}
+                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                      📰 Berita Utama Pasar (Generasi LLM)
+                    </h4>
+                    {activeFrame.debug_news && activeFrame.debug_news.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {activeFrame.debug_news.map((item: any, idx: number) => (
+                          <div key={idx} className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3.5 flex flex-col gap-1 hover:border-slate-700/60 transition-colors">
+                            <span className="text-sm text-slate-200 font-medium leading-snug">
+                              {item.headline}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500">
+                              {item.timestamp ? item.timestamp.replace("T", " ").substring(0, 19) : "-"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                        Tidak ada data berita historis untuk tanggal ini.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Calendar Events */}
+                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                      📅 Jadwal Rilis Data Ekonomi (Generasi LLM)
+                    </h4>
+                    {activeFrame.debug_events && activeFrame.debug_events.length > 0 ? (
+                      <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/40 text-xs">
+                        <table className="w-full text-left">
+                          <thead className="bg-slate-900/40 border-b border-slate-800/80 text-slate-400 font-semibold">
+                            <tr>
+                              <th className="py-2.5 px-4">Nama Peristiwa / Data</th>
+                              <th className="py-2.5 px-4 text-center">Dampak</th>
+                              <th className="py-2.5 px-4 text-right">Waktu Rilis</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                            {activeFrame.debug_events.map((item: any, idx: number) => {
+                              const isHigh = item.impact?.toLowerCase() === "high";
+                              return (
+                                <tr key={idx} className="hover:bg-slate-800/20 transition-colors">
+                                  <td className="py-2.5 px-4 font-medium text-slate-200">
+                                    {item.event}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                      isHigh 
+                                        ? "bg-rose-500/10 text-rose-400 border border-rose-500/20" 
+                                        : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                    }`}>
+                                      {item.impact || "medium"}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-right font-mono text-slate-400">
+                                    {item.time ? item.time.replace("T", " ").substring(0, 19) : "-"}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                        Tidak ada peristiwa ekonomi terjadwal untuk tanggal ini.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Reasoning Block */}
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold text-slate-300">📝 Analisis & Rationale (Reasoning)</h4>
+                <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 text-sm text-slate-300 leading-relaxed font-sans min-h-[100px] whitespace-pre-wrap">
+                  {selectedAgent.reasoning || "Tidak ada rincian analisis dari agen."}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+              <button
+                onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup

@@ -24,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ponytail: cache candle+structure DB queries for simulate-event
+# Key: (candle_table, date_from, date_to) — events within 1 replay session share same 30-day window
+_sim_candle_cache: dict = {}
+_SIM_CACHE_MAX = 50  # FIFO eviction
+
 
 def calculate_ema200(candles: List[dict]) -> List[Optional[float]]:
     """Calculate EMA 200 for a list of candles.
@@ -704,7 +709,7 @@ async def get_current_signal_wrapper(
         derived_signal = reader.get_trading_signal()
 
         if derived_signal:
-            logger.info(
+            logger.debug(
                 f"[API] Signal from structure: {derived_signal['signal']} "
                 f"conf={derived_signal['confidence']}"
             )
@@ -975,11 +980,18 @@ async def get_session_zones(
         )
 
 
+_cached_replay_months = None
+
+
 @router.get("/replay/months")
 async def get_replay_months():
     """
     Get list of available years and months from the marketdata table in NeonDB.
     """
+    global _cached_replay_months
+    if _cached_replay_months is not None:
+        return _cached_replay_months
+
     from app.core.database import get_db_conn, is_pool_ready
 
     if not is_pool_ready():
@@ -998,7 +1010,9 @@ async def get_replay_months():
                 )
                 month_rows = cur.fetchall()
 
-        return [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
+        result = [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
+        _cached_replay_months = result
+        return result
 
     except Exception as e:
         logger.error(f"Replay months error: {e}", exc_info=True)
@@ -1264,6 +1278,12 @@ async def get_simulation_data(
     ]
 
     try:
+        try:
+            from app.services.orchestrator_simulator import get_orchestrator
+            get_orchestrator().reset_state()
+        except Exception as re:
+            logger.warning(f"Failed to reset orchestrator state at replay init: {re}")
+
         result = await run_in_threadpool(
             run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe
         )
@@ -1272,4 +1292,177 @@ async def get_simulation_data(
         raise HTTPException(status_code=500, detail=str(e))
 
     return result
+
+
+@router.get("/simulate-event")
+async def get_single_event_simulation(
+    time: int = Query(..., description="Timestamp of the structure event"),
+    timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
+    symbol: str = "XAUUSD",
+    type: Optional[str] = Query(None, description="Type of the structure event (HH, LL, BOS, CHOCH)"),
+):
+    """Run the OrchestratorAgent for a single historical event timestamp."""
+    logger.info(f"--- SIMULATE EVENT ENDPOINT HIT: time={time} type={type} ---")
+    from datetime import date, datetime, timedelta, timezone
+    from app.core.database import get_db_conn, is_pool_ready
+    from app.services.orchestrator_simulator import (
+        get_orchestrator,
+        reconstruct_market_data,
+        _build_frame,
+    )
+    import pandas as pd
+
+    if not is_pool_ready():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    # Fetch candles and structures 30 days prior for warmup/indicators
+    dt_event = datetime.fromtimestamp(time, tz=timezone.utc)
+    date_from = (dt_event - timedelta(days=30)).date()
+    date_to = dt_event.date()
+
+    table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
+    candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
+
+    try:
+        cache_key = (candle_table, date_from, date_to)
+        if cache_key in _sim_candle_cache:
+            candle_rows, structure_rows = _sim_candle_cache[cache_key]
+        else:
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    # Fetch candles up to event day
+                    cur.execute(
+                        f"SELECT time, open, high, low, close, volume, ema200 "
+                        f"FROM {candle_table} WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
+                        (date_from, date_to),
+                    )
+                    candle_rows = cur.fetchall()
+
+                    # Fetch structures up to the event day
+                    cur.execute(
+                        "SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time "
+                        "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC",
+                        (date_from, date_to, timeframe.upper()),
+                    )
+                    structure_rows = cur.fetchall()
+
+            # Store in cache (FIFO eviction)
+            if len(_sim_candle_cache) >= _SIM_CACHE_MAX:
+                del _sim_candle_cache[next(iter(_sim_candle_cache))]
+            _sim_candle_cache[cache_key] = (candle_rows, structure_rows)
+    except Exception as e:
+        logger.error(f"Event simulation DB error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    def _ts(dt):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+
+    candles = [
+        {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
+         "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+        for r in candle_rows
+    ]
+    structure_events = [
+        {"type": (r[0] or "").strip(), "direction": (r[1] or "").strip(), "price": float(r[2]) if r[2] is not None else None,
+         "time": _ts(r[3]), "timeframe": r[4], "status": r[5],
+         "previous_price": float(r[6]) if r[6] is not None else None, "previous_time": _ts(r[7])}
+        for r in structure_rows
+    ]
+
+    # Find the target structure event matching the target time
+    target_evs = [e for e in structure_events if e["time"] == time]
+    if not target_evs:
+        # Fallback: create dummy event if not found exactly in db
+        target_ev = {"type": "HH", "direction": "Bullish", "price": 0.0, "time": time}
+    else:
+        if type:
+            matched_evs = [e for e in target_evs if e["type"].upper() == type.upper()]
+            if matched_evs:
+                target_ev = matched_evs[0]
+            else:
+                target_ev = target_evs[0]
+        else:
+            target_ev = target_evs[0]
+
+    # Run the orchestrator on this event
+    try:
+        from loguru import logger as loguru_logger
+        base_df = pd.DataFrame(candles)
+        base_df["time"] = pd.to_datetime(base_df["time"], unit="s", utc=True)
+        if "tick_volume" not in base_df.columns and "volume" in base_df.columns:
+            base_df["tick_volume"] = base_df["volume"]
+        if "ema200" not in base_df.columns or base_df["ema200"].isna().all():
+            base_df["ema200"] = base_df["close"].ewm(span=200, adjust=False).mean()
+        base_df["high_low"] = base_df["high"] - base_df["low"]
+        base_df = base_df.sort_values("time").reset_index(drop=True)
+
+        _ev_type = (target_ev.get("type") or "?").upper()
+        _ev_dir = (target_ev.get("direction") or "?")[:4]
+        _ev_dt_str = dt_event.strftime("%Y-%m-%d %H:%M")
+        _has_news = bool(md.get("news_headlines")) if 'md' in dir() else False
+        loguru_logger.info(
+            f"🎯 SIM-EVENT | {_ev_dt_str} {_ev_type} {_ev_dir} | "
+            f"Candles: {len(candles)} | Structures: {len(structure_events)}"
+        )
+
+        md = reconstruct_market_data(base_df, time, structure_events, generate_news=True, event_type_hint=type)
+        _news_count = len(md.get("news_headlines", []))
+        _cal_count = len(md.get("upcoming_events", []))
+        loguru_logger.info(f"   📰 News: {_news_count} headlines | 📅 Calendar: {_cal_count} events")
+
+        orch = get_orchestrator()
+        result = await run_in_threadpool(
+            orch.analyze, md, symbol, timeframe
+        )
+
+        # --- Log: per-agent summary ---
+        _ar = result.get("agent_results") or {}
+        _ms = _ar.get("market_structure", {})
+        _ml = _ar.get("ml_prediction", {})
+        _st = _ar.get("sentiment", {})
+        _fsig = result.get("final_signal", "HOLD")
+        _fconf = result.get("final_confidence", 0.0)
+        _appr = "✅" if result.get("approved") else "⛔"
+        loguru_logger.info(
+            f"   → MS:{_ms.get('signal', '-')}({_ms.get('confidence', 0):.2f}) "
+            f"ML:{_ml.get('signal', '-')}({_ml.get('confidence', 0):.2f}) "
+            f"SENT:{(_st.get('final_signal') or '-')[:4]}({_st.get('final_confidence', 0):.2f}) "
+            f"→ {_fsig} {_fconf:.2f} {_appr}"
+        )
+
+        # Propagate counter-swing flag from market data into result so _build_frame can include it
+        result["is_counter_swing"] = md.get("is_counter_swing", False)
+
+        frame = _build_frame(target_ev, result)
+        frame_dict = frame.dict() if hasattr(frame, "dict") else dict(frame)
+        frame_dict["debug_news"] = md.get("news_headlines", [])
+        frame_dict["debug_events"] = md.get("upcoming_events", [])
+        return frame_dict
+    except Exception as e:
+        logger.error(f"Event simulation run error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replay/clear-cache")
+async def clear_replay_cache():
+    """Clear the replay simulation candle, structure cache, and orchestrator state."""
+    global _sim_candle_cache
+    _sim_candle_cache.clear()
+    
+    # Also reset the simulation orchestrator state and warmup cache
+    try:
+        from app.services.orchestrator_simulator import get_orchestrator
+        get_orchestrator().reset_state()
+        logger.info("[Replay] Simulation orchestrator state reset successfully")
+    except Exception as re:
+        logger.warning(f"Failed to reset orchestrator state at clear-cache: {re}")
+
+    logger.info("[Replay] Simulation candle cache cleared successfully")
+    return {"status": "success", "message": "Replay cache cleared"}
+
+
 

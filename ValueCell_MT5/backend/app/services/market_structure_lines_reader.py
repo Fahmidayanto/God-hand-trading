@@ -273,7 +273,7 @@ class MarketStructureLinesReader:
         result['from_date'] = from_date
         result['to_date'] = to_dt.isoformat()
 
-        logger.info(f"[MarketStructureLinesReader] Loaded {result['total_points']} points ({from_date} to {to_dt.date()})")
+        logger.debug(f"[MarketStructureLinesReader] Loaded {result['total_points']} points ({from_date} to {to_dt.date()})")
         return result
 
     def _get_latest_csv_file(self) -> Optional[Path]:
@@ -284,7 +284,7 @@ class MarketStructureLinesReader:
             if not csv_files:
                 return None
             latest = max(csv_files, key=self._extract_date)
-            logger.info(f"[MarketStructureLinesReader] Using file: {latest.name}")
+            logger.debug(f"[MarketStructureLinesReader] Using file: {latest.name}")
             return latest
         except Exception as e:
             logger.error(f"[MarketStructureLinesReader] Error finding CSV: {e}", exc_info=True)

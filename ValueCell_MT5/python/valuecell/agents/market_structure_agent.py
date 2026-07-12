@@ -186,35 +186,67 @@ class MarketStructureAgent:
         session: str = "Unknown",
         df_h1: Optional[pd.DataFrame] = None,
         df_h4: Optional[pd.DataFrame] = None,
+        structure_events: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
-        Analisis struktur pasar langsung dari Neon DB.
+        Analisis struktur pasar langsung dari Neon DB atau data historis jika dikirim.
         
         Args:
-            df_m15: Diabaikan (untuk backward compatibility)
+            df_m15: DataFrame M15 (digunakan untuk harga & EMA200 jika dalam simulasi)
             symbol: Simbol trading (default: XAUUSD)
             session: Sesi aktif (London, NewYork, Asia, Sydney)
-            df_h1: Diabaikan (untuk backward compatibility)
-            df_h4: Diabaikan (untuk backward compatibility)
+            df_h1: DataFrame H1 (digunakan jika dalam simulasi)
+            df_h4: DataFrame H4 (digunakan jika dalam simulasi)
+            structure_events: Daftar event struktur historis jika dalam simulasi
         """
         conn = None
         try:
-            conn = self._get_db_conn()
-            
-            # Ambil parameter terkini dari Neon DB
-            current_price = self._get_neon_current_price(conn)
-            if not current_price:
-                return self._no_signal_response("Gagal mendapatkan data harga close terbaru dari database")
+            # Mode Simulasi / Replay (data historis disediakan)
+            if structure_events is not None and df_m15 is not None and len(df_m15) > 0:
+                current_price = float(df_m15["close"].iloc[-1])
+                
+                # Baca EMA200 historis
+                ema200_m15 = float(df_m15["ema200"].iloc[-1]) if "ema200" in df_m15.columns and not pd.isna(df_m15["ema200"].iloc[-1]) else current_price
+                ema200_h1 = float(df_h1["ema200"].iloc[-1]) if df_h1 is not None and len(df_h1) > 0 and "ema200" in df_h1.columns and not pd.isna(df_h1["ema200"].iloc[-1]) else ema200_m15
+                ema200_h4 = float(df_h4["ema200"].iloc[-1]) if df_h4 is not None and len(df_h4) > 0 and "ema200" in df_h4.columns and not pd.isna(df_h4["ema200"].iloc[-1]) else ema200_m15
+                
+                # Map dan urutkan event struktur historis (time DESC)
+                mapped_events = []
+                for idx, ev in enumerate(structure_events):
+                    mapped_events.append({
+                        "type": (ev.get("type") or "").strip(),
+                        "direction_action": (ev.get("direction") or "").strip(),
+                        "price": float(ev["price"]) if ev.get("price") is not None else 0.0,
+                        "time": ev.get("time"),
+                        "timeframe": ev.get("timeframe"),
+                        "status": ev.get("status"),
+                        "_orig_idx": idx,
+                    })
+                
+                events = [e for e in mapped_events if e.get("status") in ("Accepted", "Confirmed", None)]
+                events.sort(key=lambda x: (x["time"] if x["time"] is not None else 0, x["_orig_idx"]), reverse=True)
+                
+                if len(events) < 3:
+                    logger.warning(f"Jumlah event historis sangat sedikit: {len(events)} (butuh minimal 3)")
+                    return self._no_signal_response("Data event historis terlalu sedikit")
+            else:
+                # Mode Live Trading (default Neon DB)
+                conn = self._get_db_conn()
+                
+                # Ambil parameter terkini dari Neon DB
+                current_price = self._get_neon_current_price(conn)
+                if not current_price:
+                    return self._no_signal_response("Gagal mendapatkan data harga close terbaru dari database")
 
-            ema200_m15 = self._get_neon_ema200(conn, "M15")
-            ema200_h1  = self._get_neon_ema200(conn, "H1")
-            ema200_h4  = self._get_neon_ema200(conn, "H4")
+                ema200_m15 = self._get_neon_ema200(conn, "M15")
+                ema200_h1  = self._get_neon_ema200(conn, "H1")
+                ema200_h4  = self._get_neon_ema200(conn, "H4")
 
-            # Ambil event terbaru dari llhhbosdata_xauusd
-            events = self._fetch_neon_events(conn, limit=50)
-            if len(events) < 3:
-                logger.warning(f"Jumlah event di DB sangat sedikit: {len(events)} (butuh minimal 3)")
-                return self._no_signal_response("Data event di database Neon terlalu sedikit")
+                # Ambil event terbaru dari llhhbosdata_xauusd
+                events = self._fetch_neon_events(conn, limit=50)
+                if len(events) < 3:
+                    logger.warning(f"Jumlah event di DB sangat sedikit: {len(events)} (butuh minimal 3)")
+                    return self._no_signal_response("Data event di database Neon terlalu sedikit")
 
             # Analisis sequence 3 event terbaru
             # e1: terbaru, e2: kedua terbaru, e3: ketiga terbaru
@@ -225,18 +257,28 @@ class MarketStructureAgent:
             logger.info(f"Analyzing 3 latest events: 1st={e1['type']} ({e1['direction_action']}), 2nd={e2['type']} ({e2['direction_action']}), 3rd={e3['type']} ({e3['direction_action']})")
 
             # Normalisasi tipe & arah
-            t1, t2, t3 = e1["type"].upper(), e2["type"].upper(), e3["type"].upper()
-            d1, d2, d3 = e1["direction_action"].upper(), e2["direction_action"].upper(), e3["direction_action"].upper()
+            t1 = e1["type"].upper()
+            d1 = e1["direction_action"].upper()
 
-            is_bull_choch_e2 = "CHOCH" in t2 and ("BULL" in d2 or "UP" in d2)
-            is_bear_choch_e2 = "CHOCH" in t2 and "BEAR" in d2
-            is_bull_choch_e3 = "CHOCH" in t3 and ("BULL" in d3 or "UP" in d3)
-            is_bear_choch_e3 = "CHOCH" in t3 and "BEAR" in d3
+            def _has_recent_choch(direction: str, max_lookback: int = 10) -> bool:
+                """Scan recent events (skip e1) for a CHoCH matching direction. Stop if a BOS is encountered."""
+                for ev in events[1:max_lookback]:
+                    t = ev["type"].upper()
+                    d = ev["direction_action"].upper()
+                    if "BOS" in t:
+                        # BOS sudah terjadi, maka sequence CHoCH sebelumnya sudah selesai
+                        return False
+                    if "CHOCH" in t:
+                        if direction == "Bullish" and ("BULL" in d or "UP" in d):
+                            return True
+                        if direction == "Bearish" and "BEAR" in d:
+                            return True
+                return False
 
             # ── Pemeriksaan Skenario ──
-            
-            # 1. PENDING_SETUP - Bullish (CHoCH + HH terbentuk)
-            if t1 == "HH" and is_bull_choch_e2:
+
+            # 1. PENDING_SETUP - Bullish (CHoCH anywhere in recent events + HH terbentuk)
+            if t1 == "HH" and _has_recent_choch("Bullish"):
                 pre_signal = self._on_choch_hh_formed(
                     event_type="HH",
                     direction="Bullish",
@@ -257,10 +299,11 @@ class MarketStructureAgent:
                     current_price=current_price,
                     ema200=ema200_m15,
                     symbol=symbol,
+                    is_new_setup=True,
                 )
 
-            # 2. PENDING_SETUP - Bearish (CHoCH + LL terbentuk)
-            elif t1 == "LL" and is_bear_choch_e2:
+            # 2. PENDING_SETUP - Bearish (CHoCH anywhere in recent events + LL terbentuk)
+            elif t1 == "LL" and _has_recent_choch("Bearish"):
                 pre_signal = self._on_choch_hh_formed(
                     event_type="LL",
                     direction="Bearish",
@@ -281,10 +324,13 @@ class MarketStructureAgent:
                     current_price=current_price,
                     ema200=ema200_m15,
                     symbol=symbol,
+                    is_new_setup=True,
                 )
 
             # 3. TRIGGER - Bullish BoS (CHoCH -> HH -> BoS)
-            elif "BOS" in t1 and ("BULL" in d1 or "UP" in d1) and t2 == "HH" and is_bull_choch_e3:
+            elif "BOS" in t1 and ("BULL" in d1 or "UP" in d1) and (
+                self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bullish"
+            ):
                 signal_result = self._on_bos_confirmed(
                     direction="Bullish",
                     price=e1["price"],
@@ -308,7 +354,9 @@ class MarketStructureAgent:
                 )
 
             # 4. TRIGGER - Bearish BoS (CHoCH -> LL -> BoS)
-            elif "BOS" in t1 and "BEAR" in d1 and t2 == "LL" and is_bear_choch_e3:
+            elif "BOS" in t1 and "BEAR" in d1 and (
+                self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bearish"
+            ):
                 signal_result = self._on_bos_confirmed(
                     direction="Bearish",
                     price=e1["price"],
@@ -420,6 +468,7 @@ class MarketStructureAgent:
                 ema200=ema200,
                 session=session,
                 timeframe=self.timeframe,
+                prior_choch=True,
             )
         self._pending_analysis = pattern_analysis
 
@@ -608,6 +657,7 @@ class MarketStructureAgent:
         ema200: float,
         session: str,
         timeframe: str,
+        prior_choch: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """Query ke database vektor LanceDB untuk melihat kesamaan pola."""
         try:
@@ -620,6 +670,7 @@ class MarketStructureAgent:
                 timeframe=timeframe,
                 limit=20,
                 min_similarity=0.7,
+                prior_choch=prior_choch,
             )
             return result
         except Exception as e:
@@ -638,6 +689,7 @@ class MarketStructureAgent:
         current_price: float,
         ema200: Optional[float],
         symbol: str,
+        is_new_setup: bool = False,
     ) -> Dict[str, Any]:
         """Hasilkan format response dictionary standar."""
         return {
@@ -650,6 +702,7 @@ class MarketStructureAgent:
             "confidence": round(confidence, 3),
             "reasoning": reasoning,
             "phase": phase.value,
+            "is_new_setup": is_new_setup,
             "pre_signal": pre_signal,
             "structure_events": events[:5],  # 5 event terakhir
             "current_state": {

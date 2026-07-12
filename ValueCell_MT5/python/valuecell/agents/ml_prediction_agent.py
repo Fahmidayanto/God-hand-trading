@@ -308,7 +308,7 @@ class MLPredictionAgent:
         Analyze whether to take the structure signal.
         """
         try:
-            logger.info(f"🔍 {self.name} analyzing {symbol} {timeframe} using model type '{self.model_type}'...")
+            logger.debug(f"🔍 {self.name} analyzing {symbol} {timeframe} using model type '{self.model_type}'...")
             
             entry_price = float(market_data.get("current_bar", {}).get("close", 0.0))
             if entry_price <= 0:
@@ -373,7 +373,7 @@ class MLPredictionAgent:
                     "model_type": self.model_type,
                 }
                 
-                logger.info(
+                logger.debug(
                     f"✅ {self.name} v5 dynamic R:R: {expected_rr:.2f} | "
                     f"MFE: {predicted_mfe:.1f} | MAE: {predicted_mae:.1f} | Signal: {signal}"
                 )
@@ -426,7 +426,7 @@ class MLPredictionAgent:
                     "model_accuracy": self.metadata.get("cv_accuracy_mean", 0)
                 }
                 
-                logger.info(
+                logger.debug(
                     f"✅ {self.name} signal: {response['signal']} | "
                     f"Confidence: {response['confidence']:.2f} | "
                     f"Probability: {probability:.3f}"

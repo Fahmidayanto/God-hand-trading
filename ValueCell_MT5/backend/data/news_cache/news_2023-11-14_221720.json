@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as US inflation data cools, boosting safe haven demand amid recession fears",
+            "timestamp": "2023-11-14T19:30:00"
+        },
+        {
+            "headline": "US Dollar weakens after CPI report; traders price in dovish Fed pivot as bond yields tumble",
+            "timestamp": "2023-11-14T20:15:00"
+        },
+        {
+            "headline": "XAUUSD breaks key resistance as hawkish Fed expectations fade following softer inflation print",
+            "timestamp": "2023-11-14T21:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Fed Chair Powell Speech",
+            "impact": "high",
+            "time": "2023-11-15T01:00:00"
+        },
+        {
+            "event": "US Initial Jobless Claims",
+            "impact": "medium",
+            "time": "2023-11-15T03:30:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to new highs as safe haven demand intensifies amid recession fears",
+            "timestamp": "2026-01-05T14:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed minutes reveal dovish shift on inflation targets",
+            "timestamp": "2026-01-05T15:30:00"
+        },
+        {
+            "headline": "Treasury yield drop fuels XAUUSD rally as investors hedge against stagflation",
+            "timestamp": "2026-01-05T16:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "ISM Services PMI",
+            "impact": "high",
+            "time": "2026-01-05T19:00:00"
+        },
+        {
+            "event": "Factory Orders",
+            "impact": "medium",
+            "time": "2026-01-05T21:30:00"
+        }
+    ]
+}

@@ -1,6 +1,9 @@
 import asyncio
 import logging
+import warnings
 from contextlib import asynccontextmanager
+
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +19,32 @@ from app.utils.logger import setup_logging
 # Setup logging
 setup_logging()
 logger = logging.getLogger(__name__)
+
+# Filter out quiet polling access logs in Uvicorn
+class QuietAccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if len(record.args) >= 3:
+            path = str(record.args[2])
+            quiet_prefixes = [
+                "/api/v1/health",
+                "/api/v1/dashboard/",
+                "/api/v1/trading/positions",
+                "/api/v1/trading/signal",
+                "/api/v1/trading/replay/months",
+                "/api/v1/scenarios",
+                "/api/v1/activity-logs",
+                "/api/v1/agents/",
+                "/api/v1/performance/",
+                "/api/v1/conversations/",
+            ]
+            method = str(record.args[1])
+            if method == "OPTIONS" or any(path.startswith(prefix) for prefix in quiet_prefixes):
+                status_code = record.args[4] if len(record.args) > 4 else 200
+                if isinstance(status_code, int) and status_code < 400:
+                    return False
+        return True
+
+logging.getLogger("uvicorn.access").addFilter(QuietAccessLogFilter())
 
 settings = get_settings()
 
@@ -232,3 +261,4 @@ if __name__ == "__main__":
         reload=settings.DEBUG,
         log_level=settings.LOG_LEVEL.lower(),
     )
+# force reload trigger 2

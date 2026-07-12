@@ -16,7 +16,7 @@ Integrates with:
 
 import MetaTrader5 as mt5
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from loguru import logger
 
@@ -294,7 +294,48 @@ class ExecutionAgent:
         except Exception as e:
             logger.error(f"❌ Failed to get position: {e}")
             return None
-    
+
+    def get_closed_position_pnl(self, ticket: int) -> Optional[float]:
+        """Look up realized PnL for a closed position via MT5 history deals.
+
+        Reads the OUT deal (``entry=mt5.DEAL_ENTRY_OUT``) for the given
+        position ticket and returns ``profit + swap + commission``.
+
+        Returns ``None`` when no OUT deal is found or MT5 is unreachable —
+        callers should treat that as "PnL unknown" rather than zero. The
+        audit log still records a row, just with the previous explicit
+        pnl=0.0 fallback so the trading cycle never blocks.
+
+        Ponytail choice: read one round-trip per position close. We do
+        NOT cache or batch — closed positions are rare events (1 per trade),
+        and the fetch is cheap (~ms). add a cache the day this becomes hot.
+        """
+        if not self.mt5_initialized:
+            return None
+        try:
+            # 14d window is plenty — even a held-overnight position is
+            # well under that, and reopens within 14d would be a separate
+            # position_ticket.
+            date_to = datetime.now()
+            date_from = date_to - timedelta(days=14)
+            deals = mt5.history_deals_get(date_from, date_to, position=ticket)
+        except Exception as e:
+            logger.warning(f"history_deals_get(position={ticket}) failed: {e}")
+            return None
+        if not deals:
+            return None
+        pnl = 0.0
+        out_deals = 0
+        for d in deals:
+            # mt5.DEAL_ENTRY_OUT == 1. Use getattr for the rare case
+            # the namedtuple-like struct disagrees (some MT5 builds).
+            if int(getattr(d, "entry", -1)) == int(getattr(mt5, "DEAL_ENTRY_OUT", 1)):
+                out_deals += 1
+                pnl += float(getattr(d, "profit", 0.0))
+                pnl += float(getattr(d, "swap", 0.0))
+                pnl += float(getattr(d, "commission", 0.0))
+        return pnl if out_deals else None
+
     def modify_position(
         self,
         ticket: int,

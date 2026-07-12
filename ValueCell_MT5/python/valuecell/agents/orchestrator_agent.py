@@ -102,6 +102,8 @@ class OrchestratorAgent:
             sentiment_config = agent_configs.get("sentiment", {})
             self.agents["sentiment"] = SentimentAgent(**sentiment_config)
         
+        self._latest_warmup_results = None
+        
         logger.info(
             f"✅ {self.name} v{self.version} initialized | "
             f"Active agents: {len(self.agents)} | "
@@ -133,23 +135,24 @@ class OrchestratorAgent:
             Comprehensive consensus decision with all agent results
         """
         try:
-            logger.info(f"🎯 {self.name} orchestrating analysis for {symbol} {timeframe}...")
+            logger.debug(f"🎯 {self.name} orchestrating analysis for {symbol} {timeframe}...")
             
             start_time = datetime.now()
             agent_results = {}
             
             # === STEP 1: Market Structure Analysis ===
             if "market_structure" in self.agents:
-                logger.info("📊 Step 1: Market Structure Analysis...")
+                logger.debug("📊 Step 1: Market Structure Analysis...")
                 ms_result = self.agents["market_structure"].analyze(
                     df_m15=market_data["df"],
                     symbol=symbol,
                     session=market_data.get("session", "Other"),
                     df_h1=market_data.get("h1_data"),   # Multi-TF EMA scoring H1
                     df_h4=market_data.get("h4_data"),   # Multi-TF EMA scoring H4
+                    structure_events=market_data.get("structure_events"),
                 )
                 agent_results["market_structure"] = ms_result
-                logger.info(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")
+                logger.debug(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")
                 # === STEP 2 & 3: ML Validation & Sentiment Analysis ===
             ms_result = agent_results.get("market_structure")
             if ms_result:
@@ -157,11 +160,66 @@ class OrchestratorAgent:
                 pre_signal = ms_result.get("pre_signal")
                 is_warmup = ms_signal == "HOLD" and pre_signal is not None
                 
+                # Clear cache if the setup is IDLE (reset) or if it's a new setup formation
+                if ms_result.get("phase") == "IDLE" or ms_result.get("is_new_setup") is True:
+                    self._latest_warmup_results = None
+                
+                use_cache = (is_warmup or ms_signal in ["BUY", "SELL"]) and self._latest_warmup_results is not None
+                
                 run_ml = "ml_prediction" in self.agents and (ms_signal in ["BUY", "SELL"] or is_warmup)
                 run_sent = "sentiment" in self.agents
                 
-                if is_warmup and run_ml and run_sent:
-                    logger.info("⚡ Warm-up mode: Executing ML Agent and Sentiment Agent in PARALLEL...")
+                if use_cache:
+                    ml_result = self._latest_warmup_results["ml_prediction"]
+                    agent_results["ml_prediction"] = ml_result
+                    
+                    if ms_signal in ["BUY", "SELL"]:
+                        logger.info("⚡ Execution Trigger: Combining warmup news with current news for updated sentiment analysis...")
+                        # Combine headlines from warmup and current execution
+                        warmup_news = self._latest_warmup_results.get("news_headlines", [])
+                        current_news = market_data.get("news_headlines", [])
+                        
+                        combined_news = []
+                        seen_headlines = set()
+                        for item in warmup_news + current_news:
+                            hl = item.get("headline", "").strip()
+                            if hl and hl not in seen_headlines:
+                                seen_headlines.add(hl)
+                                combined_news.append(item)
+                                
+                        warmup_events = self._latest_warmup_results.get("upcoming_events", [])
+                        current_events = market_data.get("upcoming_events", [])
+                        
+                        combined_events = []
+                        seen_events = set()
+                        for item in warmup_events + current_events:
+                            evt = item.get("event", "").strip()
+                            if evt and evt not in seen_events:
+                                seen_events.add(evt)
+                                combined_events.append(item)
+                                
+                        # Run fresh sentiment analysis on combined news
+                        sentiment_result = self.agents["sentiment"].analyze(
+                            signal=ms_signal,
+                            confidence=ms_result["confidence"],
+                            current_time=market_data["current_bar"]["time"],
+                            news_headlines=combined_news,
+                            upcoming_events=combined_events,
+                            symbol=symbol
+                        )
+                        agent_results["sentiment"] = sentiment_result
+                    else:
+                        # Fallback for other warmup states if any
+                        sentiment_result = self._latest_warmup_results["sentiment"]
+                        agent_results["sentiment"] = sentiment_result
+                    
+                    ml_prob = ml_result.get("probability", ml_result.get("expected_rr", 0.0))
+                    prob_label = "Expected R:R" if "expected_rr" in ml_result else "Probability"
+                    logger.debug(f"   → Execution (Cached) ML Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
+                    logger.debug(f"   → Execution (Updated Combined) Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    
+                elif is_warmup and run_ml and run_sent:
+                    logger.debug("⚡ Warm-up mode: Executing ML Agent and Sentiment Agent in PARALLEL...")
                     
                     pre_dir = pre_signal.get("direction", "Bullish")
                     warmup_signal = "BUY" if pre_dir == "Bullish" else "SELL"
@@ -201,17 +259,25 @@ class OrchestratorAgent:
                     agent_results["ml_prediction"] = ml_result
                     agent_results["sentiment"] = sentiment_result
                     
+                    # Store to cache
+                    self._latest_warmup_results = {
+                        "ml_prediction": ml_result,
+                        "sentiment": sentiment_result,
+                        "news_headlines": market_data.get("news_headlines", []),
+                        "upcoming_events": market_data.get("upcoming_events", [])
+                    }
+                    
                     ml_prob = ml_result.get("probability", ml_result.get("expected_rr", 0.0))
                     prob_label = "Expected R:R" if "expected_rr" in ml_result else "Probability"
-                    logger.info(f"   → Parallel Warm-up ML Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
-                    logger.info(f"   → Parallel Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                    logger.debug(f"   → Parallel Warm-up ML Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
+                    logger.debug(f"   → Parallel Warm-up Sentiment Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
                     
                 else:
                     # Sequential mode (Normal mode or if one of the agents is disabled)
                     # --- STEP 2: ML Prediction Validation ---
                     ml_result = None
                     if run_ml:
-                        logger.info("🤖 Step 2: ML Prediction Validation...")
+                        logger.debug("🤖 Step 2: ML Prediction Validation...")
                         target_signal = ms_signal
                         ml_result = self.agents["ml_prediction"].analyze(
                             market_data={
@@ -227,13 +293,13 @@ class OrchestratorAgent:
                         agent_results["ml_prediction"] = ml_result
                         ml_prob = ml_result.get("probability", ml_result.get("expected_rr", 0.0))
                         prob_label = "Expected R:R" if "expected_rr" in ml_result else "Probability"
-                        logger.info(f"   → Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
+                        logger.debug(f"   → Signal: {ml_result['signal']} | {prob_label}: {ml_prob:.3f}")
                     elif "ml_prediction" in self.agents:
-                        logger.info(f"   → Skipped ML (MS signal: {ms_signal})")
+                        logger.debug(f"   → Skipped ML (MS signal: {ms_signal})")
                         
                     # --- STEP 3: Sentiment Analysis ---
                     if run_sent:
-                        logger.info("📰 Step 3: Sentiment Analysis...")
+                        logger.debug("📰 Step 3: Sentiment Analysis...")
                         base_signal = ms_signal
                         base_confidence = ms_result["confidence"]
                         
@@ -252,17 +318,17 @@ class OrchestratorAgent:
                                 symbol=symbol
                             )
                             agent_results["sentiment"] = sentiment_result
-                            logger.info(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
+                            logger.debug(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")
                         else:
-                            logger.info(f"   → Skipped Sentiment (signal: {base_signal})")
+                            logger.debug(f"   → Skipped Sentiment (signal: {base_signal})")
             
             # === STEP 4: Calculate Consensus ===
-            logger.info("⚖️ Step 4: Calculating Consensus...")
+            logger.debug("⚖️ Step 4: Calculating Consensus...")
             consensus = self._calculate_consensus(agent_results, market_data)
             
             # === STEP 5: Risk Management (if consensus approved) ===
             if "risk_management" in self.agents and consensus["approved"] and consensus["final_signal"] in ["BUY", "SELL"]:
-                logger.info("💼 Step 5: Risk Management Calculation...")
+                logger.debug("💼 Step 5: Risk Management Calculation...")
                 
                 # Check if v5 regression results are available
                 ml_res = agent_results.get("ml_prediction")
@@ -273,9 +339,9 @@ class OrchestratorAgent:
                     predicted_mfe = ml_res["predicted_mfe"]
                     predicted_mae = ml_res["predicted_mae"]
                     
-                    sl_dist = predicted_mae / 100.0
+                    sl_dist = (predicted_mae * 2.0) / 100.0
                     tp_dist = predicted_mfe / 100.0
-                    sl_pips = predicted_mae / 10.0
+                    sl_pips = (predicted_mae * 2.0) / 10.0
                     
                     entry_price = float(market_data["current_bar"]["close"])
                     if consensus["final_signal"] == "BUY":
@@ -334,19 +400,27 @@ class OrchestratorAgent:
                         
                         agent_results["risk_management"] = {
                             "approved": True,
+                            "signal": consensus["final_signal"],
+                            "confidence": consensus["final_confidence"],
                             "lot_size": round(lot_size, 2),
                             "sl_price": round(sl_price, 2),
                             "tp_price": round(tp_price, 2),
                             "rr_ratio": round(expected_rr, 2),
+                            "reasoning": (
+                                f"v5 dynamic approval: {consensus['final_signal']} @ {consensus['final_confidence']:.1%} confidence. "
+                                f"ML regression_v5 predicted MAE={predicted_mae:.1f} / MFE={predicted_mfe:.1f} pips. "
+                                f"Lot {round(lot_size, 2)} (base {risk_result['lot_size']:.2f} × {mult}x multiplier from R:R {expected_rr:.2f}). "
+                                f"Risk {actual_risk_pct:.2f}% of balance. SL {round(sl_price, 2)} / TP {round(tp_price, 2)}."
+                            ),
                             "note": f"v5 dynamic parameters: Expected R:R={expected_rr:.2f} (mult: {mult}x)",
                         }
                         
-                        logger.info(f"   → v5 Approved: Lot {lot_size:.2f} (mult: {mult}x) | SL {sl_price:.2f} | TP {tp_price:.2f}")
+                        logger.debug(f"   → v5 Approved: Lot {lot_size:.2f} (mult: {mult}x) | SL {sl_price:.2f} | TP {tp_price:.2f}")
                     else:
                         consensus["approved"] = False
                         consensus["risk_approved"] = False
                         consensus["final_signal"] = "HOLD"
-                        logger.info(f"   → Rejected by risk management (v5)")
+                        logger.debug(f"   → Rejected by risk management (v5)")
                 else:
                     # Standard v4 risk management behavior
                     risk_result = self.agents["risk_management"].analyze(
@@ -375,12 +449,12 @@ class OrchestratorAgent:
                             "tp_distance_pips": risk_result["tp_distance_pips"],
                             "rr_ratio": risk_result["rr_ratio"]
                         }
-                        logger.info(f"   → Approved: Lot {risk_result['lot_size']:.2f} | SL {risk_result['sl_price']:.2f} | TP {risk_result['tp_price']:.2f}")
+                        logger.debug(f"   → Approved: Lot {risk_result['lot_size']:.2f} | SL {risk_result['sl_price']:.2f} | TP {risk_result['tp_price']:.2f}")
                     else:
                         consensus["approved"] = False
                         consensus["risk_approved"] = False
                         consensus["final_signal"] = "HOLD"
-                        logger.info(f"   → Rejected by risk management")
+                        logger.debug(f"   → Rejected by risk management")
             
             # === Build Final Response ===
             execution_time = (datetime.now() - start_time).total_seconds()
@@ -571,6 +645,13 @@ class OrchestratorAgent:
                 "5. Risk Management (if approved)"
             ]
         }
+
+    def reset_state(self) -> None:
+        """Reset state machine for all sub-agents and clear the warmup cache."""
+        if "market_structure" in self.agents:
+            self.agents["market_structure"].reset_state()
+        self._latest_warmup_results = None
+        logger.info("[RESET] OrchestratorAgent state and warmup cache reset -> IDLE")
 
 
 # ========== STANDALONE TESTING ==========

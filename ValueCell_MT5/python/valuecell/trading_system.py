@@ -12,6 +12,15 @@ It coordinates all components:
 Usage:
     python -m valuecell.trading_system --mode paper
     python -m valuecell.trading_system --mode live
+
+Sprint 4 (2026-07-10):
+- Tier 4 #16: Decision audit log. Every orchestrator decision is written to
+  ``logs/decisions_<symbol>_<timeframe>.db`` (SQLite); closed positions
+  have realized PnL attached. Best-effort writer — failure disables
+  logging silently without affecting the trading cycle.
+- Tier 4 #17: Source attribution piggy-backed on the audit log. Each
+  headline in the news feed carries a ``source`` tag; the DecisionLogger
+  exposes ``get_source_stats()`` for per-source PnL/win-rate aggregation.
 """
 
 import time
@@ -26,6 +35,9 @@ from valuecell.agents.orchestrator_agent import OrchestratorAgent
 from valuecell.agents.state_machine_agent import StateMachineAgent
 from valuecell.execution.execution_agent import ExecutionAgent
 from valuecell.adapters.mt5.mt5_adapter import MT5Adapter
+from valuecell.adapters.news.news_feed import NewsFeed
+from valuecell.adapters.calendar.economic_calendar import get_upcoming_events_naive
+from valuecell.adapters.db.decision_log import DecisionLogger
 from valuecell.safety.circuit_breaker import CircuitBreaker
 from valuecell.safety.notifier import Notifier
 
@@ -50,58 +62,98 @@ class TradingSystem:
         symbol: str = "XAUUSD",
         timeframe: str = "M15",
         mode: str = "paper",
-        check_interval: int = 5
+        check_interval: int = 5,
+        enable_news_feed: bool = True,
+        news_feed_ttl_minutes: int = 10,
+        news_feed_query: str = "gold XAUUSD market news today safe haven dollar fed",
+        sentiment_shadow_mode: bool = True,
+        decision_log_enabled: bool = True,
+        decision_log_path: Optional[str] = None,
     ):
         """
         Initialize Trading System.
-        
+
         Args:
             symbol: Trading symbol
             timeframe: Timeframe for analysis (M15, H1, etc.)
             mode: "paper" or "live" trading
             check_interval: Check interval in seconds
+            enable_news_feed: Wire NewsAgent's web_search into market_data so the
+                SentimentAgent actually sees headlines. Sprint 1 default: ON.
+            news_feed_ttl_minutes: How long to cache fetched news. Default 10
+                minutes — keeps the polling loop from hammering Perplexity/Gemini.
+            news_feed_query: Search query passed to the underlying provider.
+                Default tuned for XAUUSD; override per-symbol as needed.
+            sentiment_shadow_mode: When True (default for Sprint 1), the
+                SentimentAgent records what it WOULD do but does not veto or
+                adjust the upstream signal. Set False to enable real
+                sentiment-driven filtering in production.
+            decision_log_enabled: When True (default), every orchestrator
+                decision is logged to a SQLite DB; closed positions have
+                their realized PnL attached. Sprint 4 #16. Set False to
+                disable (e.g. for benchmark runs that want zero side-effects).
+            decision_log_path: Override the SQLite DB path. Default
+                ``logs/decisions_<symbol>_<timeframe>.db`` next to the
+                trading-state JSON.
         """
         self.name = "TradingSystem"
-        self.version = "1.0.0"
+        self.version = "1.2.0-sprint4"
         self.symbol = symbol
         self.timeframe = timeframe
         self.mode = mode
         self.check_interval = check_interval
         self.running = False
-        
+        self.enable_news_feed = enable_news_feed
+        self.sentiment_shadow_mode = sentiment_shadow_mode
+
         # Convert timeframe to MT5 constant
         self.mt5_timeframe = self._get_mt5_timeframe(timeframe)
-        
+
         # Initialize components
         logger.info(f"🚀 Initializing {self.name} v{self.version}")
         logger.info(f"   Symbol: {symbol}")
         logger.info(f"   Timeframe: {timeframe}")
         logger.info(f"   Mode: {mode.upper()}")
         logger.info(f"   Check interval: {check_interval}s")
-        
+        logger.info(f"   News feed: {'ON' if enable_news_feed else 'OFF'} (ttl={news_feed_ttl_minutes}m)")
+        logger.info(f"   Sentiment shadow mode: {'ON' if sentiment_shadow_mode else 'OFF'}")
+
         # Initialize MT5 adapter
         self.mt5_adapter = MT5Adapter()
         if not self.mt5_adapter.initialize():
             raise RuntimeError("Failed to initialize MT5 adapter")
-        
+
         # Initialize State Machine
         self.state_machine = StateMachineAgent(
             state_file=f"trading_state_{symbol}_{timeframe}.json"
         )
-        
-        # Initialize Orchestrator
+
+        # Initialize News Feed (lazy — if import fails we fall back to empty
+        # headlines and the SentimentAgent still does its thing on events only)
+        self.news_feed: Optional[NewsFeed] = None
+        if enable_news_feed:
+            try:
+                self.news_feed = NewsFeed(
+                    query=news_feed_query,
+                    ttl_minutes=news_feed_ttl_minutes,
+                )
+            except Exception as e:
+                logger.warning(f"NewsFeed init failed, continuing without news: {e}")
+
+        # Initialize Orchestrator (Sprint 1: pass shadow_mode to SentimentAgent)
         self.orchestrator = OrchestratorAgent(
             consensus_threshold=0.60,
             market_structure={"swing_length": 5, "timeframe": timeframe},
-            risk_management={"account_balance": 10000.0}  # TODO: Get from MT5
+            risk_management={"account_balance": 10000.0},  # TODO: Get from MT5
+            sentiment={"shadow_mode": sentiment_shadow_mode},
         )
-        
+
         # Initialize Execution Agent
         self.execution = ExecutionAgent(
             symbol=symbol,
             enable_paper_trading=(mode == "paper")
         )
-        
+
         # Initialize Circuit Breaker
         self.circuit_breaker = CircuitBreaker(
             max_consecutive_losses=3,
@@ -111,14 +163,29 @@ class TradingSystem:
             cooldown_minutes=60,
             account_balance=10000.0  # TODO: Get from MT5
         )
-        
+
         # Initialize Notifier
         self.notifier = Notifier(telegram_enabled=True)
-        
+
+        # Initialize Decision Audit Log (Sprint 4 #16)
+        # ponytail: best-effort writer. If it fails to open, sets
+        # enabled=False internally and the trading cycle proceeds
+        # unchanged. No try/except needed at the call site.
+        log_path = decision_log_path or f"logs/decisions_{symbol}_{timeframe}.db"
+        self.decision_log = DecisionLogger(
+            db_path=log_path,
+            enabled=decision_log_enabled,
+        )
+
+        # ticket -> decision_id map so we can attach outcome PnL on close
+        # (Sprint 4 #16). In-memory only — a process restart will leave
+        # earlier tickets unattributed, which is acceptable for measurement.
+        self._decision_by_ticket: Dict[int, int] = {}
+
         # State tracking
         self.last_bar_time = None
         self.current_position_ticket = None
-        
+
         logger.info("✅ All components initialized successfully")
     
     def _get_mt5_timeframe(self, timeframe: str) -> int:
@@ -249,11 +316,32 @@ class TradingSystem:
                 symbol=self.symbol,
                 timeframe=self.timeframe
             )
-            
+
             logger.info(
                 f"📊 Orchestrator result: {result['final_signal']} | "
                 f"Confidence: {result['final_confidence']:.3f} | "
                 f"Consensus: {result['consensus_level']}"
+            )
+
+            # === Sprint 4 #16: log this decision ===
+            # Pull market_structure as the "upstream" (entry-point) signal,
+            # fall back to final_signal if unavailable (e.g. error path).
+            # Attach market_data so DecisionLogger can mine news + sources.
+            ms_result = (result.get("agent_results") or {}).get("market_structure") or {}
+            upstream_signal = ms_result.get("signal", result.get("final_signal", "HOLD"))
+            upstream_confidence = ms_result.get(
+                "confidence", result.get("final_confidence", 0.0)
+            )
+            audit_result = dict(result)
+            audit_result["market_data"] = market_data  # so DecisionLogger sees news+ts
+            decision_id = self.decision_log.log_decision(
+                symbol=self.symbol,
+                mode=self.mode,
+                timeframe=self.timeframe,
+                bar_time=self.last_bar_time,
+                upstream_signal=upstream_signal,
+                upstream_confidence=upstream_confidence,
+                orchestrator_result=audit_result,
             )
             
             # Check if approved
@@ -279,7 +367,8 @@ class TradingSystem:
                 "entry_price": market_data['current_bar']['close'],
                 "sl_price": result['sl_tp']['sl_price'],
                 "tp_price": result['sl_tp']['tp_price'],
-                "lot_size": result['position_sizing']['lot_size']
+                "lot_size": result['position_sizing']['lot_size'],
+                "decision_id": decision_id,  # Sprint 4 #16: link to audit row
             }
             
             self.state_machine.signal_approved(trade_plan)
@@ -300,19 +389,19 @@ class TradingSystem:
             m15_rates = mt5.copy_rates_from_pos(self.symbol, self.mt5_timeframe, 0, 150)
             if m15_rates is None or len(m15_rates) == 0:
                 return None
-            
+
             # Convert to DataFrame
             import pandas as pd
             df = pd.DataFrame(m15_rates)
             df['time'] = pd.to_datetime(df['time'], unit='s')
-            
+
             # Rename tick_volume to volume (required by agents)
             if 'tick_volume' in df.columns:
                 df['volume'] = df['tick_volume']
-            
+
             # Calculate EMA200
             df['ema200'] = df['close'].ewm(span=200, adjust=False).mean()
-            
+
             # Get current bar
             current_bar = {
                 "time": df.iloc[-1]['time'],
@@ -322,11 +411,11 @@ class TradingSystem:
                 "close": float(df.iloc[-1]['close']),
                 "volume": int(df.iloc[-1]['tick_volume'])
             }
-            
+
             # Calculate ATR (simple)
             df['high_low'] = df['high'] - df['low']
             atr = df['high_low'].tail(14).mean()
-            
+
             # Get session
             hour = datetime.now().hour
             if 7 <= hour < 16:
@@ -337,7 +426,27 @@ class TradingSystem:
                 session = "Asia"
             else:
                 session = "Sydney"
-            
+
+            # === Sprint 1: News feed ===
+            # NewsFeed is cached so this is a no-op on most calls; first call
+            # per TTL window hits the upstream provider. Never raises into the
+            # trading cycle — empty list is fine for SentimentAgent.
+            news_headlines: list = []
+            if self.news_feed is not None:
+                try:
+                    news_headlines = self.news_feed.fetch_sync()
+                except Exception as e:
+                    logger.warning(f"NewsFeed.fetch_sync failed: {e}")
+                    news_headlines = []
+
+            # === Sprint 2: Economic calendar ===
+            # stdlib-only; in-process cache (1h TTL); FOMC + NFP/CPI/GDP/JC.
+            try:
+                upcoming_events = get_upcoming_events_naive(hours_ahead=24)
+            except Exception as e:
+                logger.warning(f"Economic calendar fetch failed: {e}")
+                upcoming_events = []
+
             return {
                 "df": df,
                 "current_bar": current_bar,
@@ -345,14 +454,14 @@ class TradingSystem:
                 "m15_history": df,
                 "atr": atr,
                 "session": session,
-                "news_headlines": [],  # TODO: Integrate news feed
-                "upcoming_events": []   # TODO: Integrate economic calendar
+                "news_headlines": news_headlines,
+                "upcoming_events": upcoming_events,
             }
-            
+
         except Exception as e:
             logger.error(f"❌ Error fetching market data: {e}")
             return None
-    
+
     def _execute_trade(self, trade_plan: Dict[str, Any]):
         """Execute trade via Execution Agent"""
         try:
@@ -380,7 +489,13 @@ class TradingSystem:
             
             # Order success!
             logger.info(f"✅ Order executed! Ticket: {result['ticket']}")
-            
+
+            # Sprint 4 #16: link audit row to the live ticket so we can
+            # attach realized PnL when the position closes.
+            decision_id = trade_plan.get("decision_id")
+            if decision_id is not None:
+                self._decision_by_ticket[result['ticket']] = int(decision_id)
+
             # Transition to TRADING state
             self.state_machine.position_opened({
                 "ticket": result['ticket'],
@@ -420,18 +535,38 @@ class TradingSystem:
             if not position:
                 # Position closed (TP/SL hit)
                 logger.info(f"🔚 Position {self.current_position_ticket} closed")
-                
-                # Get close details from MT5 history
-                # TODO: Get actual exit price and PnL
+
+                # Sprint 7 #16 close-out: fetch real realized PnL from
+                # MT5 history deals. If MT5 doesn't know about this ticket
+                # (paper trading, pre-init, or older than 14d window)
+                # we silently fall back to 0.0 — the audit row still
+                # lands, just without a number. exit_price is still a TODO
+                # since the audit log only needs realized PnL.
+                realized = self.execution.get_closed_position_pnl(
+                    self.current_position_ticket
+                )
+                pnl = float(realized) if realized is not None else 0.0
                 exit_price = 0.0
-                pnl = 0.0
-                close_reason = "TP/SL hit"
-                
+                close_reason = "TP/SL hit" if realized is not None else "closed (PnL unknown)"
+
                 # Get signal from state machine
                 state_data = self.state_machine.get_current_state()
                 signal = state_data.get('context', {}).get('signal', 'UNKNOWN')
                 entry_price = state_data.get('context', {}).get('entry_price', 0.0)
-                
+
+                # Sprint 4 #16: attach realized PnL to the audit row, then
+                # forget the ticket. pnl=0.0 is acceptable for now — the
+                # audit row is still useful (tells us the position closed).
+                decision_id = self._decision_by_ticket.pop(
+                    self.current_position_ticket, None
+                )
+                if decision_id is not None:
+                    self.decision_log.record_outcome(
+                        decision_id=decision_id,
+                        pnl=pnl,
+                        ticket=self.current_position_ticket,
+                    )
+
                 # Record trade result in circuit breaker
                 self.circuit_breaker.record_trade_result(pnl)
                 

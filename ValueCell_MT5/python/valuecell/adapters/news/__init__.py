@@ -1,0 +1,1 @@
+"""News feed adapter - bridges news_agent.web_search to SentimentAgent."""

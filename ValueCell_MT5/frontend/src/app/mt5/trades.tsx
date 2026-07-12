@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 import { CalendarDays, X, Loader2 } from "lucide-react";
 import {
   createChart,
@@ -2316,25 +2317,34 @@ export default function TradesPage() {
 
         {/* Progress popup for Load Full History */}
         {loadProgress.visible && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
-              <div className="text-center mb-4">
-                <div className="text-purple-300 font-semibold text-sm mb-2">
-                  📅 Loading Full History
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+            <div 
+              className="bg-slate-900/90 border border-purple-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(168,85,247,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <div className="flex flex-col items-center justify-center text-center mb-5">
+                <div className="relative flex items-center justify-center w-12 h-12 mb-3 bg-purple-500/10 rounded-full border border-purple-500/25 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
+                  <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">
+                <div className="text-purple-300 font-semibold text-xs tracking-wider uppercase mb-1">
+                  Loading Full History
+                </div>
+                <div className="text-3xl font-mono font-bold text-white mb-1 shadow-sm">
                   {loadProgress.percent}%
                 </div>
-                <div className="text-xs text-gray-400">{loadProgress.step}</div>
-                <div className="text-[10px] text-gray-500 mt-1">
+                <div className="text-[10px] font-medium text-slate-400 max-w-[240px] truncate mb-0.5">{loadProgress.step}</div>
+                <div className="text-[9px] font-mono text-slate-500">
                   {loadProgress.total.toLocaleString()} total rows
                 </div>
               </div>
-              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(168,85,247,0.5)] relative overflow-hidden"
                   style={{ width: `${loadProgress.percent}%` }}
-                />
+                >
+                  {/* cylindrical light reflection gloss overlay */}
+                  <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.15),transparent)]" />
+                </div>
               </div>
             </div>
           </div>
@@ -2342,24 +2352,33 @@ export default function TradesPage() {
 
         {/* Progress popup for Drawing Lines */}
         {drawLineProgress.visible && (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-            <div className="bg-gray-900 border border-cyan-500/30 rounded-xl p-6 shadow-2xl w-96">
-              <div className="text-center mb-4">
-                <div className="text-cyan-300 font-semibold text-sm mb-2">
-                  ✍️ Drawing Structure Lines
+          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+            <div 
+              className="bg-slate-900/90 border border-cyan-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(6,182,212,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+              style={{ transformStyle: "preserve-3d" }}
+            >
+              <div className="flex flex-col items-center justify-center text-center mb-5">
+                <div className="relative flex items-center justify-center w-12 h-12 mb-3 bg-cyan-500/10 rounded-full border border-cyan-500/25 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                  <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
                 </div>
-                <div className="text-3xl font-bold text-white mb-1">
+                <div className="text-cyan-300 font-semibold text-xs tracking-wider uppercase mb-1">
+                  Drawing Structure Lines
+                </div>
+                <div className="text-3xl font-mono font-bold text-white mb-1 shadow-sm">
                   {drawLineProgress.percent}%
                 </div>
-                <div className="text-xs text-gray-400">
+                <div className="text-[10px] font-medium text-slate-400 max-w-[240px] truncate">
                   Drawing line {drawLineProgress.current} of {drawLineProgress.total}
                 </div>
               </div>
-              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(6,182,212,0.5)] relative overflow-hidden"
                   style={{ width: `${drawLineProgress.percent}%` }}
-                />
+                >
+                  {/* cylindrical light reflection gloss overlay */}
+                  <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.15),transparent)]" />
+                </div>
               </div>
             </div>
           </div>

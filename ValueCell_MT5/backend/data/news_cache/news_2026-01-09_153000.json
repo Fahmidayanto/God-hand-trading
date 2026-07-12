@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as safe haven demand intensifies amid rising recession fears and dovish Fed speculation",
+            "timestamp": "2026-01-09T12:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after treasury yields drop on softer-than-expected inflation data",
+            "timestamp": "2026-01-09T13:45:00"
+        },
+        {
+            "headline": "Market volatility spikes as hawkish comments from ECB officials clash with dovish US economic outlook",
+            "timestamp": "2026-01-09T14:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Consumer Sentiment Index",
+            "impact": "medium",
+            "time": "2026-01-09T16:00:00"
+        },
+        {
+            "event": "FOMC Member Speech",
+            "impact": "high",
+            "time": "2026-01-09T19:30:00"
+        }
+    ]
+}

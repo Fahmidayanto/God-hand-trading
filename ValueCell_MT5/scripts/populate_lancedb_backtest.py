@@ -81,8 +81,11 @@ def main():
     db = LanceDBManager(str(PYTHON_DIR / "valuecell" / "data" / "lancedb"))
     
     # Clear existing structures for a clean import
-    logger.info("Clearing existing table 'historical_structures'...")
+    logger.info("Clearing all existing LanceDB collections...")
     db.clear_collection("historical_structures")
+    db.clear_collection("market_conditions")
+    db.clear_collection("session_patterns")
+    db.clear_collection("trade_outcomes")
     
     # Find files
     structure_files = sorted(glob.glob(str(BACKTEST_DIR / "LLHHBOSData_XAUUSD_*.csv")))
@@ -134,6 +137,7 @@ def main():
 
         # Convert structures to LanceDB format
         patterns_to_add = []
+        seen_events = set()
         
         # Parse structures and try to join with trades/market data
         for _, row in df_struct.iterrows():
@@ -209,6 +213,10 @@ def main():
             session = "London"
             
             if trade_match is not None:
+                if str(trade_match.get("Status", "EXECUTED")).upper() == "REJECTED":
+                    trade_match = None
+            
+            if trade_match is not None:
                 net_profit = float(trade_match.get("Net_Profit", 0))
                 outcome = "WIN" if net_profit > 0 else "LOSS"
                 
@@ -250,6 +258,12 @@ def main():
             except:
                 dt_iso = datetime.now().isoformat()
                 
+            # Prevent duplicate patterns from same event + time
+            event_key = (dt_iso, event_type, direction, tf)
+            if event_key in seen_events:
+                continue
+            seen_events.add(event_key)
+                 
             patterns_to_add.append({
                 "timestamp": dt_iso,
                 "symbol": "XAUUSD",

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as safe haven demand intensifies amid rising recession fears and dovish Fed speculation",
+            "timestamp": "2026-01-07T14:30:00"
+        },
+        {
+            "headline": "US Dollar weakens after Treasury yields drop on softer-than-expected inflation data",
+            "timestamp": "2026-01-07T15:45:00"
+        },
+        {
+            "headline": "XAUUSD breaks key resistance as hawkish central bank rhetoric fades globally",
+            "timestamp": "2026-01-07T16:10:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC Meeting Minutes",
+            "impact": "high",
+            "time": "2026-01-07T19:00:00"
+        },
+        {
+            "event": "Crude Oil Inventories",
+            "impact": "medium",
+            "time": "2026-01-07T20:30:00"
+        }
+    ]
+}

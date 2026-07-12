@@ -69,6 +69,17 @@ export default function Database() {
   const [diffLoading, setDiffLoading] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
 
+  // LanceDB collection info modal
+  const [selectedCollectionInfo, setSelectedCollectionInfo] = useState<string | null>(null);
+
+  // LanceDB preview (data table) state
+  const [selectedLanceCollection, setSelectedLanceCollection] = useState<string>("historical_structures");
+  const [selectedLanceLimit, setSelectedLanceLimit] = useState<number>(30);
+  const [lancePreviewCache, setLancePreviewCache] = useState<Record<string, TableData>>({});
+  const [lanceLoading, setLanceLoading] = useState(false);
+  const [lanceError, setLanceError] = useState<string | null>(null);
+  const [lanceDropdownOpen, setLanceDropdownOpen] = useState(false);
+
   const TABLES_METADATA = [
     { value: "llhhbosdata_xauusd", label: "llhhbosdata_xauusd (Swing Events)" },
     { value: "backtest_results_xauusd", label: "backtest_results_xauusd (Trades)" },
@@ -80,6 +91,43 @@ export default function Database() {
   ];
 
   const currentLabel = TABLES_METADATA.find(t => t.value === selectedTable)?.label || selectedTable;
+
+  const LANCE_COLLECTIONS_METADATA = [
+    { value: "historical_structures", label: "historical_structures (Market Structure Patterns)" },
+    { value: "market_conditions", label: "market_conditions (OHLCV + Indicators)" },
+    { value: "session_patterns", label: "session_patterns (Session Stats)" },
+    { value: "trade_outcomes", label: "trade_outcomes (Trade History for ML)" },
+  ];
+  const currentLanceLabel = LANCE_COLLECTIONS_METADATA.find(c => c.value === selectedLanceCollection)?.label || selectedLanceCollection;
+
+  // Deskripsi tiap koleksi LanceDB (purpose, vector dim, key fields, use case).
+  // Sumber: ValueCell_MT5/python/valuecell/knowledge/lance_db.py
+  const LANCE_COLLECTIONS_INFO: Record<string, { purpose: string; vectorDim: number; keyFields: string[]; useCase: string }> = {
+    historical_structures: {
+      purpose: "Market structure patterns (CHoCH, BoS, HH, LL) untuk similarity search pola historis.",
+      vectorDim: 16,
+      keyFields: ["event_type", "direction", "price", "ema200", "ema_distance", "session", "outcome", "profit_pips"],
+      useCase: "Pattern matcher cari pola struktur mirip kondisi saat ini untuk confidence score.",
+    },
+    market_conditions: {
+      purpose: "Konteks kondisi pasar OHLCV + indikator (EMA200, ATR) per candle.",
+      vectorDim: 8,
+      keyFields: ["open", "high", "low", "close", "volume", "ema200", "atr", "session"],
+      useCase: "Referensi kondisi pasar saat pattern match sedang berjalan.",
+    },
+    session_patterns: {
+      purpose: "Statistik perilaku per sesi trading (London, NewYork, Asia, Sydney).",
+      vectorDim: 4,
+      keyFields: ["session", "win_rate", "avg_profit_pips", "total_trades", "best_event_type"],
+      useCase: "Filter / bobot trade berdasarkan performa historis sesi tersebut.",
+    },
+    trade_outcomes: {
+      purpose: "Trade history + outcome (WIN/LOSS/PENDING) untuk training ML model.",
+      vectorDim: 12,
+      keyFields: ["ticket", "type", "entry_price", "exit_price", "profit_pips", "outcome", "structure_event", "consensus_score"],
+      useCase: "Dataset training ML prediction (v3/v4) dan analisis post-mortem trade.",
+    },
+  };
 
   const API_BASE = "http://localhost:8000/api/v1/database";
 
@@ -152,6 +200,33 @@ export default function Database() {
     }
   };
 
+  const fetchLancePreview = async (collection: string, limit: number, silent = false) => {
+    const cacheKey = `${collection}:${limit}`;
+    const hasCache = !!lancePreviewCache[cacheKey];
+    if (!hasCache && !silent) {
+      setLanceLoading(true);
+      setLanceError(null);
+    }
+    try {
+      const res = await fetch(`${API_BASE}/lancedb/preview?collection=${collection}&limit=${limit}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+        throw new Error(errBody.detail || `Failed to load ${collection}`);
+      }
+      const data = await res.json();
+      const mapped: TableData = { table: data.collection, columns: data.columns, rows: data.rows };
+      setLancePreviewCache(prev => ({ ...prev, [cacheKey]: mapped }));
+    } catch (err: any) {
+      if (!hasCache) {
+        setLanceError(err.message || "Failed to load LanceDB collection");
+      }
+    } finally {
+      if (!hasCache) {
+        setLanceLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     fetchStats();
   }, []);
@@ -161,6 +236,8 @@ export default function Database() {
       fetchTablePreview(selectedTable);
     } else if (activeTab === "sync") {
       fetchSyncStatus();
+    } else if (activeTab === "lance" && stats?.lancedb_active) {
+      fetchLancePreview(selectedLanceCollection, selectedLanceLimit);
     }
   }, [selectedTable, activeTab]);
 
@@ -246,12 +323,18 @@ export default function Database() {
     fetchStats();
     if (activeTab === "neon") {
       fetchTablePreview(selectedTable, false); // force loading spinner
+    } else if (activeTab === "lance") {
+      // bust lance cache then refetch
+      setLancePreviewCache({});
+      fetchLancePreview(selectedLanceCollection, selectedLanceLimit, false);
     } else if (activeTab === "sync") {
       fetchSyncStatus();
     }
   };
 
   const previewData = previewCache[selectedTable] || null;
+  const lancePreviewKey = `${selectedLanceCollection}:${selectedLanceLimit}`;
+  const lancePreviewData = lancePreviewCache[lancePreviewKey] || null;
 
   const filteredSyncData = syncData.filter(item => {
     const matchesSearch = item.filename.toLowerCase().includes(syncSearch.toLowerCase()) || 
@@ -483,35 +566,183 @@ export default function Database() {
 
       {/* LANCE DB CONTENT */}
       {activeTab === "lance" && (
-        <div className="glass-card p-6 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md">
-          <h3 className="text-lg font-semibold mb-4">LanceDB Vector Collections Summary</h3>
-          {stats?.lancedb_active ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400">
-                    <th className="py-2">Collection Name</th>
-                    <th className="py-2">Total Vector Records</th>
-                    <th className="py-2">Type</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                  {stats.lancedb_collections.map((col) => (
-                    <tr key={col.name}>
-                      <td className="py-3 font-semibold text-blue-400">{col.name}</td>
-                      <td className="py-3 font-mono">{col.count} vectors</td>
-                      <td className="py-3 text-slate-500">In-Memory / Vector</td>
+        <div>
+          {/* Collections Summary (compact, with ? info) */}
+          <div className="glass-card p-6 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md mb-6">
+            <h3 className="text-lg font-semibold mb-4">LanceDB Vector Collections Summary</h3>
+            {stats?.lancedb_active ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800 text-slate-400">
+                      <th className="py-2">Collection Name</th>
+                      <th className="py-2">Total Vector Records</th>
+                      <th className="py-2">Type</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-6 bg-slate-950/50 rounded-lg border border-slate-800 text-center">
-              <p className="text-slate-400 font-medium">⚠️ LanceDB tidak terdeteksi atau belum aktif.</p>
-              <p className="text-xs text-slate-500 mt-1">
-                (Track 1 saat ini dinonaktifkan di backend, sehingga database vektor tidak diinisialisasi).
-              </p>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {stats.lancedb_collections.map((col) => (
+                      <tr key={col.name}>
+                        <td className="py-3 font-semibold text-blue-400">
+                          <span className="inline-flex items-center gap-2">
+                            {col.name}
+                            <button
+                              onClick={() => setSelectedCollectionInfo(col.name)}
+                              className="text-slate-500 hover:text-purple-300 transition-all text-[11px] font-bold w-5 h-5 rounded-full border border-slate-700 hover:border-purple-500/60 hover:bg-purple-500/10 flex items-center justify-center leading-none"
+                              title={`Info about ${col.name}`}
+                            >
+                              ?
+                            </button>
+                          </span>
+                        </td>
+                        <td className="py-3 font-mono">{col.count} vectors</td>
+                        <td className="py-3 text-slate-500">In-Memory / Vector</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 bg-slate-950/50 rounded-lg border border-slate-800 text-center">
+                <p className="text-slate-400 font-medium">⚠️ LanceDB tidak terdeteksi atau belum aktif.</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  (Track 1 saat ini dinonaktifkan di backend, sehingga database vektor tidak diinisialisasi).
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Data Preview (collection picker + limit + table) */}
+          {stats?.lancedb_active && (
+            <div className="glass-card p-6">
+              <h3 className="text-lg font-semibold mb-4">Data Preview</h3>
+
+              {/* Collection + Limit controls */}
+              <div className="flex flex-wrap gap-3 items-center mb-5 glass-chip p-3 max-w-fit relative z-20">
+                <span className="text-sm text-slate-400 font-medium ml-1">🗂️ Collection:</span>
+                <div className="relative">
+                  <button
+                    onClick={() => setLanceDropdownOpen(!lanceDropdownOpen)}
+                    className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all cursor-pointer text-sm font-semibold hover:bg-slate-900 shadow-inner flex items-center min-w-[280px] text-left"
+                  >
+                    <span className="truncate">{currentLanceLabel}</span>
+                    <span className="absolute right-3 text-slate-500 text-[10px]">
+                      {lanceDropdownOpen ? "▲" : "▼"}
+                    </span>
+                  </button>
+
+                  {lanceDropdownOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setLanceDropdownOpen(false)} />
+                      <div className="absolute left-0 right-0 mt-2 bg-slate-950/95 border border-purple-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-slate-900/40 py-1">
+                        {LANCE_COLLECTIONS_METADATA.map((c) => {
+                          const isSelected = selectedLanceCollection === c.value;
+                          return (
+                            <button
+                              key={c.value}
+                              onClick={() => {
+                                setSelectedLanceCollection(c.value);
+                                setLanceDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-all flex items-center justify-between ${
+                                isSelected
+                                  ? "bg-purple-500/15 text-purple-300 font-bold border-l-2 border-purple-500"
+                                  : "text-slate-300 hover:bg-slate-900/70 hover:text-white"
+                              }`}
+                            >
+                              <span>{c.label}</span>
+                              {isSelected && <span className="text-xs text-purple-300 drop-shadow-[0_0_5px_rgba(139,92,246,0.6)]">●</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <span className="text-sm text-slate-400 font-medium ml-2">🔢 Limit:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={selectedLanceLimit}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setSelectedLanceLimit(Math.min(500, Math.max(1, v)));
+                  }}
+                  className="bg-slate-950/80 border border-slate-700/40 text-slate-200 px-3 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all text-sm font-semibold hover:bg-slate-900 shadow-inner w-[100px]"
+                />
+                <button
+                  onClick={() => {
+                    setLancePreviewCache({});
+                    fetchLancePreview(selectedLanceCollection, selectedLanceLimit, false);
+                  }}
+                  className="px-3 py-1.5 bg-purple-600/25 text-purple-200 border border-purple-500/50 hover:bg-purple-600/40 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 neon-glow-purple"
+                  title="Refresh preview"
+                >
+                  🔄 Apply
+                </button>
+              </div>
+
+              {/* Data Grid — flat glass surface, no padding (table flows edge-to-edge) */}
+              <div className="bg-[var(--glass-primary)] backdrop-blur-md border border-slate-700/30 rounded-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+                {lanceLoading && (
+                  <div className="p-8 text-center text-slate-400">Loading data from LanceDB...</div>
+                )}
+                {lanceError && (
+                  <div className="p-8 text-center text-red-400 font-medium">⚠️ Error: {lanceError}</div>
+                )}
+                {!lanceLoading && !lanceError && lancePreviewData && (
+                  <div className="overflow-auto max-h-[500px] db-inspector-scroll">
+                    <table className="w-full border-collapse text-sm text-left">
+                      <thead>
+                        <tr className="glass-header">
+                          {lancePreviewData.columns.map((col) => (
+                            // Vector column is dropped server-side to keep payload small;
+                            // header renders plain column names.
+                            <th
+                              key={col}
+                              className="p-3 text-slate-400 font-semibold uppercase text-xs whitespace-nowrap"
+                            >
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/40">
+                        {lancePreviewData.rows.length === 0 ? (
+                          <tr>
+                            <td colSpan={lancePreviewData.columns.length} className="p-8 text-center text-slate-500">
+                              No rows found in this collection.
+                            </td>
+                          </tr>
+                        ) : (
+                          lancePreviewData.rows.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-slate-800/20">
+                              {lancePreviewData.columns.map((col) => {
+                                const val = row[col];
+                                let display: string;
+                                if (val === null || val === undefined) display = "NULL";
+                                else if (typeof val === "boolean") display = String(val);
+                                else if (Array.isArray(val)) display = `[${val.map(v => typeof v === "number" ? v.toFixed(4) : String(v)).join(", ")}]`;
+                                else display = String(val);
+                                return (
+                                  <td
+                                    key={col}
+                                    className="p-3 font-mono text-xs text-slate-300 align-top"
+                                  >
+                                    {display}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -772,6 +1003,94 @@ export default function Database() {
             <div className="flex justify-end px-6 py-4 border-t border-slate-800 bg-slate-950/30 gap-3">
               <button
                 onClick={() => setSelectedDiffFile(null)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LANCEDB COLLECTION INFO MODAL */}
+      {selectedCollectionInfo && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in-50 duration-200">
+          <div className="fixed inset-0" onClick={() => setSelectedCollectionInfo(null)} />
+          <div className="relative bg-slate-900 border border-purple-500/30 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-2xl z-10 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-950/40">
+              <div>
+                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                  <span className="text-purple-400">⛁</span>
+                  <span className="font-mono text-blue-400">{selectedCollectionInfo}</span>
+                  {LANCE_COLLECTIONS_INFO[selectedCollectionInfo] && (
+                    <span className="text-xs bg-purple-500/10 text-purple-300 border border-purple-500/20 px-2 py-0.5 rounded font-semibold uppercase">
+                      {LANCE_COLLECTIONS_INFO[selectedCollectionInfo].vectorDim}-dim vector
+                    </span>
+                  )}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  LanceDB vector collection description
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedCollectionInfo(null)}
+                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-slate-800/40 hover:bg-slate-800 rounded-lg h-8 w-8 flex items-center justify-center"
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 p-6 overflow-y-auto min-h-[200px] flex flex-col gap-5">
+              {(() => {
+                const info = LANCE_COLLECTIONS_INFO[selectedCollectionInfo];
+                if (!info) {
+                  return (
+                    <div className="text-slate-400 text-sm">
+                      Tidak ada deskripsi untuk koleksi ini. Cek
+                      <code className="mx-1 px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-purple-300 font-mono text-xs">
+                        python/valuecell/knowledge/lance_db.py
+                      </code>
+                      untuk schema lengkap.
+                    </div>
+                  );
+                }
+                return (
+                  <>
+                    <section>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Purpose</div>
+                      <p className="text-sm text-slate-200 leading-relaxed">{info.purpose}</p>
+                    </section>
+                    <section>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Use Case</div>
+                      <p className="text-sm text-slate-300 leading-relaxed">{info.useCase}</p>
+                    </section>
+                    <section>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Key Fields</div>
+                      <div className="flex flex-wrap gap-2">
+                        {info.keyFields.map((f) => (
+                          <span
+                            key={f}
+                            className="inline-block px-2.5 py-1 text-[11px] font-mono font-semibold text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-md"
+                          >
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                    <section className="bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-500 font-mono">
+                      <span className="text-slate-400">source:</span> python/valuecell/knowledge/lance_db.py
+                    </section>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end px-6 py-4 border-t border-slate-800 bg-slate-950/30">
+              <button
+                onClick={() => setSelectedCollectionInfo(null)}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
               >
                 Tutup

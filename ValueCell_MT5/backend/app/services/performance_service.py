@@ -509,13 +509,28 @@ def get_monthly_pnl_from_csv(symbol: str = "XAUUSD", year: Optional[int] = None,
             # If no year specified, use all files
             files_to_process = matching_files
         
-        logger.info(f"Processing {len(files_to_process)} backtest file(s) for year={year}, month={month}")
+        if len(files_to_process) > 1:
+            try:
+                sorted_files = sorted(files_to_process, key=lambda f: f.name)
+                import re
+                def extract_date_str(p):
+                    m = re.search(r'(\d{4}-\d{2}-\d{2})', p.name)
+                    return m.group(1) if m else p.name
+                oldest_date = extract_date_str(sorted_files[0])
+                newest_date = extract_date_str(sorted_files[-1])
+                logger.info(f"[PerformanceService] Processing {len(files_to_process)} backtest files (range: {oldest_date} to {newest_date}) for year={year}, month={month}")
+            except Exception:
+                logger.info(f"[PerformanceService] Processing {len(files_to_process)} backtest files for year={year}, month={month}")
+        elif len(files_to_process) == 1:
+            logger.info(f"[PerformanceService] Processing 1 backtest file: {files_to_process[0].name} for year={year}, month={month}")
+        else:
+            logger.info(f"[PerformanceService] Processing 0 backtest files for year={year}, month={month}")
         
         # Parse CSV and group by month
         monthly_data: Dict[tuple, Dict] = {}  # (year, month_num) -> data
         
         for csv_file in files_to_process:
-            logger.info(f"Reading backtest file: {csv_file}")
+            logger.debug(f"Reading backtest file: {csv_file}")
             
             with open(csv_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)

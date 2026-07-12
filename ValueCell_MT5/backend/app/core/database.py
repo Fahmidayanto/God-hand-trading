@@ -117,13 +117,42 @@ def get_db_conn() -> Generator:
         raise RuntimeError("[DB] Connection pool is not initialized. Call init_db_pool() first.")
 
     conn = _pool.getconn()
+    is_broken = False
     try:
+        # Check if the connection has been closed or went dead while sitting idle in pool
+        connection_dead = False
+        if conn.closed != 0:
+            connection_dead = True
+        else:
+            try:
+                with conn.cursor() as test_cur:
+                    test_cur.execute("SELECT 1")
+            except Exception:
+                connection_dead = True
+
+        if connection_dead:
+            is_broken = True
+            # Discard the closed connection and request a new one
+            _pool.putconn(conn, close=True)
+            conn = _pool.getconn()
+            is_broken = False  # Reset flag for the new connection
         yield conn
     except Exception:
-        conn.rollback()
+        is_broken = True
+        try:
+            if conn.closed == 0:
+                conn.rollback()
+        except Exception:
+            pass
         raise
     finally:
-        _pool.putconn(conn)
+        try:
+            if is_broken or conn.closed != 0:
+                _pool.putconn(conn, close=True)
+            else:
+                _pool.putconn(conn)
+        except Exception as put_exc:
+            logger.warning(f"[DB] Error returning connection to pool: {put_exc}")
 
 
 def test_connection() -> bool:

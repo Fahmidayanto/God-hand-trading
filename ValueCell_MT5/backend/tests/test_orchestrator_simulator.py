@@ -101,6 +101,12 @@ def test_run_simulation_mocked(monkeypatch):
         "market_structure", "ml_prediction", "sentiment", "risk_management"}
     assert result["frames"][0]["agents"]["market_structure"]["status"] == "fired"
     assert result["frames"][0]["agents"]["risk_management"]["approved"] is True
+    # Trade execution context must reach the frame so the frontend
+    # TradesOverlayPrimitive can draw SL/TP zones. Regression guard.
+    frame = result["frames"][0]
+    assert frame["sl_tp"] == {"sl_price": 98.0, "tp_price": 105.0}
+    assert frame["position_sizing"] == {"lot_size": 0.1}
+    assert frame["event_price"] == events[0]["price"]
 
 
 def test_run_simulation_filters_trigger_types(monkeypatch):

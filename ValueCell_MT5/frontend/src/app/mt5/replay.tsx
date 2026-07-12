@@ -1546,7 +1546,7 @@ export default function ReplayTrades() {
         </h1>
 
         {/* Filter controls + Playback Controls */}
-        <div className="flex items-center gap-4 flex-wrap flex-1 justify-end ml-4">
+        <div className="flex items-center gap-2 flex-nowrap flex-1 justify-end ml-4 min-w-0 overflow-x-auto whitespace-nowrap">
           {/* If replayData is loaded, render playback controls FIRST! */}
           {replayData && (
             <>
@@ -1660,7 +1660,7 @@ export default function ReplayTrades() {
             </>
           )}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Timeframe selector (tiru 100% dari page trades) */}
             <div className="flex items-center gap-2 mr-2">
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary,#94a3b8)]">Timeframe</span>

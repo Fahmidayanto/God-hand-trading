@@ -268,6 +268,18 @@ class TablePreviewResponse(BaseModel):
     columns: List[str]
     rows: List[Dict[str, Any]]
 
+class LancePreviewResponse(BaseModel):
+    collection: str
+    columns: List[str]
+    rows: List[Dict[str, Any]]
+
+ALLOWED_LANCE_COLLECTIONS = [
+    "historical_structures",
+    "market_conditions",
+    "session_patterns",
+    "trade_outcomes",
+]
+
 class CsvSyncStatusItem(BaseModel):
     filename: str
     table_name: str
@@ -306,8 +318,9 @@ def get_database_stats():
     lancedb_collections = []
     
     try:
-        # LanceDB path relative to this file
-        base_dir = Path(__file__).parent.parent.parent.parent
+        # LanceDB path: this file lives at .../ValueCell_MT5/backend/app/api/v1/database.py
+        # Walk 5 levels up to reach the ValueCell_MT5 root, then into python/valuecell/data/lancedb.
+        base_dir = Path(__file__).parents[4]
         lancedb_path = base_dir / "python" / "valuecell" / "data" / "lancedb"
         
         if lancedb_path.exists() and (lancedb_path / "historical_structures.lance").exists():
@@ -374,6 +387,68 @@ def preview_table(
     except Exception as exc:
         logger.error(f"[DB] Error previewing table {table}: {exc}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}")
+
+
+@router.get("/lancedb/preview", response_model=LancePreviewResponse)
+def preview_lancedb_collection(
+    collection: str = Query(..., description="Name of the LanceDB collection to preview"),
+    limit: int = Query(30, ge=1, le=500, description="Max rows to return"),
+):
+    """Return up to `limit` rows from a LanceDB collection with full vector payload."""
+    if collection not in ALLOWED_LANCE_COLLECTIONS:
+        raise HTTPException(status_code=400, detail="Invalid collection name")
+
+    base_dir = Path(__file__).parents[4]
+    lancedb_path = base_dir / "python" / "valuecell" / "data" / "lancedb"
+
+    if not lancedb_path.exists():
+        raise HTTPException(status_code=503, detail="LanceDB folder not found on server")
+
+    try:
+        import lancedb
+        import pandas as pd  # noqa: F401  (lancedb returns pandas frames)
+
+        db = lancedb.connect(str(lancedb_path))
+
+        if collection not in db.table_names():
+            raise HTTPException(
+                status_code=404,
+                detail=f"Collection '{collection}' not found in LanceDB",
+            )
+
+        tbl = db.open_table(collection)
+        # NOTE: lancedb 0.33 calls LanceDataset.to_pandas() which was removed in
+        # newer pylance. Use search().limit() path which works across versions.
+        df = tbl.search().limit(limit).to_pandas()
+        # Vector payload not needed in inspector view — drop to keep payload small.
+        if "vector" in df.columns:
+            df = df.drop(columns=["vector"])
+
+        # Serialize: numpy arrays (vector), datetime, numpy scalars → JSON-safe types
+        formatted_rows: List[Dict[str, Any]] = []
+        for _, row in df.iterrows():
+            row_dict: Dict[str, Any] = {}
+            for col in df.columns:
+                val = row[col]
+                if hasattr(val, "tolist"):
+                    row_dict[col] = val.tolist()
+                elif hasattr(val, "isoformat"):
+                    row_dict[col] = val.isoformat()
+                else:
+                    # pandas may yield numpy scalars; bool/int/float pass through fine
+                    row_dict[col] = val.item() if hasattr(val, "item") else val
+            formatted_rows.append(row_dict)
+
+        return LancePreviewResponse(
+            collection=collection,
+            columns=list(df.columns),
+            rows=formatted_rows,
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[DB] Error previewing LanceDB collection {collection}: {exc}")
+        raise HTTPException(status_code=500, detail=f"LanceDB error: {str(exc)}")
 
 
 @router.get("/sync-status", response_model=List[CsvSyncStatusItem])

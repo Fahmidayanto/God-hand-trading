@@ -49,6 +49,10 @@ class LanceDBManager:
         
         logger.info(f"[DB] LanceDB connected: {self.db_path}")
         
+        # ponytail: simple dict cache for vector search results — avoid repeated IO for same pattern
+        self._search_cache: Dict[tuple, List[Dict[str, Any]]] = {}
+        self._cache_max = 200  # evict when full (FIFO)
+        
         # Initialize collections
         self._init_collections()
     
@@ -95,6 +99,7 @@ class LanceDBManager:
             "ema_distance": 4.90,
             "session": "London",
             "hour": 14,
+            "prior_choch": False,
             "outcome": "WIN",  # WIN/LOSS/PENDING
             "profit_pips": 40.0,
             "duration_minutes": 17,
@@ -107,6 +112,21 @@ class LanceDBManager:
         
         logger.info("✅ Collection 'historical_structures' created")
         return table
+
+    def reset_historical_structures(self) -> bool:
+        """Drop and recreate historical_structures collection (fresh start)."""
+        try:
+            if "historical_structures" in self.db.table_names():
+                self.db.drop_table("historical_structures")
+                logger.info("🗑️ Dropped historical_structures collection")
+            self._create_historical_structures_collection()
+            # Clear search cache so stale results don't persist
+            self._search_cache.clear()
+            logger.info("✅ historical_structures reset complete (fresh start)")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to reset historical_structures: {e}")
+            return False
     
     def add_structure_pattern(self, pattern: Dict[str, Any]) -> bool:
         """
@@ -138,6 +158,7 @@ class LanceDBManager:
                 "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
                 "session": pattern.get("session", "Unknown"),
                 "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
+                "prior_choch": bool(pattern.get("prior_choch", False)),
                 "outcome": pattern.get("outcome", "PENDING"),
                 "profit_pips": float(pattern.get("profit_pips", 0)),
                 "duration_minutes": int(pattern.get("duration_minutes", 0)),
@@ -152,6 +173,44 @@ class LanceDBManager:
             
         except Exception as e:
             logger.error(f"Failed to add structure pattern: {e}")
+            return False
+
+    def add_structure_patterns_batch(self, patterns: List[Dict[str, Any]]) -> bool:
+        """
+        Add multiple market structure patterns in a single batch (highly optimized).
+        """
+        if not patterns:
+            return True
+        try:
+            table = self.db.open_table("historical_structures")
+            data_list = []
+            for pattern in patterns:
+                vector = self._pattern_to_vector(pattern)
+                data = {
+                    "id": f"{pattern['symbol']}_{pattern['timestamp']}",
+                    "timestamp": pattern["timestamp"],
+                    "symbol": pattern["symbol"],
+                    "timeframe": pattern["timeframe"],
+                    "event_type": pattern["event_type"],
+                    "direction": pattern["direction"],
+                    "price": float(pattern["price"]),
+                    "ema200": float(pattern.get("ema200", 0)),
+                    "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
+                    "session": pattern.get("session", "Unknown"),
+                    "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
+                    "prior_choch": bool(pattern.get("prior_choch", False)),
+                    "outcome": pattern.get("outcome", "PENDING"),
+                    "profit_pips": float(pattern.get("profit_pips", 0)),
+                    "duration_minutes": int(pattern.get("duration_minutes", 0)),
+                    "vector": vector
+                }
+                data_list.append(data)
+            
+            table.add(data_list)
+            logger.info(f"✅ Successfully batch added {len(data_list)} patterns to LanceDB")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to batch add structure patterns: {e}")
             return False
     
     def search_similar_patterns(
@@ -177,6 +236,12 @@ class LanceDBManager:
             # Calculate query vector
             query_vector = self._pattern_to_vector(current_pattern)
             
+            # Check cache first
+            cache_key = (tuple(query_vector), limit, min_similarity)
+            if cache_key in self._search_cache:
+                logger.debug("[DB] Cache hit for pattern search")
+                return self._search_cache[cache_key]
+            
             # Search similar patterns
             results = (
                 table.search(query_vector)
@@ -196,7 +261,13 @@ class LanceDBManager:
             # Convert to list of dicts
             similar_patterns = results.to_dict('records')
             
-            logger.info(f"Found {len(similar_patterns)} similar patterns")
+            # Store in cache (evict oldest if full)
+            if len(self._search_cache) >= self._cache_max:
+                oldest_key = next(iter(self._search_cache))
+                del self._search_cache[oldest_key]
+            self._search_cache[cache_key] = similar_patterns
+            
+            logger.debug(f"Found {len(similar_patterns)} similar patterns")
             return similar_patterns
             
         except Exception as e:
@@ -252,7 +323,10 @@ class LanceDBManager:
         timeframe_map = {"M15": 1.0, "H1": 2.0, "H4": 3.0}
         vector[11] = timeframe_map.get(pattern.get("timeframe", "M15"), 1.0) / 3.0
         
-        # [12-15] Reserved (zeros for now)
+        # [12] Prior CHoCH context: was this pattern formed after a CHoCH? (1=yes, 0=no)
+        vector[12] = 1.0 if pattern.get("prior_choch", False) else 0.0
+        
+        # [13-15] Reserved (zeros for now)
         
         return vector
     
@@ -320,6 +394,25 @@ class LanceDBManager:
             "structure_event": "BoS",
             "session": "London",
             "consensus_score": 0.754,
+            "body_ratio": 0.75,
+            "body_ratio_min": 0.40,
+            "body_ratio_passed": "YES",
+            "body_ratio_mode": "H4_STRETCHED_STRICT",
+            "initial_sl": 2340.50,
+            "initial_tp": 2370.50,
+            "final_sl": 2340.50,
+            "final_tp": 2370.50,
+            "initial_risk_points": 3000,
+            "initial_reward_points": 3000,
+            "final_risk_points": 3000,
+            "final_reward_points": 3000,
+            "trailing_modified": "YES",
+            "trailing_count": 32,
+            "tp_expanded": "NO",
+            "tp_expand_count": 0,
+            "max_favorable_points": 2085,
+            "max_adverse_points": 2997,
+            "close_reason": "TAKE_PROFIT",
             "vector": [0.0] * 12
         }]
         
@@ -349,6 +442,25 @@ class LanceDBManager:
                 "structure_event": trade.get("structure_event", "Unknown"),
                 "session": trade.get("session", "Unknown"),
                 "consensus_score": float(trade.get("consensus_score", 0)),
+                "body_ratio": float(trade.get("body_ratio")) if trade.get("body_ratio") is not None else None,
+                "body_ratio_min": float(trade.get("body_ratio_min")) if trade.get("body_ratio_min") is not None else None,
+                "body_ratio_passed": str(trade.get("body_ratio_passed", "NO")),
+                "body_ratio_mode": str(trade.get("body_ratio_mode", "N/A")),
+                "initial_sl": float(trade.get("initial_sl")) if trade.get("initial_sl") is not None else None,
+                "initial_tp": float(trade.get("initial_tp")) if trade.get("initial_tp") is not None else None,
+                "final_sl": float(trade.get("final_sl")) if trade.get("final_sl") is not None else None,
+                "final_tp": float(trade.get("final_tp")) if trade.get("final_tp") is not None else None,
+                "initial_risk_points": int(trade.get("initial_risk_points")) if trade.get("initial_risk_points") is not None else None,
+                "initial_reward_points": int(trade.get("initial_reward_points")) if trade.get("initial_reward_points") is not None else None,
+                "final_risk_points": int(trade.get("final_risk_points")) if trade.get("final_risk_points") is not None else None,
+                "final_reward_points": int(trade.get("final_reward_points")) if trade.get("final_reward_points") is not None else None,
+                "trailing_modified": str(trade.get("trailing_modified", "NO")),
+                "trailing_count": int(trade.get("trailing_count")) if trade.get("trailing_count") is not None else None,
+                "tp_expanded": str(trade.get("tp_expanded", "NO")),
+                "tp_expand_count": int(trade.get("tp_expand_count")) if trade.get("tp_expand_count") is not None else None,
+                "max_favorable_points": int(trade.get("max_favorable_points")) if trade.get("max_favorable_points") is not None else None,
+                "max_adverse_points": int(trade.get("max_adverse_points")) if trade.get("max_adverse_points") is not None else None,
+                "close_reason": str(trade.get("close_reason", "Unknown")),
                 "vector": vector
             }
             
@@ -358,6 +470,58 @@ class LanceDBManager:
             
         except Exception as e:
             logger.error(f"Failed to add trade outcome: {e}")
+            return False
+
+    def add_trade_outcomes_batch(self, trades: List[Dict[str, Any]]) -> bool:
+        """Add multiple trade outcomes in a single batch (highly optimized)"""
+        if not trades:
+            return True
+        try:
+            table = self.db.open_table("trade_outcomes")
+            data_list = []
+            for trade in trades:
+                vector = self._trade_to_vector(trade)
+                data = {
+                    "id": f"trade_{trade['ticket']}",
+                    "ticket": int(trade["ticket"]),
+                    "timestamp": trade["timestamp"],
+                    "symbol": trade["symbol"],
+                    "type": trade["type"],
+                    "entry_price": float(trade["entry_price"]),
+                    "exit_price": float(trade.get("exit_price", 0)),
+                    "profit_pips": float(trade.get("profit_pips", 0)),
+                    "duration_minutes": int(trade.get("duration_minutes", 0)),
+                    "outcome": trade.get("outcome", "PENDING"),
+                    "structure_event": trade.get("structure_event", "Unknown"),
+                    "session": trade.get("session", "Unknown"),
+                    "consensus_score": float(trade.get("consensus_score", 0)),
+                    "body_ratio": float(trade.get("body_ratio")) if trade.get("body_ratio") is not None else None,
+                    "body_ratio_min": float(trade.get("body_ratio_min")) if trade.get("body_ratio_min") is not None else None,
+                    "body_ratio_passed": str(trade.get("body_ratio_passed", "NO")),
+                    "body_ratio_mode": str(trade.get("body_ratio_mode", "N/A")),
+                    "initial_sl": float(trade.get("initial_sl")) if trade.get("initial_sl") is not None else None,
+                    "initial_tp": float(trade.get("initial_tp")) if trade.get("initial_tp") is not None else None,
+                    "final_sl": float(trade.get("final_sl")) if trade.get("final_sl") is not None else None,
+                    "final_tp": float(trade.get("final_tp")) if trade.get("final_tp") is not None else None,
+                    "initial_risk_points": int(trade.get("initial_risk_points")) if trade.get("initial_risk_points") is not None else None,
+                    "initial_reward_points": int(trade.get("initial_reward_points")) if trade.get("initial_reward_points") is not None else None,
+                    "final_risk_points": int(trade.get("final_risk_points")) if trade.get("final_risk_points") is not None else None,
+                    "final_reward_points": int(trade.get("final_reward_points")) if trade.get("final_reward_points") is not None else None,
+                    "trailing_modified": str(trade.get("trailing_modified", "NO")),
+                    "trailing_count": int(trade.get("trailing_count")) if trade.get("trailing_count") is not None else None,
+                    "tp_expanded": str(trade.get("tp_expanded", "NO")),
+                    "tp_expand_count": int(trade.get("tp_expand_count")) if trade.get("tp_expand_count") is not None else None,
+                    "max_favorable_points": int(trade.get("max_favorable_points")) if trade.get("max_favorable_points") is not None else None,
+                    "max_adverse_points": int(trade.get("max_adverse_points")) if trade.get("max_adverse_points") is not None else None,
+                    "close_reason": str(trade.get("close_reason", "Unknown")),
+                    "vector": vector
+                }
+                data_list.append(data)
+            table.add(data_list)
+            logger.info(f"✅ Successfully batch added {len(data_list)} trade outcomes to LanceDB")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to batch add trade outcomes: {e}")
             return False
     
     def _trade_to_vector(self, trade: Dict[str, Any]) -> List[float]:
