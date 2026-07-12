@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "US inflation expectations climb as 10-year Treasury yields breach 4.3%, gold draws safe haven bids",
+            "timestamp": "2026-03-09T00:15:00"
+        },
+        {
+            "headline": "Dollar softens on dovish Fed rhetoric, XAUUSD extends gains above $2,650 amid declining real yields",
+            "timestamp": "2026-03-09T01:40:00"
+        },
+        {
+            "headline": "Geopolitical tensions in Middle East escalate, investors flock to gold as ultimate safe haven asset",
+            "timestamp": "2026-03-09T02:25:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-03-09T08:30:00"
+        }
+    ]
+}

@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rallies as rising inflation expectations boost safe haven appeal",
+            "timestamp": "2026-03-04T06:45:00"
+        },
+        {
+            "headline": "XAUUSD steadies near weekly high as Treasury yields pull back",
+            "timestamp": "2026-03-04T05:30:00"
+        },
+        {
+            "headline": "Gold prices firm as investors eye upcoming CPI data for Fed rate clues",
+            "timestamp": "2026-03-04T04:15:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-03-04T08:30:00"
+        }
+    ]
+}

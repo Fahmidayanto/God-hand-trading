@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold jumps as US core PCE inflation cools to 2.1%, reinforcing safe-haven appeal amid dovish rate expectations",
+            "timestamp": "2026-02-26T13:30:00"
+        },
+        {
+            "headline": "XAUUSD retreats from session highs as 10-year Treasury yield rebounds above 4.15%",
+            "timestamp": "2026-02-26T14:45:00"
+        },
+        {
+            "headline": "Gold holds steady near $2,680 as investors await FOMC Minutes for clues on rate cut timeline",
+            "timestamp": "2026-02-26T15:50:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-26T18:00:00"
+        },
+        {
+            "event": "GDP",
+            "impact": "medium",
+            "time": "2026-02-26T20:30:00"
+        }
+    ]
+}

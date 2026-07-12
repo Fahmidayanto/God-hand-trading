@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends rally as US Treasury yields slip on cooling inflation data",
+            "timestamp": "2026-02-12T14:30:00"
+        },
+        {
+            "headline": "Safe haven demand lifts XAUUSD amid escalating geopolitical tensions in Eastern Europe",
+            "timestamp": "2026-02-12T15:45:00"
+        },
+        {
+            "headline": "Dollar weakness persists as Fed officials signal patience on rate cuts, gold benefits from lower real yields",
+            "timestamp": "2026-02-12T16:50:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-12T20:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-02-12T23:30:00"
+        }
+    ]
+}

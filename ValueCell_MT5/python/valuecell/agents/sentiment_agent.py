@@ -148,6 +148,9 @@ class SentimentAgent:
         nvidia_122b_api_key: str = "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",
         nvidia_122b_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_122b_model_id: str = "qwen/qwen3.5-122b-a10b",
+        agentrouter_api_key: str = "sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
+        agentrouter_base_url: str = "https://agentrouter.org/v1",
+        agentrouter_model_id: str = "glm-5.2",
     ):
         """
         Initialize Sentiment Agent.
@@ -175,6 +178,9 @@ class SentimentAgent:
             nvidia_122b_api_key: NVIDIA 122B API Key.
             nvidia_122b_base_url: NVIDIA 122B Base URL.
             nvidia_122b_model_id: NVIDIA 122B Model ID.
+            agentrouter_api_key: AgentRouter API Key.
+            agentrouter_base_url: AgentRouter Base URL.
+            agentrouter_model_id: AgentRouter Model ID.
         """
         self.name = "SentimentAgent"
         self.version = "1.1.0-sprint1"
@@ -198,6 +204,10 @@ class SentimentAgent:
         self.nvidia_122b_base_url = nvidia_122b_base_url
         self.nvidia_122b_model_id = nvidia_122b_model_id
 
+        self.agentrouter_api_key = agentrouter_api_key
+        self.agentrouter_base_url = agentrouter_base_url
+        self.agentrouter_model_id = agentrouter_model_id
+
         # Convert keywords to lowercase for case-insensitive matching
         self.bullish_keywords = [kw.lower() for kw in self.BULLISH_KEYWORDS]
         self.bearish_keywords = [kw.lower() for kw in self.BEARISH_KEYWORDS]
@@ -209,7 +219,7 @@ class SentimentAgent:
             f"Sentiment threshold: {sentiment_threshold} | "
             f"Event filtering: {enable_event_filtering} | "
             f"Shadow mode: {shadow_mode} | "
-            f"Use LLM: {use_llm} (DeepSeek-V4-Pro -> Qwen-397B -> Qwen-122B -> Gemini)"
+            f"Use LLM: {use_llm} (GLM-5.2 -> Qwen-397B -> Qwen-122B -> Gemini)"
         )
 
 
@@ -398,6 +408,7 @@ class SentimentAgent:
         """Run LLM-based sentiment analysis with sequential fallback: DeepSeek -> Qwen 397B -> Qwen 122B -> Gemini."""
         import json
         import os
+        import re
         from agno.agent import Agent
         from agno.models.openai import OpenAILike
         
@@ -419,47 +430,51 @@ class SentimentAgent:
             headlines_str += f"{i}. ({time_desc}) {text}\n"
 
         prompt = f"""
-        Analyze the overall market sentiment for Gold (XAUUSD) based on the following news headlines.
-        The headlines are ordered by recency (newest first). Factor in the recency when determining the sentiment.
+Analyze XAUUSD sentiment from headlines (ordered newest first, factor recency).
+JSON output format:
+{{
+  "sentiment": "bullish"|"bearish"|"neutral",
+  "score": float (-1.0 to 1.0),
+  "strength": "strong"|"moderate"|"weak"|"none",
+  "reasoning": "brief explanation"
+}}
+Return raw JSON ONLY. No markdown code blocks.
 
-        Headlines:
-        {headlines_str}
-
-        Return a JSON object containing exactly these fields:
-        1. "sentiment": "bullish" (supports Gold price increase), "bearish" (supports Gold price decrease), or "neutral".
-        2. "score": a number from -1.0 to 1.0 (positive for bullish, negative for bearish, 0.0 for neutral).
-        3. "strength": "strong", "moderate", "weak", or "none" representing the strength of the sentiment.
-        4. "reasoning": a brief explanation of why this sentiment was chosen.
-
-        Return ONLY the raw JSON object. Do not include markdown code block syntax (like ```json).
-        """
+Headlines:
+{headlines_str}
+"""
 
         content = None
         data = None
 
-        # 1. NVIDIA Qwen 397B
+        # 1. AgentRouter GLM-5.2
         try:
-            logger.info("Initializing NVIDIA Qwen 397B for sentiment analysis...")
-            model_397b = OpenAILike(
-                id=self.nvidia_397b_model_id,
-                api_key=self.nvidia_397b_api_key,
-                base_url=self.nvidia_397b_base_url,
+            logger.info("Initializing AgentRouter GLM-5.2 for sentiment analysis...")
+            model_glm = OpenAILike(
+                id=self.agentrouter_model_id,
+                api_key=self.agentrouter_api_key,
+                base_url=self.agentrouter_base_url,
                 temperature=0.6,
                 top_p=0.95,
-                max_tokens=1024,
+                max_tokens=4096,
+                default_headers={
+                    "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
+                    "anthropic-version": "2023-06-01",
+                    "anthropic-beta": "claude-code-20250219",
+                    "x-app": "cli"
+                }
             )
-            agent_397b = Agent(
-                model=model_397b,
+            agent_glm = Agent(
+                model=model_glm,
                 description="You are a market sentiment analyst for Gold (XAUUSD).",
             )
-            response = agent_397b.run(prompt)
+            response = agent_glm.run(prompt)
             if not response or not response.content:
-                raise ValueError("Empty response content from NVIDIA Qwen 397B")
+                raise ValueError("Empty response content from AgentRouter GLM-5.2")
             content = response.content.strip()
             
             # Clean markdown code block or extract JSON object robustly via regex
             cleaned_content = content.strip()
-            import re
             match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
             if match:
                 cleaned_content = match.group(1).strip()
@@ -469,30 +484,30 @@ class SentimentAgent:
                     cleaned_content = brace_match.group(1).strip()
                     
             data = json.loads(cleaned_content)
-            logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 397B")
-        except Exception as qwen397_err:
-            logger.warning(f"NVIDIA Qwen 397B sentiment analysis failed, trying Qwen 122B: {qwen397_err}")
+            logger.info("✅ Successfully analyzed sentiment via AgentRouter GLM-5.2")
+        except Exception as glm_err:
+            logger.warning(f"AgentRouter GLM-5.2 sentiment analysis failed, trying Qwen 397B: {glm_err}")
             if content:
                 logger.warning(f"Raw LLM content was: {content}")
-            
-            # 3. NVIDIA Qwen 122B (DeepSeek V4 Pro bypassed)
+
+            # 2. NVIDIA Qwen 397B
             try:
-                logger.info("Initializing NVIDIA Qwen 122B for sentiment analysis...")
-                model_122b = OpenAILike(
-                    id=self.nvidia_122b_model_id,
-                    api_key=self.nvidia_122b_api_key,
-                    base_url=self.nvidia_122b_base_url,
+                logger.info("Initializing NVIDIA Qwen 397B for sentiment analysis...")
+                model_397b = OpenAILike(
+                    id=self.nvidia_397b_model_id,
+                    api_key=self.nvidia_397b_api_key,
+                    base_url=self.nvidia_397b_base_url,
                     temperature=0.6,
                     top_p=0.95,
                     max_tokens=1024,
                 )
-                agent_122b = Agent(
-                    model=model_122b,
+                agent_397b = Agent(
+                    model=model_397b,
                     description="You are a market sentiment analyst for Gold (XAUUSD).",
                 )
-                response = agent_122b.run(prompt)
+                response = agent_397b.run(prompt)
                 if not response or not response.content:
-                    raise ValueError("Empty response content from NVIDIA Qwen 122B")
+                    raise ValueError("Empty response content from NVIDIA Qwen 397B")
                 content = response.content.strip()
                 
                 # Clean markdown code block or extract JSON object robustly via regex
@@ -506,32 +521,30 @@ class SentimentAgent:
                         cleaned_content = brace_match.group(1).strip()
                         
                 data = json.loads(cleaned_content)
-                logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 122B")
-            except Exception as qwen122_err:
-                logger.warning(f"NVIDIA Qwen 122B sentiment analysis failed, trying Gemini: {qwen122_err}")
+                logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 397B")
+            except Exception as qwen397_err:
+                logger.warning(f"NVIDIA Qwen 397B sentiment analysis failed, trying Qwen 122B: {qwen397_err}")
                 if content:
                     logger.warning(f"Raw LLM content was: {content}")
-                
-                # 4. Gemini Fallback
+            
+                # 3. NVIDIA Qwen 122B (DeepSeek V4 Pro bypassed)
                 try:
-                    google_api_key = os.getenv("GOOGLE_API_KEY")
-                    if not google_api_key:
-                        raise ValueError("GOOGLE_API_KEY not found in environment.")
-
-                    from agno.models.google import Gemini
-
-                    model_gemini = Gemini(
-                        id="gemini-2.5-flash",
-                        api_key=google_api_key,
+                    logger.info("Initializing NVIDIA Qwen 122B for sentiment analysis...")
+                    model_122b = OpenAILike(
+                        id=self.nvidia_122b_model_id,
+                        api_key=self.nvidia_122b_api_key,
+                        base_url=self.nvidia_122b_base_url,
+                        temperature=0.6,
+                        top_p=0.95,
                         max_tokens=1024,
                     )
-                    agent_gemini = Agent(
-                        model=model_gemini,
+                    agent_122b = Agent(
+                        model=model_122b,
                         description="You are a market sentiment analyst for Gold (XAUUSD).",
                     )
-                    response = agent_gemini.run(prompt)
+                    response = agent_122b.run(prompt)
                     if not response or not response.content:
-                        raise ValueError("Empty response content from Gemini Fallback")
+                        raise ValueError("Empty response content from NVIDIA Qwen 122B")
                     content = response.content.strip()
                     
                     # Clean markdown code block or extract JSON object robustly via regex
@@ -545,12 +558,51 @@ class SentimentAgent:
                             cleaned_content = brace_match.group(1).strip()
                             
                     data = json.loads(cleaned_content)
-                    logger.info("✅ Successfully analyzed sentiment via Gemini Fallback")
-                except Exception as gemini_err:
-                    logger.error(f"Gemini fallback also failed: {gemini_err}")
+                    logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 122B")
+                except Exception as qwen122_err:
+                    logger.warning(f"NVIDIA Qwen 122B sentiment analysis failed, trying Gemini: {qwen122_err}")
                     if content:
-                        logger.error(f"Raw LLM content was: {content}")
-                    return None
+                        logger.warning(f"Raw LLM content was: {content}")
+                    
+                    # 4. Gemini Fallback
+                    try:
+                        google_api_key = os.getenv("GOOGLE_API_KEY")
+                        if not google_api_key:
+                            raise ValueError("GOOGLE_API_KEY not found in environment.")
+    
+                        from agno.models.google import Gemini
+    
+                        model_gemini = Gemini(
+                            id="gemini-2.5-flash",
+                            api_key=google_api_key,
+                            max_output_tokens=1024,
+                        )
+                        agent_gemini = Agent(
+                            model=model_gemini,
+                            description="You are a market sentiment analyst for Gold (XAUUSD).",
+                        )
+                        response = agent_gemini.run(prompt)
+                        if not response or not response.content:
+                            raise ValueError("Empty response content from Gemini Fallback")
+                        content = response.content.strip()
+                        
+                        # Clean markdown code block or extract JSON object robustly via regex
+                        cleaned_content = content.strip()
+                        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
+                        if match:
+                            cleaned_content = match.group(1).strip()
+                        else:
+                            brace_match = re.search(r"(\{[\s\S]*\})", cleaned_content)
+                            if brace_match:
+                                cleaned_content = brace_match.group(1).strip()
+                                
+                        data = json.loads(cleaned_content)
+                        logger.info("✅ Successfully analyzed sentiment via Gemini Fallback")
+                    except Exception as gemini_err:
+                        logger.error(f"Gemini fallback also failed: {gemini_err}")
+                        if content:
+                            logger.error(f"Raw LLM content was: {content}")
+                        return None
 
 
         # Parse data safely

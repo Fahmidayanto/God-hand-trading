@@ -1242,8 +1242,8 @@ async def get_simulation_data(
                 )
                 candle_rows = cur.fetchall()
                 cur.execute(
-                    "SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time "
-                    "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC",
+                    "SELECT id, type, direction_action, price, time, timeframe, status, previous_price, previous_time "
+                    "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC, id ASC",
                     (date_from, date_to, timeframe.upper()),
                 )
                 structure_rows = cur.fetchall()
@@ -1253,6 +1253,18 @@ async def get_simulation_data(
                     (date_from, date_to),
                 )
                 trade_rows = cur.fetchall()
+                cur.execute(
+                    "SELECT time, open, high, low, close, volume, ema200 "
+                    "FROM marketdata_xauusd_h1 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
+                    (date_from, date_to),
+                )
+                h1_rows = cur.fetchall()
+                cur.execute(
+                    "SELECT time, open, high, low, close, volume, ema200 "
+                    "FROM marketdata_xauusd_h4 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
+                    (date_from, date_to),
+                )
+                h4_rows = cur.fetchall()
     except Exception as e:
         logger.error(f"Simulation DB error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1263,9 +1275,9 @@ async def get_simulation_data(
         for r in candle_rows
     ]
     structure_events = [
-        {"type": (r[0] or "").strip(), "direction": (r[1] or "").strip(), "price": float(r[2]) if r[2] is not None else None,
-         "time": _ts(r[3]), "timeframe": r[4], "status": r[5],
-         "previous_price": float(r[6]) if r[6] is not None else None, "previous_time": _ts(r[7])}
+        {"id": r[0], "type": (r[1] or "").strip(), "direction": (r[2] or "").strip(), "price": float(r[3]) if r[3] is not None else None,
+         "time": _ts(r[4]), "timeframe": r[5], "status": r[6],
+         "previous_price": float(r[7]) if r[7] is not None else None, "previous_time": _ts(r[8])}
         for r in structure_rows
     ]
     backtest_trades = [
@@ -1276,16 +1288,26 @@ async def get_simulation_data(
          "lot_size": float(r[10]) if r[10] is not None else None}
         for r in trade_rows
     ]
+    h1_candles = [
+        {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
+         "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+        for r in h1_rows
+    ]
+    h4_candles = [
+        {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
+         "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+        for r in h4_rows
+    ]
 
     try:
         try:
-            from app.services.orchestrator_simulator import get_orchestrator
-            get_orchestrator().reset_state()
+            from app.services.orchestrator_simulator import reset_simulation_orchestrator
+            reset_simulation_orchestrator()
         except Exception as re:
             logger.warning(f"Failed to reset orchestrator state at replay init: {re}")
 
         result = await run_in_threadpool(
-            run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe
+            run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe, 300, h1_candles, h4_candles
         )
     except Exception as e:
         logger.error(f"Simulation run error: {e}", exc_info=True)
@@ -1306,6 +1328,7 @@ async def get_single_event_simulation(
     from datetime import date, datetime, timedelta, timezone
     from app.core.database import get_db_conn, is_pool_ready
     from app.services.orchestrator_simulator import (
+        analyze_with_orchestrator_lock,
         get_orchestrator,
         reconstruct_market_data,
         _build_frame,
@@ -1326,7 +1349,7 @@ async def get_single_event_simulation(
     try:
         cache_key = (candle_table, date_from, date_to)
         if cache_key in _sim_candle_cache:
-            candle_rows, structure_rows = _sim_candle_cache[cache_key]
+            candle_rows, structure_rows, h1_rows, h4_rows = _sim_candle_cache[cache_key]
         else:
             with get_db_conn() as conn:
                 with conn.cursor() as cur:
@@ -1340,16 +1363,32 @@ async def get_single_event_simulation(
 
                     # Fetch structures up to the event day
                     cur.execute(
-                        "SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time "
-                        "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC",
+                        "SELECT id, type, direction_action, price, time, timeframe, status, previous_price, previous_time "
+                        "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC, id ASC",
                         (date_from, date_to, timeframe.upper()),
                     )
                     structure_rows = cur.fetchall()
 
+                    # Fetch H1 candles
+                    cur.execute(
+                        "SELECT time, open, high, low, close, volume, ema200 "
+                        "FROM marketdata_xauusd_h1 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
+                        (date_from, date_to),
+                    )
+                    h1_rows = cur.fetchall()
+
+                    # Fetch H4 candles
+                    cur.execute(
+                        "SELECT time, open, high, low, close, volume, ema200 "
+                        "FROM marketdata_xauusd_h4 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
+                        (date_from, date_to),
+                    )
+                    h4_rows = cur.fetchall()
+
             # Store in cache (FIFO eviction)
             if len(_sim_candle_cache) >= _SIM_CACHE_MAX:
                 del _sim_candle_cache[next(iter(_sim_candle_cache))]
-            _sim_candle_cache[cache_key] = (candle_rows, structure_rows)
+            _sim_candle_cache[cache_key] = (candle_rows, structure_rows, h1_rows, h4_rows)
     except Exception as e:
         logger.error(f"Event simulation DB error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1367,9 +1406,9 @@ async def get_single_event_simulation(
         for r in candle_rows
     ]
     structure_events = [
-        {"type": (r[0] or "").strip(), "direction": (r[1] or "").strip(), "price": float(r[2]) if r[2] is not None else None,
-         "time": _ts(r[3]), "timeframe": r[4], "status": r[5],
-         "previous_price": float(r[6]) if r[6] is not None else None, "previous_time": _ts(r[7])}
+        {"id": r[0], "type": (r[1] or "").strip(), "direction": (r[2] or "").strip(), "price": float(r[3]) if r[3] is not None else None,
+         "time": _ts(r[4]), "timeframe": r[5], "status": r[6],
+         "previous_price": float(r[7]) if r[7] is not None else None, "previous_time": _ts(r[8])}
         for r in structure_rows
     ]
 
@@ -1400,6 +1439,35 @@ async def get_single_event_simulation(
         base_df["high_low"] = base_df["high"] - base_df["low"]
         base_df = base_df.sort_values("time").reset_index(drop=True)
 
+        h1_candles = [
+            {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
+             "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+            for r in h1_rows
+        ]
+        h4_candles = [
+            {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
+             "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+            for r in h4_rows
+        ]
+
+        h1_df = pd.DataFrame(h1_candles)
+        if not h1_df.empty:
+            h1_df["time"] = pd.to_datetime(h1_df["time"], unit="s", utc=True)
+            if "ema200" not in h1_df.columns or h1_df["ema200"].isna().all():
+                h1_df["ema200"] = h1_df["close"].ewm(span=200, adjust=False).mean()
+            h1_df = h1_df.sort_values("time").reset_index(drop=True)
+        else:
+            h1_df = None
+
+        h4_df = pd.DataFrame(h4_candles)
+        if not h4_df.empty:
+            h4_df["time"] = pd.to_datetime(h4_df["time"], unit="s", utc=True)
+            if "ema200" not in h4_df.columns or h4_df["ema200"].isna().all():
+                h4_df["ema200"] = h4_df["close"].ewm(span=200, adjust=False).mean()
+            h4_df = h4_df.sort_values("time").reset_index(drop=True)
+        else:
+            h4_df = None
+
         _ev_type = (target_ev.get("type") or "?").upper()
         _ev_dir = (target_ev.get("direction") or "?")[:4]
         _ev_dt_str = dt_event.strftime("%Y-%m-%d %H:%M")
@@ -1409,14 +1477,17 @@ async def get_single_event_simulation(
             f"Candles: {len(candles)} | Structures: {len(structure_events)}"
         )
 
-        md = reconstruct_market_data(base_df, time, structure_events, generate_news=True, event_type_hint=type)
+        md = reconstruct_market_data(
+            base_df, time, structure_events, generate_news=True, event_type_hint=type,
+            h1_df=h1_df, h4_df=h4_df, target_event_id=target_ev.get("id")
+        )
         _news_count = len(md.get("news_headlines", []))
         _cal_count = len(md.get("upcoming_events", []))
         loguru_logger.info(f"   📰 News: {_news_count} headlines | 📅 Calendar: {_cal_count} events")
 
         orch = get_orchestrator()
         result = await run_in_threadpool(
-            orch.analyze, md, symbol, timeframe
+            analyze_with_orchestrator_lock, orch, md, symbol, timeframe
         )
 
         # --- Log: per-agent summary ---
@@ -1455,8 +1526,8 @@ async def clear_replay_cache():
     
     # Also reset the simulation orchestrator state and warmup cache
     try:
-        from app.services.orchestrator_simulator import get_orchestrator
-        get_orchestrator().reset_state()
+        from app.services.orchestrator_simulator import reset_simulation_orchestrator
+        reset_simulation_orchestrator()
         logger.info("[Replay] Simulation orchestrator state reset successfully")
     except Exception as re:
         logger.warning(f"Failed to reset orchestrator state at clear-cache: {re}")

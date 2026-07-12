@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends rally as March CPI data signals sticky inflation, boosting safe haven demand",
+            "timestamp": "2026-04-16T04:30:00"
+        },
+        {
+            "headline": "XAUUSD holds near record highs as declining Treasury yields weaken dollar appeal",
+            "timestamp": "2026-04-16T06:15:00"
+        },
+        {
+            "headline": "Gold prices firm amid escalating geopolitical tensions and safe haven inflows",
+            "timestamp": "2026-04-16T07:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-16T14:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-04-16T12:30:00"
+        }
+    ]
+}

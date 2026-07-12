@@ -1,4 +1,5 @@
 import sys
+import threading
 import time as _time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -22,6 +23,20 @@ def _to_dt(ts: int) -> datetime:
     return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
+def _detect_session(ts: int) -> str:
+    """Return trading session name based on UTC hour of timestamp."""
+    hour = datetime.fromtimestamp(ts, tz=timezone.utc).hour
+    if 0 <= hour < 8:
+        return "Tokyo"
+    if 8 <= hour < 12:
+        return "London"
+    if 12 <= hour < 17:
+        return "London_NY_Overlap"
+    if 17 <= hour < 21:
+        return "NewYork"
+    return "Offmarket"
+
+
 def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, Any]:
     """Uses LLM (Gemini/OpenAI) to generate realistic historical news headlines and calendar events."""
     import os
@@ -32,7 +47,18 @@ def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, An
     date_str = event_time_dt.strftime("%Y-%m-%d")
     time_str = event_time_dt.strftime("%H%M%S")
     
-    # Check cache first to avoid slow LLM API calls on replay
+    # Check LanceDB cache first to avoid slow LLM API calls on replay
+    try:
+        from valuecell.knowledge.lance_db import LanceDBManager
+        db_mgr = LanceDBManager()
+        cached_db_data = db_mgr.read_news_cache(event_time_dt.strftime("%Y-%m-%d %H:%M:%S"))
+        if cached_db_data is not None:
+            logger.info(f"💾 Loaded sentiment/news data from LanceDB cache for {date_str} {event_time_dt.strftime('%H:%M:%S')}")
+            return cached_db_data
+    except Exception as dbe:
+        logger.warning(f"Failed to read from LanceDB cache: {dbe}")
+
+    # Check local file cache as fallback
     cache_dir = Path(__file__).resolve().parent.parent.parent / "data" / "news_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f"news_{date_str}_{time_str}.json"
@@ -41,10 +67,10 @@ def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, An
         try:
             with open(cache_file, "r") as f:
                 cached_data = json.load(f)
-            logger.info(f"💾 Loaded sentiment/news data from cache for {date_str} {event_time_dt.strftime('%H:%M:%S')}")
+            logger.info(f"💾 Loaded sentiment/news data from file cache for {date_str} {event_time_dt.strftime('%H:%M:%S')}")
             return cached_data
         except Exception as e:
-            logger.warning(f"Failed to read news cache: {e}")
+            logger.warning(f"Failed to read news file cache: {e}")
 
     # Explicitly load the backend .env file
     env_path = Path(__file__).resolve().parents[2] / ".env"
@@ -63,43 +89,80 @@ def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, An
 
     date_str = event_time_dt.strftime("%Y-%m-%d")
     prompt = f"""
-    Provide a historical or realistic reconstruction of market news and economic calendar events for Gold (XAUUSD) and USD on {date_str}.
-    Return a JSON object containing:
-    1. "news_headlines": A list of 3 news headline objects. Each object must have:
-       - "headline": A news headline string (e.g., "Gold spikes on inflation worries", "US Dollar rallies following retail sales"). Include relevant keywords like inflation, hawkish, dovish, recession, yield, safe haven.
-       - "timestamp": A timestamp string in "YYYY-MM-DD HH:MM:SS" format (set this between 1 and 4 hours BEFORE the time {event_time_dt.strftime('%H:%M:%S')}).
-    2. "upcoming_events": A list of 1-2 upcoming economic calendar event objects. Each object must have:
-       - "event": The event name (e.g., "CPI", "FOMC", "NFP", "GDP", "Unemployment Rate").
-       - "impact": "high" or "medium".
-       - "time": A timestamp string in "YYYY-MM-DD HH:MM:SS" format (set this between 30 minutes and 6 hours AFTER the time {event_time_dt.strftime('%H:%M:%S')}).
-
-    Return ONLY the raw JSON object. Do not include markdown code block syntax (like ```json).
-    """
+Generate realistic XAUUSD/USD news + calendar events on {date_str} {event_time_dt.strftime('%H:%M:%S')}.
+JSON output format:
+{{
+  "news_headlines": [
+    {{
+      "headline": "headline text (use keywords like inflation/safe haven/yield)",
+      "timestamp": "YYYY-MM-DD HH:MM:SS" (1-4h before {event_time_dt.strftime('%H:%M:%S')})
+    }}
+  ],
+  "upcoming_events": [
+    {{
+      "event": "CPI"|"FOMC"|"NFP"|"GDP"|"Unemployment Rate",
+      "impact": "high"|"medium",
+      "time": "YYYY-MM-DD HH:MM:SS" (30m-6h after {event_time_dt.strftime('%H:%M:%S')})
+    }}
+  ]
+}}
+Generate exactly 3 news_headlines and 1-2 upcoming_events.
+Return raw JSON ONLY. No markdown code blocks.
+"""
 
     content = None
 
-    # 1. Try NVIDIA Qwen 397B
+    # 1. Try AgentRouter GLM-5.2
     try:
-        logger.info("Initializing NVIDIA Qwen 397B for sentiment/news generation...")
-        model_397b = OpenAILike(
-            id="qwen/qwen3.5-397b-a17b",
-            api_key="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",
-            base_url="https://integrate.api.nvidia.com/v1",
+        logger.info("Initializing AgentRouter GLM-5.2 for sentiment/news generation...")
+        model_glm = OpenAILike(
+            id="glm-5.2",
+            api_key="sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
+            base_url="https://agentrouter.org/v1",
             temperature=0.6,
             top_p=0.95,
-            max_tokens=1024,
+            max_tokens=4096,
+            default_headers={
+                "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "claude-code-20250219",
+                "x-app": "cli"
+            }
         )
-        agent_397b = Agent(
-            model=model_397b,
+        agent_glm = Agent(
+            model=model_glm,
             description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
         )
-        response = agent_397b.run(prompt)
+        response = agent_glm.run(prompt)
         if not response or not response.content:
-            raise ValueError("Empty response content from NVIDIA Qwen 397B")
+            raise ValueError("Empty response content from AgentRouter GLM-5.2")
         content = response.content.strip()
-        logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 397B")
-    except Exception as qwen397_err:
-        logger.warning(f"NVIDIA Qwen 397B generation failed, trying Qwen 122B: {qwen397_err}")
+        logger.info("✅ Successfully generated sentiment data via AgentRouter GLM-5.2")
+    except Exception as glm_err:
+        logger.warning(f"AgentRouter GLM-5.2 generation failed, trying Qwen 397B: {glm_err}")
+
+        # 2. Try NVIDIA Qwen 397B
+        try:
+            logger.info("Initializing NVIDIA Qwen 397B for sentiment/news generation...")
+            model_397b = OpenAILike(
+                id="qwen/qwen3.5-397b-a17b",
+                api_key="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",
+                base_url="https://integrate.api.nvidia.com/v1",
+                temperature=0.6,
+                top_p=0.95,
+                max_tokens=1024,
+            )
+            agent_397b = Agent(
+                model=model_397b,
+                description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
+            )
+            response = agent_397b.run(prompt)
+            if not response or not response.content:
+                raise ValueError("Empty response content from NVIDIA Qwen 397B")
+            content = response.content.strip()
+            logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 397B")
+        except Exception as qwen397_err:
+            logger.warning(f"NVIDIA Qwen 397B generation failed, trying Qwen 122B: {qwen397_err}")
 
         # 3. Try NVIDIA Qwen-122B (DeepSeek V4 Pro bypassed)
         try:
@@ -134,7 +197,7 @@ def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, An
                 model_gemini = Gemini(
                     id="gemini-2.5-flash",
                     api_key=google_api_key,
-                    max_tokens=1024,
+                    max_output_tokens=1024,
                 )
                 agent_gemini = Agent(
                     model=model_gemini,
@@ -205,13 +268,26 @@ def _generate_historical_sentiment_data(event_time_dt: datetime) -> Dict[str, An
         "upcoming_events": events,
     }
 
-    # Save to local cache
+    # Save to LanceDB cache
+    try:
+        from valuecell.knowledge.lance_db import LanceDBManager
+        db_mgr = LanceDBManager()
+        db_mgr.write_news_cache(
+            timestamp=event_time_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            event_type="SIM",
+            news_headlines=result["news_headlines"],
+            upcoming_events=result["upcoming_events"]
+        )
+    except Exception as dbe:
+        logger.warning(f"Failed to write to LanceDB cache: {dbe}")
+
+    # Save to local file cache as fallback
     try:
         with open(cache_file, "w") as f:
             json.dump(result, f, indent=4)
-        logger.info(f"💾 Saved generated sentiment/news data to cache: {cache_file.name}")
+        logger.info(f"💾 Saved generated sentiment/news data to file cache: {cache_file.name}")
     except Exception as e:
-        logger.warning(f"Failed to write news cache: {e}")
+        logger.warning(f"Failed to write news file cache: {e}")
 
     return result
 
@@ -222,9 +298,15 @@ def reconstruct_market_data(
     structure_events: List[Dict[str, Any]],
     generate_news: bool = False,
     event_type_hint: Optional[str] = None,
+    h1_df: Optional[pd.DataFrame] = None,
+    h4_df: Optional[pd.DataFrame] = None,
+    target_event_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    logger.info(f"--- reconstruct_market_data called: generate_news={generate_news} ---")
     df = df[df["time"] <= _to_dt(event_time)].copy()
+    if h1_df is not None and not h1_df.empty:
+        h1_df = h1_df[h1_df["time"] <= _to_dt(event_time)].copy()
+    if h4_df is not None and not h4_df.empty:
+        h4_df = h4_df[h4_df["time"] <= _to_dt(event_time)].copy()
     if df.empty:
         raise ValueError("No candles up to event_time")
     if "tick_volume" not in df.columns and "volume" in df.columns:
@@ -250,7 +332,17 @@ def reconstruct_market_data(
         session = "Asia"
     else:
         session = "Sydney"
-    events_up_to = [e for e in structure_events if e.get("time", 0) <= event_time]
+    # Multiple structure events can share one candle timestamp.  Preserve the
+    # CSV/DB sequence so replaying an earlier row cannot see a later same-time
+    # event (and replaying LL cannot accidentally execute the preceding BOS).
+    events_up_to = [
+        e for e in structure_events
+        if e.get("time", 0) < event_time
+        or (
+            e.get("time", 0) == event_time
+            and (target_event_id is None or e.get("id") is None or e.get("id") <= target_event_id)
+        )
+    ]
 
     news_headlines = []
     upcoming_events = []
@@ -314,6 +406,8 @@ def reconstruct_market_data(
         "news_headlines": news_headlines,
         "upcoming_events": upcoming_events,
         "is_counter_swing": is_counter_swing if generate_news else False,
+        "h1_data": h1_df,
+        "h4_data": h4_df,
     }
 
 
@@ -411,10 +505,12 @@ def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
             "meta": meta,
         }
 
+    ev_ts = ev.get("time") or 0
     return {
-        "event_time": ev.get("time"),
+        "event_time": ev_ts,
         "event_type": ev.get("type"),
         "event_direction": ev.get("direction"),
+        "session": _detect_session(ev_ts) if ev_ts else None,
         "agents": {
             "market_structure": view("market_structure"),
             "ml_prediction": view("ml_prediction"),
@@ -438,6 +534,7 @@ def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
 
 
 _cached_orchestrator = None
+_orchestrator_lock = threading.Lock()
 
 
 def get_orchestrator():
@@ -474,6 +571,18 @@ def get_orchestrator():
     return _cached_orchestrator
 
 
+def analyze_with_orchestrator_lock(orch, market_data, symbol="XAUUSD", timeframe="M15"):
+    """Protect stateful simulation agent and warm-up cache from concurrent requests."""
+    with _orchestrator_lock:
+        return orch.analyze(market_data=market_data, symbol=symbol, timeframe=timeframe)
+
+
+def reset_simulation_orchestrator():
+    """Reset simulation state without racing an in-flight analysis."""
+    with _orchestrator_lock:
+        get_orchestrator().reset_state()
+
+
 def run_simulation(
     candles: List[Dict[str, Any]],
     structure_events: List[Dict[str, Any]],
@@ -481,6 +590,8 @@ def run_simulation(
     symbol: str = "XAUUSD",
     timeframe: str = "M15",
     max_events: int = 300,
+    h1_candles: Optional[List[Dict[str, Any]]] = None,
+    h4_candles: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     orch = get_orchestrator()
 
@@ -530,20 +641,63 @@ def run_simulation(
     base_df["high_low"] = base_df["high"] - base_df["low"]
     base_df = base_df.sort_values("time").reset_index(drop=True)
 
+    h1_df = pd.DataFrame(h1_candles) if h1_candles else None
+    if h1_df is not None and not h1_df.empty:
+        h1_df["time"] = pd.to_datetime(h1_df["time"], unit="s", utc=True)
+        if "ema200" not in h1_df.columns or h1_df["ema200"].isna().all():
+            h1_df["ema200"] = h1_df["close"].ewm(span=200, adjust=False).mean()
+        h1_df = h1_df.sort_values("time").reset_index(drop=True)
+
+    h4_df = pd.DataFrame(h4_candles) if h4_candles else None
+    if h4_df is not None and not h4_df.empty:
+        h4_df["time"] = pd.to_datetime(h4_df["time"], unit="s", utc=True)
+        if "ema200" not in h4_df.columns or h4_df["ema200"].isna().all():
+            h4_df["ema200"] = h4_df["close"].ewm(span=200, adjust=False).mean()
+        h4_df = h4_df.sort_values("time").reset_index(drop=True)
+
     signals: List[Dict[str, Any]] = []
     frames: List[Dict[str, Any]] = []
     _total_ev = len(structure_events)
+    last_event_date = None
     for _ev_idx, ev in enumerate(structure_events, 1):
         ev_time = ev.get("time")
         if ev_time is None:
             continue
         try:
-            md = reconstruct_market_data(base_df, ev_time, structure_events, generate_news=True, event_type_hint=ev.get("type"))
+            ev_dt = _to_dt(ev_time)
+            current_date = ev_dt.date()
+            if last_event_date is not None and current_date > last_event_date:
+                # Skenario 2: Skip weekend
+                if ev_dt.weekday() < 5:
+                    events_before = [e for e in structure_events if e.get("time", 0) < ev_time]
+                    recent_baseline = None
+                    for old_ev in reversed(events_before):
+                        old_ev_type = old_ev.get("type", "").upper()
+                        if old_ev_type in ("CHOCH", "BOS"):
+                            recent_baseline = old_ev_type
+                            break
+                    if recent_baseline == "CHOCH":
+                        prefetch_time = datetime(current_date.year, current_date.month, current_date.day, 1, 0, 0, tzinfo=timezone.utc)
+                        logger.info(f"🌅 Day Change Setup Active: Pre-fetching news for {current_date} at 01:00:00...")
+                        import threading
+                        threading.Thread(
+                            target=_generate_historical_sentiment_data,
+                            args=(prefetch_time,),
+                            daemon=True
+                        ).start()
+            last_event_date = current_date
+        except Exception as pfe:
+            logger.warning(f"Failed to check day change pre-fetch: {pfe}")
+        try:
+            md = reconstruct_market_data(
+                base_df, ev_time, structure_events, generate_news=True, event_type_hint=ev.get("type"),
+                h1_df=h1_df, h4_df=h4_df, target_event_id=ev.get("id")
+            )
         except Exception as e:
             logger.warning(f"sim: skip event {ev_time}: {e}")
             continue
         try:
-            result = orch.analyze(market_data=md, symbol=symbol, timeframe=timeframe)
+            result = analyze_with_orchestrator_lock(orch, md, symbol, timeframe)
         except Exception as e:
             logger.warning(f"sim: orchestrator failed at {ev_time}: {e}")
             err_result = {
@@ -578,11 +732,43 @@ def run_simulation(
         )
 
         if not result.get("approved") or result.get("final_signal") not in ("BUY", "SELL"):
+            # Log rejected decisions to NeonDB
+            try:
+                from app.services.simulation_logger import _sim_logger
+                _ar = result.get("agent_results") or {}
+                _ms = _ar.get("market_structure") or {}
+                _ml = _ar.get("ml_prediction") or {}
+                _st = _ar.get("sentiment") or {}
+                _sim_logger.log_decision({
+                    "symbol": symbol, "timeframe": timeframe,
+                    "event_time": _to_dt(ev_time),
+                    "event_type": ev.get("type"),
+                    "event_price": ev.get("price"),
+                    "session": _detect_session(ev_time),
+                    "entry_session": _detect_session(ev_time),
+                    "final_signal": result.get("final_signal"),
+                    "final_confidence": result.get("final_confidence"),
+                    "consensus_level": result.get("consensus_level"),
+                    "approved": False,
+                    "reject_reason": (result.get("reasoning") or result.get("error") or "consensus_failed")[:200],
+                    "ms_signal": _ms.get("signal"), "ms_confidence": _ms.get("confidence"),
+                    "ml_signal": _ml.get("signal"), "ml_confidence": _ml.get("confidence"),
+                    "sent_signal": _st.get("final_signal"), "sent_confidence": _st.get("final_confidence"),
+                    "ml_model_version": _ml.get("model_type") or "regression_v5",
+                })
+            except Exception as _le:
+                logger.debug(f"[SimLogger] rejected log skipped: {_le}")
             continue
         sig = result["final_signal"]
         sl = (result.get("sl_tp") or {}).get("sl_price")
         tp = (result.get("sl_tp") or {}).get("tp_price")
+        entry_p = (result.get("sl_tp") or {}).get("entry_price") or md.get("current_bar", {}).get("close")
         outcome = forward_walk_outcome(candles, ev_time, sig, sl, tp)
+        pnl_pips = None
+        if outcome["outcome"] == "TP" and entry_p and tp:
+            pnl_pips = round(abs(tp - entry_p) / 0.1, 1)
+        elif outcome["outcome"] == "SL" and entry_p and sl:
+            pnl_pips = -round(abs(sl - entry_p) / 0.1, 1)
         signals.append({
             "time": ev_time,
             "signal": sig,
@@ -593,7 +779,40 @@ def run_simulation(
             "lot": (result.get("position_sizing") or {}).get("lot_size"),
             "outcome": outcome["outcome"],
             "outcome_bar": outcome["outcome_bar"],
+            "session": _detect_session(ev_time),
         })
+        # Log approved decisions to NeonDB
+        try:
+            from app.services.simulation_logger import _sim_logger
+            _ar = result.get("agent_results") or {}
+            _ms = _ar.get("market_structure") or {}
+            _ml = _ar.get("ml_prediction") or {}
+            _st = _ar.get("sentiment") or {}
+            _obar = outcome["outcome_bar"]
+            _sim_logger.log_decision({
+                "symbol": symbol, "timeframe": timeframe,
+                "event_time": _to_dt(ev_time),
+                "event_type": ev.get("type"),
+                "event_price": ev.get("price"),
+                "session": _detect_session(ev_time),
+                "entry_session": _detect_session(ev_time),
+                "final_signal": sig,
+                "final_confidence": result.get("final_confidence"),
+                "consensus_level": result.get("consensus_level"),
+                "approved": True,
+                "ms_signal": _ms.get("signal"), "ms_confidence": _ms.get("confidence"),
+                "ml_signal": _ml.get("signal"), "ml_confidence": _ml.get("confidence"),
+                "sent_signal": _st.get("final_signal"), "sent_confidence": _st.get("final_confidence"),
+                "ml_model_version": _ml.get("model_type") or "regression_v5",
+                "entry_price": entry_p,
+                "sl_price": sl, "tp_price": tp,
+                "lot_size": (result.get("position_sizing") or {}).get("lot_size"),
+                "outcome": outcome["outcome"],
+                "outcome_bar_time": _to_dt(_obar) if _obar else None,
+                "pnl_pips": pnl_pips,
+            })
+        except Exception as _le:
+            logger.debug(f"[SimLogger] approved log skipped: {_le}")
     metrics = compute_metrics(signals, backtest_trades)
     frames.sort(key=lambda f: f["event_time"])
 

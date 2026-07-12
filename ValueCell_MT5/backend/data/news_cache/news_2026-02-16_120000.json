@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold prices climb as sticky inflation data fuels safe haven demand ahead of key US economic reports",
+            "timestamp": "2026-02-16T08:30:00"
+        },
+        {
+            "headline": "Falling Treasury yields boost XAUUSD appeal as investors reassess Fed rate cut timeline",
+            "timestamp": "2026-02-16T10:15:00"
+        },
+        {
+            "headline": "Dollar weakness persists amid geopolitical tensions, lifting gold toward weekly high",
+            "timestamp": "2026-02-16T11:05:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-16T14:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-02-16T15:30:00"
+        }
+    ]
+}

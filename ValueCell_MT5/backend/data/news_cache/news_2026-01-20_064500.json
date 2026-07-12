@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as safe haven demand intensifies amid global recession fears and rising bond yields",
+            "timestamp": "2026-01-20T03:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed officials signal a more dovish stance on inflation targets for 2026",
+            "timestamp": "2026-01-20T04:30:00"
+        },
+        {
+            "headline": "XAUUSD breaks key resistance as geopolitical tensions spike and inflation data looms",
+            "timestamp": "2026-01-20T05:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Core CPI m/m",
+            "impact": "high",
+            "time": "2026-01-20T08:30:00"
+        },
+        {
+            "event": "FOMC Member Speech",
+            "impact": "medium",
+            "time": "2026-01-20T11:00:00"
+        }
+    ]
+}

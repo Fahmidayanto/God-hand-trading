@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "US 10-year Treasury yield climbs to 4.75% as sticky inflation data dampens rate cut hopes, weighing on gold",
+            "timestamp": "2026-03-03T13:48:00"
+        },
+        {
+            "headline": "Gold safe-haven demand surges as global equity markets tumble on renewed recession fears",
+            "timestamp": "2026-03-03T14:52:00"
+        },
+        {
+            "headline": "Dollar index slips from two-month high ahead of FOMC minutes, buoying XAUUSD above $2,920",
+            "timestamp": "2026-03-03T16:05:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-03-03T19:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-03T21:30:00"
+        }
+    ]
+}

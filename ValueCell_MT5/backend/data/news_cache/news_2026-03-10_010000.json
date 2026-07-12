@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold prices steady as US inflation expectations ease, Treasury yields pull back from multi-week highs",
+            "timestamp": "2026-03-09T22:30:00"
+        },
+        {
+            "headline": "Safe-haven demand lifts XAUUSD amid escalating trade tensions and soft Asian session equities",
+            "timestamp": "2026-03-09T23:45:00"
+        },
+        {
+            "headline": "Dollar weakness ahead of key CPI data supports gold; 10-year yield slips below 4.3%",
+            "timestamp": "2026-03-10T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-03-10T03:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-10T05:30:00"
+        }
+    ]
+}

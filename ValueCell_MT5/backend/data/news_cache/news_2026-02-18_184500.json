@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rises as hotter-than-expected inflation data boosts safe-haven appeal",
+            "timestamp": "2026-02-18T14:52:00"
+        },
+        {
+            "headline": "XAUUSD pulls back as surging Treasury yields dim non-yielding gold's luster",
+            "timestamp": "2026-02-18T15:38:00"
+        },
+        {
+            "headline": "Gold consolidates ahead of FOMC minutes as investors seek inflation clarity",
+            "timestamp": "2026-02-18T17:12:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-18T21:30:00"
+        },
+        {
+            "event": "GDP",
+            "impact": "medium",
+            "time": "2026-02-18T23:00:00"
+        }
+    ]
+}

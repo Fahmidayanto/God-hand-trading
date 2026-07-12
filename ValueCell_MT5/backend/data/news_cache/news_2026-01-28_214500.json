@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to new highs as safe haven demand intensifies amid recession fears and rising inflation expectations",
+            "timestamp": "2026-01-28T18:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed officials signal a more dovish stance on interest rates despite sticky yield curve pressures",
+            "timestamp": "2026-01-28T19:30:00"
+        },
+        {
+            "headline": "XAUUSD rallies as geopolitical tensions escalate, driving investors away from risk assets toward gold",
+            "timestamp": "2026-01-28T20:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC Rate Decision",
+            "impact": "high",
+            "time": "2026-01-29T02:00:00"
+        },
+        {
+            "event": "US GDP Preliminary Estimate",
+            "impact": "high",
+            "time": "2026-01-29T03:30:00"
+        }
+    ]
+}

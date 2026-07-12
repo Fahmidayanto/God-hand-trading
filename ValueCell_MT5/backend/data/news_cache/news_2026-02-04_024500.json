@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold climbs as US Treasury yields ease on cooling inflation bets",
+            "timestamp": "2026-02-03T23:10:00"
+        },
+        {
+            "headline": "Safe haven demand surges for gold amid escalating trade tensions",
+            "timestamp": "2026-02-04T00:35:00"
+        },
+        {
+            "headline": "Gold holds firm near monthly high as dollar weakens ahead of Fed decision",
+            "timestamp": "2026-02-04T01:50:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-04T07:00:00"
+        }
+    ]
+}

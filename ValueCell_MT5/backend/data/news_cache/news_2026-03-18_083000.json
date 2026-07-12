@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rises as cooling inflation data boosts safe haven appeal, Treasury yields slide",
+            "timestamp": "2026-03-18T05:15:00"
+        },
+        {
+            "headline": "XAUUSD steadies near $2,980 as investors await FOMC policy decision on rate path",
+            "timestamp": "2026-03-18T06:40:00"
+        },
+        {
+            "headline": "Dollar softness supports bullion; Fed rate cut bets lift non-yielding gold demand",
+            "timestamp": "2026-03-18T07:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-03-18T14:00:00"
+        }
+    ]
+}

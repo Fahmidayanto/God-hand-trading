@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends safe haven rally as sticky inflation data fuels demand for bullion",
+            "timestamp": "2026-04-27T22:15:00"
+        },
+        {
+            "headline": "Declining US Treasury yields lift XAUUSD above key resistance amid dovish Fed speculation",
+            "timestamp": "2026-04-27T23:40:00"
+        },
+        {
+            "headline": "Dollar weakens on soft consumer spending data, gold eyes monthly high as risk sentiment sours",
+            "timestamp": "2026-04-28T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-28T02:30:00"
+        },
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-04-28T05:00:00"
+        }
+    ]
+}

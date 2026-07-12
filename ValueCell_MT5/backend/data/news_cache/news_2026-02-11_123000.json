@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold climbs as sticky inflation data fuels safe-haven demand; XAUUSD tests $2,680 resistance",
+            "timestamp": "2026-02-11T09:15:00"
+        },
+        {
+            "headline": "Treasury yields slip on dovish Fed remarks, lifting non-yielding gold ahead of CPI print",
+            "timestamp": "2026-02-11T10:42:00"
+        },
+        {
+            "headline": "Dollar weakens broadly as traders price in rate cut bets; gold eyes monthly high",
+            "timestamp": "2026-02-11T11:22:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-02-11T13:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-02-11T15:00:00"
+        }
+    ]
+}

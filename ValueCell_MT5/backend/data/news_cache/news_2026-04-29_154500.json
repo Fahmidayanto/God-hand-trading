@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends gains as US inflation expectations rise, weakening dollar outlook",
+            "timestamp": "2026-04-29T11:50:00"
+        },
+        {
+            "headline": "XAUUSD climbs above $2,450 as Treasury yields pull back ahead of Fed decision",
+            "timestamp": "2026-04-29T13:15:00"
+        },
+        {
+            "headline": "Safe haven demand lifts gold as geopolitical tensions escalate in Middle East",
+            "timestamp": "2026-04-29T14:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-29T18:00:00"
+        },
+        {
+            "event": "GDP",
+            "impact": "medium",
+            "time": "2026-04-29T20:30:00"
+        }
+    ]
+}

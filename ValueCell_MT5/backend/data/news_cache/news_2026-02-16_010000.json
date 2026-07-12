@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold prices climb as rising inflation expectations boost safe haven demand amid global uncertainty",
+            "timestamp": "2026-02-15T22:15:00"
+        },
+        {
+            "headline": "Falling Treasury yields lift XAUUSD above key resistance as dollar weakens in Asian session",
+            "timestamp": "2026-02-15T23:30:00"
+        },
+        {
+            "headline": "Investors flock to gold safe haven assets after hawkish Fed rhetoric fails to lift yields",
+            "timestamp": "2026-02-16T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-02-16T03:00:00"
+        }
+    ]
+}

@@ -261,7 +261,12 @@ class MarketStructureAgent:
             d1 = e1["direction_action"].upper()
 
             def _has_recent_choch(direction: str, max_lookback: int = 10) -> bool:
-                """Scan recent events (skip e1) for a CHoCH matching direction. Stop if a BOS is encountered."""
+                """Match only the latest active CHoCH before e1.
+
+                An opposite, newer CHoCH invalidates older CHoCH events. Continuing
+                past it can turn a counter-swing into a new setup and overwrite the
+                pending setup with the wrong direction.
+                """
                 for ev in events[1:max_lookback]:
                     t = ev["type"].upper()
                     d = ev["direction_action"].upper()
@@ -269,10 +274,9 @@ class MarketStructureAgent:
                         # BOS sudah terjadi, maka sequence CHoCH sebelumnya sudah selesai
                         return False
                     if "CHOCH" in t:
-                        if direction == "Bullish" and ("BULL" in d or "UP" in d):
-                            return True
-                        if direction == "Bearish" and "BEAR" in d:
-                            return True
+                        if direction == "Bullish":
+                            return "BULL" in d or "UP" in d
+                        return "BEAR" in d
                 return False
 
             # ── Pemeriksaan Skenario ──

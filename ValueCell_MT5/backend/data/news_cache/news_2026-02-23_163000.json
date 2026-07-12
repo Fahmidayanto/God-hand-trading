@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rises as sticky US inflation data fuels safe haven demand and bets on delayed Fed rate cuts",
+            "timestamp": "2026-02-23T12:45:00"
+        },
+        {
+            "headline": "XAUUSD steadies near $2,680 as falling Treasury yields support non-yielding bullion ahead of FOMC minutes",
+            "timestamp": "2026-02-23T14:15:00"
+        },
+        {
+            "headline": "Safe haven inflows push gold higher amid rising trade tensions and softer dollar outlook",
+            "timestamp": "2026-02-23T15:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-23T18:00:00"
+        },
+        {
+            "event": "GDP",
+            "impact": "medium",
+            "time": "2026-02-23T20:30:00"
+        }
+    ]
+}

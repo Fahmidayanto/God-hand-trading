@@ -10,7 +10,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -19,6 +19,12 @@ import {
   TradesOverlayPrimitive,
   type TradeOverlayEntry,
 } from "@/components/valuecell/charts/trades-overlay-primitive";
+import {
+  SessionZonesPrimitive,
+  type SessionZoneBox,
+} from "@/components/valuecell/charts/session-zones-primitive";
+import { useSessionZones } from "@/api/mt5_agents";
+import { selectSetupExtremeEvents } from "./structure-extremes";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,7 +197,7 @@ function CustomSelect<T extends string | number>({
 
       {isOpen && (
         <div
-          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110] transition-all origin-top-right animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out"
+          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110] transition-all origin-top-right animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out transform perspective-1000 rotate-x-4 hover:rotate-x-0 transition-transform duration-200"
         >
           {options.map((opt) => {
             const active = opt === value;
@@ -496,6 +502,7 @@ export default function SimulationOfDead() {
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<any> | null>(null);
   const structurePrimitiveRef = useRef<StructureLinesPrimitive | null>(null);
   const tradesPrimitiveRef = useRef<TradesOverlayPrimitive | null>(null);
+  const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
   const candleTimeArrayRef = useRef<number[]>([]);
   const candleTimeMapRef = useRef<Map<number, ReplayCandle>>(new Map());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -521,6 +528,10 @@ export default function SimulationOfDead() {
   const [simLoading, setSimLoading] = useState<boolean>(false);
   const [simFramesMap, setSimFramesMap] = useState<Record<string, SimFrame>>({});
   const [isFrameLoading, setIsFrameLoading] = useState<boolean>(false);
+  const isFrameLoadingRef = useRef<boolean>(false);
+  useEffect(() => {
+    isFrameLoadingRef.current = isFrameLoading;
+  }, [isFrameLoading]);
   const [activeFrame, setActiveFrame] = useState<SimFrame | null>(null);
   const activeFrameAbortControllerRef = useRef<AbortController | null>(null);
   // ponytail: limit concurrent simulate-event fetches — drop excess, not queue
@@ -574,6 +585,21 @@ export default function SimulationOfDead() {
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
   const [selectedPattern, setSelectedPattern] = useState<any>(null);
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+
+  // Session zones for replay chart
+  const fromDateStr = `${yearFrom}-${String(monthFrom).padStart(2, "0")}-01`;
+  const { data: sessionZonesData } = useSessionZones(fromDateStr, "XAUUSD");
+  useEffect(() => {
+    const primitive = sessionZonesPrimitiveRef.current;
+    if (!primitive || !sessionZonesData?.zones?.length) return;
+    const boxes: SessionZoneBox[] = sessionZonesData.zones.map((z) => ({
+      start: z.start_time,
+      end: z.end_time,
+      session: z.session,
+      open: z.status === "OPEN",
+    }));
+    primitive.setBoxes(boxes);
+  }, [sessionZonesData]);
 
   const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
     if (!data) return;
@@ -760,6 +786,15 @@ export default function SimulationOfDead() {
       console.warn("Could not attach trades overlay primitive in replay:", e);
     }
 
+    // Init session zones primitive
+    try {
+      const sessionPrimitive = new SessionZonesPrimitive();
+      (candleSeriesRef.current as any).attachPrimitive(sessionPrimitive);
+      sessionZonesPrimitiveRef.current = sessionPrimitive;
+    } catch (e) {
+      console.warn("Could not attach session zones primitive in replay:", e);
+    }
+
     emaSeriesRef.current = chart.addSeries(LineSeries, {
       color: "#facc15",
       lineWidth: 1,
@@ -916,7 +951,7 @@ export default function SimulationOfDead() {
         const tpPrice = t.tp;
 
         // Check candles since entryTs up to current candle.time
-        const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+        const activeCandles = (replayData?.candles ?? []).filter(c => c.time >= entryTs && c.time <= candle.time);
         
         let isClosed = false;
         let exitPrice = null;
@@ -1020,6 +1055,7 @@ export default function SimulationOfDead() {
 
     // Also update chart markers
     if (tradesPrimitiveRef.current) {
+      tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
       const mapped = agentTrades
         .filter(t => (t.entry_time ?? 0) <= candle.time)
         .map(t => {
@@ -1031,7 +1067,7 @@ export default function SimulationOfDead() {
           const tpPrice = t.tp;
 
           // Check if closed at or before candle.time
-          const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+          const activeCandles = (replayData?.candles ?? []).filter(c => c.time >= entryTs && c.time <= candle.time);
           let isClosed = false;
           let exitPrice = null;
           let exitTime = null;
@@ -1087,7 +1123,7 @@ export default function SimulationOfDead() {
         });
       tradesPrimitiveRef.current.setTrades(mapped);
     }
-  }, [strategyParams, replayData, currentIndex, agentTrades]);
+  }, [strategyParams, replayData, currentIndex, agentTrades, activeTimeframe]);
 
 
 
@@ -1218,7 +1254,6 @@ export default function SimulationOfDead() {
     const newData = allReplayData[tf];
     if (newData) {
       setReplayData(newData);
-      setAgentTrades([]);
       candleTimeArrayRef.current = newData.candles.map(c => c.time);
       const map = new Map<number, ReplayCandle>();
       newData.candles.forEach(c => map.set(c.time, c));
@@ -1389,6 +1424,8 @@ export default function SimulationOfDead() {
 
     const linesToDraw: StructureLineItem[] = [];
     const currentCandleTime = candle.time;
+    const formedStructures = data.structures.filter(s => s.time <= currentCandleTime);
+    const visibleStructureEvents = selectSetupExtremeEvents(formedStructures);
 
     for (const s of data.structures) {
       const typeUpper = s.type?.toUpperCase() ?? "";
@@ -1431,6 +1468,10 @@ export default function SimulationOfDead() {
           });
         }
       } else if (typeUpper === "HH" || typeUpper === "LL" || typeUpper === "LH" || typeUpper === "HL") {
+        if (!visibleStructureEvents.has(s)) {
+          continue;
+        }
+
         // Skip HH/LL line drawing if it has already been broken by a BOS/CHOCH event at this playhead
         if (isLevelBrokenAtPlayhead(s, currentCandleTime)) {
           continue;
@@ -1514,7 +1555,7 @@ export default function SimulationOfDead() {
           const tpPrice = t.tp;
 
           // Check if closed at or before candle.time
-          const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+          const activeCandles = (replayData?.candles ?? []).filter(c => c.time >= entryTs && c.time <= candle.time);
           let isClosed = false;
           let exitPrice = null;
           let exitTime = null;
@@ -1570,7 +1611,7 @@ export default function SimulationOfDead() {
         });
       tradesPrimitiveRef.current.setTrades(entries);
       tradesPrimitiveRef.current.setLastCandleTime(candle.time);
-      tradesPrimitiveRef.current.setTimeframe("M15");
+      tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
     }
 
     // Track running trade stats
@@ -1590,7 +1631,7 @@ export default function SimulationOfDead() {
         const tpPrice = t.tp;
 
         // Check candles since entryTs up to current candle.time
-        const activeCandles = replayData.candles.filter(c => c.time >= entryTs && c.time <= candle.time);
+        const activeCandles = (replayData?.candles ?? []).filter(c => c.time >= entryTs && c.time <= candle.time);
         
         let isClosed = false;
         let exitPrice = null;
@@ -1702,6 +1743,7 @@ export default function SimulationOfDead() {
 
     let idx = currentIndex;
     timerRef.current = setInterval(() => {
+      if (isFrameLoadingRef.current) return;
       if (idx >= replayData.candles.length) {
         clearInterval(timerRef.current!);
         timerRef.current = null;
@@ -1838,10 +1880,23 @@ export default function SimulationOfDead() {
           if (frame && frame.approved && ["BUY", "SELL"].includes(frame.final_signal)) {
             setSimSignals(prev => {
               if (prev.some(s => s.time === frame.event_time)) return prev;
-              return [...prev, {
-                time: frame.event_time,
-                signal: frame.final_signal,
-              }];
+              const next = [...prev, { time: frame.event_time, signal: frame.final_signal }];
+              // ponytail: instant marker render — don't wait for next candle tick
+              if (markersPluginRef.current) {
+                const existingMarkers: any[] = [];
+                for (const sig of next) {
+                  existingMarkers.push({
+                    time: sig.time as any,
+                    position: sig.signal === "BUY" ? "belowBar" : "aboveBar",
+                    color: sig.signal === "BUY" ? "#22c55e" : "#ef4444",
+                    shape: sig.signal === "BUY" ? "arrowUp" : "arrowDown",
+                    text: sig.signal,
+                    size: 1,
+                  });
+                }
+                markersPluginRef.current.setMarkers(existingMarkers);
+              }
+              return next;
             });
 
             setAgentTrades(prev => {
@@ -1885,15 +1940,16 @@ export default function SimulationOfDead() {
   return (
     <div
       className="flex flex-col size-full text-[var(--text-primary)]"
-      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "250px", overflow: "hidden" }}
+      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "240px", overflow: "hidden" }}
     >
       {/* ── Header ── */}
       <div
         className="flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
         style={{ borderColor: "rgba(59,130,246,0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
-        <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex-shrink-0">
-          🎬 Replay Trades
+        <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex-shrink-0 flex items-center gap-2">
+          <Clapperboard className={cn("w-5 h-5 text-cyan-400 transition-all", isPlaying && "animate-spin")} style={{ animationDuration: isPlaying ? '3s' : '0s' }} />
+          <span>Replay Trades</span>
         </h1>
 
         {/* Filter controls + Playback Controls */}
@@ -1901,64 +1957,52 @@ export default function SimulationOfDead() {
           {/* If replayData is loaded, render playback controls FIRST! */}
           {replayData && (
             <>
-              {/* Rewind */}
-              <button
-                onClick={handlePrev}
-                disabled={isPlaying || currentIndex <= 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
-                style={{
-                  background: "rgba(167,139,250,0.15)",
-                  color: "#a78bfa",
-                  border: "1px solid rgba(167,139,250,0.3)",
-                }}
-              >
-                <Rewind size={12} />
-                Rewind
-              </button>
+              {/* Playback Control Deck */}
+              <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+                {/* Rewind */}
+                <button
+                  onClick={handlePrev}
+                  disabled={isPlaying || currentIndex <= 0}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
+                >
+                  <Rewind size={12} />
+                  <span>Rewind</span>
+                </button>
 
-              {/* Play / Pause */}
-              <button
-                onClick={isPlaying ? stopPlayback : startPlayback}
-                disabled={currentIndex >= totalCandles}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
-                style={{
-                  background: isPlaying ? "rgba(248,113,113,0.15)" : "rgba(34,211,238,0.15)",
-                  color: isPlaying ? "#f87171" : "#22d3ee",
-                  border: `1px solid ${isPlaying ? "rgba(248,113,113,0.3)" : "rgba(34,211,238,0.3)"}`,
-                }}
-              >
-                {isPlaying ? <Pause size={12} /> : <Play size={12} />}
-                {isPlaying ? "Pause" : "Play"}
-              </button>
+                {/* Play / Pause */}
+                <button
+                  onClick={isPlaying ? stopPlayback : startPlayback}
+                  disabled={currentIndex >= totalCandles}
+                  className={cn(
+                    "flex items-center gap-1 px-3 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer shadow-sm border",
+                    isPlaying
+                      ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
+                      : "bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
+                  )}
+                >
+                  {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+                  <span>{isPlaying ? "Pause" : "Play"}</span>
+                </button>
 
-              {/* Next */}
-              <button
-                onClick={handleNext}
-                disabled={isPlaying || currentIndex >= totalCandles}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-40 cursor-pointer"
-                style={{
-                  background: "rgba(167,139,250,0.15)",
-                  color: "#a78bfa",
-                  border: "1px solid rgba(167,139,250,0.3)",
-                }}
-              >
-                <SkipForward size={12} />
-                Next
-              </button>
+                {/* Next */}
+                <button
+                  onClick={handleNext}
+                  disabled={isPlaying || currentIndex >= totalCandles}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
+                >
+                  <SkipForward size={12} />
+                  <span>Next</span>
+                </button>
 
-              {/* Stop */}
-              <button
-                onClick={handleStop}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 hover:bg-[rgba(239,68,68,0.2)] cursor-pointer"
-                style={{
-                  background: "rgba(239,68,68,0.12)",
-                  color: "#ef4444",
-                  border: "1px solid rgba(239,68,68,0.25)",
-                }}
-              >
-                <Square size={12} />
-                Stop
-              </button>
+                {/* Stop */}
+                <button
+                  onClick={handleStop}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                >
+                  <Square size={12} />
+                  <span>Stop</span>
+                </button>
+              </div>
 
               {/* Speed */}
               <div className="flex items-center gap-1.5 ml-1">
@@ -1998,16 +2042,19 @@ export default function SimulationOfDead() {
               </div>
 
               {/* Legend */}
-              <div className="flex items-center gap-2 ml-1 text-xs">
+              <div className="flex items-center gap-1.5 ml-1 text-xs">
                 {Object.entries(STRUCTURE_COLORS).map(([k, c]) => (
-                  <span key={k} className="flex items-center gap-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: c }} />
-                    <span className="text-[10px] scale-90 origin-left">{k}</span>
+                  <span 
+                    key={k} 
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-950/40 border border-slate-800/40 text-[9px] font-semibold text-slate-400 hover:scale-105 duration-150 transition-all select-none shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />
+                    <span>{k}</span>
                   </span>
                 ))}
-                <span className="flex items-center gap-0.5">
-                  <span className="w-3 h-0.5 inline-block" style={{ background: "#facc15" }} />
-                  <span className="text-[10px] scale-90 origin-left">EMA200</span>
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-950/40 border border-slate-800/40 text-[9px] font-semibold text-slate-400 hover:scale-105 duration-150 transition-all select-none shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+                  <span className="w-3 h-0.5 inline-block" style={{ background: "#facc15", boxShadow: "0 0 4px #facc15" }} />
+                  <span>EMA200</span>
                 </span>
               </div>
 
@@ -2242,7 +2289,7 @@ export default function SimulationOfDead() {
         {!replayData && !loadError && (
           <div
             className="flex items-center justify-center flex-col gap-3 text-[var(--text-secondary,#94a3b8)] flex-shrink-0"
-            style={{ height: "790px" }}
+            style={{ height: "700px" }}
           >
             <span className="text-5xl">🎬</span>
             <p className="text-sm">Pilih rentang tanggal dan klik <strong>Load</strong> untuk memulai replay.</p>
@@ -2250,7 +2297,7 @@ export default function SimulationOfDead() {
         )}
 
         {/* ── Chart ── */}
-        <div className="relative px-4 pt-3 pb-0 flex-shrink-0" style={{ height: "790px", display: replayData ? "block" : "none" }}>
+        <div className="relative px-4 pt-3 pb-0 flex-shrink-0" style={{ height: "700px", display: replayData ? "block" : "none" }}>
           {/* Floating Tooltip/Legend */}
           {hoveredInfo && (
             <div className="absolute top-6 left-8 z-10 bg-slate-900/95 border border-slate-800/80 rounded px-3 py-1.5 text-[10px] font-mono flex items-center gap-3 text-slate-300 backdrop-blur-md pointer-events-none shadow-xl">

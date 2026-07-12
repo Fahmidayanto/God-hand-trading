@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold edges higher as US Treasury yields slip on softening inflation expectations",
+            "timestamp": "2026-02-05T01:30:00"
+        },
+        {
+            "headline": "Safe-haven demand lifts XAUUSD amid escalating geopolitical tensions in Eastern Europe",
+            "timestamp": "2026-02-05T02:45:00"
+        },
+        {
+            "headline": "Dollar weakness ahead of key economic data supports gold prices near $2,650 mark",
+            "timestamp": "2026-02-05T03:50:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Unemployment Rate",
+            "impact": "high",
+            "time": "2026-02-05T08:30:00"
+        },
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-05T10:00:00"
+        }
+    ]
+}

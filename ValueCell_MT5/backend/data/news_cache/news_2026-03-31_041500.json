@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold climbs as cooling US inflation data fuels Fed rate cut speculation",
+            "timestamp": "2026-03-31T01:45:00"
+        },
+        {
+            "headline": "Safe haven demand surges for XAUUSD as Treasury yields drop to multi-week lows",
+            "timestamp": "2026-03-31T02:30:00"
+        },
+        {
+            "headline": "Dollar weakness pushes gold near record highs ahead of key economic reports",
+            "timestamp": "2026-03-31T03:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-03-31T08:30:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as US CPI inflation exceeds expectations, safe haven demand intensifies",
+            "timestamp": "2026-03-20T17:30:00"
+        },
+        {
+            "headline": "XAUUSD retreats as Treasury yields spike following hawkish Fed commentary",
+            "timestamp": "2026-03-20T18:45:00"
+        },
+        {
+            "headline": "Gold steadies above $2,170 as investors seek safe haven amid banking sector jitters",
+            "timestamp": "2026-03-20T19:15:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-03-20T21:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-21T00:30:00"
+        }
+    ]
+}

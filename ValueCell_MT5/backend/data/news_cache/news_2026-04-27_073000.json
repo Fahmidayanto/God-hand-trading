@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rises as sticky inflation data fuels safe haven demand ahead of Fed meeting",
+            "timestamp": "2026-04-27T04:15:00"
+        },
+        {
+            "headline": "XAUUSD holds firm near record highs as Treasury yields slip on growth concerns",
+            "timestamp": "2026-04-27T05:50:00"
+        },
+        {
+            "headline": "Investors pile into gold as inflation expectations climb and dollar weakens",
+            "timestamp": "2026-04-27T06:25:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-04-27T08:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-04-27T10:00:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold prices steady near record highs as sticky inflation data fuels safe haven demand",
+            "timestamp": "2026-02-24T22:30:00"
+        },
+        {
+            "headline": "Declining US Treasury yields lift XAUUSD as investors reassess Fed rate cut path",
+            "timestamp": "2026-02-24T23:45:00"
+        },
+        {
+            "headline": "Gold extends gains in Asian session amid rising geopolitical tensions and inflation hedge buying",
+            "timestamp": "2026-02-25T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-02-25T03:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-02-25T05:30:00"
+        }
+    ]
+}

@@ -78,6 +78,11 @@ class LanceDBManager:
         if "trade_outcomes" not in self.db.table_names():
             logger.info("Creating collection: trade_outcomes")
             self._create_trade_outcomes_collection()
+
+        # Collection 5: News Sentiment Cache
+        if "news_sentiment_cache" not in self.db.table_names():
+            logger.info("Creating collection: news_sentiment_cache")
+            self._create_news_sentiment_cache_collection()
         
         logger.info(f"[OK] LanceDB collections ready: {len(self.db.table_names())} collections")
     
@@ -602,6 +607,87 @@ class LanceDBManager:
             logger.error(f"Failed to clear collection: {e}")
             return False
     
+    def _create_news_sentiment_cache_collection(self):
+        """Create news_sentiment_cache collection with sample data"""
+        sample_data = [{
+            "id": "sample_news_1",
+            "timestamp": "2020-01-01 00:00:00",
+            "event_type": "SAMPLE",
+            "news_headlines": "[]",
+            "upcoming_events": "[]",
+            "vector": [0.0, 0.0]
+        }]
+        df = pd.DataFrame(sample_data)
+        table = self.db.create_table("news_sentiment_cache", df)
+        logger.info("✅ Collection 'news_sentiment_cache' created")
+        return table
+
+    def read_news_cache(self, timestamp: str) -> Optional[Dict[str, Any]]:
+        """
+        Read cached news sentiment data for a specific timestamp or date.
+        Supports exact timestamp lookup or date-only lookup.
+        """
+        try:
+            if "news_sentiment_cache" not in self.db.table_names():
+                return None
+            tbl = self.db.open_table("news_sentiment_cache")
+            # First try exact timestamp
+            results = tbl.search().where(f"timestamp = '{timestamp}'").limit(1).to_pandas()
+            if not results.empty:
+                row = results.iloc[0]
+                import json
+                return {
+                    "news_headlines": json.loads(row["news_headlines"]),
+                    "upcoming_events": json.loads(row["upcoming_events"]),
+                    "event_type": row["event_type"],
+                }
+            
+            # Date-only fallback: if timestamp has space, extract YYYY-MM-DD
+            if " " in timestamp:
+                date_str = timestamp.split(" ")[0]
+                results = tbl.search().where(f"timestamp LIKE '{date_str}%'").limit(1).to_pandas()
+                if not results.empty:
+                    row = results.iloc[0]
+                    import json
+                    return {
+                        "news_headlines": json.loads(row["news_headlines"]),
+                        "upcoming_events": json.loads(row["upcoming_events"]),
+                        "event_type": row["event_type"],
+                    }
+            return None
+        except Exception as e:
+            logger.error(f"Failed to read news cache from LanceDB: {e}")
+            return None
+
+    def write_news_cache(self, timestamp: str, event_type: str, news_headlines: List[Dict[str, Any]], upcoming_events: List[Dict[str, Any]]):
+        """Write news sentiment data to cache in LanceDB"""
+        try:
+            import json
+            tbl = self.db.open_table("news_sentiment_cache")
+            # Check if it already exists to avoid duplicates
+            existing = tbl.search().where(f"timestamp = '{timestamp}'").limit(1).to_pandas()
+            import uuid
+            row_id = str(uuid.uuid4())
+            if not existing.empty:
+                # Update (lancedb update via delete then add)
+                tbl.delete(f"timestamp = '{timestamp}'")
+                row_id = existing.iloc[0]["id"]
+            
+            new_data = [{
+                "id": row_id,
+                "timestamp": timestamp,
+                "event_type": event_type,
+                "news_headlines": json.dumps(news_headlines),
+                "upcoming_events": json.dumps(upcoming_events),
+                "vector": [0.0, 0.0]
+            }]
+            tbl.add(new_data)
+            logger.info(f"✅ News sentiment cache written to LanceDB for {timestamp} ({event_type})")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to write news cache to LanceDB: {e}")
+            return False
+
     def close(self):
         """Close database connection"""
         # LanceDB doesn't need explicit close

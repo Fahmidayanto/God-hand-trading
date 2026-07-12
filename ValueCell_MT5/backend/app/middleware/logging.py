@@ -35,6 +35,11 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 "/api/v1/agents/",
                 "/api/v1/performance/",
                 "/api/v1/conversations/",
+                "/api/v1/trading/replay",
+                "/api/v1/trading/chart/rongsokan-data",
+                "/api/v1/trading/session-zones",
+                "/api/v1/trading/trades/history",
+                "/api/v1/trading/simulate-event",
             ]
             if any(path.startswith(prefix) for prefix in quiet_prefixes):
                 is_quiet = True

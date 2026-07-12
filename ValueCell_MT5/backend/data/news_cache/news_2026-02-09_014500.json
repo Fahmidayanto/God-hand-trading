@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "US Treasury yields slip on cooling inflation expectations, gold safe haven demand strengthens",
+            "timestamp": "2026-02-08T22:30:00"
+        },
+        {
+            "headline": "Dollar weakens as Fed officials hint at rate cut patience, XAUUSD tests $2,050 resistance",
+            "timestamp": "2026-02-08T23:45:00"
+        },
+        {
+            "headline": "Gold prices firm near weekly highs as global yield curve flattens amid growth concerns",
+            "timestamp": "2026-02-09T00:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-02-09T03:30:00"
+        },
+        {
+            "event": "FOMC",
+            "impact": "medium",
+            "time": "2026-02-09T06:00:00"
+        }
+    ]
+}

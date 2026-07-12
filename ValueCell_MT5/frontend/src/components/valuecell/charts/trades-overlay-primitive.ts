@@ -119,7 +119,8 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
         if (left > right) [left, right] = [right, left];
         left = Math.max(0, Math.min(width, left));
         right = Math.max(0, Math.min(width, right));
-        if (right - left < 0.5) continue;
+        // ponytail: 0-bar trades (stopped same candle) get min 2px width instead of skip
+        if (right - left < 2) right = left + 2;
 
         const snapHeight = (y: number) => Math.max(0, Math.min(height, y * vpr));
 

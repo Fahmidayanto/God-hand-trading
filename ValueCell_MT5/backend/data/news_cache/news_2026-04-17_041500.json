@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends rally as March CPI print fuels inflation concerns, spot XAUUSD eyes $2,450",
+            "timestamp": "2026-04-17T01:30:00"
+        },
+        {
+            "headline": "Falling Treasury yields boost safe-haven appeal of bullion amid geopolitical tensions",
+            "timestamp": "2026-04-17T02:45:00"
+        },
+        {
+            "headline": "Dollar weakness persists ahead of key economic data, gold holds firm near record highs",
+            "timestamp": "2026-04-17T03:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Unemployment Rate",
+            "impact": "high",
+            "time": "2026-04-17T08:30:00"
+        },
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-17T10:00:00"
+        }
+    ]
+}

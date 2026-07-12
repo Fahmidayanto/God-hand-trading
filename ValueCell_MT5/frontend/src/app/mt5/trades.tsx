@@ -503,17 +503,6 @@ export default function TradesPage() {
 
   useEffect(() => {
     loadTradeHistory();
-    loadMonthlyPNL();
-    const interval = setInterval(() => {
-      loadTradeHistory();
-      if (activeBottomTab === 'monthly-summary') {
-        loadMonthlyPNL();
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [activeBottomTab]);
-
-  useEffect(() => {
     if (activeBottomTab === 'monthly-summary') {
       loadMonthlyPNL();
     }

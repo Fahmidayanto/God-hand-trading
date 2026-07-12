@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold prices climb as US inflation expectations rise ahead of key CPI data release",
+            "timestamp": "2026-04-09T00:15:00"
+        },
+        {
+            "headline": "Safe haven demand lifts XAUUSD amid escalating geopolitical tensions in Middle East",
+            "timestamp": "2026-04-09T01:30:00"
+        },
+        {
+            "headline": "Falling Treasury yields boost gold appeal as investors eye potential Fed policy shift",
+            "timestamp": "2026-04-09T01:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-04-09T08:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-04-09T05:00:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as dovish Fed signals pause in rate hikes amid sticky inflation data",
+            "timestamp": "2026-01-16T14:30:00"
+        },
+        {
+            "headline": "US Dollar weakens after disappointing retail sales fuel recession fears, boosting safe-haven demand for XAU",
+            "timestamp": "2026-01-16T15:45:00"
+        },
+        {
+            "headline": "Treasury yields drop sharply on hawkish-to-dovish pivot speculation, lifting gold prices to session highs",
+            "timestamp": "2026-01-16T16:10:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "US Initial Jobless Claims",
+            "impact": "medium",
+            "time": "2026-01-16T18:30:00"
+        },
+        {
+            "event": "US Core PCE Price Index (Preliminary)",
+            "impact": "high",
+            "time": "2026-01-16T21:00:00"
+        }
+    ]
+}

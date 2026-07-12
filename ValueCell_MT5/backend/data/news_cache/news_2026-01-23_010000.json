@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold climbs as sticky inflation readings revive safe-haven demand despite rising yields",
+            "timestamp": "2026-01-22T22:15:00"
+        },
+        {
+            "headline": "XAUUSD holds firm near record highs as dollar softens on dovish Fed policy bets",
+            "timestamp": "2026-01-22T23:30:00"
+        },
+        {
+            "headline": "Treasury yields pull back from multi-week highs, easing pressure on non-yielding gold",
+            "timestamp": "2026-01-23T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-01-23T03:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-01-23T05:30:00"
+        }
+    ]
+}

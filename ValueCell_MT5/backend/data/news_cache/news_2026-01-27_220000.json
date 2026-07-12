@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges to new highs as safe haven demand intensifies amid recession fears",
+            "timestamp": "2026-01-27T19:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after dovish Fed comments suggest pause in rate hikes despite sticky inflation",
+            "timestamp": "2026-01-27T20:30:00"
+        },
+        {
+            "headline": "Treasury yields drop sharply, boosting non-yielding assets like XAUUSD ahead of key data",
+            "timestamp": "2026-01-27T21:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Consumer Confidence Index",
+            "impact": "medium",
+            "time": "2026-01-28T01:00:00"
+        },
+        {
+            "event": "FOMC Member Speech",
+            "impact": "high",
+            "time": "2026-01-28T03:30:00"
+        }
+    ]
+}

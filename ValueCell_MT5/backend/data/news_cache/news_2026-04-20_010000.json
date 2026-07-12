@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold edges higher as rising inflation expectations boost safe haven demand",
+            "timestamp": "2026-04-19T22:15:00"
+        },
+        {
+            "headline": "XAUUSD holds firm near record highs as Treasury yields slip on dovish Fed bets",
+            "timestamp": "2026-04-19T23:30:00"
+        },
+        {
+            "headline": "Safe haven inflows accelerate into gold amid escalating Middle East geopolitical tensions",
+            "timestamp": "2026-04-20T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-20T02:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-04-20T05:30:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold surges as safe haven demand intensifies amid recession fears and rising inflation expectations",
+            "timestamp": "2026-01-30T07:15:00"
+        },
+        {
+            "headline": "US Dollar weakens after Fed officials signal a dovish pivot, sending Treasury yields lower",
+            "timestamp": "2026-01-30T08:45:00"
+        },
+        {
+            "headline": "XAUUSD breaks resistance as hawkish ECB comments contrast with slowing US economic data",
+            "timestamp": "2026-01-30T09:30:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "Core PCE Price Index",
+            "impact": "high",
+            "time": "2026-01-30T13:30:00"
+        },
+        {
+            "event": "Consumer Sentiment",
+            "impact": "medium",
+            "time": "2026-01-30T15:00:00"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold climbs as rising US inflation expectations boost safe-haven demand amid geopolitical tensions",
+            "timestamp": "2026-03-08T22:30:00"
+        },
+        {
+            "headline": "Dollar softens on declining Treasury yields, XAUUSD eyes breakout above $2,150",
+            "timestamp": "2026-03-08T23:15:00"
+        },
+        {
+            "headline": "Fed officials signal cautious stance on rate cuts, gold holds firm near record highs",
+            "timestamp": "2026-03-08T21:45:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-03-09T03:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-09T05:30:00"
+        }
+    ]
+}

@@ -20,6 +20,16 @@ from app.utils.logger import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+# Configure Loguru format (remove file and line number for cleaner logs)
+from loguru import logger as loguru_logger
+import sys
+loguru_logger.remove()
+loguru_logger.add(
+    sys.stderr,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <level>{message}</level>",
+    level="DEBUG"
+)
+
 # Filter out quiet polling access logs in Uvicorn
 class QuietAccessLogFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -36,6 +46,11 @@ class QuietAccessLogFilter(logging.Filter):
                 "/api/v1/agents/",
                 "/api/v1/performance/",
                 "/api/v1/conversations/",
+                "/api/v1/trading/replay",
+                "/api/v1/trading/chart/rongsokan-data",
+                "/api/v1/trading/session-zones",
+                "/api/v1/trading/trades/history",
+                "/api/v1/trading/simulate-event",
             ]
             method = str(record.args[1])
             if method == "OPTIONS" or any(path.startswith(prefix) for prefix in quiet_prefixes):

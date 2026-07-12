@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold edges higher as US inflation expectations rise, safe haven demand strengthens ahead of FOMC minutes",
+            "timestamp": "2026-01-07T22:30:00"
+        },
+        {
+            "headline": "Dollar softens on declining Treasury yields, XAUUSD tests key resistance near $2,080 level",
+            "timestamp": "2026-01-07T23:45:00"
+        },
+        {
+            "headline": "Gold prices climb as investors seek safe haven amid global growth concerns and Fed rate cut speculation",
+            "timestamp": "2026-01-08T00:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-01-08T02:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-01-08T03:30:00"
+        }
+    ]
+}

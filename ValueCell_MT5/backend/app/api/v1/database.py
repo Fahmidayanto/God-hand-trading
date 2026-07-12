@@ -278,6 +278,7 @@ ALLOWED_LANCE_COLLECTIONS = [
     "market_conditions",
     "session_patterns",
     "trade_outcomes",
+    "news_sentiment_cache",
 ]
 
 class CsvSyncStatusItem(BaseModel):

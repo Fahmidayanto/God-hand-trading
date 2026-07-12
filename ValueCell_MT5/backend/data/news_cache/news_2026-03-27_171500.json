@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "US Core PCE Inflation Prints Above Expectations at 2.9%, Gold Rallies on Safe-Haven Demand as Treasury Yields Spike",
+            "timestamp": "2026-03-27T13:30:00"
+        },
+        {
+            "headline": "Dollar Index Slides to 3-Week Low, Gold Extends Gains as Real Yields Turn Negative Amid Growth Concerns",
+            "timestamp": "2026-03-27T14:45:00"
+        },
+        {
+            "headline": "Fed Officials Signal Cautious Stance on Rate Cuts, Gold Holds Firm Near Record Highs on Persistent Inflation Fears",
+            "timestamp": "2026-03-27T15:50:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-03-27T20:00:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-27T22:30:00"
+        }
+    ]
+}

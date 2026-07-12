@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold extends rally as US inflation expectations rise, safe haven demand surges amid geopolitical tensions",
+            "timestamp": "2026-04-07T22:30:00"
+        },
+        {
+            "headline": "XAUUSD holds firm above $2,650 as Treasury yields slip, investors eye upcoming CPI data for rate cut clues",
+            "timestamp": "2026-04-07T23:50:00"
+        },
+        {
+            "headline": "Dollar weakness boosts gold appeal; safe haven inflows accelerate on renewed trade war fears",
+            "timestamp": "2026-04-08T00:55:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "CPI",
+            "impact": "high",
+            "time": "2026-04-08T02:30:00"
+        },
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-04-08T06:00:00"
+        }
+    ]
+}

@@ -879,9 +879,10 @@ export default function ReplayTrades() {
             exit_time_ts: isClosed ? finalExitTs : null,
           };
         });
+      tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
       tradesPrimitiveRef.current.setTrades(mapped);
     }
-  }, [strategyParams, replayData, currentIndex]);
+  }, [strategyParams, replayData, currentIndex, activeTimeframe]);
 
   const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
     if (!data) return;
@@ -1362,7 +1363,7 @@ export default function ReplayTrades() {
         });
       tradesPrimitiveRef.current.setTrades(entries);
       tradesPrimitiveRef.current.setLastCandleTime(candle.time);
-      tradesPrimitiveRef.current.setTimeframe("M15");
+      tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
     }
 
     // Track running trade stats

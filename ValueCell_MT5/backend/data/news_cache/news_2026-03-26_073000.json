@@ -1,0 +1,28 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold rises as US inflation concerns resurface amid stubborn core PCE readings",
+            "timestamp": "2026-03-26T04:15:00"
+        },
+        {
+            "headline": "Falling Treasury yields boost safe haven appeal of bullion ahead of key economic data",
+            "timestamp": "2026-03-26T05:30:00"
+        },
+        {
+            "headline": "Dollar weakness near two-week low lifts XAUUSD toward $2,180 as rate cut bets grow",
+            "timestamp": "2026-03-26T06:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "GDP",
+            "impact": "high",
+            "time": "2026-03-26T09:30:00"
+        },
+        {
+            "event": "Unemployment Rate",
+            "impact": "medium",
+            "time": "2026-03-26T12:00:00"
+        }
+    ]
+}

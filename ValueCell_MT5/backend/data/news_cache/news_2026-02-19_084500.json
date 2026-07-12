@@ -1,0 +1,23 @@
+{
+    "news_headlines": [
+        {
+            "headline": "Gold edges higher as US inflation expectations rise ahead of key CPI data",
+            "timestamp": "2026-02-19T05:15:00"
+        },
+        {
+            "headline": "Safe haven demand lifts XAUUSD amid escalating geopolitical tensions in Eastern Europe",
+            "timestamp": "2026-02-19T06:40:00"
+        },
+        {
+            "headline": "Falling Treasury yields boost gold appeal as investors eye Fed rate path uncertainty",
+            "timestamp": "2026-02-19T07:20:00"
+        }
+    ],
+    "upcoming_events": [
+        {
+            "event": "FOMC",
+            "impact": "high",
+            "time": "2026-02-19T14:00:00"
+        }
+    ]
+}
