@@ -167,15 +167,30 @@ class FeatureEngineer:
                 break
         
         # Calculate ages (hours since event)
+        from datetime import timezone
         if last_bos:
-            bos_age = (current_time - last_bos["time"]).total_seconds() / 3600
+            bos_time = last_bos["time"]
+            if isinstance(bos_time, (int, float)):
+                bos_time = datetime.fromtimestamp(bos_time, tz=timezone.utc).replace(tzinfo=None)
+            elif hasattr(bos_time, "tzinfo") and bos_time.tzinfo is not None:
+                bos_time = bos_time.replace(tzinfo=None)
+                
+            curr_time = current_time.replace(tzinfo=None) if hasattr(current_time, "tzinfo") and current_time.tzinfo is not None else current_time
+            bos_age = (curr_time - bos_time).total_seconds() / 3600
             bos_direction = 1 if "BULLISH" in last_bos["type"] else -1
         else:
             bos_age = 999.0  # No recent BoS
             bos_direction = 0
         
         if last_choch:
-            choch_age = (current_time - last_choch["time"]).total_seconds() / 3600
+            choch_time = last_choch["time"]
+            if isinstance(choch_time, (int, float)):
+                choch_time = datetime.fromtimestamp(choch_time, tz=timezone.utc).replace(tzinfo=None)
+            elif hasattr(choch_time, "tzinfo") and choch_time.tzinfo is not None:
+                choch_time = choch_time.replace(tzinfo=None)
+                
+            curr_time = current_time.replace(tzinfo=None) if hasattr(current_time, "tzinfo") and current_time.tzinfo is not None else current_time
+            choch_age = (curr_time - choch_time).total_seconds() / 3600
             choch_direction = 1 if "BULLISH" in last_choch["type"] else -1
         else:
             choch_age = 999.0

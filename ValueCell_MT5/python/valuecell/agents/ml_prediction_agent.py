@@ -180,7 +180,7 @@ class MLPredictionAgent:
             momentum_5_atr = (entry_price - close_5) / atr_14
             
         # H1 and H4 context
-        h1_atr_14 = atr_14 * 1.5
+        h1_atr_14 = 0.0
         if h1_history is not None and not h1_history.empty:
             high = h1_history["high"].astype(float).to_numpy()
             low = h1_history["low"].astype(float).to_numpy()
@@ -191,7 +191,7 @@ class MLPredictionAgent:
                 
         h1_atr_14_pct = (h1_atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
         
-        h4_atr_14 = atr_14 * 2.0
+        h4_atr_14 = 0.0
         if h4_history is not None and not h4_history.empty:
             high = h4_history["high"].astype(float).to_numpy()
             low = h4_history["low"].astype(float).to_numpy()
@@ -244,49 +244,87 @@ class MLPredictionAgent:
             
         day_of_week = float(current_time.weekday())
         
-        # Session opens/closes and priority maps
-        session_priority = 0.0
-        session_start = current_time.replace(hour=22, minute=0, second=0)
-        session_end = current_time.replace(hour=7, minute=0, second=0)
-        
-        if session == "Asia":
-            session_priority = 1.0
-            session_start = current_time.replace(hour=0, minute=0, second=0)
-            session_end = current_time.replace(hour=9, minute=0, second=0)
-        elif session == "London":
-            session_priority = 2.0
-            session_start = current_time.replace(hour=7, minute=0, second=0)
-            session_end = current_time.replace(hour=16, minute=0, second=0)
-        elif session in ["NY", "NewYork"]:
-            session_priority = 3.0
-            session_start = current_time.replace(hour=13, minute=0, second=0)
-            session_end = current_time.replace(hour=22, minute=0, second=0)
+        session_zone = market_data.get("session_zone")
+        if session_zone:
+            session = session_zone.get("session", "Other")
+            session_is_dst = session_zone.get("is_dst", "NO")
             
-        minutes_from_session_open = float((current_time - session_start).total_seconds() / 60.0)
-        minutes_to_session_close = float((session_end - current_time).total_seconds() / 60.0)
-        
-        # Calculate dynamic high/low of current session
-        session_high = entry_price
-        session_low = entry_price
-        if m15_history is not None and not m15_history.empty:
-            sess_mask = (m15_history["time"] >= session_start) & (m15_history["time"] <= current_time)
-            session_bars = m15_history[sess_mask]
-            if not session_bars.empty:
-                session_high = float(session_bars["high"].max())
-                session_low = float(session_bars["low"].min())
+            session_start = session_zone.get("start_time")
+            session_end = session_zone.get("end_time")
+            if isinstance(session_start, str):
+                session_start = pd.to_datetime(session_start)
+            if isinstance(session_end, str):
+                session_end = pd.to_datetime(session_end)
                 
-        session_range_points = (session_high - session_low) * 100.0 # gold points (1 USD = 100 points)
-        price_position_session_range = (entry_price - session_low) / (session_high - session_low) if (session_high > session_low) else 0.5
-        
-        distance_to_session_high_atr = (session_high - entry_price) / atr_14 if atr_14 > 0 else 0.0
-        distance_to_session_low_atr = (entry_price - session_low) / atr_14 if atr_14 > 0 else 0.0
-        
-        # DST Check
-        session_is_dst_NO = 1.0 # default to NO (standard time, winter)
-        # Check standard DST offset
-        import time as pytime
-        if pytime.localtime().tm_isdst > 0:
-            session_is_dst_NO = 0.0
+            if session_start and session_start.tzinfo is not None:
+                session_start = session_start.replace(tzinfo=None)
+            if session_end and session_end.tzinfo is not None:
+                session_end = session_end.replace(tzinfo=None)
+            current_time_naive = current_time.replace(tzinfo=None) if current_time.tzinfo is not None else current_time
+            
+            session_range_points = float(session_zone.get("range_points", 0.0))
+            session_high = float(session_zone.get("high_price", entry_price))
+            session_low = float(session_zone.get("low_price", entry_price))
+            
+            minutes_from_session_open = float((current_time_naive - session_start).total_seconds() / 60.0) if session_start else 0.0
+            minutes_to_session_close = float((session_end - current_time_naive).total_seconds() / 60.0) if session_end else 0.0
+            price_position_session_range = (entry_price - session_low) / (session_high - session_low) if (session_high > session_low) else 0.5
+            distance_to_session_high_atr = (session_high - entry_price) / atr_14 if atr_14 > 0 else 0.0
+            distance_to_session_low_atr = (entry_price - session_low) / atr_14 if atr_14 > 0 else 0.0
+            
+            session_priority = 0.0
+            if session == "Asia":
+                session_priority = 1.0
+            elif session == "London":
+                session_priority = 2.0
+            elif session in ["NY", "NewYork", "NewYork_London_Overlap", "London_NewYork_Overlap", "London_NY_Overlap"]:
+                session_priority = 3.0
+                
+            session_is_dst_NO = 1.0 if session_is_dst == "NO" else 0.0
+        else:
+            # Session opens/closes and priority maps
+            session_priority = 0.0
+            session_start = current_time.replace(hour=22, minute=0, second=0)
+            session_end = current_time.replace(hour=7, minute=0, second=0)
+            
+            if session == "Asia":
+                session_priority = 1.0
+                session_start = current_time.replace(hour=0, minute=0, second=0)
+                session_end = current_time.replace(hour=9, minute=0, second=0)
+            elif session == "London":
+                session_priority = 2.0
+                session_start = current_time.replace(hour=7, minute=0, second=0)
+                session_end = current_time.replace(hour=16, minute=0, second=0)
+            elif session in ["NY", "NewYork"]:
+                session_priority = 3.0
+                session_start = current_time.replace(hour=13, minute=0, second=0)
+                session_end = current_time.replace(hour=22, minute=0, second=0)
+                
+            minutes_from_session_open = float((current_time - session_start).total_seconds() / 60.0)
+            minutes_to_session_close = float((session_end - current_time).total_seconds() / 60.0)
+            
+            # Calculate dynamic high/low of current session
+            session_high = entry_price
+            session_low = entry_price
+            if m15_history is not None and not m15_history.empty:
+                sess_mask = (m15_history["time"] >= session_start) & (m15_history["time"] <= current_time)
+                session_bars = m15_history[sess_mask]
+                if not session_bars.empty:
+                    session_high = float(session_bars["high"].max())
+                    session_low = float(session_bars["low"].min())
+                    
+            session_range_points = (session_high - session_low) * 100.0 # gold points (1 USD = 100 points)
+            price_position_session_range = (entry_price - session_low) / (session_high - session_low) if (session_high > session_low) else 0.5
+            
+            distance_to_session_high_atr = (session_high - entry_price) / atr_14 if atr_14 > 0 else 0.0
+            distance_to_session_low_atr = (entry_price - session_low) / atr_14 if atr_14 > 0 else 0.0
+            
+            # DST Check
+            session_is_dst_NO = 1.0 # default to NO (standard time, winter)
+            # Check standard DST offset
+            import time as pytime
+            if pytime.localtime().tm_isdst > 0:
+                session_is_dst_NO = 0.0
             
         # Swing distance features (structural SL/TP context)
         structure_events = market_data.get("structure_events", [])
@@ -323,6 +361,7 @@ class MLPredictionAgent:
             "body_ratio_ea": body_ratio_ea,
             "distance_to_session_high_atr": distance_to_session_high_atr,
             "h4_atr_14": h4_atr_14,
+            "h1_atr_14": h1_atr_14,
             "h4_atr_14_pct": h4_atr_14_pct,
             "h1_atr_14_pct": h1_atr_14_pct,
             "h1_ext_ema200_distance_atr": h1_ext_ema200_distance_atr,

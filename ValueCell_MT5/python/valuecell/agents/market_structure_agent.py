@@ -282,7 +282,7 @@ class MarketStructureAgent:
             # ── Pemeriksaan Skenario ──
 
             # 1. PENDING_SETUP - Bullish (CHoCH anywhere in recent events + HH terbentuk)
-            if t1 == "HH" and _has_recent_choch("Bullish"):
+            if t1.startswith("HH") and _has_recent_choch("Bullish"):
                 pre_signal = self._on_choch_hh_formed(
                     event_type="HH",
                     direction="Bullish",
@@ -307,7 +307,7 @@ class MarketStructureAgent:
                 )
 
             # 2. PENDING_SETUP - Bearish (CHoCH anywhere in recent events + LL terbentuk)
-            elif t1 == "LL" and _has_recent_choch("Bearish"):
+            elif t1.startswith("LL") and _has_recent_choch("Bearish"):
                 pre_signal = self._on_choch_hh_formed(
                     event_type="LL",
                     direction="Bearish",

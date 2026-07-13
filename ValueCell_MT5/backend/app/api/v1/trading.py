@@ -1368,12 +1368,34 @@ async def get_simulation_data(
          "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
         for r in candle_rows
     ]
-    structure_events = [
-        {"id": r[0], "type": (r[1] or "").strip(), "direction": (r[2] or "").strip(), "price": float(r[3]) if r[3] is not None else None,
-         "time": _ts(r[4]), "timeframe": r[5], "status": r[6],
-         "previous_price": float(r[7]) if r[7] is not None else None, "previous_time": _ts(r[8])}
-        for r in structure_rows
-    ]
+    structure_events = []
+    for r in structure_rows:
+        r_type = (r[1] or "").strip().upper()
+        r_dir = (r[2] or "").strip().upper()
+        kind = "BOS" if "BOS" in r_type else "CHOCH" if "CHOCH" in r_type else r_type
+        if r_type in ("HH", "LL") and not r_dir:
+            direction = "BULLISH" if r_type == "HH" else "BEARISH"
+        elif "BULL" in r_dir or "BULL" in r_type:
+            direction = "BULLISH"
+        elif "BEAR" in r_dir or "BEAR" in r_type:
+            direction = "BEARISH"
+        elif r_dir == "UPDATE":
+            direction = "BULLISH" if r_type == "HH" else "BEARISH" if r_type == "LL" else "UPDATE"
+        else:
+            direction = r_dir
+            
+        evt_type = f"{kind}_{direction}" if direction else kind
+        structure_events.append({
+            "id": r[0],
+            "type": evt_type,
+            "direction": r_dir,
+            "price": float(r[3]) if r[3] is not None else None,
+            "time": _ts(r[4]),
+            "timeframe": r[5],
+            "status": r[6],
+            "previous_price": float(r[7]) if r[7] is not None else None,
+            "previous_time": _ts(r[8])
+        })
     backtest_trades = [
         {"ticket": r[0], "type": r[1], "entry_price": float(r[2]) if r[2] is not None else None,
          "exit_price": float(r[3]) if r[3] is not None else None, "sl": float(r[4]) if r[4] is not None else None,
@@ -1420,6 +1442,7 @@ async def get_single_event_simulation(
     """Run the OrchestratorAgent for a single historical event timestamp."""
     logger.info(f"--- SIMULATE EVENT ENDPOINT HIT: time={time} type={type} ---")
     from datetime import date, datetime, timedelta, timezone
+    session_row = None
     from app.core.database import get_db_conn, is_pool_ready
     from app.services.orchestrator_simulator import (
         analyze_with_orchestrator_lock,
@@ -1443,7 +1466,12 @@ async def get_single_event_simulation(
     try:
         cache_key = (candle_table, date_from, date_to)
         if cache_key in _sim_candle_cache:
-            candle_rows, structure_rows, h1_rows, h4_rows = _sim_candle_cache[cache_key]
+            cached_data = _sim_candle_cache[cache_key]
+            if len(cached_data) == 5:
+                candle_rows, structure_rows, h1_rows, h4_rows, session_row = cached_data
+            else:
+                candle_rows, structure_rows, h1_rows, h4_rows = cached_data
+                session_row = None
         else:
             with get_db_conn() as conn:
                 with conn.cursor() as cur:
@@ -1479,10 +1507,18 @@ async def get_single_event_simulation(
                     )
                     h4_rows = cur.fetchall()
 
+                    # Fetch active session zone for the event time
+                    cur.execute(
+                        "SELECT session, is_dst, start_time, end_time, open_price, high_price, low_price, close_price, range_points "
+                        "FROM sessionzone_xauusd WHERE start_time <= %s ORDER BY start_time DESC LIMIT 1",
+                        (dt_event,),
+                    )
+                    session_row = cur.fetchone()
+
             # Store in cache (FIFO eviction)
             if len(_sim_candle_cache) >= _SIM_CACHE_MAX:
                 del _sim_candle_cache[next(iter(_sim_candle_cache))]
-            _sim_candle_cache[cache_key] = (candle_rows, structure_rows, h1_rows, h4_rows)
+            _sim_candle_cache[cache_key] = (candle_rows, structure_rows, h1_rows, h4_rows, session_row)
     except Exception as e:
         logger.error(f"Event simulation DB error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -1499,12 +1535,34 @@ async def get_single_event_simulation(
          "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
         for r in candle_rows
     ]
-    structure_events = [
-        {"id": r[0], "type": (r[1] or "").strip(), "direction": (r[2] or "").strip(), "price": float(r[3]) if r[3] is not None else None,
-         "time": _ts(r[4]), "timeframe": r[5], "status": r[6],
-         "previous_price": float(r[7]) if r[7] is not None else None, "previous_time": _ts(r[8])}
-        for r in structure_rows
-    ]
+    structure_events = []
+    for r in structure_rows:
+        r_type = (r[1] or "").strip().upper()
+        r_dir = (r[2] or "").strip().upper()
+        kind = "BOS" if "BOS" in r_type else "CHOCH" if "CHOCH" in r_type else r_type
+        if r_type in ("HH", "LL") and not r_dir:
+            direction = "BULLISH" if r_type == "HH" else "BEARISH"
+        elif "BULL" in r_dir or "BULL" in r_type:
+            direction = "BULLISH"
+        elif "BEAR" in r_dir or "BEAR" in r_type:
+            direction = "BEARISH"
+        elif r_dir == "UPDATE":
+            direction = "BULLISH" if r_type == "HH" else "BEARISH" if r_type == "LL" else "UPDATE"
+        else:
+            direction = r_dir
+            
+        evt_type = f"{kind}_{direction}" if direction else kind
+        structure_events.append({
+            "id": r[0],
+            "type": evt_type,
+            "direction": r_dir,
+            "price": float(r[3]) if r[3] is not None else None,
+            "time": _ts(r[4]),
+            "timeframe": r[5],
+            "status": r[6],
+            "previous_price": float(r[7]) if r[7] is not None else None,
+            "previous_time": _ts(r[8])
+        })
 
     # Find the target structure event matching the target time
     target_evs = [e for e in structure_events if e["time"] == time]
@@ -1513,7 +1571,8 @@ async def get_single_event_simulation(
         target_ev = {"type": "HH", "direction": "Bullish", "price": 0.0, "time": time}
     else:
         if type:
-            matched_evs = [e for e in target_evs if e["type"].upper() == type.upper()]
+            # substring matching because of format differences, e.g. "BOS" in "BOS_BULLISH"
+            matched_evs = [e for e in target_evs if type.upper() in e["type"].upper()]
             if matched_evs:
                 target_ev = matched_evs[0]
             else:
@@ -1571,9 +1630,23 @@ async def get_single_event_simulation(
             f"Candles: {len(candles)} | Structures: {len(structure_events)}"
         )
 
+        session_zone = None
+        if session_row:
+            session_zone = {
+                "session": session_row[0],
+                "is_dst": session_row[1],
+                "start_time": session_row[2],
+                "end_time": session_row[3],
+                "open_price": float(session_row[4]) if session_row[4] is not None else None,
+                "high_price": float(session_row[5]) if session_row[5] is not None else None,
+                "low_price": float(session_row[6]) if session_row[6] is not None else None,
+                "close_price": float(session_row[7]) if session_row[7] is not None else None,
+                "range_points": float(session_row[8]) if session_row[8] is not None else None,
+            }
+
         md = reconstruct_market_data(
             base_df, time, structure_events, generate_news=True, event_type_hint=type,
-            h1_df=h1_df, h4_df=h4_df, target_event_id=target_ev.get("id")
+            h1_df=h1_df, h4_df=h4_df, target_event_id=target_ev.get("id"), session_zone=session_zone
         )
         _news_count = len(md.get("news_headlines", []))
         _cal_count = len(md.get("upcoming_events", []))

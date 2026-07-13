@@ -301,6 +301,7 @@ def reconstruct_market_data(
     h1_df: Optional[pd.DataFrame] = None,
     h4_df: Optional[pd.DataFrame] = None,
     target_event_id: Optional[int] = None,
+    session_zone: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     df = df[df["time"] <= _to_dt(event_time)].copy()
     if h1_df is not None and not h1_df.empty:
@@ -363,10 +364,10 @@ def reconstruct_market_data(
             if ev.get("time", 0) == event_time:
                 continue
             ev_type = ev.get("type", "").upper()
-            if ev_type in ("CHOCH", "BOS"):
-                recent_baseline = ev_type
-                if ev_type == "CHOCH":
-                    recent_choch_dir = ev.get("direction", "").upper()
+            if "CHOCH" in ev_type or "BOS" in ev_type:
+                recent_baseline = "CHOCH" if "CHOCH" in ev_type else "BOS"
+                if "CHOCH" in ev_type:
+                    recent_choch_dir = "BULLISH" if "BULL" in ev_type or "BULL" in str(ev.get("direction", "")).upper() else "BEARISH"
                 break
 
         # LLM only searches for news when:
@@ -380,12 +381,16 @@ def reconstruct_market_data(
         # Bearish setup: CHoCH Bear + LL (setup swing) -> HH is counter-swing -> IDLE
         # Post-BoS: any HH/LL after BoS is ignored until next CHoCH resets the cycle
         is_post_bos = recent_baseline == "BOS"
+        
+        is_bos = "BOS" in target_ev_type
+        is_hh_ll = any(x in target_ev_type for x in ("HH", "LL"))
+        
         is_counter_swing = is_post_bos or (is_setup_active and (
-            (target_ev_type == "LL" and recent_choch_dir and ("BULL" in recent_choch_dir or "UP" in recent_choch_dir)) or
-            (target_ev_type == "HH" and recent_choch_dir and "BEAR" in recent_choch_dir)
+            (any(x in target_ev_type for x in ("LL", "BEAR")) and recent_choch_dir and "BULL" in recent_choch_dir) or
+            (any(x in target_ev_type for x in ("HH", "BULL")) and recent_choch_dir and "BEAR" in recent_choch_dir)
         ))
 
-        should_run_llm = target_ev_type == "BOS" or (target_ev_type in ("HH", "LL") and is_setup_active and not is_counter_swing)
+        should_run_llm = is_bos or (is_hh_ll and is_setup_active and not is_counter_swing)
 
         if not should_run_llm:
             logger.info(f"💤 Simulator orchestrator is IDLE (event: {target_ev_type}) -> Skipping news LLM generation")
@@ -402,7 +407,8 @@ def reconstruct_market_data(
         "structure_events": events_up_to,
         "m15_history": df,
         "atr": atr,
-        "session": session,
+        "session": session_zone.get("session") if session_zone else session,
+        "session_zone": session_zone,
         "news_headlines": news_headlines,
         "upcoming_events": upcoming_events,
         "is_counter_swing": is_counter_swing if generate_news else False,
@@ -596,7 +602,7 @@ def run_simulation(
     orch = get_orchestrator()
 
     # Keep only structure-event types the orchestrator should react to.
-    structure_events = [e for e in structure_events if (e.get("type") or "").upper() in TRIGGER_TYPES]
+    structure_events = [e for e in structure_events if any(t in (e.get("type") or "").upper() for t in TRIGGER_TYPES)]
 
     # Cap the number of structure events processed so the simulation always
     # returns in bounded time even for very wide date ranges. Processing
@@ -629,6 +635,35 @@ def run_simulation(
         f"Sentiment: {'ON' if _has_sent else 'OFF'} | News: OFF"
     )
     _sim_t0 = _time.monotonic()
+
+    # Load session zones for simulation range in bulk
+    session_zones = []
+    try:
+        from app.core.database import get_db_conn
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT session, is_dst, start_time, end_time, open_price, high_price, low_price, close_price, range_points "
+                    "FROM sessionzone_xauusd WHERE DATE(start_time) >= %s AND DATE(end_time) <= %s ORDER BY start_time ASC",
+                    (_to_dt(_first_ts).date(), _to_dt(_last_ts).date()),
+                )
+                session_zones = [
+                    {
+                        "session": r[0],
+                        "is_dst": r[1],
+                        "start_time": r[2],
+                        "end_time": r[3],
+                        "open_price": float(r[4]) if r[4] is not None else None,
+                        "high_price": float(r[5]) if r[5] is not None else None,
+                        "low_price": float(r[6]) if r[6] is not None else None,
+                        "close_price": float(r[7]) if r[7] is not None else None,
+                        "range_points": float(r[8]) if r[8] is not None else None,
+                    }
+                    for r in cur.fetchall()
+                ]
+        logger.info(f"Loaded {len(session_zones)} session zones for simulation range")
+    except Exception as e:
+        logger.warning(f"Could not load session zones for simulation bulk run: {e}")
 
     # Build the base DataFrame ONCE (datetime index, sorted) instead of
     # reconstructing the full frame on every structure event.
@@ -688,10 +723,22 @@ def run_simulation(
             last_event_date = current_date
         except Exception as pfe:
             logger.warning(f"Failed to check day change pre-fetch: {pfe}")
+        session_zone = None
+        for sz in session_zones:
+            sz_start = int(sz["start_time"].timestamp())
+            sz_end = int(sz["end_time"].timestamp())
+            if sz_start <= ev_time <= sz_end:
+                session_zone = sz
+                break
+        if session_zone is None:
+            sz_candidates = [sz for sz in session_zones if int(sz["start_time"].timestamp()) <= ev_time]
+            if sz_candidates:
+                session_zone = sz_candidates[-1]
+
         try:
             md = reconstruct_market_data(
                 base_df, ev_time, structure_events, generate_news=True, event_type_hint=ev.get("type"),
-                h1_df=h1_df, h4_df=h4_df, target_event_id=ev.get("id")
+                h1_df=h1_df, h4_df=h4_df, target_event_id=ev.get("id"), session_zone=session_zone
             )
         except Exception as e:
             logger.warning(f"sim: skip event {ev_time}: {e}")

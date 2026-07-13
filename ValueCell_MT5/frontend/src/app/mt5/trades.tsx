@@ -95,10 +95,9 @@ export default function TradesPage() {
   // Data loading mode state
   const [dataMode, setDataMode] = useState<'recent' | 'full' | 'loading'>('recent');
   const [chartFromDate, setChartFromDate] = useState(() => {
-    // Default: 6 months ago
     const date = new Date();
-    date.setMonth(date.getMonth() - 6);
-    return date.toISOString().split('T')[0];
+    const currentYear = date.getFullYear();
+    return `${currentYear}-01-01`;
   });
   const [candlesCount, setCandlesCount] = useState(0);
 
@@ -166,6 +165,46 @@ export default function TradesPage() {
       console.error("Error loading monthly trades:", error);
     } finally {
       setIsLoadingTrades(false);
+    }
+  };
+
+  const handleTradeClick = async (trade: any) => {
+    setIsModalOpen(false);
+
+    const timeParts = trade.entry_time.split(' ')[0].split('.');
+    const year = timeParts[0];
+    const month = timeParts[1];
+
+    const formattedTime = trade.entry_time.replace(/\./g, '-').replace(' ', 'T') + 'Z';
+    const tradeTimestamp = Date.parse(formattedTime) / 1000;
+
+    console.log("🎯 handleTradeClick: jumping to", year, month, "for trade timestamp", tradeTimestamp);
+
+    const loadedCandles = await jumpToDate(year, month);
+
+    const timeScale = chartRef.current?.timeScale();
+    if (!timeScale) return;
+
+    const cacheKey = activeTimeframe;
+    const cachedData = candleCacheRef.current[cacheKey];
+    const candlesToSearch = loadedCandles || (cachedData && fullHistoryLoadedRef.current[cacheKey] 
+      ? cachedData.candles 
+      : chartCandles);
+
+    if (candlesToSearch && candlesToSearch.length > 0) {
+      const idx = candlesToSearch.findIndex((c) => c.time >= tradeTimestamp);
+      if (idx >= 0) {
+        console.log("🎯 Scrolling chart to candle index", idx, "for timestamp", tradeTimestamp);
+        requestAnimationFrame(() => {
+          timeScale.setVisibleLogicalRange({
+            from: (idx - 50) as any,
+            to: (idx + 100) as any,
+          });
+          chartRef.current?.priceScale('right').applyOptions({
+            autoScale: true,
+          });
+        });
+      }
     }
   };
 
@@ -508,6 +547,72 @@ export default function TradesPage() {
     }
   }, [activeBottomTab]);
 
+  // Dynamic stats calculation based on dropdown filter (Jan - selectedMonth)
+  useEffect(() => {
+    if (!backtestTradesData || !backtestTradesData.trades) return;
+
+    const tradesList = backtestTradesData.trades;
+
+    // Start of the selected year
+    const startTimestamp = Date.parse(`${selectedYear}-01-01T00:00:00Z`) / 1000;
+
+    // End of the selected month
+    const nextMonth = parseInt(selectedMonth) + 1;
+    const endYear = nextMonth > 12 ? parseInt(selectedYear) + 1 : parseInt(selectedYear);
+    const endMonth = nextMonth > 12 ? 1 : nextMonth;
+    const endMonthStr = String(endMonth).padStart(2, '0');
+    const endTimestamp = Date.parse(`${endYear}-${endMonthStr}-01T00:00:00Z`) / 1000;
+
+    // Filter closed trades within the range (January to selected month)
+    const filteredClosed = tradesList.filter((t: BacktestTrade) => {
+      const isClosed = t.exit_time_ts !== null && t.exit_time !== null && t.exit_time !== '1970.01.01 00:00:00';
+      if (!isClosed) return false;
+      const exitTs = t.exit_time_ts!;
+      return exitTs >= startTimestamp && exitTs < endTimestamp;
+    });
+
+    // Filter open trades within the range
+    const filteredOpen = tradesList.filter((t: BacktestTrade) => {
+      const isClosed = t.exit_time_ts !== null && t.exit_time !== null && t.exit_time !== '1970.01.01 00:00:00';
+      if (isClosed) return false;
+      return t.entry_time_ts >= startTimestamp && t.entry_time_ts < endTimestamp;
+    });
+
+    const totalTrades = filteredClosed.length;
+    const winCount = filteredClosed.filter((t: BacktestTrade) => t.profit > 0).length;
+    const winRate = totalTrades > 0 ? (winCount / totalTrades) * 100 : 0;
+    const totalPnL = filteredClosed.reduce((sum: number, t: BacktestTrade) => sum + t.profit, 0);
+
+    setStats({
+      total_trades: totalTrades,
+      win_rate: winRate,
+      total_pnl: totalPnL,
+      open_positions: filteredOpen.length,
+    });
+
+    // Map BacktestTrade to Trade interface for the table
+    const mappedTrades: Trade[] = [...filteredClosed, ...filteredOpen].map((t: BacktestTrade) => {
+      const ticket = (t as any).ticket;
+      const tradeId = (t as any).trade_id || (ticket ? `#TRD-${String(ticket).padStart(3, '0')}` : `#TRD-${t.entry_time_ts}`);
+      return {
+        trade_id: tradeId,
+        symbol: t.symbol,
+        type: t.type,
+        entry_price: t.entry_price,
+        exit_price: t.exit_price,
+        lot_size: t.lot_size,
+        pnl: t.profit,
+        status: t.exit_time_ts !== null && t.exit_time !== null && t.exit_time !== '1970.01.01 00:00:00' ? "CLOSED" : "OPEN",
+        open_time: t.entry_time,
+      };
+    });
+
+    // Sort by open time descending
+    mappedTrades.sort((a, b) => new Date(b.open_time).getTime() - new Date(a.open_time).getTime());
+
+    setTrades(mappedTrades);
+  }, [backtestTradesData, selectedYear, selectedMonth]);
+
   useEffect(() => {
     // Auto-refresh chart data every 30 seconds (increased from 5s for performance)
     // ONLY refresh in recent mode AND only if user hasn't jumped to specific date
@@ -606,6 +711,15 @@ export default function TradesPage() {
           updateLoadedCandles(processedCandles, data.candles_count || processedCandles.length);
           if (mode === 'full' && processedCandles.length > 0) {
             cacheFullHistory(timeframe, processedCandles);
+          }
+
+          if (!isJumping && processedCandles.length > 0) {
+            const lastCandle = processedCandles[processedCandles.length - 1];
+            const lastCandleDate = new Date(lastCandle.time * 1000);
+            const latestYear = String(lastCandleDate.getUTCFullYear());
+            const latestMonth = String(lastCandleDate.getUTCMonth() + 1).padStart(2, '0');
+            setSelectedYear(latestYear);
+            setSelectedMonth(latestMonth);
           }
 
           // Restore viewport position or align timeline after switching timeframes
@@ -891,7 +1005,7 @@ export default function TradesPage() {
       } finally {
         setIsJumping(false);
       }
-      return;
+      return cachedData.candles;
     }
 
     // No cache available - fetch from API (fallback to original behavior)
@@ -934,6 +1048,7 @@ export default function TradesPage() {
             await overlayMarketStructure(processedCandles, true);
           }
           console.log(`✅ Jumped to ${centerDate} successfully`);
+          return processedCandles;
         }
       }
     } catch (error) {
@@ -942,6 +1057,7 @@ export default function TradesPage() {
     } finally {
       setIsJumping(false);
     }
+    return undefined;
   };
 
   // Handle year change - jump to January of selected year
@@ -1924,7 +2040,9 @@ export default function TradesPage() {
               <div className="text-2xl font-semibold mono mb-1">
                 {stats.total_trades}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Last 30 days</div>
+              <div className="text-sm text-[var(--text-tertiary)]">
+                Jan - {availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} {selectedYear}
+              </div>
             </div>
 
             <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
@@ -2464,7 +2582,12 @@ export default function TradesPage() {
                               .map((trade) => {
                                 const isWin = trade.net_profit >= 0;
                                 return (
-                                  <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors">
+                                  <tr
+                                    key={trade.ticket}
+                                    onClick={() => handleTradeClick(trade)}
+                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                                    title="Klik untuk melihat transaksi di chart"
+                                  >
                                     <td className="py-3 px-4 mono text-xs text-slate-400">#{trade.ticket}</td>
                                     <td className="py-3 px-4">
                                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${trade.type === "BUY"

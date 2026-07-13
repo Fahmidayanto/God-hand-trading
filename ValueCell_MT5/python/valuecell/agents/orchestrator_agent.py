@@ -174,13 +174,14 @@ class OrchestratorAgent:
                     # to match the feature alignment of the training dataset.
                     if ms_signal in ["BUY", "SELL"] and "ml_prediction" in self.agents:
                         logger.debug("🔍 Running fresh ML validation on execution trigger bar...")
-                        ml_result = self.agents["ml_prediction"].analyze(
+                        ml_result = self.agents["ml_prediction"].analyze({
                                 "current_bar": market_data["current_bar"],
                                 "structure_events": market_data.get("structure_events", []),
                                 "h1_data": market_data.get("h1_data"),
                                 "h4_data": market_data.get("h4_data"),
                                 "m15_history": market_data.get("m15_history"),
                                 "session": market_data.get("session", "Other"),
+                                "session_zone": market_data.get("session_zone"),
                                 **{k: v for k, v in {
                                     "spread": market_data.get("spread"),
                                     "init_risk_points": market_data.get("init_risk_points"),
@@ -251,13 +252,14 @@ class OrchestratorAgent:
                     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                         # Submit ML Agent
                         future_ml = executor.submit(
-                            self.agents["ml_prediction"].analyze,
+                            self.agents["ml_prediction"].analyze, {
                                 "current_bar": market_data["current_bar"],
                                 "structure_events": market_data.get("structure_events", []),
                                 "h1_data": market_data.get("h1_data"),
                                 "h4_data": market_data.get("h4_data"),
                                 "m15_history": market_data.get("m15_history"),
                                 "session": market_data.get("session", "Other"),
+                                "session_zone": market_data.get("session_zone"),
                                 **{k: v for k, v in {
                                     "spread": market_data.get("spread"),
                                     "init_risk_points": market_data.get("init_risk_points"),
@@ -307,7 +309,7 @@ class OrchestratorAgent:
                     if run_ml:
                         logger.debug("🤖 Step 2: ML Prediction Validation...")
                         target_signal = ms_signal
-                        ml_result = self.agents["ml_prediction"].analyze(
+                        ml_result = self.agents["ml_prediction"].analyze({
                                 "current_bar": market_data["current_bar"],
                                 "structure_events": market_data.get("structure_events", []),
                                 "h1_data": market_data.get("h1_data"),
