@@ -787,76 +787,142 @@ async def place_order(
 @router.get("/trades/history")
 async def get_trades_history(
     days: int = Query(30, ge=1, le=365, description="Number of days"),
-    mt5: MT5Manager = Depends(get_mt5_manager),
 ):
     """
-    Get trade history with statistics.
-    
-    Args:
-        days: Number of days to fetch (1-365)
-        
-    Returns:
-        Trades with summary statistics
+    Get trade history with statistics from Backtest_result CSV files.
     """
-    try:
-        deals = mt5.get_history_deals(days)
+    import csv
+    from datetime import datetime, timedelta
+    from pathlib import Path
 
-        # Group deals into trades
-        trades = []
-        total_profit = 0
-        win_count = 0
-        loss_count = 0
-        
-        for deal in deals[:50]:  # Limit to 50 recent
-            # Skip non-trading deals (balance operations, deposits, etc.)
-            symbol = deal.get("symbol", "")
-            if not symbol or symbol == "":
-                continue  # Skip deals without symbol (balance operations)
-            
-            profit = float(deal.get("profit", 0))
-            total_profit += profit
-            
-            if profit > 0:
-                win_count += 1
-            elif profit < 0:
-                loss_count += 1
-            
-            trade_data = {
-                "trade_id": f"#TRD-{str(deal['ticket']).zfill(3)}",
-                "ticket": deal["ticket"],
-                "symbol": symbol,
-                "type": "BUY" if deal.get("type", 0) == 0 else "SELL",
-                "volume": float(deal.get("volume", 0)),
-                "entry_price": float(deal.get("price", 0)),
-                "exit_price": float(deal.get("price", 0)) if deal.get("entry") == 1 else None,
-                "lot_size": float(deal.get("volume", 0)),
-                "pnl": profit,
-                "profit": profit,
-                "status": "CLOSED" if deal.get("entry") == 1 else "OPEN",
-                "open_time": deal.get("time", ""),
-                "close_time": deal.get("time", "") if deal.get("entry") == 1 else None,
-                "comment": deal.get("comment", ""),
+    try:
+        # Resolve Backtest_result path robustly
+        current_file = Path(__file__).resolve()
+        project_root = None
+        for parent in current_file.parents:
+            if (parent / "Backtest_result").exists():
+                project_root = parent
+                break
+        if not project_root:
+            project_root = current_file.parents[5]
+        backtest_dir = project_root / "Backtest_result"
+
+        if not backtest_dir.exists():
+            return {
+                "trades": [],
+                "total_trades": 0,
+                "win_rate": 0,
+                "total_pnl": 0,
+                "open_positions": 0
             }
-            trades.append(trade_data)
+
+        csv_files = sorted(backtest_dir.glob("Backtest_Results_XAUUSD_*.csv"))
+        all_trades = []
+
+        for csv_file in csv_files:
+            try:
+                with open(csv_file, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        status = row.get("Status", "").upper().strip()
+                        if status != "EXECUTED":
+                            continue
+
+                        ticket = row.get("Ticket", "")
+                        symbol = row.get("Symbol", "XAUUSD")
+                        trade_type = row.get("Type", "").strip()
+                        entry_price = float(row.get("EntryPrice", 0) or 0)
+                        exit_price = float(row.get("ExitPrice", 0) or 0)
+                        lot_size = float(row.get("LotSize", 0) or 0)
+                        profit = float(row.get("Net_Profit", 0) or row.get("Profit", 0) or 0)
+                        comment = row.get("CloseReason", row.get("Reject_Reason", ""))
+
+                        entry_time_str = row.get("EntryTime", "")
+                        exit_time_str = row.get("ExitTime", "")
+
+                        # Parse times
+                        entry_dt = None
+                        for fmt in ['%Y.%m.%d %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+                            try:
+                                entry_dt = datetime.strptime(entry_time_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+
+                        exit_dt = None
+                        for fmt in ['%Y.%m.%d %H:%M:%S', '%Y-%m-%d %H:%M:%S']:
+                            try:
+                                exit_dt = datetime.strptime(exit_time_str, fmt)
+                                break
+                            except ValueError:
+                                continue
+
+                        if not entry_dt:
+                            continue
+
+                        all_trades.append({
+                            "trade_id": f"#TRD-{str(ticket).zfill(3)}",
+                            "ticket": ticket,
+                            "symbol": symbol,
+                            "type": trade_type,
+                            "volume": lot_size,
+                            "entry_price": entry_price,
+                            "exit_price": exit_price if exit_price > 0 else None,
+                            "lot_size": lot_size,
+                            "pnl": profit,
+                            "profit": profit,
+                            "status": "CLOSED" if (exit_dt and exit_time_str != '1970.01.01 00:00:00') else "OPEN",
+                            "open_time": entry_dt.isoformat() + "Z",
+                            "close_time": exit_dt.isoformat() + "Z" if exit_dt else None,
+                            "comment": comment,
+                            "exit_dt": exit_dt
+                        })
+            except Exception as e:
+                logger.warning(f"Error reading file {csv_file.name}: {e}")
+
+        if not all_trades:
+            return {
+                "trades": [],
+                "total_trades": 0,
+                "win_rate": 0,
+                "total_pnl": 0,
+                "open_positions": 0
+            }
+
+        # Sort trades by exit time descending (most recent first)
+        all_trades.sort(key=lambda t: t["exit_dt"] if t["exit_dt"] else datetime.min, reverse=True)
+
+        # Get max exit date from closed trades to anchor "recent" filter
+        closed_trades = [t for t in all_trades if t["status"] == "CLOSED"]
+        max_exit_dt = max((t["exit_dt"] for t in closed_trades if t["exit_dt"]), default=datetime.now())
+
+        # Filter trades within the last `days` days of max_exit_dt
+        start_date = max_exit_dt - timedelta(days=days)
+        filtered_trades = [
+            t for t in all_trades 
+            if t["status"] == "CLOSED" and t["exit_dt"] and t["exit_dt"] >= start_date
+        ]
 
         # Calculate statistics
-        total_trades = len(trades)
+        total_trades = len(filtered_trades)
+        win_count = len([t for t in filtered_trades if t["profit"] > 0])
         win_rate = (win_count / total_trades * 100) if total_trades > 0 else 0
-        
-        # Count open positions
-        positions = mt5.get_positions()
-        open_positions = len(positions) if positions else 0
+        total_pnl = sum(t["profit"] for t in filtered_trades)
+
+        # Remove temporary datetime objects before returning
+        for t in filtered_trades:
+            t.pop("exit_dt", None)
 
         return {
-            "trades": trades,
+            "trades": filtered_trades,
             "total_trades": total_trades,
             "win_rate": round(win_rate, 1),
-            "total_pnl": round(total_profit, 2),
-            "open_positions": open_positions,
+            "total_pnl": round(total_pnl, 2),
+            "open_positions": 0,
         }
 
     except Exception as e:
-        logger.error(f"Trades history fetch error: {e}")
+        logger.error(f"Trades history fetch error: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
@@ -1067,6 +1133,20 @@ async def get_replay_data(
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
+                # Delete existing simulation decisions for this range to avoid duplicates
+                try:
+                    cur.execute(
+                        "DELETE FROM simulation_decisions WHERE event_time >= %s AND event_time <= %s",
+                        (date_from, date_to),
+                    )
+                    if hasattr(conn, "commit"):
+                        conn.commit()
+                    logger.info(f"Deleted existing simulation decisions between {date_from} and {date_to}")
+                except Exception as de:
+                    logger.warning(f"Could not delete old decisions (might not exist yet): {de}")
+                    if hasattr(conn, "rollback"):
+                        conn.rollback()
+
                 # Fetch candles
                 cur.execute(
                     f"""
@@ -1235,6 +1315,20 @@ async def get_simulation_data(
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
+                # Delete existing simulation decisions for this range to avoid duplicates
+                try:
+                    cur.execute(
+                        "DELETE FROM simulation_decisions WHERE event_time >= %s AND event_time <= %s",
+                        (date_from, date_to),
+                    )
+                    if hasattr(conn, "commit"):
+                        conn.commit()
+                    logger.info(f"Deleted existing simulation decisions between {date_from} and {date_to}")
+                except Exception as de:
+                    logger.warning(f"Could not delete old decisions: {de}")
+                    if hasattr(conn, "rollback"):
+                        conn.rollback()
+
                 cur.execute(
                     f"SELECT time, open, high, low, close, volume, ema200 "
                     f"FROM {candle_table} WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
@@ -1507,6 +1601,81 @@ async def get_single_event_simulation(
 
         # Propagate counter-swing flag from market data into result so _build_frame can include it
         result["is_counter_swing"] = md.get("is_counter_swing", False)
+
+        # Log decision to NeonDB (or local fallback queue if database is offline)
+        try:
+            from datetime import timezone
+            from app.services.simulation_logger import _sim_logger
+            from app.services.orchestrator_simulator import _detect_session, forward_walk_outcome
+            
+            _ar = result.get("agent_results") or {}
+            _ms = _ar.get("market_structure") or {}
+            _ml = _ar.get("ml_prediction") or {}
+            _st = _ar.get("sentiment") or {}
+            
+            appr = bool(result.get("approved"))
+            sig = result.get("final_signal", "HOLD")
+            
+            # For outcome calculation
+            outcome_val = "NONE"
+            outcome_bar = None
+            pnl_pips = None
+            entry_p = (result.get("sl_tp") or {}).get("entry_price") or md.get("current_bar", {}).get("close")
+            
+            if appr and sig in ("BUY", "SELL"):
+                sl = (result.get("sl_tp") or {}).get("sl_price")
+                tp = (result.get("sl_tp") or {}).get("tp_price")
+                outcome = forward_walk_outcome(candles, time, sig, sl, tp)
+                outcome_val = outcome["outcome"]
+                outcome_bar = outcome["outcome_bar"]
+                
+                if outcome_val == "TP" and entry_p and tp:
+                    pnl_pips = round(abs(tp - entry_p) / 0.1, 1)
+                elif outcome_val == "SL" and entry_p and sl:
+                    pnl_pips = -round(abs(sl - entry_p) / 0.1, 1)
+            
+            log_data = {
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "event_time": datetime.fromtimestamp(time, tz=timezone.utc),
+                "event_type": target_ev.get("type"),
+                "event_price": target_ev.get("price"),
+                "session": _detect_session(time),
+                "entry_session": _detect_session(time),
+                "final_signal": sig,
+                "final_confidence": result.get("final_confidence"),
+                "consensus_level": result.get("consensus_level"),
+                "approved": appr,
+                "ms_signal": _ms.get("signal"),
+                "ms_confidence": _ms.get("confidence"),
+                "ml_signal": _ml.get("signal"),
+                "ml_confidence": _ml.get("confidence"),
+                "sent_signal": _st.get("final_signal"),
+                "sent_confidence": _st.get("final_confidence"),
+                "ml_model_version": _ml.get("model_type") or "regression_v5",
+                "news_context": md.get("news_headlines"),
+                "calendar_context": md.get("upcoming_events"),
+                "market_structure_state": {
+                    "is_counter_swing": result.get("is_counter_swing", False)
+                }
+            }
+            
+            if appr and sig in ("BUY", "SELL"):
+                log_data.update({
+                    "entry_price": entry_p,
+                    "sl_price": (result.get("sl_tp") or {}).get("sl_price"),
+                    "tp_price": (result.get("sl_tp") or {}).get("tp_price"),
+                    "lot_size": (result.get("position_sizing") or {}).get("lot_size"),
+                    "outcome": outcome_val,
+                    "outcome_bar_time": datetime.fromtimestamp(outcome_bar, tz=timezone.utc) if outcome_bar else None,
+                    "pnl_pips": pnl_pips,
+                })
+            else:
+                log_data["reject_reason"] = (result.get("reasoning") or result.get("error") or "consensus_failed")[:200]
+                
+            _sim_logger.log_decision(log_data)
+        except Exception as _le:
+            loguru_logger.warning(f"[SimLogger] simulate-event log failed: {_le}")
 
         frame = _build_frame(target_ev, result)
         frame_dict = frame.dict() if hasattr(frame, "dict") else dict(frame)

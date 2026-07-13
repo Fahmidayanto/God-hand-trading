@@ -23,6 +23,29 @@ def test_reconstruct_market_data():
     assert md["session"] in ("Asia", "London", "NewYork", "Sydney")
     assert md["news_headlines"] == []
 
+
+def test_reconstruct_market_data_stops_at_target_event_id():
+    """Same-time replay events must retain their original DB/CSV sequence."""
+    candles = _candles()
+    df = pd.DataFrame(candles)
+    df["time"] = pd.to_datetime(df["time"], unit="s", utc=True)
+    df["high_low"] = df["high"] - df["low"]
+    event_time = candles[-1]["time"]
+    events = [
+        {"id": 17, "type": "BOS", "direction": "Bearish", "time": event_time},
+        {"id": 18, "type": "LL", "direction": "Update", "time": event_time},
+    ]
+
+    at_bos = reconstruct_market_data(
+        df, event_time, events, target_event_id=17
+    )
+    at_ll = reconstruct_market_data(
+        df, event_time, events, target_event_id=18
+    )
+
+    assert [event["type"] for event in at_bos["structure_events"]] == ["BOS"]
+    assert [event["type"] for event in at_ll["structure_events"]] == ["BOS", "LL"]
+
 from app.services.orchestrator_simulator import forward_walk_outcome
 
 def _fw_candles():
@@ -248,7 +271,7 @@ def test_simulate_endpoint(monkeypatch):
         def fetchall(self):
             return self._rows
     candle_rows = [(__import__("datetime").datetime(2024,1,1,0,0), 100,102,98,101,10,100.0)]
-    struct_rows = [("BOS","bullish",101.0,__import__("datetime").datetime(2024,1,1,0,0),"M15","active",100.0,__import__("datetime").datetime(2024,1,1,0,0))]
+    struct_rows = [(1,"BOS","bullish",101.0,__import__("datetime").datetime(2024,1,1,0,0),"M15","active",100.0,__import__("datetime").datetime(2024,1,1,0,0))]
     trade_rows = [("T1","BUY",100.0,105.0,98.0,200.0,2.0,"Asia",__import__("datetime").datetime(2024,1,1,0,0),__import__("datetime").datetime(2024,1,1,1,0),0.1)]
 
     class FakeConn:

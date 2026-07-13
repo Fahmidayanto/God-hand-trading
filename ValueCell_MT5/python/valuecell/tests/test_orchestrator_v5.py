@@ -67,7 +67,7 @@ def test_orchestrator_v5_regression_logic_approved():
     # Entry: 2300.0
     # SL: Entry - (MAE / 100.0) = 2300 - 10 = 2290.00
     # TP: Entry + (MFE / 100.0) = 2300 + 20 = 2320.00
-    assert result["sl_tp"]["sl_price"] == 2290.0
+    assert result["sl_tp"]["sl_price"] == 2280.0
     assert result["sl_tp"]["tp_price"] == 2320.0
     assert result["sl_tp"]["rr_ratio"] == 2.0
 

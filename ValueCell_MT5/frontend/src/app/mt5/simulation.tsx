@@ -156,6 +156,7 @@ interface CustomSelectProps<T> {
   options: T[];
   getLabel: (val: T) => string;
   accent: "blue" | "purple";
+  className?: string;
 }
 
 function CustomSelect<T extends string | number>({
@@ -164,6 +165,7 @@ function CustomSelect<T extends string | number>({
   options,
   getLabel,
   accent,
+  className,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -181,10 +183,13 @@ function CustomSelect<T extends string | number>({
   const c = SELECT_ACCENTS[accent];
 
   return (
-    <div ref={containerRef} className="relative select-none z-[100] group">
+    <div ref={containerRef} className={cn("relative select-none z-[100] group", className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap outline-none"
+        className={cn(
+          "inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap outline-none",
+          className ? "w-full justify-between" : ""
+        )}
         style={{
           backgroundColor: c.bg,
           borderColor: c.border,
@@ -1944,7 +1949,7 @@ export default function SimulationOfDead() {
     >
       {/* ── Header ── */}
       <div
-        className="flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
+        className="relative z-30 flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
         style={{ borderColor: "rgba(59,130,246,0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
         <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex-shrink-0 flex items-center gap-2">
@@ -1953,7 +1958,7 @@ export default function SimulationOfDead() {
         </h1>
 
         {/* Filter controls + Playback Controls */}
-        <div className="flex items-center gap-2 flex-nowrap flex-1 justify-end ml-4 min-w-0 overflow-x-auto whitespace-nowrap">
+        <div className="flex items-center gap-2 flex-wrap flex-1 justify-end ml-4 min-w-0">
           {/* If replayData is loaded, render playback controls FIRST! */}
           {replayData && (
             <>
@@ -2102,6 +2107,7 @@ export default function SimulationOfDead() {
               options={availableMonthsFrom}
               getLabel={(val) => MONTHS[val - 1]}
               accent="purple"
+              className="w-32"
             />
 
             <span className="text-[var(--text-secondary,#94a3b8)] text-sm font-semibold">→</span>
@@ -2120,6 +2126,7 @@ export default function SimulationOfDead() {
               options={availableMonthsTo}
               getLabel={(val) => MONTHS[val - 1]}
               accent="purple"
+              className="w-32"
             />
 
             {/* Custom Switch Toggle "Run Orchestrator" */}

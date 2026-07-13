@@ -170,7 +170,29 @@ class OrchestratorAgent:
                 run_sent = "sentiment" in self.agents
                 
                 if use_cache:
-                    ml_result = self._latest_warmup_results["ml_prediction"]
+                    # Run a fresh ML prediction on confirmed execution triggers (BUY/SELL)
+                    # to match the feature alignment of the training dataset.
+                    if ms_signal in ["BUY", "SELL"] and "ml_prediction" in self.agents:
+                        logger.debug("🔍 Running fresh ML validation on execution trigger bar...")
+                        ml_result = self.agents["ml_prediction"].analyze(
+                                "current_bar": market_data["current_bar"],
+                                "structure_events": market_data.get("structure_events", []),
+                                "h1_data": market_data.get("h1_data"),
+                                "h4_data": market_data.get("h4_data"),
+                                "m15_history": market_data.get("m15_history"),
+                                "session": market_data.get("session", "Other"),
+                                **{k: v for k, v in {
+                                    "spread": market_data.get("spread"),
+                                    "init_risk_points": market_data.get("init_risk_points"),
+                                    "init_reward_points": market_data.get("init_reward_points"),
+                                }.items() if v is not None}
+                            },
+                            structure_signal=ms_signal,
+                            symbol=symbol,
+                        )
+                    else:
+                        ml_result = self._latest_warmup_results.get("ml_prediction")
+                        
                     agent_results["ml_prediction"] = ml_result
                     
                     if ms_signal in ["BUY", "SELL"]:
@@ -230,11 +252,17 @@ class OrchestratorAgent:
                         # Submit ML Agent
                         future_ml = executor.submit(
                             self.agents["ml_prediction"].analyze,
-                            market_data={
                                 "current_bar": market_data["current_bar"],
                                 "structure_events": market_data.get("structure_events", []),
                                 "h1_data": market_data.get("h1_data"),
-                                "m15_history": market_data.get("m15_history")
+                                "h4_data": market_data.get("h4_data"),
+                                "m15_history": market_data.get("m15_history"),
+                                "session": market_data.get("session", "Other"),
+                                **{k: v for k, v in {
+                                    "spread": market_data.get("spread"),
+                                    "init_risk_points": market_data.get("init_risk_points"),
+                                    "init_reward_points": market_data.get("init_reward_points"),
+                                }.items() if v is not None}
                             },
                             structure_signal=warmup_signal,
                             symbol=symbol,
@@ -280,11 +308,17 @@ class OrchestratorAgent:
                         logger.debug("🤖 Step 2: ML Prediction Validation...")
                         target_signal = ms_signal
                         ml_result = self.agents["ml_prediction"].analyze(
-                            market_data={
                                 "current_bar": market_data["current_bar"],
                                 "structure_events": market_data.get("structure_events", []),
                                 "h1_data": market_data.get("h1_data"),
-                                "m15_history": market_data.get("m15_history")
+                                "h4_data": market_data.get("h4_data"),
+                                "m15_history": market_data.get("m15_history"),
+                                "session": market_data.get("session", "Other"),
+                                **{k: v for k, v in {
+                                    "spread": market_data.get("spread"),
+                                    "init_risk_points": market_data.get("init_risk_points"),
+                                    "init_reward_points": market_data.get("init_reward_points"),
+                                }.items() if v is not None}
                             },
                             structure_signal=target_signal,
                             symbol=symbol,

@@ -137,8 +137,33 @@ def _row(data: Dict[str, Any]) -> tuple:
     ])
 
 
+from pathlib import Path
+
+_QUEUE_FILE = Path(__file__).resolve().parent.parent.parent / "data" / "sim_fallback_queue.json"
+
+
+def _serialize_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    res = {}
+    for k, v in d.items():
+        if isinstance(v, datetime):
+            res[k] = {"__type__": "datetime", "value": v.isoformat()}
+        else:
+            res[k] = v
+    return res
+
+
+def _deserialize_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+    res = {}
+    for k, v in d.items():
+        if isinstance(v, dict) and v.get("__type__") == "datetime":
+            res[k] = datetime.fromisoformat(v["value"])
+        else:
+            res[k] = v
+    return res
+
+
 class SimulationLogger:
-    """Insert simulation decisions into NeonDB. Never raises — failures are logged."""
+    """Insert simulation decisions into NeonDB. Never raises — failures are logged to a local fallback queue."""
 
     _initialized = False
 
@@ -158,10 +183,55 @@ class SimulationLogger:
         except Exception as e:
             logger.warning(f"[SimLogger] ensure_table failed: {e}")
 
+    def _write_to_queue(self, rows: List[Dict[str, Any]]) -> None:
+        try:
+            _QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            existing = []
+            if _QUEUE_FILE.exists():
+                try:
+                    with open(_QUEUE_FILE, "r") as f:
+                        existing = json.load(f)
+                except Exception:
+                    existing = []
+            
+            existing.extend([_serialize_dict(r) for r in rows])
+            with open(_QUEUE_FILE, "w") as f:
+                json.dump(existing, f, indent=4)
+            logger.info(f"[SimLogger] Wrote {len(rows)} failed decisions to local queue buffer.")
+        except Exception as e:
+            logger.error(f"[SimLogger] Failed to write to fallback queue: {e}")
+
+    def _flush_queue(self) -> None:
+        from app.core.database import is_pool_ready
+        if not is_pool_ready() or not _QUEUE_FILE.exists():
+            return
+        try:
+            with open(_QUEUE_FILE, "r") as f:
+                raw_rows = json.load(f)
+            if not raw_rows:
+                return
+            
+            rows = [_deserialize_dict(r) for r in raw_rows]
+            logger.info(f"[SimLogger] Database reconnected. Flushing {len(rows)} queued decisions...")
+            self.ensure_table()
+            
+            from app.core.database import get_db_conn
+            with get_db_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.executemany(_INSERT_SQL, [_row(r) for r in rows])
+                conn.commit()
+                
+            _QUEUE_FILE.unlink(missing_ok=True)
+            logger.info(f"[SimLogger] Successfully flushed {len(rows)} queued decisions to NeonDB.")
+        except Exception as e:
+            logger.warning(f"[SimLogger] Failed to flush fallback queue: {e}")
+
     def log_decision(self, data: Dict[str, Any]) -> None:
         try:
+            self._flush_queue()
             from app.core.database import get_db_conn, is_pool_ready
             if not is_pool_ready():
+                self._write_to_queue([data])
                 return
             self.ensure_table()
             with get_db_conn() as conn:
@@ -169,14 +239,17 @@ class SimulationLogger:
                     cur.execute(_INSERT_SQL, _row(data))
                 conn.commit()
         except Exception as e:
-            logger.warning(f"[SimLogger] log_decision failed: {e}")
+            logger.warning(f"[SimLogger] log_decision failed, buffering: {e}")
+            self._write_to_queue([data])
 
     def log_decisions_bulk(self, rows: List[Dict[str, Any]]) -> None:
         if not rows:
             return
         try:
+            self._flush_queue()
             from app.core.database import get_db_conn, is_pool_ready
             if not is_pool_ready():
+                self._write_to_queue(rows)
                 return
             self.ensure_table()
             with get_db_conn() as conn:
@@ -185,7 +258,8 @@ class SimulationLogger:
                 conn.commit()
             logger.info(f"[SimLogger] Bulk logged {len(rows)} decisions.")
         except Exception as e:
-            logger.warning(f"[SimLogger] log_decisions_bulk failed: {e}")
+            logger.warning(f"[SimLogger] log_decisions_bulk failed, buffering: {e}")
+            self._write_to_queue(rows)
 
 
 # ponytail: module-level singleton, avoids re-instantiation overhead

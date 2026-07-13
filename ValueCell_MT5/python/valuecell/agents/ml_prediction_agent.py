@@ -127,6 +127,14 @@ class MLPredictionAgent:
     ) -> Dict[str, Any]:
         """Extract all engineered features required for v5 regression models."""
         import numpy as np
+
+        def numeric_or_default(value: Any, default: float) -> float:
+            """Coerce nullable simulation inputs to a finite model-safe float."""
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return default
+            return number if np.isfinite(number) else default
         
         # Base features from standard FeatureEngineer
         base_features = self.feature_engineer.extract_features(
@@ -141,16 +149,16 @@ class MLPredictionAgent:
         h4_history = market_data.get("h4_data")
         
         # Calculate ATR on M15
-        atr_14 = base_features.get("atr_14", 7.5)
+        atr_14 = numeric_or_default(base_features.get("atr_14"), 7.5)
         if atr_14 <= 0:
             atr_14 = 7.5
             
         atr_14_pct = (atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
         
         # Spread calculation
-        spread = market_data.get("spread", 0.15) # in price units, default 15 points
+        spread = numeric_or_default(market_data.get("spread"), 0.15) # in price units, default 15 points
         if m15_history is not None and not m15_history.empty and "spread" in m15_history.columns:
-            spread = float(m15_history.iloc[-1].get("spread", 0.15))
+            spread = numeric_or_default(m15_history.iloc[-1].get("spread"), spread)
         spread_pct = (spread / entry_price) * 100.0 if entry_price > 0 else 0.0
         spread_to_atr_ratio = spread / atr_14
         
@@ -158,8 +166,8 @@ class MLPredictionAgent:
         body_ratio_ea = base_features.get("body_ratio", 0.5)
         
         # Initial planned R:R (Defaulting to 1.0 setup if not passed)
-        init_risk_points = market_data.get("init_risk_points", 300.0) # in points
-        init_reward_points = market_data.get("init_reward_points", 300.0)
+        init_risk_points = numeric_or_default(market_data.get("init_risk_points"), 300.0) # in points
+        init_reward_points = numeric_or_default(market_data.get("init_reward_points"), 300.0)
         init_risk_pct = (init_risk_points / entry_price) * 100.0 if entry_price > 0 else 0.0
         
         # Momentum lookbacks
@@ -213,6 +221,16 @@ class MLPredictionAgent:
             h1_ext_ema200_distance_atr = (entry_price - h1_ema) / h1_atr_14 if h1_atr_14 > 0 else 0.0
             h1_ext_ema200_distance_pct = (h1_ext_ema200_distance_atr * h1_atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
             
+        # ponytail: calculate M15 EMA 200 features as requested
+        m15_ema200_distance_atr = 0.0
+        m15_ema200_distance_pct = 0.0
+        if m15_history is not None and not m15_history.empty:
+            m15_history = m15_history.copy()
+            m15_history['ema200'] = m15_history['close'].ewm(span=200, adjust=False).mean()
+            m15_ema = float(m15_history.iloc[-1].get("ema200", entry_price))
+            m15_ema200_distance_atr = (entry_price - m15_ema) / atr_14 if atr_14 > 0 else 0.0
+            m15_ema200_distance_pct = (m15_ema200_distance_atr * atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
+
         h4_vol_ratio = 1.0
         if h4_history is not None and not h4_history.empty:
             avg_h4_vol = h4_history["volume"].tail(20).mean() if "volume" in h4_history.columns and len(h4_history) >= 20 else 0.0
@@ -270,15 +288,46 @@ class MLPredictionAgent:
         if pytime.localtime().tm_isdst > 0:
             session_is_dst_NO = 0.0
             
+        # Swing distance features (structural SL/TP context)
+        structure_events = market_data.get("structure_events", [])
+        pip_size = 0.1  # XAUUSD: 1 pip = 0.1 USD
+        last_ll_price = None
+        last_hh_price = None
+        for evt in reversed(structure_events):
+            etype = str(evt.get("type", "")).upper()
+            eprice = evt.get("price")
+            if eprice is None:
+                continue
+            if last_ll_price is None and "LL" in etype:
+                last_ll_price = float(eprice)
+            if last_hh_price is None and "HH" in etype:
+                last_hh_price = float(eprice)
+            if last_ll_price is not None and last_hh_price is not None:
+                break
+        distance_to_last_ll_pips = (entry_price - last_ll_price) / pip_size if last_ll_price is not None else 0.0
+        distance_to_last_hh_pips = (last_hh_price - entry_price) / pip_size if last_hh_price is not None else 0.0
+
+        # additional normalized features for training compatibility
+        h1_ext_atr_14_pct = h1_atr_14_pct
+        h4_aligned = 1.0 if (signal == "BUY" and h4_ema200_distance_atr > 0) or (signal == "SELL" and h4_ema200_distance_atr < 0) else 0.0
+        h1_aligned = 1.0 if (signal == "BUY" and h1_ext_ema200_distance_atr > 0) or (signal == "SELL" and h1_ext_ema200_distance_atr < 0) else 0.0
+        double_trend_aligned = 1.0 if (h4_aligned == 1.0 and h1_aligned == 1.0) else 0.0
+        session_name = session
+        session_is_dst = "NO" if session_is_dst_NO == 1.0 else "YES"
+
+        # ponytail: merge base_features to ensure is_overlap and other model-required fields are present
         features = {
+            **base_features,
             "h4_ema200_distance_pct": h4_ema200_distance_pct,
             "spread_to_atr_ratio": spread_to_atr_ratio,
             "body_ratio_ea": body_ratio_ea,
             "distance_to_session_high_atr": distance_to_session_high_atr,
             "h4_atr_14": h4_atr_14,
+            "h4_atr_14_pct": h4_atr_14_pct,
             "h1_atr_14_pct": h1_atr_14_pct,
             "h1_ext_ema200_distance_atr": h1_ext_ema200_distance_atr,
             "price_position_session_range": price_position_session_range,
+            "session_range_points": session_range_points,
             "session_is_dst_NO": session_is_dst_NO,
             "momentum_3_atr": momentum_3_atr,
             "momentum_5_atr": momentum_5_atr,
@@ -293,9 +342,19 @@ class MLPredictionAgent:
             "session_priority": session_priority,
             "day_of_week": day_of_week,
             "atr_14_pct": atr_14_pct,
+            "distance_to_last_ll_pips": distance_to_last_ll_pips,
+            "distance_to_last_hh_pips": distance_to_last_hh_pips,
+            "m15_ema200_distance_atr": m15_ema200_distance_atr,
+            "m15_ema200_distance_pct": m15_ema200_distance_pct,
+            "h1_ext_atr_14_pct": h1_ext_atr_14_pct,
+            "double_trend_aligned": double_trend_aligned,
+            "init_risk_pct": init_risk_pct,
+            "session_name": session_name,
+            "session_is_dst": session_is_dst,
         }
         
         return features
+
 
     def analyze(
         self,

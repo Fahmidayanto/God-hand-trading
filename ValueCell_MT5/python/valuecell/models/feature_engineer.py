@@ -48,7 +48,9 @@ class FeatureEngineer:
             "session_priority",
             "is_london",
             "is_ny",
-            "is_overlap"
+            "is_overlap",
+            "distance_to_last_ll_pips",
+            "distance_to_last_hh_pips",
         ]
         
         logger.info(f"✅ FeatureEngineer initialized | Features: {len(self.feature_names)}")
@@ -120,8 +122,13 @@ class FeatureEngineer:
             # === 4. TIME/SESSION FEATURES ===
             time_features = self._extract_time_features(current_time)
             features.update(time_features)
-            
-            # Validate all 19 features present
+
+            # === 5. SWING DISTANCE FEATURES ===
+            entry_price = current_bar.get("close", current_bar.get("open", 0.0))
+            swing_features = self._extract_swing_distances(entry_price, structure_events)
+            features.update(swing_features)
+
+            # Validate all features present
             missing = set(self.feature_names) - set(features.keys())
             if missing:
                 logger.warning(f"Missing features: {missing}")
@@ -308,6 +315,41 @@ class FeatureEngineer:
             "is_overlap": is_overlap
         }
     
+    def _extract_swing_distances(
+        self,
+        entry_price: float,
+        events: List[Dict[str, Any]]
+    ) -> Dict[str, float]:
+        """Extract distance (in pips) from entry to last LL and last HH swing levels.
+
+        For XAUUSD: 1 pip = 0.1 USD. So distance_pips = (price_diff / 0.1).
+        Defaults to 0.0 when no matching swing is found in event history.
+        """
+        last_ll_price = None
+        last_hh_price = None
+
+        for event in reversed(events):
+            event_type = str(event.get("type", "")).upper()
+            price = event.get("price")
+            if price is None:
+                continue
+            if last_ll_price is None and "LL" in event_type:
+                last_ll_price = float(price)
+            if last_hh_price is None and "HH" in event_type:
+                last_hh_price = float(price)
+            if last_ll_price is not None and last_hh_price is not None:
+                break
+
+        # Distance = absolute price diff / pip_size (0.1 for XAUUSD)
+        pip_size = 0.1
+        dist_ll = (entry_price - last_ll_price) / pip_size if last_ll_price is not None else 0.0
+        dist_hh = (last_hh_price - entry_price) / pip_size if last_hh_price is not None else 0.0
+
+        return {
+            "distance_to_last_ll_pips": dist_ll,
+            "distance_to_last_hh_pips": dist_hh,
+        }
+
     def _calculate_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         """Calculate Average True Range"""
         try:

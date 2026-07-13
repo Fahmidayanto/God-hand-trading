@@ -224,8 +224,11 @@ def test_agent_with_scenario(agent: MLPredictionAgent, scenario: str):
     logger.info("🎯 AGENT RESPONSE:")
     logger.info(f"   Signal: {result['signal']}")
     logger.info(f"   Confidence: {result['confidence']:.3f}")
-    logger.info(f"   Probability: {result['probability']:.3f}")
-    logger.info(f"   Threshold: {result['threshold']:.3f}")
+    if "probability" in result:
+        logger.info(f"   Probability: {result['probability']:.3f}")
+    if "expected_rr" in result:
+        logger.info(f"   Expected R:R: {result['expected_rr']:.3f}")
+    logger.info(f"   Threshold: {result.get('threshold', 0.0):.3f}")
     logger.info(f"   Reasoning: {result['reasoning']}")
     logger.info("")
     
@@ -336,7 +339,8 @@ def test_probability_thresholds():
         market_data = create_test_market_data(scenario)
         result = agent.analyze(market_data, structure_signal="BUY")
         
-        logger.info(f"{scenario.upper():20} | Prob: {result['probability']:.3f} | Signal: {result['signal']:8} | Conf: {result['confidence']:.3f}")
+        prob_str = f"Prob: {result['probability']:.3f}" if "probability" in result else f"E_RR: {result.get('expected_rr', 0.0):.3f}"
+        logger.info(f"{scenario.upper():20} | {prob_str} | Signal: {result['signal']:8} | Conf: {result['confidence']:.3f}")
     
     logger.info("")
 
@@ -377,11 +381,12 @@ def test_all_scenarios():
     logger.info("")
     
     for scenario, result in results.items():
+        prob_str = f"Probability: {result['probability']:.3f}" if "probability" in result else f"Expected R:R: {result.get('expected_rr', 0.0):.3f}"
         logger.info(
             f"{scenario.upper():20} | "
             f"Signal: {result['signal']:8} | "
             f"Confidence: {result['confidence']:.3f} | "
-            f"Probability: {result['probability']:.3f}"
+            f"{prob_str}"
         )
     
     logger.info("")
