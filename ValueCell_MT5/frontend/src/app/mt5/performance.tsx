@@ -398,13 +398,18 @@ export default function PerformancePage() {
         <div className="px-12 py-8">
 
         {/* Page Header */}
-        <div className="mb-6">
-          <h1 className="text-[32px] font-bold mb-2 bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-cyan)] bg-clip-text text-transparent">
-            📈 Performance Analytics
-          </h1>
-          <p className="text-[var(--text-tertiary)] text-sm">
-            Comprehensive trading performance metrics and analysis
-          </p>
+        <div className="flex items-center gap-4 mb-8">
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
+            📈
+          </div>
+          <div>
+            <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
+              Performance Analytics
+            </h1>
+            <p className="text-[var(--text-tertiary)] text-base">
+              Comprehensive trading performance metrics and analysis
+            </p>
+          </div>
         </div>
 
         {/* Filter Controls */}

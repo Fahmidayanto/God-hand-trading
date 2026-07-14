@@ -16,11 +16,11 @@ export default function MT5Navbar() {
   };
 
   return (
-    <nav className="glass-card !mb-8 flex justify-center items-center px-8 py-5 hover:border-[rgba(59,130,246,0.4)] hover:shadow-[0_8px_32px_rgba(59,130,246,0.2)] transition-all relative">
+    <nav className="glass-card !mb-8 flex justify-center items-center px-8 py-5 relative">
       {/* Logo - positioned absolutely on the left */}
       <Link
         to="/mt5"
-        className="absolute left-8 text-2xl font-bold bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] bg-clip-text text-transparent"
+        className="absolute left-8 text-2xl font-bold text-[var(--neon-blue)]"
       >
         ✋⚡ God Hand
       </Link>

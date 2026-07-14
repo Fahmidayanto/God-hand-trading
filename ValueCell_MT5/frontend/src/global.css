@@ -73,21 +73,24 @@
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 
-  /* ValueCell Trading Dashboard - Glassmorphism */
-  --bg-deepspace: #0a0e27;
-  --bg-void: #060914;
-  --bg-surface: #111827;
-  --bg-elevated: #1f2937;
-  --bg-interactive: #374151;
-  --glass-primary: rgba(17, 24, 39, 0.6);
-  --glass-secondary: rgba(31, 41, 55, 0.5);
+  /* ValueCell Trading Dashboard - Amber & Amethyst Theme */
+  --bg-deepspace: #0B0F19;
+  --bg-void: #05070C;
+  --bg-surface: #0E1424;
+  --bg-elevated: #182038;
+  --bg-interactive: #243054;
+  --glass-primary: rgba(11, 15, 25, 0.7);
+  --glass-secondary: rgba(14, 20, 36, 0.6);
   --glass-border: rgba(255, 255, 255, 0.05);
-  --neon-blue: #3b82f6;
-  --neon-cyan: #06b6d4;
-  --neon-emerald: #34d399; /* Emerald-400 */
-  --neon-ruby: #fb7185; /* Rose-400 */
-  --neon-amber: #fbbf24;
-  --neon-purple: #8b5cf6;
+  --neon-blue-rgb: 245, 158, 11;
+  --neon-cyan-rgb: 139, 92, 246;
+  --neon-purple-rgb: 167, 139, 250;
+  --neon-blue: rgb(var(--neon-blue-rgb));
+  --neon-cyan: rgb(var(--neon-cyan-rgb));
+  --neon-emerald: #10B981;
+  --neon-ruby: #EF4444;
+  --neon-amber: #FBBF24;
+  --neon-purple: rgb(var(--neon-purple-rgb));
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
   --text-tertiary: #94a3b8;
@@ -138,7 +141,7 @@
   }
 
   body {
-    background-color: #0a0e27 !important;
+    background-color: var(--bg-deepspace) !important;
     color: #f8fafc !important;
     overflow-x: hidden !important;
     margin: 0 !important;
@@ -232,18 +235,18 @@
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 16px;
+    border-radius: 12px;
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 4px 8px rgba(0, 0, 0, 0.3),
       inset 0 1px 1px rgba(255, 255, 255, 0.05);
     transition: all 0.3s ease;
   }
 
   .glass-card:hover {
-    border-color: rgba(59, 130, 246, 0.4);
+    border-color: rgba(var(--neon-blue-rgb), 0.4);
     box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      0 0 24px rgba(59, 130, 246, 0.2);
+      0 4px 8px rgba(0, 0, 0, 0.3),
+      0 0 12px rgba(var(--neon-blue-rgb), 0.25);
   }
 
   /* Compact glass — for inline control bars, chips, sub-panels. */
@@ -302,7 +305,7 @@
 
   .neon-text {
     color: var(--neon-blue);
-    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+    text-shadow: 0 0 10px rgba(var(--neon-blue-rgb), 0.5);
   }
 
   @keyframes pulse-glow {
@@ -341,7 +344,7 @@
   /* Toggle Switch Fix */
   input[type="checkbox"]:checked + span {
     background-color: var(--neon-blue) !important;
-    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 15px rgba(var(--neon-blue-rgb), 0.5);
   }
 
   input[type="checkbox"]:checked + span::before {
@@ -368,9 +371,9 @@
   height: 100%;
   z-index: 1;
   background: 
-    radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
-    radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 20% 50%, rgba(var(--neon-blue-rgb), 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(var(--neon-cyan-rgb), 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
     var(--bg-deepspace);
   pointer-events: none;
 }
@@ -425,14 +428,14 @@
 
 /* Status Bar */
 .status-bar {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  background: linear-gradient(135deg, rgba(var(--neon-blue-rgb), 0.15), rgba(var(--neon-cyan-rgb), 0.15));
   padding: 16px 24px;
   border-radius: 12px;
   margin-bottom: 24px;
   display: flex;
   align-items: center;
   gap: 24px;
-  border: 1px solid rgba(59, 130, 246, 0.3);
+  border: 1px solid rgba(var(--neon-blue-rgb), 0.25);
 }
 
 .status-live {
@@ -617,7 +620,7 @@
 
   /* Elegant neon scrollbar */
   scrollbar-width: thin;
-  scrollbar-color: rgba(59, 130, 246, 0.4) transparent;
+  scrollbar-color: rgba(var(--neon-blue-rgb), 0.4) transparent;
 }
 
 .activity-log::-webkit-scrollbar {
@@ -633,7 +636,7 @@
 .activity-log::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--neon-blue), var(--neon-cyan));
   border-radius: 10px;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+  box-shadow: 0 0 8px rgba(var(--neon-blue-rgb), 0.5);
   transition: box-shadow 0.3s ease;
 }
 
@@ -654,8 +657,8 @@
 }
 
 .log-entry:hover {
-  background: rgba(59, 130, 246, 0.06);
-  box-shadow: inset 0 0 20px rgba(59, 130, 246, 0.03);
+  background: rgba(var(--neon-blue-rgb), 0.06);
+  box-shadow: inset 0 0 20px rgba(var(--neon-blue-rgb), 0.03);
 }
 
 .log-entry:last-child {
@@ -698,14 +701,14 @@
 }
 
 .log-info {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(var(--neon-blue-rgb), 0.15);
   color: var(--neon-blue);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(var(--neon-blue-rgb), 0.2);
+  box-shadow: 0 0 8px rgba(var(--neon-blue-rgb), 0.08);
 }
 
 .log-entry:hover .log-info {
-  box-shadow: 0 0 14px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 14px rgba(var(--neon-blue-rgb), 0.25);
 }
 
 .log-success {

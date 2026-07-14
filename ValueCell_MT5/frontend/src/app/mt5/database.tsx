@@ -371,24 +371,28 @@ export default function Database() {
           border-radius: 8px;
         }
         .db-inspector-scroll::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.2);
+          background: rgba(var(--neon-blue-rgb), 0.2);
           border-radius: 8px;
           border: 1px solid rgba(255, 255, 255, 0.05);
         }
         .db-inspector-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.35);
+          background: rgba(var(--neon-blue-rgb), 0.35);
         }
       `}</style>
       <div className="px-12 py-8 text-slate-200">
       <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent flex items-center gap-2.5">
-            <DatabaseIcon className="w-7 h-7 text-blue-400" />
-            <span>Database Inspector</span>
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            Verify database storage row counts and preview records in NeonDB and LanceDB.
-          </p>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
+            💾
+          </div>
+          <div>
+            <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
+              Database Inspector
+            </h1>
+            <p className="text-[var(--text-tertiary)] text-base">
+              Verify database storage row counts and preview records in NeonDB and LanceDB.
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button

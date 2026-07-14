@@ -1,4 +1,4 @@
-﻿import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 
 export default function MT5Sidebar() {
   const location = useLocation();
@@ -12,7 +12,7 @@ export default function MT5Sidebar() {
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },
     { path: "/mt5/database", label: "DB Inspector", icon: "💾" },
     { path: "/mt5/replay", label: "Replay Trades", icon: "🎬" },
-    { path: "/mt5/simulation", label: "Simulation of Dead", icon: "💀" },
+    { path: "/mt5/simulation", label: "Ghost Engine", icon: "👻" },
   ];
 
   const isActive = (path: string) => {
@@ -21,7 +21,7 @@ export default function MT5Sidebar() {
 
   return (
     <aside 
-      className="glass-card fixed z-50 flex flex-col hover:border-[rgba(59,130,246,0.4)] hover:shadow-[0_8px_32px_rgba(59,130,246,0.2)] transition-all"
+      className="glass-card fixed z-50 flex flex-col"
       style={{
         left: 5,
         top: 5,
@@ -35,7 +35,7 @@ export default function MT5Sidebar() {
       {/* Logo */}
       <Link
         to="/mt5"
-        className="mb-8 text-xl font-bold bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-purple)] bg-clip-text text-transparent text-center block"
+        className="mb-8 text-xl font-bold text-[var(--neon-blue)] text-center block"
       >
         ✋⚡ God Hand
       </Link>
@@ -47,9 +47,9 @@ export default function MT5Sidebar() {
             <li key={link.path}>
               <Link
                 to={link.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--text-secondary)] no-underline transition-all hover:bg-[rgba(59,130,246,0.1)] hover:text-[var(--neon-blue)] hover:translate-x-1 ${
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--text-secondary)] no-underline transition-all hover:bg-[rgba(var(--neon-blue-rgb),0.1)] hover:text-[var(--neon-blue)] hover:translate-x-1 ${
                   isActive(link.path) 
-                    ? "!text-[var(--neon-blue)] !bg-[rgba(59,130,246,0.15)] border-l-2 border-[var(--neon-blue)]" 
+                    ? "!text-[var(--neon-blue)] !bg-[rgba(var(--neon-blue-rgb),0.15)] border-l-2 border-[var(--neon-blue)]" 
                     : ""
                 }`}
                 style={{

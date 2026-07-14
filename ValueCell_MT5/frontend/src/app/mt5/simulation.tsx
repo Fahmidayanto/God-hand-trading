@@ -1950,12 +1950,21 @@ export default function SimulationOfDead() {
       {/* ── Header ── */}
       <div
         className="relative z-30 flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
-        style={{ borderColor: "rgba(59,130,246,0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
+        style={{ borderColor: "rgba(var(--neon-blue-rgb), 0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
-        <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent flex-shrink-0 flex items-center gap-2">
-          <Clapperboard className={cn("w-5 h-5 text-cyan-400 transition-all", isPlaying && "animate-spin")} style={{ animationDuration: isPlaying ? '3s' : '0s' }} />
-          <span>Replay Trades</span>
-        </h1>
+        <div className="flex items-center gap-4">
+          <div className={cn("flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none", isPlaying && "animate-pulse")}>
+            👻
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-1">
+              Ghost Engine
+            </h1>
+            <p className="text-[var(--text-tertiary)] text-xs">
+              Replay trades and validate strategy outcomes
+            </p>
+          </div>
+        </div>
 
         {/* Filter controls + Playback Controls */}
         <div className="flex items-center gap-2 flex-wrap flex-1 justify-end ml-4 min-w-0">
