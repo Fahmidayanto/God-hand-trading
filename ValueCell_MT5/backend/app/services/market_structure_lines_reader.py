@@ -76,8 +76,16 @@ class MarketStructureLinesReader:
             except:
                 return None
 
-            is_bullish = 'BULL' in direction.upper() or 'UP' in direction.upper()
-            is_bearish = 'BEAR' in direction.upper() or 'DOWN' in direction.upper()
+            direction_upper = direction.upper()
+            is_bullish = 'BULL' in direction_upper
+            is_bearish = 'BEAR' in direction_upper
+            
+            # Fallback for generic actions/directions (e.g., "Update", "Reference")
+            if not is_bullish and not is_bearish:
+                if event_type in ('HH', 'BOS'):
+                    is_bullish = True
+                elif event_type in ('LL', 'BOS'):
+                    is_bearish = True
 
             previous_price = 0.0
             if prev_price_str and prev_price_str != '':

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { CalendarDays, X, Loader2 } from "lucide-react";
+import { CalendarDays, X, Loader2, History } from "lucide-react";
 import {
   createChart,
   type IChartApi,
@@ -545,10 +545,11 @@ export default function TradesPage() {
     if (activeBottomTab === 'monthly-summary') {
       loadMonthlyPNL();
     }
-  }, [activeBottomTab]);
+  }, [activeBottomTab, activeTimeframe]);
 
   // Dynamic stats calculation based on dropdown filter (Jan - selectedMonth)
   useEffect(() => {
+    if (activeTimeframe === "M1") return; // Skip in live mode (M1)
     if (!backtestTradesData || !backtestTradesData.trades) return;
 
     const tradesList = backtestTradesData.trades;
@@ -611,7 +612,7 @@ export default function TradesPage() {
     mappedTrades.sort((a, b) => new Date(b.open_time).getTime() - new Date(a.open_time).getTime());
 
     setTrades(mappedTrades);
-  }, [backtestTradesData, selectedYear, selectedMonth]);
+  }, [backtestTradesData, selectedYear, selectedMonth, activeTimeframe]);
 
   useEffect(() => {
     // Auto-refresh chart data every 30 seconds (increased from 5s for performance)
@@ -1789,6 +1790,7 @@ export default function TradesPage() {
   }, [loadProgress.visible]);
 
   const loadTradeHistory = async () => {
+    if (activeTimeframe !== "M1") return; // Skip in backtest mode
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
@@ -2022,13 +2024,18 @@ export default function TradesPage() {
         <div className="w-full px-12 py-8">
 
           {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-[36px] font-bold mb-3 bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-cyan)] bg-clip-text text-transparent">
-              📊 Trading History
-            </h1>
-            <p className="text-[var(--text-tertiary)] text-base">
-              View your trades, analyze performance, and track live positions
-            </p>
+          <div className="flex items-center gap-4 mb-8">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-[var(--neon-blue)] hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+              <History className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-[36px] font-bold bg-gradient-to-r from-[var(--neon-blue)] to-[var(--neon-cyan)] bg-clip-text text-transparent leading-none mb-1">
+                Activity
+              </h1>
+              <p className="text-[var(--text-tertiary)] text-base">
+                View your trades, analyze performance, and track live positions
+              </p>
+            </div>
           </div>
 
           {/* Stats Grid - Fixed Position */}
@@ -2041,7 +2048,9 @@ export default function TradesPage() {
                 {stats.total_trades}
               </div>
               <div className="text-sm text-[var(--text-tertiary)]">
-                Jan - {availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} {selectedYear}
+                {activeTimeframe === "M1"
+                  ? "Last 30 days"
+                  : `Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear}`}
               </div>
             </div>
 
@@ -2052,7 +2061,11 @@ export default function TradesPage() {
               <div className={`text-2xl font-semibold mono mb-1 ${stats.win_rate >= 50 ? 'positive' : 'negative'}`}>
                 {stats.win_rate.toFixed(1)}%
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Winning percentage</div>
+              <div className="text-sm text-[var(--text-tertiary)]">
+                {activeTimeframe === "M1"
+                  ? "Win rate (30 days)"
+                  : `Win rate (Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear})`}
+              </div>
             </div>
 
             <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
@@ -2062,7 +2075,11 @@ export default function TradesPage() {
               <div className={`text-2xl font-semibold mono mb-1 ${stats.total_pnl >= 0 ? 'positive' : 'negative'}`}>
                 {stats.total_pnl >= 0 ? '+' : ''}${stats.total_pnl.toFixed(2)}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Profit & Loss</div>
+              <div className="text-sm text-[var(--text-tertiary)]">
+                {activeTimeframe === "M1"
+                  ? "PnL (30 days)"
+                  : `Net PnL (Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear})`}
+              </div>
             </div>
 
             <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
@@ -2139,7 +2156,7 @@ export default function TradesPage() {
             <button
               onClick={() => setActiveBottomTab('recent-trades')}
               className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${activeBottomTab === 'recent-trades'
-                ? "bg-[var(--neon-blue)] text-white shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                ? "bg-[var(--neon-blue)] text-white shadow-[0_4px_20px_rgba(59,130,246,0.2)]"
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                 }`}
             >
@@ -2148,7 +2165,7 @@ export default function TradesPage() {
             <button
               onClick={() => setActiveBottomTab('monthly-summary')}
               className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${activeBottomTab === 'monthly-summary'
-                ? "bg-[var(--neon-blue)] text-white shadow-[0_0_20px_rgba(59,130,246,0.35)]"
+                ? "bg-[var(--neon-blue)] text-white shadow-[0_4px_20px_rgba(59,130,246,0.2)]"
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                 }`}
             >
@@ -2168,7 +2185,7 @@ export default function TradesPage() {
                       key={filter}
                       onClick={() => filterTrades(filter)}
                       className={`px-4 py-2 rounded-lg text-sm transition-all capitalize ${activeFilter === filter
-                        ? "bg-[var(--neon-blue)] text-white shadow-[0_0_15px_rgba(59,130,246,0.4)]"
+                        ? "bg-[var(--neon-blue)] text-white shadow-[0_4px_15px_rgba(59,130,246,0.2)]"
                         : "bg-[var(--glass-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                         }`}
                     >
@@ -2217,16 +2234,27 @@ export default function TradesPage() {
                       <tr>
                         <td
                           colSpan={9}
-                          className="text-center py-12 text-[var(--text-tertiary)]"
+                          className="text-center py-16 text-[var(--text-tertiary)]"
                         >
-                          No trades found
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <svg className="w-12 h-12 text-slate-500/80 stroke-[1.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                            </svg>
+                            <span className="text-sm font-medium text-slate-400">Belum ada riwayat transaksi</span>
+                            <button 
+                              onClick={() => loadChartData(true, 'full')} 
+                              className="mt-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700/50 transition-all cursor-pointer"
+                            >
+                              Muat Semua Riwayat
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       filteredTrades.map((trade) => (
                         <tr
                           key={trade.trade_id}
-                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-[var(--bg-elevated)] transition-colors"
+                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-white/5 transition-all duration-200"
                         >
                           <td className="py-3 px-4 mono text-xs">
                             {trade.trade_id.substring(0, 8)}...
@@ -2244,18 +2272,18 @@ export default function TradesPage() {
                               {trade.type}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-right mono">
+                          <td className="py-3 px-4 text-right mono font-light">
                             {trade.entry_price.toFixed(2)}
                           </td>
-                          <td className="py-3 px-4 text-right mono">
+                          <td className="py-3 px-4 text-right mono font-light">
                             {trade.exit_price ? trade.exit_price.toFixed(2) : "-"}
                           </td>
-                          <td className="py-3 px-4 text-right mono">
+                          <td className="py-3 px-4 text-right mono font-light">
                             {trade.lot_size.toFixed(2)}
                           </td>
-                          <td className="py-3 px-4 text-right mono">
+                          <td className="py-3 px-4 text-right mono font-light">
                             <span
-                              className={`font-semibold ${trade.pnl >= 0 ? "positive" : "negative"
+                              className={`font-medium ${trade.pnl >= 0 ? "positive" : "negative"
                                 }`}
                             >
                               {trade.pnl >= 0 ? "+" : ""}${trade.pnl.toFixed(2)}
@@ -2390,12 +2418,12 @@ export default function TradesPage() {
                         <tr
                           key={idx}
                           onClick={() => handleMonthRowClick(month.year, month.month_num, month.month_label || `${month.month} ${month.year}`)}
-                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
+                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-white/5 cursor-pointer transition-all duration-200"
                           title="Klik untuk melihat detail transaksi"
                         >
                           <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
-                          <td className="px-4 py-3.5 whitespace-nowrap mono">{month.executed_trades ?? month.trades ?? 0}</td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${
+                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light">{month.executed_trades ?? month.trades ?? 0}</td>
+                          <td className={`px-4 py-3.5 whitespace-nowrap font-medium ${
                             (month.win_rate ?? 0) > 50
                               ? "positive"
                               : (month.win_rate ?? 0) === 50
@@ -2404,12 +2432,12 @@ export default function TradesPage() {
                           }`}>
                             {(month.win_rate ?? 0).toFixed(1)}%
                           </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold positive">{(month.profit ?? 0).toFixed(2)}</td>
-                          <td className="px-4 py-3.5 whitespace-nowrap mono font-semibold negative">{(month.loss ?? 0).toFixed(2)}</td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "positive" : "negative"}`}>
+                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light positive">{(month.profit ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light negative">{(month.loss ?? 0).toFixed(2)}</td>
+                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${(month.net_profit ?? 0) >= 0 ? "positive" : "negative"}`}>
                             {(month.net_profit ?? 0) >= 0 ? "+" : ""}{(month.net_profit ?? 0).toFixed(2)}
                           </td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "positive" : "negative"}`}>
+                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "positive" : "negative"}`}>
                             {((month.net_profit ?? 0) / 1000 * 100).toFixed(2)}%
                           </td>
                         </tr>
@@ -2493,8 +2521,8 @@ export default function TradesPage() {
 
         {/* Monthly Trades Detail Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-            <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300 ease-out">
+            <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-12 duration-300 ease-out relative">
               {/* Premium Gradient Top Accent Line */}
               <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
@@ -2552,7 +2580,7 @@ export default function TradesPage() {
                       </div>
                       <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
                         <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
-                        <span className={`text-2xl font-bold mono ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-emerald-400" : "text-rose-500"
+                        <span className={`text-2xl font-semibold mono ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-[var(--neon-emerald)]" : "text-[var(--neon-ruby)]"
                           }`}>
                           {selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "+" : ""}
                           ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0).toFixed(2)}
@@ -2585,22 +2613,22 @@ export default function TradesPage() {
                                   <tr
                                     key={trade.ticket}
                                     onClick={() => handleTradeClick(trade)}
-                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                                    className="hover:bg-white/5 transition-all duration-200 cursor-pointer"
                                     title="Klik untuk melihat transaksi di chart"
                                   >
-                                    <td className="py-3 px-4 mono text-xs text-slate-400">#{trade.ticket}</td>
+                                    <td className="py-3 px-4 mono font-light text-xs text-slate-400">#{trade.ticket}</td>
                                     <td className="py-3 px-4">
                                       <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${trade.type === "BUY"
-                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                        : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                        ? "bg-emerald-500/10 text-[var(--neon-emerald)] border border-emerald-500/20"
+                                        : "bg-rose-500/10 text-[var(--neon-ruby)] border border-rose-500/20"
                                         }`}>
                                         {trade.type}
                                       </span>
                                     </td>
-                                    <td className="py-3 px-4 text-right mono">{(getActualLotSize(trade)).toFixed(2)}</td>
-                                    <td className="py-3 px-4 text-right mono">${trade.entry_price.toFixed(2)}</td>
-                                    <td className="py-3 px-4 text-right mono">${trade.exit_price.toFixed(2)}</td>
-                                    <td className={`py-3 px-4 text-right mono font-semibold ${isWin ? "text-emerald-400" : "text-rose-500"
+                                    <td className="py-3 px-4 text-right mono font-light">{(getActualLotSize(trade)).toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right mono font-light">${trade.entry_price.toFixed(2)}</td>
+                                    <td className="py-3 px-4 text-right mono font-light">${trade.exit_price.toFixed(2)}</td>
+                                    <td className={`py-3 px-4 text-right mono font-medium ${isWin ? "text-[var(--neon-emerald)]" : "text-[var(--neon-ruby)]"
                                       }`}>
                                       {isWin ? "+" : ""}${trade.net_profit.toFixed(2)}
                                     </td>

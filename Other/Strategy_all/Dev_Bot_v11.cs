@@ -2988,8 +2988,20 @@ void RedrawVisualsFromCSV()
     for (int c = ObjectsTotal(0) - 1; c >= 0; c--)
     {
         string nmDel = ObjectName(0, c);
-        if (StringFind(nmDel, "redraw_") == 0)
+        if (StringFind(nmDel, "redraw_") == 0 ||
+            StringFind(nmDel, "CHoCH_") == 0 ||
+            StringFind(nmDel, "BoS_") == 0 ||
+            StringFind(nmDel, "H1_CHoCH_") == 0 ||
+            StringFind(nmDel, "H1_BoS_") == 0 ||
+            StringFind(nmDel, "zone_ll_M15_") == 0 ||
+            StringFind(nmDel, "zone_hh_M15_") == 0 ||
+            StringFind(nmDel, "H1_zone_ll_") == 0 ||
+            StringFind(nmDel, "H1_zone_hh_") == 0 ||
+            StringFind(nmDel, "line_lastAccepted") == 0 ||
+            StringFind(nmDel, "label_lastAccepted") == 0)
+        {
             ObjectDelete(0, nmDel);
+        }
     }
 
     // ponytail: scan mundur dari hari ini sampai tanggal 1 di bulan yang sama.
@@ -5439,11 +5451,13 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     {
                         preChochHH_M15     = highestHH_BF;
                         lastAcceptedHH_M15 = highestHH_BF;
+                        lastTimeHH_M15     = highestHHTime_BF;
                         preChochHHTime_BF  = highestHHTime_BF;
                     }
                     else
                     {
                         lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                        lastTimeHH_M15     = lastLoggedValidHHTime_M15;
                     }
                 }
                 UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_BF);
@@ -5799,13 +5813,19 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //-------------------------------------------------------------------------------+
                     if (rates_M15[i].high > lastAcceptedHH_M15) // <-- Pembaruan utama dalam tren bullish
                         {
+                            double oldHH = lastAcceptedHH_M15;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1 M15]Update last Accepted HH After Bos: %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time); // Update visual setelah semua kondisi
                             hhAfterBosConfirmedFlag_M15 = true;           // Tandai HH setelah BoS bullish terkonfirmasi
                             timeHHAfterBosConfirmed_M15 = TimeCurrent();  // Simpan waktu konfirmasi
                             postChoCH_HH_M15            = rates_M15[i].high;  // Update postChoCH_HH
                             time_postChoCH_HH_M15       = rates_M15[i].time; // Update time postChoCH_HH
+                            
+                            // SAVE HH UPDATE
+                            if (oldHH != -1)
+                                SaveLLHHBOSToArray("HH", "Bullish", lastAcceptedHH_M15, rates_M15[i].time, "M15", "Updated", oldHH, 0);
                             
                             // PrintFormat("✅ Post CHoCH HH M15: %s | Time: %s", DoubleToString(postChoCH_HH_M15, _Digits), TimeToString(rates_M15[i].time));
                             PrintFormat("✅ HH After BoS Confirmed M15: %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
@@ -5823,9 +5843,15 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     // Lanjutkan mencari Higher High secara default
                     if (rates_M15[i].high > lastAcceptedHH_M15) // <-- Pembaruan utama
                         {
+                            double oldHH = lastAcceptedHH_M15;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1 M15] Update Last Accepted HH (Default): %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time); // Update visual setelah semua kondisi
+                            
+                            // SAVE HH UPDATE
+                            if (oldHH != -1)
+                                SaveLLHHBOSToArray("HH", "Bullish", lastAcceptedHH_M15, rates_M15[i].time, "M15", "Updated", oldHH, 0);
                         }
                 }  
 
@@ -5887,6 +5913,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // HH PERTAMA setelah CHoCH Bearish - jadikan sebagai lastAcceptedHH baru untuk tren bearish
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     hhAfterChochConfirmedFlag_M15 = true;
                     PrintFormat("✅ [HH AFTER CHoCH BEARISH M15] HH baru setelah CHoCH Bearish: %.5f | Time: %s",
                                 lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
@@ -5942,6 +5969,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         timeAbsoluteHighestHH_M15 = rates_M15[i].time;
                         absoluteHighFound_M15 = true;
                         lastAcceptedHH_M15 = rates_M15[i].high;
+                        lastTimeHH_M15      = rates_M15[i].time;
                         PrintFormat("🎯 [MODE 2 BEARISH M15 - ABS HIGH INIT] HH Tertinggi Absolut Awal: %.2f | Time: %s", absoluteHighestHH_M15, TimeToString(timeAbsoluteHighestHH_M15));
                         UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
 
@@ -5964,6 +5992,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                             absoluteHighestHH_M15 = rates_M15[i].high;
                             timeAbsoluteHighestHH_M15 = rates_M15[i].time;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
 
                             PrintFormat("📈 [MODE 2.1 BEARISH M15 - ABS HIGH UPDATE] HH Tertinggi Absolut Diperbarui: %.2f -> %.2f | Time: %s",
                                         previousHigh, absoluteHighestHH_M15, TimeToString(timeAbsoluteHighestHH_M15));
@@ -6030,6 +6059,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     double previousHH = lastAcceptedHH_M15;
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     PrintFormat("✅ [MODE 3 M15] Update last Accepted HH sebelum Bos dan paling tinggi (Belum Ada LL After BoS): %.2f < HH_sebelumnya (%.2f) | Time: %s",
                                 lastAcceptedHH_M15, previousHH, TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
@@ -6041,6 +6071,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     double previousHH = lastAcceptedHH_M15;
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     PrintFormat("✅ [MODE 3 M15] Update last Accepted HH After Bos (Belum Ada LL After BoS): %.2f > HH_sebelumnya (%.2f) | Time: %s",
                                 lastAcceptedHH_M15, previousHH, TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
@@ -6103,6 +6134,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         
                         // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
                         lastAcceptedHH_M15 = absoluteHighestHH_M15;
+                        lastTimeHH_M15      = timeAbsoluteHighestHH_M15 > 0 ? timeAbsoluteHighestHH_M15 : rates_M15[i].time;
                         UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     }
                 }
@@ -6360,6 +6392,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //-------------------------------------------------------------------------------+
                 if (rates_M15[i].low < lastAcceptedLL_M15) // <-- Pembaruan utama dalam tren bullish
                 {
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low;
                     lastTimeLL_M15 = rates_M15[i].time; // Update time LL terakhir
                     PrintFormat("✅ [MODE 2.2 M15]Update last Accepted LL After Bos: %s | Time: %s", DoubleToString(lastAcceptedLL_M15, _Digits), TimeToString(rates_M15[i].time));
@@ -6368,6 +6401,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //timeLLAfterBosConfirmed_M15 = TimeCurrent(); // Simpan waktu konfirmasi
                     postChoCH_LL_M15            = rates_M15[i].low;  // Update postChoCH_LL
                     time_postChoCH_LL_M15       = rates_M15[i].time; // Update time postChoCH_LL
+                    
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
                     
                     // ✅ Reset absoluteHighestHH untuk mulai tracking HH tertinggi sejak LL baru ini
                     // Ini penting untuk MODE 3 BEARISH Part 2: setiap LL baru = tracking HH baru dimulai
@@ -6384,12 +6421,17 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 }
                 else if (rates_M15[i].low < lastAcceptedLL_M15) 
                 {
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low; // Update lastAcceptedLL jika lebih rendah
                     PrintFormat("✅ [MODE 1.2 M15] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                             lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                     // 🔥 HAPUS OBJEK RECTANGLE LL SEBELUMNYA ---
                     if (ObjectFind(0, previousLLBoxName_M15) >= 0)
                         ObjectDelete(0, previousLLBoxName_M15);
+
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
 
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time); // Update visual setelah semua kondisi
                 }
@@ -6417,9 +6459,14 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 if (lastAcceptedLL_M15 == -1 || rates_M15[i].low < lastAcceptedLL_M15) 
                 {
                     // ✅ Update LL jika lebih rendah
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low;
                     Print("✅ [MODE 1 M15] Update LL (Pre-CHoCH): ", lastAcceptedLL_M15);
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
+                    
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
                 }
             //---------------------------------------------------------------+
             // Sebelum Choch Bearish dan HH After CHoCH M15----------------------+
@@ -6861,6 +6908,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     preChochHH_M15     = highestHHInWindow_M15;
                     lastAcceptedHH_M15 = highestHHInWindow_M15;
+                    lastTimeHH_M15     = highestHHInWindowTime_M15;
                     preChochHHTime_M15 = highestHHInWindowTime_M15;
                     PrintFormat("🔧 [CHoCH BEARISH M15] HH referensi (LH) = high tertinggi window LL→break: %.2f @ %s",
                                 preChochHH_M15, TimeToString(preChochHHTime_M15));
@@ -6869,6 +6917,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // Fallback (window kosong): perilaku lama — HH terdekat terakhir yang ter-log.
                     lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                    lastTimeHH_M15     = lastLoggedValidHHTime_M15;
                 }
             }
             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_M15); // waktu high asli (bukan candle break)
