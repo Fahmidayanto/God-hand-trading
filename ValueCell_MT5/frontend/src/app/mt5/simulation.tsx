@@ -568,6 +568,7 @@ export default function SimulationOfDead() {
 
   // ── Strategy params state
   const [strategyParams, setStrategyParams] = useState({ ...DEFAULT_STRATEGY_PARAMS });
+  const [vetoMode, setVetoMode] = useState<'hard' | 'soft' | 'none'>('hard');
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [scenarioName, setScenarioName] = useState("");
   const [isStrategyPanelOpen, setIsStrategyPanelOpen] = useState(false);
@@ -706,8 +707,8 @@ export default function SimulationOfDead() {
       activeFrameAbortControllerRef.current = null;
     }
 
-    // Clear backend replay cache when stop is clicked
-    fetch(`${BASE_URL}/trading/replay/clear-cache`, { method: "POST" })
+    // Clear backend replay cache and delete simulation decisions for the selected year range when stop is clicked
+    fetch(`${BASE_URL}/trading/replay/clear-cache?year_from=${yearFrom}&year_to=${yearTo}`, { method: "POST" })
       .catch(err => console.error("Failed to clear replay cache:", err));
 
     if (replayData) {
@@ -719,7 +720,7 @@ export default function SimulationOfDead() {
       structurePrimitiveRef.current?.setLines([]);
       tradesPrimitiveRef.current?.setTrades([]);
     }
-  }, [stopPlayback, replayData, setChartDataToIndex]);
+  }, [stopPlayback, replayData, setChartDataToIndex, yearFrom, yearTo]);
 
   const yearOptions = Array.from({ length: currentYear - 2018 + 1 }, (_, i) => 2018 + i);
 
@@ -932,6 +933,22 @@ export default function SimulationOfDead() {
       .catch(() => { });
   }, []);
 
+  // Reset simulation cache and playback when vetoMode changes
+  useEffect(() => {
+    if (activeFrameAbortControllerRef.current) {
+      activeFrameAbortControllerRef.current.abort();
+      activeFrameAbortControllerRef.current = null;
+    }
+    setSimFramesMap({});
+    setActiveFrame(null);
+    setSimSignals([]);
+    setAgentTrades([]);
+    completedSimTimesRef.current.clear();
+    pendingSimTimesRef.current.clear();
+    setCurrentIndex(0);
+    setIsPlaying(false);
+  }, [vetoMode]);
+
   // Re-simulate active positions and chart markers whenever strategy parameters change
   useEffect(() => {
     if (!replayData || currentIndex === 0) return;
@@ -948,6 +965,26 @@ export default function SimulationOfDead() {
     for (const t of agentTrades) {
       const entryTs = t.entry_time ?? 0;
       if (entryTs <= candle.time) {
+        if (t.status === "Rejected" || t.type === "REJECTED" || t.type === "HOLD") {
+          activePosList.push({
+            ticket: t.ticket,
+            type: t.type,
+            lot_size: t.lot_size || 0.0,
+            entry_price: t.entry_price,
+            current_price: t.entry_price,
+            sl: null,
+            tp: null,
+            original_sl: null,
+            original_tp: null,
+            status: "Rejected",
+            pnl: 0,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
+          });
+          continue;
+        }
         total++;
         const typeLower = t.type.toLowerCase();
         const lotSize = t.lot_size;
@@ -1628,6 +1665,26 @@ export default function SimulationOfDead() {
     for (const t of agentTrades) {
       const entryTs = t.entry_time ?? 0;
       if (entryTs <= candle.time) {
+        if (t.status === "Rejected" || t.type === "REJECTED" || t.type === "HOLD") {
+          activePosList.push({
+            ticket: t.ticket,
+            type: t.type,
+            lot_size: t.lot_size || 0.0,
+            entry_price: t.entry_price,
+            current_price: t.entry_price,
+            sl: null,
+            tp: null,
+            original_sl: null,
+            original_tp: null,
+            status: "Rejected",
+            pnl: 0,
+            be_trigger_price: null,
+            is_be_active: false,
+            tp_trigger_price: null,
+            is_tp_maxed: false,
+          });
+          continue;
+        }
         total++;
         const typeLower = t.type.toLowerCase();
         const lotSize = t.lot_size;
@@ -1827,7 +1884,39 @@ export default function SimulationOfDead() {
       return;
     }
 
+    // Find the most recent baseline event (CHOCH or BOS) in history before latestEvent
+    let recentBaseline: string | null = null;
+    let recentChochDir: string | null = null;
+    for (let i = triggerEvents.length - 2; i >= 0; i--) {
+      const ev = triggerEvents[i];
+      const t = ev.type.toUpperCase();
+      if (t.includes("CHOCH") || t.includes("BOS")) {
+        recentBaseline = t.includes("CHOCH") ? "CHOCH" : "BOS";
+        if (t.includes("CHOCH")) {
+          recentChochDir = (t.includes("BULL") || (ev.direction && ev.direction.toUpperCase().includes("BULL"))) ? "BULLISH" : "BEARISH";
+        }
+        break;
+      }
+    }
+
+    const isPostBos = recentBaseline === "BOS";
+    const isSetupActive = recentBaseline === "CHOCH";
+    const isCounterSwing = isPostBos || (isSetupActive && (
+      ((latestType.includes("LL") || latestType.includes("BEAR")) && recentChochDir === "BULLISH") ||
+      ((latestType.includes("HH") || latestType.includes("BULL")) && recentChochDir === "BEARISH")
+    ));
+
     const cacheKey = `${latestEvent.time}_${latestEvent.type}`;
+
+    if (isCounterSwing) {
+      if (!simFramesMap[cacheKey]) {
+        setSimFramesMap(prev => ({
+          ...prev,
+          [cacheKey]: { event_time: latestEvent.time, is_counter_swing: true } as any
+        }));
+      }
+      return;
+    }
 
     // Check Ref cache (synchronous) to avoid duplicate fetching during render races
     if (completedSimTimesRef.current.has(cacheKey)) {
@@ -1865,7 +1954,7 @@ export default function SimulationOfDead() {
       activeSimFetchesRef.current += 1;
       pendingSimTimesRef.current.add(cacheKey);
 
-      const url = `${BASE_URL}/trading/simulate-event?time=${latestEvent.time}&timeframe=${activeTimeframe}&type=${latestEvent.type}`;
+      const url = `${BASE_URL}/trading/simulate-event?time=${latestEvent.time}&timeframe=${activeTimeframe}&type=${latestEvent.type}&veto_mode=${vetoMode}`;
       fetch(url, { signal: controller.signal })
         .then(res => {
           if (!res.ok) throw new Error("Failed to fetch event simulation");
@@ -1882,49 +1971,78 @@ export default function SimulationOfDead() {
           setIsFrameLoading(false);
 
           // Add marker and dynamic position when a new tradeable signal is approved by agent
-          if (frame && frame.approved && ["BUY", "SELL"].includes(frame.final_signal)) {
-            setSimSignals(prev => {
-              if (prev.some(s => s.time === frame.event_time)) return prev;
-              const next = [...prev, { time: frame.event_time, signal: frame.final_signal }];
-              // ponytail: instant marker render — don't wait for next candle tick
-              if (markersPluginRef.current) {
-                const existingMarkers: any[] = [];
-                for (const sig of next) {
-                  existingMarkers.push({
-                    time: sig.time as any,
-                    position: sig.signal === "BUY" ? "belowBar" : "aboveBar",
-                    color: sig.signal === "BUY" ? "#22c55e" : "#ef4444",
-                    shape: sig.signal === "BUY" ? "arrowUp" : "arrowDown",
-                    text: sig.signal,
-                    size: 1,
-                  });
+          if (frame) {
+            const isApproved = frame.approved && ["BUY", "SELL"].includes(frame.final_signal);
+            if (isApproved) {
+              setSimSignals(prev => {
+                if (prev.some(s => s.time === frame.event_time)) return prev;
+                const next = [...prev, { time: frame.event_time, signal: frame.final_signal }];
+                // ponytail: instant marker render — don't wait for next candle tick
+                if (markersPluginRef.current) {
+                  const existingMarkers: any[] = [];
+                  for (const sig of next) {
+                    existingMarkers.push({
+                      time: sig.time as any,
+                      position: sig.signal === "BUY" ? "belowBar" : "aboveBar",
+                      color: sig.signal === "BUY" ? "#22c55e" : "#ef4444",
+                      shape: sig.signal === "BUY" ? "arrowUp" : "arrowDown",
+                      text: sig.signal,
+                      size: 1,
+                    });
+                  }
+                  markersPluginRef.current.setMarkers(existingMarkers);
                 }
-                markersPluginRef.current.setMarkers(existingMarkers);
-              }
-              return next;
-            });
+                return next;
+              });
 
-            setAgentTrades(prev => {
-              if (prev.some(t => t.entry_time === frame.event_time)) return prev;
-              const slVal = frame.sl_tp?.sl_price || null;
-              const tpVal = frame.sl_tp?.tp_price || null;
-              const lotVal = frame.position_sizing?.lot_size || 0.01;
-              const entryVal = frame.sl_tp?.entry_price || frame.event_price || 0.0;
-              
-              return [...prev, {
-                ticket: prev.length + 1,
-                type: frame.final_signal,
-                entry_time: frame.event_time,
-                entry_price: entryVal,
-                sl: slVal,
-                tp: tpVal,
-                lot_size: lotVal,
-                exit_time: null,
-                exit_price: null,
-                net_profit: null,
-                is_agent_trade: true,
-              }];
-            });
+              setAgentTrades(prev => {
+                if (prev.some(t => t.entry_time === frame.event_time)) return prev;
+                const slVal = frame.sl_tp?.sl_price || null;
+                const tpVal = frame.sl_tp?.tp_price || null;
+                const lotVal = frame.position_sizing?.lot_size || 0.01;
+                const entryVal = frame.sl_tp?.entry_price || frame.event_price || 0.0;
+                
+                return [...prev, {
+                  ticket: prev.length + 1,
+                  type: frame.final_signal,
+                  entry_time: frame.event_time,
+                  entry_price: entryVal,
+                  sl: slVal,
+                  tp: tpVal,
+                  lot_size: lotVal,
+                  exit_time: null,
+                  exit_price: null,
+                  net_profit: null,
+                  is_agent_trade: true,
+                  status: "Running",
+                }];
+              });
+            } else {
+              // Only add Rejected position for the first BOS of a cycle (after CHoCH + HH/LL)
+              // HH, LL, CHoCH and subsequent BOS events are not added to Daftar Posisi
+              if (frame.is_first_bos) {
+                setAgentTrades(prev => {
+                  if (prev.some(t => t.entry_time === frame.event_time)) return prev;
+                  const entryVal = frame.event_price || 0.0;
+                  const typeVal = frame.final_signal || "HOLD";
+
+                  return [...prev, {
+                    ticket: prev.length + 1,
+                    type: typeVal,
+                    entry_time: frame.event_time,
+                    entry_price: entryVal,
+                    sl: null,
+                    tp: null,
+                    lot_size: 0.0,
+                    exit_time: frame.event_time,
+                    exit_price: entryVal,
+                    net_profit: 0,
+                    is_agent_trade: true,
+                    status: "Rejected",
+                  }];
+                });
+              }
+            }
           }
         })
         .catch(err => {
@@ -1938,7 +2056,7 @@ export default function SimulationOfDead() {
           pendingSimTimesRef.current.delete(cacheKey);
         });
     }
-  }, [currentCandle, replayData, activeTimeframe, simFramesMap, orchestratorEnabled, activeFrame]);
+  }, [currentCandle, replayData, activeTimeframe, simFramesMap, orchestratorEnabled, activeFrame, vetoMode]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -2052,23 +2170,6 @@ export default function SimulationOfDead() {
                 </div>
                 <span className="text-xs font-mono text-[var(--text-secondary,#94a3b8)] min-w-[28px] text-right">
                   {progress}%
-                </span>
-              </div>
-
-              {/* Legend */}
-              <div className="flex items-center gap-1.5 ml-1 text-xs">
-                {Object.entries(STRUCTURE_COLORS).map(([k, c]) => (
-                  <span 
-                    key={k} 
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-950/40 border border-slate-800/40 text-[9px] font-semibold text-slate-400 hover:scale-105 duration-150 transition-all select-none shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]"
-                  >
-                    <span className="w-1.5 h-1.5 rounded-full inline-block animate-pulse" style={{ background: c, boxShadow: `0 0 6px ${c}` }} />
-                    <span>{k}</span>
-                  </span>
-                ))}
-                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-950/40 border border-slate-800/40 text-[9px] font-semibold text-slate-400 hover:scale-105 duration-150 transition-all select-none shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
-                  <span className="w-3 h-0.5 inline-block" style={{ background: "#facc15", boxShadow: "0 0 4px #facc15" }} />
-                  <span>EMA200</span>
                 </span>
               </div>
 
@@ -2687,6 +2788,36 @@ export default function SimulationOfDead() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Section C: Agent Consensus & Veto Mode */}
+                  <div className="p-4 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-4 md:col-span-2">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">🤖 Agent Consensus & Veto Mode</h3>
+                    <div className="flex flex-col gap-3 text-xs">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-slate-400 font-medium">Market Structure Agent Veto Mode <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R >= 1.35. No Veto -> Mengikuti voting demokratis." /></label>
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          {[
+                            { value: "hard", label: "🔒 Hard Veto (Default)" },
+                            { value: "soft", label: "🛡️ Soft Veto (R:R >= 1.35)" },
+                            { value: "none", label: "🗳️ No Veto (Democratic)" }
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              onClick={() => setVetoMode(opt.value as any)}
+                              className="px-4 py-2 rounded-lg font-bold border transition-all cursor-pointer flex-1 text-center text-xs"
+                              style={{
+                                background: vetoMode === opt.value ? "rgba(6,182,212,0.08)" : "rgba(255,255,255,0.02)",
+                                borderColor: vetoMode === opt.value ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)",
+                                color: vetoMode === opt.value ? "#06b6d4" : "#94a3b8",
+                              }}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Save scenario form actions */}
@@ -2793,15 +2924,19 @@ export default function SimulationOfDead() {
                         badgeClass = "bg-green-500/15 text-green-400 border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.15)]";
                       } else if (pos.status === "Closed - Loss") {
                         badgeClass = "bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]";
+                      } else if (pos.status === "Rejected") {
+                        badgeClass = "bg-slate-500/15 text-slate-400 border border-slate-500/20";
                       }
 
                       return (
                         <tr key={pos.ticket} className="hover:bg-slate-800/20 transition-colors">
                           <td className="py-3.5 px-4 font-mono text-slate-400">#{pos.ticket}</td>
                           <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${isBuy
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${pos.type === "BUY"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              : pos.type === "SELL"
+                              ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
                               }`}>
                               {pos.type}
                             </span>
@@ -3046,7 +3181,7 @@ export default function SimulationOfDead() {
       {/* ── Transaction Detail Pop-up Modal (100% Identical to trades.tsx) ── */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
             {/* Premium Gradient Top Accent Line */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
@@ -3116,7 +3251,7 @@ export default function SimulationOfDead() {
                   <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
                           <tr>
                             <th className="py-3 px-4">Ticket</th>
                             <th className="py-3 px-4">Type</th>
@@ -3136,7 +3271,7 @@ export default function SimulationOfDead() {
                             .map((trade) => {
                               const isWin = (trade.net_profit ?? 0) >= 0;
                               return (
-                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors">
+                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors whitespace-nowrap">
                                   <td className="py-3 px-4 font-mono text-xs text-slate-400">#{trade.ticket}</td>
                                   <td className="py-3 px-4">
                                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${trade.type === "BUY"

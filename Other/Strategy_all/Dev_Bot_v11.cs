@@ -1900,6 +1900,8 @@ void UpdateAcceptedLevelVisuals_H1(double level, string type, datetime time)
 
     ObjectDelete(0, lineName);
     ObjectDelete(0, labelName);
+    ObjectDelete(0, "redraw_last" + type + "_H1"); // Hapus redraw_last H1 lama
+    ObjectDelete(0, "redraw_last" + type + "_H1_label"); // Hapus label redraw_last H1 lama
 
     if (level != -1) {
         // Gunakan OBJ_TREND dengan OBJPROP_RAY_RIGHT untuk membuat garis hanya ke depan
@@ -2393,6 +2395,8 @@ void UpdateAcceptedLevelVisuals_M15(double level, string type, datetime time)
     
     ObjectDelete(0, lineName); // Hapus garis lama jika ada
     ObjectDelete(0, labelName); // Hapus label lama jika ada
+    ObjectDelete(0, "redraw_last" + type + "_M15"); // Hapus redraw_last lama
+    ObjectDelete(0, "redraw_last" + type + "_M15_label"); // Hapus label redraw_last lama
     
     if (level != -1) { // Jika level valid (bukan -1)
         // --- Gambar Garis Horizontal dengan OBJ_TREND + RAY_RIGHT ---
@@ -2810,6 +2814,26 @@ datetime OldestTimeForPrice(double &priceArr[], datetime &timeArr[], int cnt, do
     }
     return oldest;
 }
+
+//+------------------------------------------------------------------+
+//| Find next formation time for capping historical lines             |
+//+------------------------------------------------------------------+
+datetime FindNextFormationTime(datetime &formTimeArr[], int formCnt, datetime currentTimeVal)
+{
+    datetime nextTime = 0;
+    for (int i = 0; i < formCnt; i++)
+    {
+        if (formTimeArr[i] > currentTimeVal)
+        {
+            if (nextTime == 0 || formTimeArr[i] < nextTime)
+            {
+                nextTime = formTimeArr[i];
+            }
+        }
+    }
+    return nextTime;
+}
+
 
 //+------------------------------------------------------------------+
 //| LOAD CSV TO ARRAYS - Load LLHHBOSData CSV ke memory arrays       |
@@ -3261,7 +3285,26 @@ void RedrawVisualsFromCSV()
         {
             datetime lenCap = time + MaxLineLengthBars * m15PeriodSec;
             if (lineEndTime > lenCap) lineEndTime = lenCap;
+            
+            // Capping: akhiri garis jika HH/LL baru berikutnya sudah terbentuk
+            if (type == "HH")
+            {
+                datetime nextHHTime = isM15
+                    ? FindNextFormationTime(hhFormTimeM15, hhFormCntM15, time)
+                    : FindNextFormationTime(hhFormTimeH1,  hhFormCntH1,  time);
+                if (nextHHTime > 0 && lineEndTime > nextHHTime)
+                    lineEndTime = nextHHTime;
+            }
+            else // LL
+            {
+                datetime nextLLTime = isM15
+                    ? FindNextFormationTime(llFormTimeM15, llFormCntM15, time)
+                    : FindNextFormationTime(llFormTimeH1,  llFormCntH1,  time);
+                if (nextLLTime > 0 && lineEndTime > nextLLTime)
+                    lineEndTime = nextLLTime;
+            }
         }
+        
         
         // === Draw HH Accepted ===
         if (type == "HH" && status == "Accepted")
@@ -5715,7 +5758,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //START: Logika Reset lastAcceptedLL ke preChoch LL setelah CHoCH Bullish dan HH valid (MODE 1) M15 --|
                 //------------------------------------------------------------------------------------------------+
 
-                if (!hhAfterChochConfirmedFlag_M15) 
+                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bullish_M15) 
                 {
                     lastAcceptedLL_M15            = preChochLL_M15;
                     lastAcceptedHH_M15            = rates_M15[i].high;  
@@ -5758,7 +5801,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //CHoCH Bullish Confirmed, terbentuk HH valid sebagai target BoS Bullish M15|
             //----------------------------------------------------------------------|
 
-            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
+            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time > time_choch_bullish_M15) // guard: bar harus setelah CHoCH Bullish
             {
                 postChoCH_HH_M15      = rates_M15[i].high; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_HH_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
@@ -8950,20 +8993,6 @@ void OnTick()
         if (rates_M15[0].time == lastBarTime_M15) return;
         lastBarTime_M15 = rates_M15[0].time;
 
-        //+------------------------------------------------------------------+
-        //| M15 BAR CLOSE: Export semua data + Save State + Reverse Sync      |
-        //| Setiap M15 candle close, export semua file lalu sync ke project  |
-        //| ✅ HANYA live trading — backtest export di OnTester/OnDeinit      |
-        //+------------------------------------------------------------------+
-        if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
-        {
-            SetExportDate();            // Handle date rollover
-            ExportAllData();            // Export semua CSV per candle close
-            SaveMarketStructureState(); // ponytail: state selalu fresh tiap candle
-            // ReverseSyncCSV();           // Sync ke Backtest_result\
-        }
-        //+------------------------------------------------------------------+
-
         static bool isScriptLoadedLogged_M15 = false; // Variabel statis untuk memastikan log hanya sekali
         if (!isScriptLoadedLogged_M15)
         {
@@ -8985,6 +9014,20 @@ void OnTick()
         }
 
         DetectAndDraw_M15(rates_M15, /*backfillMode=*/false);
+
+        //+------------------------------------------------------------------+
+        //| M15 BAR CLOSE: Export semua data + Save State + Reverse Sync      |
+        //| Setiap M15 candle close, export semua file lalu sync ke project  |
+        //| ✅ HANYA live trading — backtest export di OnTester/OnDeinit      |
+        //+------------------------------------------------------------------+
+        if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+        {
+            SetExportDate();            // Handle date rollover
+            ExportAllData();            // Export semua CSV per candle close
+            SaveMarketStructureState(); // ponytail: state selalu fresh tiap candle
+            // ReverseSyncCSV();           // Sync ke Backtest_result\
+        }
+        //+------------------------------------------------------------------+
     }
     else if(Period() == PERIOD_H1)
     {

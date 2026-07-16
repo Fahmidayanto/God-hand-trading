@@ -187,6 +187,7 @@ class MarketStructureAgent:
         df_h1: Optional[pd.DataFrame] = None,
         df_h4: Optional[pd.DataFrame] = None,
         structure_events: Optional[List[Dict[str, Any]]] = None,
+        veto_mode: str = "hard",
     ) -> Dict[str, Any]:
         """
         Analisis struktur pasar langsung dari Neon DB atau data historis jika dikirim.
@@ -343,6 +344,7 @@ class MarketStructureAgent:
                     ema200_h1=ema200_h1,
                     ema200_h4=ema200_h4,
                     session=session,
+                    veto_mode=veto_mode,
                 )
                 return self._build_response(
                     signal=signal_result["signal"],
@@ -369,6 +371,7 @@ class MarketStructureAgent:
                     ema200_h1=ema200_h1,
                     ema200_h4=ema200_h4,
                     session=session,
+                    veto_mode=veto_mode,
                 )
                 return self._build_response(
                     signal=signal_result["signal"],
@@ -523,6 +526,7 @@ class MarketStructureAgent:
         ema200_h1: Optional[float],
         ema200_h4: Optional[float],
         session: str,
+        veto_mode: str = "hard",
     ) -> Dict[str, Any]:
         """Tahap 2 - Dijalankan saat BoS terkonfirmasi."""
         logger.info(f"[TRIGGER] Tahap 2: BoS terkonfirmasi @ {price:.2f}")
@@ -556,8 +560,8 @@ class MarketStructureAgent:
         confidence = round(max(0.0, min(1.0, confidence)), 3)
         signal = "BUY" if is_bullish else "SELL"
 
-        # Veto jika confidence kurang dari 60%
-        if confidence < 0.6:
+        # Veto jika confidence kurang dari 60% dan veto_mode adalah hard
+        if confidence < 0.6 and veto_mode == "hard":
             signal = "HOLD"
             logger.warning(f"[VETO] Sinyal diubah ke HOLD karena confidence ({confidence:.2f}) < 0.60")
 

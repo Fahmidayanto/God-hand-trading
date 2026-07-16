@@ -55,36 +55,44 @@ class LanceDBManager:
         
         # Initialize collections
         self._init_collections()
+
+    def _table_names(self) -> List[str]:
+        res = self.db.list_tables()
+        if isinstance(res, list):
+            return res
+        if hasattr(res, "tables"):
+            return res.tables
+        return list(res)
     
     def _init_collections(self):
         """Initialize all collections if they don't exist"""
         
         # Collection 1: Historical Structures
-        if "historical_structures" not in self.db.table_names():
+        if "historical_structures" not in self._table_names():
             logger.info("Creating collection: historical_structures")
             self._create_historical_structures_collection()
         
         # Collection 2: Market Conditions
-        if "market_conditions" not in self.db.table_names():
+        if "market_conditions" not in self._table_names():
             logger.info("Creating collection: market_conditions")
             self._create_market_conditions_collection()
         
         # Collection 3: Session Patterns
-        if "session_patterns" not in self.db.table_names():
+        if "session_patterns" not in self._table_names():
             logger.info("Creating collection: session_patterns")
             self._create_session_patterns_collection()
         
         # Collection 4: Trade Outcomes
-        if "trade_outcomes" not in self.db.table_names():
+        if "trade_outcomes" not in self._table_names():
             logger.info("Creating collection: trade_outcomes")
             self._create_trade_outcomes_collection()
 
         # Collection 5: News Sentiment Cache
-        if "news_sentiment_cache" not in self.db.table_names():
+        if "news_sentiment_cache" not in self._table_names():
             logger.info("Creating collection: news_sentiment_cache")
             self._create_news_sentiment_cache_collection()
         
-        logger.info(f"[OK] LanceDB collections ready: {len(self.db.table_names())} collections")
+        logger.info(f"[OK] LanceDB collections ready: {len(self._table_names())} collections")
     
     # ========== COLLECTION 1: Historical Structures ==========
     
@@ -121,7 +129,7 @@ class LanceDBManager:
     def reset_historical_structures(self) -> bool:
         """Drop and recreate historical_structures collection (fresh start)."""
         try:
-            if "historical_structures" in self.db.table_names():
+            if "historical_structures" in self._table_names():
                 self.db.drop_table("historical_structures")
                 logger.info("🗑️ Dropped historical_structures collection")
             self._create_historical_structures_collection()
@@ -566,7 +574,7 @@ class LanceDBManager:
             "total_patterns": 0
         }
         
-        for table_name in self.db.table_names():
+        for table_name in self._table_names():
             try:
                 table = self.db.open_table(table_name)
                 count = table.count_rows()
@@ -585,7 +593,7 @@ class LanceDBManager:
     def clear_collection(self, collection_name: str) -> bool:
         """Clear all data from a collection (for testing)"""
         try:
-            if collection_name in self.db.table_names():
+            if collection_name in self._table_names():
                 self.db.drop_table(collection_name)
                 logger.info(f"Cleared collection: {collection_name}")
                 
@@ -628,7 +636,7 @@ class LanceDBManager:
         Supports exact timestamp lookup or date-only lookup.
         """
         try:
-            if "news_sentiment_cache" not in self.db.table_names():
+            if "news_sentiment_cache" not in self._table_names():
                 return None
             tbl = self.db.open_table("news_sentiment_cache")
             # First try exact timestamp

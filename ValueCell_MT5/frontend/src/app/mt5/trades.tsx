@@ -2522,7 +2522,7 @@ export default function TradesPage() {
         {/* Monthly Trades Detail Modal */}
         {isModalOpen && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300 ease-out">
-            <div className="w-full max-w-4xl bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-12 duration-300 ease-out relative">
+            <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-12 duration-300 ease-out relative">
               {/* Premium Gradient Top Accent Line */}
               <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
@@ -2592,7 +2592,7 @@ export default function TradesPage() {
                     <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                          <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
                             <tr>
                               <th className="py-3 px-4">Ticket</th>
                               <th className="py-3 px-4">Type</th>
@@ -2613,7 +2613,7 @@ export default function TradesPage() {
                                   <tr
                                     key={trade.ticket}
                                     onClick={() => handleTradeClick(trade)}
-                                    className="hover:bg-white/5 transition-all duration-200 cursor-pointer"
+                                    className="hover:bg-white/5 transition-all duration-200 cursor-pointer whitespace-nowrap"
                                     title="Klik untuk melihat transaksi di chart"
                                   >
                                     <td className="py-3 px-4 mono font-light text-xs text-slate-400">#{trade.ticket}</td>

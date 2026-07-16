@@ -45,7 +45,8 @@ class SystemCollector:
             )
             self._events.append(startup_log)
             self._initialized = True
-            logger.info("[SystemCollector] Startup event logged")
+            from loguru import logger as loguru_logger
+            loguru_logger.info("[SystemCollector] Startup event logged")
     
     def log_event(
         self,

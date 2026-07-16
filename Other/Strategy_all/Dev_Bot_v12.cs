@@ -5419,7 +5419,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //START: Logika Reset lastAcceptedLL ke preChoch LL setelah CHoCH Bullish dan HH valid (MODE 1) M15 --|
                 //------------------------------------------------------------------------------------------------+
 
-                if (!hhAfterChochConfirmedFlag_M15) 
+                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bullish_M15)
                 {
                     lastAcceptedLL_M15            = preChochLL_M15;
                     lastAcceptedHH_M15            = rates_M15[i].high;  
@@ -5462,7 +5462,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //CHoCH Bullish Confirmed, terbentuk HH valid sebagai target BoS Bullish M15|
             //----------------------------------------------------------------------|
 
-            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
+            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time > time_choch_bullish_M15) // guard: bar harus setelah CHoCH Bullish
             {
                 postChoCH_HH_M15      = rates_M15[i].high; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_HH_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali

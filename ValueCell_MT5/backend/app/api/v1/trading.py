@@ -1003,6 +1003,7 @@ async def get_session_zones(
     """
     try:
         from datetime import timedelta, datetime
+        from loguru import logger as loguru_logger
 
         server_now = _server_now()
         
@@ -1011,7 +1012,7 @@ async def get_session_zones(
             try:
                 # Parse as naive datetime (no timezone) to match _server_now() behavior
                 start_dt = datetime.strptime(from_date, "%Y-%m-%d")
-                logger.info(f"Using from_date: {from_date} -> {start_dt}")
+                loguru_logger.info(f"Using from_date: {from_date} -> {start_dt}")
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1019,14 +1020,14 @@ async def get_session_zones(
                 )
         else:
             start_dt = server_now - timedelta(days=days)
-            logger.info(f"Using days lookback: {days} -> {start_dt}")
+            loguru_logger.info(f"Using days lookback: {days} -> {start_dt}")
 
         all_zones = _generate_session_zones(start_dt, server_now)
 
         # Sort by start time (oldest first) so historical data is prioritized
         all_zones.sort(key=lambda x: x['start_time'], reverse=False)
 
-        logger.info(
+        loguru_logger.info(
             f"Generated {len(all_zones)} session zones for {symbol} "
             f"({start_dt} -> {server_now} server time)"
         )
@@ -1279,6 +1280,7 @@ async def get_simulation_data(
     year_to: int = Query(..., description="End year"),
     month_to: int = Query(..., ge=1, le=12, description="End month (1-12)"),
     timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
+    veto_mode: str = Query("hard", description="Veto mode (hard, soft, none)"),
 ):
     """Run a separate OrchestratorAgent instance over historical data.
 
@@ -1423,7 +1425,7 @@ async def get_simulation_data(
             logger.warning(f"Failed to reset orchestrator state at replay init: {re}")
 
         result = await run_in_threadpool(
-            run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe, 300, h1_candles, h4_candles
+            run_simulation, candles, structure_events, backtest_trades, "XAUUSD", timeframe, 300, h1_candles, h4_candles, veto_mode
         )
     except Exception as e:
         logger.error(f"Simulation run error: {e}", exc_info=True)
@@ -1432,15 +1434,28 @@ async def get_simulation_data(
     return result
 
 
+_sim_event_endpoint_cache = {}
+
+
 @router.get("/simulate-event")
 async def get_single_event_simulation(
     time: int = Query(..., description="Timestamp of the structure event"),
     timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
     symbol: str = "XAUUSD",
     type: Optional[str] = Query(None, description="Type of the structure event (HH, LL, BOS, CHOCH)"),
+    veto_mode: str = Query("hard", description="Veto mode (hard, soft, none)"),
 ):
     """Run the OrchestratorAgent for a single historical event timestamp."""
-    logger.info(f"--- SIMULATE EVENT ENDPOINT HIT: time={time} type={type} ---")
+    from loguru import logger as loguru_logger
+    cache_key = f"{symbol}_{timeframe}_{time}_{type}_{veto_mode}"
+    if cache_key in _sim_event_endpoint_cache:
+        loguru_logger.info(f"💾 Loaded /simulate-event response from memory cache for {cache_key}")
+        return _sim_event_endpoint_cache[cache_key]
+
+    import sys
+    sys.stdout.write("\n\n\n\n")
+    sys.stdout.flush()
+    loguru_logger.info(f"--- SIMULATE EVENT ENDPOINT HIT: time={time} type={type} ---")
     from datetime import date, datetime, timedelta, timezone
     session_row = None
     from app.core.database import get_db_conn, is_pool_ready
@@ -1571,8 +1586,8 @@ async def get_single_event_simulation(
         target_ev = {"type": "HH", "direction": "Bullish", "price": 0.0, "time": time}
     else:
         if type:
-            # substring matching because of format differences, e.g. "BOS" in "BOS_BULLISH"
-            matched_evs = [e for e in target_evs if type.upper() in e["type"].upper()]
+            # Match core type (e.g. "LL" matching "LL_BEARISH" but not "HH_BULLISH")
+            matched_evs = [e for e in target_evs if type.upper() == e["type"].split("_")[0]]
             if matched_evs:
                 target_ev = matched_evs[0]
             else:
@@ -1654,7 +1669,7 @@ async def get_single_event_simulation(
 
         orch = get_orchestrator()
         result = await run_in_threadpool(
-            analyze_with_orchestrator_lock, orch, md, symbol, timeframe
+            analyze_with_orchestrator_lock, orch, md, symbol, timeframe, veto_mode
         )
 
         # --- Log: per-agent summary ---
@@ -1719,34 +1734,46 @@ async def get_single_event_simulation(
                 "final_confidence": result.get("final_confidence"),
                 "consensus_level": result.get("consensus_level"),
                 "approved": appr,
+                "reasoning": result.get("reasoning"),
                 "ms_signal": _ms.get("signal"),
                 "ms_confidence": _ms.get("confidence"),
                 "ml_signal": _ml.get("signal"),
                 "ml_confidence": _ml.get("confidence"),
                 "sent_signal": _st.get("final_signal"),
                 "sent_confidence": _st.get("final_confidence"),
-                "ml_model_version": _ml.get("model_type") or "regression_v5",
+                "ml_model_version": _ml.get("model_type") or "regression_v5_unconstrained",
                 "news_context": md.get("news_headlines"),
                 "calendar_context": md.get("upcoming_events"),
+                "top_sentiment_headlines": _st.get("sentiment", {}).get("keyword_matches"),
                 "market_structure_state": {
                     "is_counter_swing": result.get("is_counter_swing", False)
                 }
             }
             
             if appr and sig in ("BUY", "SELL"):
+                lot_size = (result.get("position_sizing") or {}).get("lot_size") or 0.01
+                net_profit_usd = round(pnl_pips * lot_size * 10.0, 2) if pnl_pips is not None else None
+                close_reason = "TAKE_PROFIT" if outcome_val == "TP" else ("STOP_LOSS" if outcome_val == "SL" else "TIMEOUT")
                 log_data.update({
                     "entry_price": entry_p,
                     "sl_price": (result.get("sl_tp") or {}).get("sl_price"),
                     "tp_price": (result.get("sl_tp") or {}).get("tp_price"),
-                    "lot_size": (result.get("position_sizing") or {}).get("lot_size"),
+                    "lot_size": lot_size,
                     "outcome": outcome_val,
                     "outcome_bar_time": datetime.fromtimestamp(outcome_bar, tz=timezone.utc) if outcome_bar else None,
                     "pnl_pips": pnl_pips,
+                    "net_profit_usd": net_profit_usd,
+                    "close_reason": close_reason,
                 })
             else:
-                log_data["reject_reason"] = (result.get("reasoning") or result.get("error") or "consensus_failed")[:200]
+                log_data["reject_reason"] = result.get("reasoning") or result.get("error") or "consensus_failed"
+                log_data["net_profit_usd"] = 0.0
+                log_data["close_reason"] = "REJECTED"
                 
-            _sim_logger.log_decision(log_data)
+            # Only log to DB if approved (executed trade) OR if it is the first BOS trigger of the cycle (rejected trigger)
+            is_first_bos = "BOS" in target_ev.get("type", "").upper() and _ms.get("pre_signal") is not None
+            if appr or is_first_bos:
+                _sim_logger.log_decision(log_data)
         except Exception as _le:
             loguru_logger.warning(f"[SimLogger] simulate-event log failed: {_le}")
 
@@ -1754,6 +1781,7 @@ async def get_single_event_simulation(
         frame_dict = frame.dict() if hasattr(frame, "dict") else dict(frame)
         frame_dict["debug_news"] = md.get("news_headlines", [])
         frame_dict["debug_events"] = md.get("upcoming_events", [])
+        _sim_event_endpoint_cache[cache_key] = frame_dict
         return frame_dict
     except Exception as e:
         logger.error(f"Event simulation run error: {e}", exc_info=True)
@@ -1761,20 +1789,49 @@ async def get_single_event_simulation(
 
 
 @router.post("/replay/clear-cache")
-async def clear_replay_cache():
-    """Clear the replay simulation candle, structure cache, and orchestrator state."""
-    global _sim_candle_cache
+async def clear_replay_cache(
+    year_from: Optional[int] = Query(None, description="Start year to delete simulation decisions"),
+    year_to: Optional[int] = Query(None, description="End year to delete simulation decisions"),
+):
+    """Clear the replay simulation candle, structure cache, and orchestrator state,
+    and optionally delete simulation decisions for the specified year range.
+    """
+    global _sim_candle_cache, _sim_event_endpoint_cache
     _sim_candle_cache.clear()
+    _sim_event_endpoint_cache.clear()
     
     # Also reset the simulation orchestrator state and warmup cache
+    from loguru import logger as loguru_logger
     try:
         from app.services.orchestrator_simulator import reset_simulation_orchestrator
         reset_simulation_orchestrator()
-        logger.info("[Replay] Simulation orchestrator state reset successfully")
+        loguru_logger.info("[Replay] Simulation orchestrator state reset successfully")
     except Exception as re:
         logger.warning(f"Failed to reset orchestrator state at clear-cache: {re}")
 
-    logger.info("[Replay] Simulation candle cache cleared successfully")
+    # Delete simulation decisions for the selected year range if provided
+    if year_from is not None and year_to is not None:
+        from datetime import date
+        from app.core.database import get_db_conn, is_pool_ready
+        if is_pool_ready():
+            try:
+                date_from = date(year_from, 1, 1)
+                date_to = date(year_to, 12, 31)
+                with get_db_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute(
+                            "DELETE FROM simulation_decisions WHERE DATE(event_time) >= %s AND DATE(event_time) <= %s",
+                            (date_from, date_to),
+                        )
+                        if hasattr(conn, "commit"):
+                            conn.commit()
+                loguru_logger.info(f"[Replay] Deleted simulation decisions from {date_from} to {date_to}")
+            except Exception as de:
+                loguru_logger.warning(f"[Replay] Failed to delete simulation decisions: {de}")
+                if 'conn' in locals() and hasattr(conn, "rollback"):
+                    conn.rollback()
+
+    loguru_logger.info("[Replay] Simulation candle cache cleared successfully")
     return {"status": "success", "message": "Replay cache cleared"}
 
 

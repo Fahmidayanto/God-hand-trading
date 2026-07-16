@@ -114,7 +114,8 @@ class OrchestratorAgent:
         self,
         market_data: Dict[str, Any],
         symbol: str = "XAUUSD",
-        timeframe: str = "M15"
+        timeframe: str = "M15",
+        veto_mode: str = "hard"
     ) -> Dict[str, Any]:
         """
         Orchestrate all agents and generate consensus decision.
@@ -150,6 +151,7 @@ class OrchestratorAgent:
                     df_h1=market_data.get("h1_data"),   # Multi-TF EMA scoring H1
                     df_h4=market_data.get("h4_data"),   # Multi-TF EMA scoring H4
                     structure_events=market_data.get("structure_events"),
+                    veto_mode=veto_mode,
                 )
                 agent_results["market_structure"] = ms_result
                 logger.debug(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")
@@ -359,8 +361,8 @@ class OrchestratorAgent:
                             logger.debug(f"   → Skipped Sentiment (signal: {base_signal})")
             
             # === STEP 4: Calculate Consensus ===
-            logger.debug("⚖️ Step 4: Calculating Consensus...")
-            consensus = self._calculate_consensus(agent_results, market_data)
+            logger.debug(f"⚖️ Step 4: Calculating Consensus (Veto Mode: {veto_mode})...")
+            consensus = self._calculate_consensus(agent_results, market_data, veto_mode=veto_mode)
             
             # === STEP 5: Risk Management (if consensus approved) ===
             if "risk_management" in self.agents and consensus["approved"] and consensus["final_signal"] in ["BUY", "SELL"]:
@@ -368,7 +370,7 @@ class OrchestratorAgent:
                 
                 # Check if v5 regression results are available
                 ml_res = agent_results.get("ml_prediction")
-                is_v5 = ml_res and ml_res.get("model_type") == "regression_v5"
+                is_v5 = ml_res and ml_res.get("model_type") in ("regression_v5", "regression_v5_unconstrained")
                 
                 if is_v5:
                     expected_rr = ml_res["expected_rr"]
@@ -531,7 +533,8 @@ class OrchestratorAgent:
     def _calculate_consensus(
         self,
         agent_results: Dict[str, Dict[str, Any]],
-        market_data: Dict[str, Any]
+        market_data: Dict[str, Any],
+        veto_mode: str = "hard"
     ) -> Dict[str, Any]:
         """Calculate weighted consensus from all agent results"""
         
@@ -577,9 +580,29 @@ class OrchestratorAgent:
         # Determine winning signal
         final_signal = max(vote_scores, key=vote_scores.get)
         
-        # Force final_signal to HOLD if Market Structure signal is HOLD (pre-analysis / warm-up)
+        # Force final_signal to HOLD if Market Structure signal is HOLD (pre-analysis / warm-up / hard veto)
+        # or if we are in soft veto mode, MSA has low confidence (< 0.60), and ML is not strong
         ms_signal = agent_results.get("market_structure", {}).get("signal", "HOLD")
+        ms_confidence = agent_results.get("market_structure", {}).get("confidence", 1.0)
+        
+        apply_veto = False
+        is_veto_bypassed = False
+        
         if ms_signal == "HOLD":
+            apply_veto = True
+        elif veto_mode == "soft" and ms_confidence < 0.60:
+            # Candidate for soft veto bypass
+            ml_res = agent_results.get("ml_prediction", {})
+            ml_rr = ml_res.get("expected_rr", 0.0) if ml_res else 0.0
+            is_ml_strong = ml_res and ml_res.get("signal") in ("BUY", "SELL") and ml_rr >= 1.35
+            
+            if not is_ml_strong:
+                apply_veto = True
+            else:
+                is_veto_bypassed = True
+                reasoning_parts.append(f"⚠️ [Veto Bypassed] MSA Veto bypassed due to strong ML signal (Expected R:R {ml_rr:.2f} >= 1.35).")
+                
+        if apply_veto:
             final_signal = "HOLD"
             final_score = vote_scores["HOLD"]
         else:
@@ -606,7 +629,7 @@ class OrchestratorAgent:
         # Check if approved
         approved = (
             final_signal in ["BUY", "SELL"] and
-            consensus_pct >= self.consensus_threshold
+            (consensus_pct >= self.consensus_threshold or is_veto_bypassed)
         )
         
         # Build reasoning
@@ -625,6 +648,23 @@ class OrchestratorAgent:
                 reasoning_parts.append("❌ No tradeable signal.")
             else:
                 reasoning_parts.append(f"❌ Consensus too weak ({consensus_pct:.0%} < {self.consensus_threshold:.0%}).")
+
+        # Append detailed agent explanations
+        ms_res = agent_results.get("market_structure")
+        if ms_res and ms_res.get("phase") == "BOS_TRIGGERED" and ms_res.get("reasoning"):
+            reasoning_parts.append(f"[Market Structure] {ms_res['reasoning']}")
+
+        ml_res = agent_results.get("ml_prediction")
+        if ml_res and ml_res.get("reasoning"):
+            reasoning_parts.append(f"[ML Filter] {ml_res['reasoning']}")
+
+        sent_res = agent_results.get("sentiment")
+        if sent_res and sent_res.get("reasoning"):
+            reasoning_parts.append(f"[Sentiment] {sent_res['reasoning']}")
+
+        rm_res = agent_results.get("risk_management")
+        if rm_res and rm_res.get("reasoning"):
+            reasoning_parts.append(f"[Risk Manager] {rm_res['reasoning']}")
         
         return {
             "final_signal": final_signal,

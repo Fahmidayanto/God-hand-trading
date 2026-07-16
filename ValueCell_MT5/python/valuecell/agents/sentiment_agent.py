@@ -457,6 +457,8 @@ Headlines:
                 temperature=0.6,
                 top_p=0.95,
                 max_tokens=4096,
+                timeout=15.0,
+                max_retries=0,
                 default_headers={
                     "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
                     "anthropic-version": "2023-06-01",
@@ -472,6 +474,8 @@ Headlines:
             if not response or not response.content:
                 raise ValueError("Empty response content from AgentRouter GLM-5.2")
             content = response.content.strip()
+            if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                raise ValueError(f"Invalid content returned from AgentRouter GLM-5.2: {content}")
             
             # Clean markdown code block or extract JSON object robustly via regex
             cleaned_content = content.strip()
@@ -500,6 +504,8 @@ Headlines:
                     temperature=0.6,
                     top_p=0.95,
                     max_tokens=1024,
+                    timeout=15.0,
+                    max_retries=0,
                 )
                 agent_397b = Agent(
                     model=model_397b,
@@ -509,6 +515,8 @@ Headlines:
                 if not response or not response.content:
                     raise ValueError("Empty response content from NVIDIA Qwen 397B")
                 content = response.content.strip()
+                if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                    raise ValueError(f"Invalid content returned from NVIDIA Qwen 397B: {content}")
                 
                 # Clean markdown code block or extract JSON object robustly via regex
                 cleaned_content = content.strip()
@@ -537,6 +545,8 @@ Headlines:
                         temperature=0.6,
                         top_p=0.95,
                         max_tokens=1024,
+                        timeout=15.0,
+                        max_retries=0,
                     )
                     agent_122b = Agent(
                         model=model_122b,
@@ -546,6 +556,8 @@ Headlines:
                     if not response or not response.content:
                         raise ValueError("Empty response content from NVIDIA Qwen 122B")
                     content = response.content.strip()
+                    if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                        raise ValueError(f"Invalid content returned from NVIDIA Qwen 122B: {content}")
                     
                     # Clean markdown code block or extract JSON object robustly via regex
                     cleaned_content = content.strip()
@@ -585,6 +597,8 @@ Headlines:
                         if not response or not response.content:
                             raise ValueError("Empty response content from Gemini Fallback")
                         content = response.content.strip()
+                        if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                            raise ValueError(f"Invalid content returned from Gemini Fallback: {content}")
                         
                         # Clean markdown code block or extract JSON object robustly via regex
                         cleaned_content = content.strip()
@@ -603,6 +617,8 @@ Headlines:
                         if content:
                             logger.error(f"Raw LLM content was: {content}")
                         return None
+
+
 
 
         # Parse data safely
@@ -714,7 +730,61 @@ Headlines:
 
         # LLM Sentiment Analysis Flow if enabled
         if self.use_llm:
-            llm_result = self._analyze_news_sentiment_llm(kept_headlines, current_time)
+            import hashlib
+            import json
+            from pathlib import Path
+            
+            cache_dir = Path(__file__).resolve().parents[3] / "backend" / "data" / "sentiment_cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create a unique key based on the headlines content
+            hl_content = "".join([f"{item.get('text', '')}_{str(item.get('timestamp', ''))}" for item in kept_headlines])
+            hl_hash = hashlib.md5(hl_content.encode('utf-8')).hexdigest()
+            cache_file = cache_dir / f"sentiment_{hl_hash}.json"
+            
+            llm_result = None
+            import os
+            if cache_file.exists() and not os.getenv("PYTEST_CURRENT_TEST"):
+                try:
+                    with open(cache_file, "r") as f:
+                        cached_data = json.load(f)
+                    
+                    # Map the string sentiment to SentimentType enum
+                    sent_str = cached_data.get("sentiment", "neutral").lower()
+                    if sent_str == "bullish":
+                        sentiment_type = SentimentType.BULLISH
+                    elif sent_str == "bearish":
+                        sentiment_type = SentimentType.BEARISH
+                    else:
+                        sentiment_type = SentimentType.NEUTRAL
+                    
+                    llm_result = {
+                        "sentiment": sentiment_type,
+                        "score": float(cached_data.get("score", 0.0)),
+                        "strength": str(cached_data.get("strength", "none")),
+                        "reasoning": str(cached_data.get("reasoning", ""))
+                    }
+                    logger.info(f"💾 Loaded sentiment analysis from cache (hash: {hl_hash})")
+                except Exception as ce:
+                    logger.warning(f"Failed to read sentiment cache: {ce}")
+            
+            if not llm_result:
+                llm_result = self._analyze_news_sentiment_llm(kept_headlines, current_time)
+                if llm_result and not os.getenv("PYTEST_CURRENT_TEST"):
+                    # Write to cache
+                    try:
+                        cache_data = {
+                            "sentiment": llm_result["sentiment"].value,
+                            "score": llm_result["score"],
+                            "strength": llm_result["strength"],
+                            "reasoning": llm_result["reasoning"]
+                        }
+                        with open(cache_file, "w") as f:
+                            json.dump(cache_data, f, indent=2)
+                        logger.info(f"💾 Wrote sentiment analysis to cache (hash: {hl_hash})")
+                    except Exception as ce:
+                        logger.warning(f"Failed to write sentiment cache: {ce}")
+            
             if llm_result:
                 return {
                     "sentiment": llm_result["sentiment"],

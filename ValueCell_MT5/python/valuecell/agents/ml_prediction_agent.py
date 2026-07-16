@@ -74,7 +74,7 @@ class MLPredictionAgent:
         self.feature_engineer = FeatureEngineer()
         
         # Override threshold if regression metadata defines a custom optimal_rr_threshold
-        if self.model_type == "regression_v5" and self.metadata and "optimal_rr_threshold" in self.metadata:
+        if self.model_type in ("regression_v5", "regression_v5_unconstrained") and self.metadata and "optimal_rr_threshold" in self.metadata:
             self.threshold = float(self.metadata["optimal_rr_threshold"])
         
         logger.info(
@@ -95,7 +95,7 @@ class MLPredictionAgent:
             # Check model type
             self.model_type = self.metadata.get("model_type", "classification")
             
-            if self.model_type == "regression_v5":
+            if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
                 # Load MFE model and scaler
                 self.mfe_model = joblib.load(self.model_path / "model_v5_mfe.pkl")
                 self.mfe_scaler = joblib.load(self.model_path / "scaler_v5_mfe.pkl")
@@ -412,7 +412,7 @@ class MLPredictionAgent:
             if entry_price <= 0:
                 raise ValueError("Entry price must be greater than zero")
                 
-            if self.model_type == "regression_v5":
+            if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
                 # Extract v5 regression features
                 features = self._extract_v5_features(market_data, entry_price, structure_signal)
                 
@@ -423,7 +423,8 @@ class MLPredictionAgent:
                     columns=mfe_feat_names,
                 )
                 mfe_scaled = self.mfe_scaler.transform(mfe_df)
-                predicted_mfe = float(self.mfe_model.predict(mfe_scaled)[0])
+                mfe_scaled_df = pd.DataFrame(mfe_scaled, columns=mfe_feat_names)
+                predicted_mfe = float(self.mfe_model.predict(mfe_scaled_df)[0])
                 
                 # Make prediction for MAE
                 mae_feat_names = self.metadata["mae_features"]
@@ -432,7 +433,8 @@ class MLPredictionAgent:
                     columns=mae_feat_names,
                 )
                 mae_scaled = self.mae_scaler.transform(mae_df)
-                predicted_mae = float(self.mae_model.predict(mae_scaled)[0])
+                mae_scaled_df = pd.DataFrame(mae_scaled, columns=mae_feat_names)
+                predicted_mae = float(self.mae_model.predict(mae_scaled_df)[0])
                 
                 # Ensure predicted values are reasonable/positive
                 predicted_mfe = max(0.0, predicted_mfe)

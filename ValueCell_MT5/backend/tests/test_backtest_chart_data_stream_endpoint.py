@@ -1,6 +1,6 @@
 import json
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from app.main import app
 
 @pytest.mark.asyncio
@@ -25,7 +25,7 @@ async def test_backtest_chart_data_stream(monkeypatch, tmp_path):
 
     monkeypatch.setattr(MarketDataStreamer, "__init__", patched_init)
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.get(
             "/api/v1/trading/chart/backtest-data-stream",
             params={

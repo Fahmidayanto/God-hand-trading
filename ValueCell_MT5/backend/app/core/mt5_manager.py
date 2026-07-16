@@ -47,7 +47,8 @@ class MT5Manager:
 
             self._connected = True
             self._account_info = account_info
-            logger.info(f"[OK] Connected to MT5 account {account_info.login}")
+            from loguru import logger as loguru_logger
+            loguru_logger.info(f"[OK] Connected to MT5 account {account_info.login}")
             return True
 
         except Exception as e:

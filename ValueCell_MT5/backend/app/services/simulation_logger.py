@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS {_TABLE} (
     final_confidence       NUMERIC(5,3),
     consensus_level        VARCHAR(20),
     approved               BOOLEAN,
-    reject_reason          VARCHAR(200),
+    reject_reason          TEXT,
     close_reason           VARCHAR(50),
     reasoning              TEXT,
     ms_signal              VARCHAR(20),

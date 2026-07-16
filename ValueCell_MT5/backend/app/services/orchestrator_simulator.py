@@ -122,6 +122,8 @@ Return raw JSON ONLY. No markdown code blocks.
             temperature=0.6,
             top_p=0.95,
             max_tokens=4096,
+            timeout=15.0,
+            max_retries=0,
             default_headers={
                 "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
                 "anthropic-version": "2023-06-01",
@@ -137,6 +139,8 @@ Return raw JSON ONLY. No markdown code blocks.
         if not response or not response.content:
             raise ValueError("Empty response content from AgentRouter GLM-5.2")
         content = response.content.strip()
+        if "Unknown model error" in content or ("{" not in content and "}" not in content):
+            raise ValueError(f"Invalid content returned from AgentRouter GLM-5.2: {content}")
         logger.info("✅ Successfully generated sentiment data via AgentRouter GLM-5.2")
     except Exception as glm_err:
         logger.warning(f"AgentRouter GLM-5.2 generation failed, trying Qwen 397B: {glm_err}")
@@ -151,6 +155,8 @@ Return raw JSON ONLY. No markdown code blocks.
                 temperature=0.6,
                 top_p=0.95,
                 max_tokens=1024,
+                timeout=15.0,
+                max_retries=0,
             )
             agent_397b = Agent(
                 model=model_397b,
@@ -160,6 +166,8 @@ Return raw JSON ONLY. No markdown code blocks.
             if not response or not response.content:
                 raise ValueError("Empty response content from NVIDIA Qwen 397B")
             content = response.content.strip()
+            if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                raise ValueError(f"Invalid content returned from NVIDIA Qwen 397B: {content}")
             logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 397B")
         except Exception as qwen397_err:
             logger.warning(f"NVIDIA Qwen 397B generation failed, trying Qwen 122B: {qwen397_err}")
@@ -174,6 +182,8 @@ Return raw JSON ONLY. No markdown code blocks.
                 temperature=0.6,
                 top_p=0.95,
                 max_tokens=1024,
+                timeout=15.0,
+                max_retries=0,
             )
             agent_122b = Agent(
                 model=model_122b,
@@ -183,6 +193,8 @@ Return raw JSON ONLY. No markdown code blocks.
             if not response or not response.content:
                 raise ValueError("Empty response content from NVIDIA Qwen 122B")
             content = response.content.strip()
+            if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                raise ValueError(f"Invalid content returned from NVIDIA Qwen 122B: {content}")
             logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 122B")
         except Exception as qwen122_err:
             logger.warning(f"NVIDIA Qwen 122B generation failed, falling back to Gemini: {qwen122_err}")
@@ -207,6 +219,8 @@ Return raw JSON ONLY. No markdown code blocks.
                 if not response or not response.content:
                     raise ValueError("Empty response content from Gemini Fallback")
                 content = response.content.strip()
+                if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                    raise ValueError(f"Invalid content returned from Gemini Fallback: {content}")
                 logger.info("✅ Successfully generated sentiment data via Gemini Fallback")
             except Exception as gemini_err:
                 logger.error(f"Gemini fallback also failed: {gemini_err}")
@@ -382,12 +396,13 @@ def reconstruct_market_data(
         # Post-BoS: any HH/LL after BoS is ignored until next CHoCH resets the cycle
         is_post_bos = recent_baseline == "BOS"
         
-        is_bos = "BOS" in target_ev_type
-        is_hh_ll = any(x in target_ev_type for x in ("HH", "LL"))
+        core_type = target_ev_type.split("_")[0]
+        is_bos = core_type == "BOS"
+        is_hh_ll = core_type in ("HH", "LL")
         
         is_counter_swing = is_post_bos or (is_setup_active and (
-            (any(x in target_ev_type for x in ("LL", "BEAR")) and recent_choch_dir and "BULL" in recent_choch_dir) or
-            (any(x in target_ev_type for x in ("HH", "BULL")) and recent_choch_dir and "BEAR" in recent_choch_dir)
+            (core_type == "LL" and recent_choch_dir == "BULLISH") or
+            (core_type == "HH" and recent_choch_dir == "BEARISH")
         ))
 
         should_run_llm = is_bos or (is_hh_ll and is_setup_active and not is_counter_swing)
@@ -512,11 +527,16 @@ def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
         }
 
     ev_ts = ev.get("time") or 0
+    _ar = result.get("agent_results") or {}
+    _ms = _ar.get("market_structure") or {}
+    is_first_bos = "BOS" in (ev.get("type") or "").upper() and _ms.get("pre_signal") is not None
+
     return {
         "event_time": ev_ts,
         "event_type": ev.get("type"),
         "event_direction": ev.get("direction"),
         "session": _detect_session(ev_ts) if ev_ts else None,
+        "is_first_bos": is_first_bos,
         "agents": {
             "market_structure": view("market_structure"),
             "ml_prediction": view("ml_prediction"),
@@ -577,10 +597,10 @@ def get_orchestrator():
     return _cached_orchestrator
 
 
-def analyze_with_orchestrator_lock(orch, market_data, symbol="XAUUSD", timeframe="M15"):
+def analyze_with_orchestrator_lock(orch, market_data, symbol="XAUUSD", timeframe="M15", veto_mode="hard"):
     """Protect stateful simulation agent and warm-up cache from concurrent requests."""
     with _orchestrator_lock:
-        return orch.analyze(market_data=market_data, symbol=symbol, timeframe=timeframe)
+        return orch.analyze(market_data=market_data, symbol=symbol, timeframe=timeframe, veto_mode=veto_mode)
 
 
 def reset_simulation_orchestrator():
@@ -598,6 +618,7 @@ def run_simulation(
     max_events: int = 300,
     h1_candles: Optional[List[Dict[str, Any]]] = None,
     h4_candles: Optional[List[Dict[str, Any]]] = None,
+    veto_mode: str = "hard",
 ) -> Dict[str, Any]:
     orch = get_orchestrator()
 
@@ -744,7 +765,7 @@ def run_simulation(
             logger.warning(f"sim: skip event {ev_time}: {e}")
             continue
         try:
-            result = analyze_with_orchestrator_lock(orch, md, symbol, timeframe)
+            result = analyze_with_orchestrator_lock(orch, md, symbol, timeframe, veto_mode=veto_mode)
         except Exception as e:
             logger.warning(f"sim: orchestrator failed at {ev_time}: {e}")
             err_result = {
@@ -779,32 +800,54 @@ def run_simulation(
         )
 
         if not result.get("approved") or result.get("final_signal") not in ("BUY", "SELL"):
-            # Log rejected decisions to NeonDB
-            try:
-                from app.services.simulation_logger import _sim_logger
-                _ar = result.get("agent_results") or {}
-                _ms = _ar.get("market_structure") or {}
-                _ml = _ar.get("ml_prediction") or {}
-                _st = _ar.get("sentiment") or {}
-                _sim_logger.log_decision({
-                    "symbol": symbol, "timeframe": timeframe,
-                    "event_time": _to_dt(ev_time),
-                    "event_type": ev.get("type"),
-                    "event_price": ev.get("price"),
+            _ar = result.get("agent_results") or {}
+            _ms = _ar.get("market_structure") or {}
+            is_first_bos = "BOS" in _ev_type and _ms.get("pre_signal") is not None
+            
+            if is_first_bos:
+                # Log rejected decisions to NeonDB
+                try:
+                    from app.services.simulation_logger import _sim_logger
+                    _ml = _ar.get("ml_prediction") or {}
+                    _st = _ar.get("sentiment") or {}
+                    _sim_logger.log_decision({
+                        "symbol": symbol, "timeframe": timeframe,
+                        "event_time": _to_dt(ev_time),
+                        "event_type": ev.get("type"),
+                        "event_price": ev.get("price"),
+                        "session": _detect_session(ev_time),
+                        "entry_session": _detect_session(ev_time),
+                        "final_signal": result.get("final_signal"),
+                        "final_confidence": result.get("final_confidence"),
+                        "consensus_level": result.get("consensus_level"),
+                        "approved": False,
+                        "reasoning": result.get("reasoning"),
+                        "reject_reason": result.get("reasoning") or result.get("error") or "consensus_failed",
+                        "close_reason": "REJECTED",
+                        "ms_signal": _ms.get("signal"), "ms_confidence": _ms.get("confidence"),
+                        "ml_signal": _ml.get("signal"), "ml_confidence": _ml.get("confidence"),
+                        "sent_signal": _st.get("final_signal"), "sent_confidence": _st.get("final_confidence"),
+                        "ml_model_version": _ml.get("model_type") or "regression_v5_unconstrained",
+                        "news_context": md.get("news_headlines"),
+                        "calendar_context": md.get("upcoming_events"),
+                        "top_sentiment_headlines": _st.get("sentiment", {}).get("keyword_matches"),
+                        "net_profit_usd": 0.0,
+                    })
+                except Exception as _le:
+                    logger.debug(f"[SimLogger] rejected log skipped: {_le}")
+                
+                signals.append({
+                    "time": ev_time,
+                    "signal": result.get("final_signal", "HOLD"),
+                    "confidence": float(result.get("final_confidence", 0.0)),
+                    "consensus": result.get("consensus_level", ""),
+                    "sl": None,
+                    "tp": None,
+                    "lot": 0.0,
+                    "outcome": "REJECTED",
+                    "outcome_bar": None,
                     "session": _detect_session(ev_time),
-                    "entry_session": _detect_session(ev_time),
-                    "final_signal": result.get("final_signal"),
-                    "final_confidence": result.get("final_confidence"),
-                    "consensus_level": result.get("consensus_level"),
-                    "approved": False,
-                    "reject_reason": (result.get("reasoning") or result.get("error") or "consensus_failed")[:200],
-                    "ms_signal": _ms.get("signal"), "ms_confidence": _ms.get("confidence"),
-                    "ml_signal": _ml.get("signal"), "ml_confidence": _ml.get("confidence"),
-                    "sent_signal": _st.get("final_signal"), "sent_confidence": _st.get("final_confidence"),
-                    "ml_model_version": _ml.get("model_type") or "regression_v5",
                 })
-            except Exception as _le:
-                logger.debug(f"[SimLogger] rejected log skipped: {_le}")
             continue
         sig = result["final_signal"]
         sl = (result.get("sl_tp") or {}).get("sl_price")
@@ -835,7 +878,10 @@ def run_simulation(
             _ms = _ar.get("market_structure") or {}
             _ml = _ar.get("ml_prediction") or {}
             _st = _ar.get("sentiment") or {}
-            _obar = outcome["outcome_bar"]
+            lot_size = (result.get("position_sizing") or {}).get("lot_size") or 0.01
+            net_profit_usd = round(pnl_pips * lot_size * 10.0, 2) if pnl_pips is not None else None
+            outcome_str = outcome.get("outcome", "NONE")
+            close_reason = "TAKE_PROFIT" if outcome_str == "TP" else ("STOP_LOSS" if outcome_str == "SL" else "TIMEOUT")
             _sim_logger.log_decision({
                 "symbol": symbol, "timeframe": timeframe,
                 "event_time": _to_dt(ev_time),
@@ -847,16 +893,22 @@ def run_simulation(
                 "final_confidence": result.get("final_confidence"),
                 "consensus_level": result.get("consensus_level"),
                 "approved": True,
+                "reasoning": result.get("reasoning"),
+                "close_reason": close_reason,
                 "ms_signal": _ms.get("signal"), "ms_confidence": _ms.get("confidence"),
                 "ml_signal": _ml.get("signal"), "ml_confidence": _ml.get("confidence"),
                 "sent_signal": _st.get("final_signal"), "sent_confidence": _st.get("final_confidence"),
-                "ml_model_version": _ml.get("model_type") or "regression_v5",
+                "ml_model_version": _ml.get("model_type") or "regression_v5_unconstrained",
                 "entry_price": entry_p,
                 "sl_price": sl, "tp_price": tp,
-                "lot_size": (result.get("position_sizing") or {}).get("lot_size"),
-                "outcome": outcome["outcome"],
+                "lot_size": lot_size,
+                "outcome": outcome_str,
                 "outcome_bar_time": _to_dt(_obar) if _obar else None,
                 "pnl_pips": pnl_pips,
+                "net_profit_usd": net_profit_usd,
+                "news_context": md.get("news_headlines"),
+                "calendar_context": md.get("upcoming_events"),
+                "top_sentiment_headlines": _st.get("sentiment", {}).get("keyword_matches"),
             })
         except Exception as _le:
             logger.debug(f"[SimLogger] approved log skipped: {_le}")
@@ -882,20 +934,23 @@ def compute_metrics(
 ) -> Dict[str, Any]:
     from collections import Counter
 
-    total = len(signals)
-    buy = sum(1 for s in signals if s["signal"] == "BUY")
-    sell = sum(1 for s in signals if s["signal"] == "SELL")
-    wins = sum(1 for s in signals if s["outcome"] == "TP")
-    losses = sum(1 for s in signals if s["outcome"] == "SL")
+    # Filter out rejected signals for metrics calculations
+    exec_signals = [s for s in signals if s.get("outcome") != "REJECTED"]
+
+    total = len(exec_signals)
+    buy = sum(1 for s in exec_signals if s["signal"] == "BUY")
+    sell = sum(1 for s in exec_signals if s["signal"] == "SELL")
+    wins = sum(1 for s in exec_signals if s["outcome"] == "TP")
+    losses = sum(1 for s in exec_signals if s["outcome"] == "SL")
     decided = wins + losses
     win_rate = (wins / decided) if decided else 0.0
-    avg_conf = (sum(s["confidence"] for s in signals) / total) if total else 0.0
+    avg_conf = (sum(s["confidence"] for s in exec_signals) / total) if total else 0.0
     bt_sorted = sorted(
         [t for t in backtest_trades if t.get("entry_time") is not None],
         key=lambda t: t["entry_time"],
     )
     matched = 0
-    for s in signals:
+    for s in exec_signals:
         for t in bt_sorted:
             if abs(t["entry_time"] - s["time"]) <= 4 * 3600:
                 bt_type = str(t.get("type", "")).upper()
@@ -905,7 +960,7 @@ def compute_metrics(
                     matched += 1
                 break
     agreement_rate = (matched / total) if total else 0.0
-    avg_consensus = Counter(s.get("consensus", "") for s in signals).most_common(1)[0][0] if total else ""
+    avg_consensus = Counter(s.get("consensus", "") for s in exec_signals).most_common(1)[0][0] if total else ""
     return {
         "total_signals": total,
         "buy": buy,

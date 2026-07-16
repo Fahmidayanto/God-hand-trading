@@ -1,5 +1,5 @@
 {
-  "model_type": "regression_v5",
+  "model_type": "regression_v5_unconstrained",
   "version": "v5_unconstrained_20260713_004508",
   "created_at": "2026-07-13T00:45:08.077573",
   "training_script": "train_ml_prediction_v5_unconstrained.py",

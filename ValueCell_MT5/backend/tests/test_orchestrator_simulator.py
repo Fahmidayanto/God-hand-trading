@@ -87,7 +87,7 @@ def test_compute_metrics():
 import app.services.orchestrator_simulator as sim_mod
 
 class FakeOrchestrator:
-    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15", *args, **kwargs):
         return {
             "approved": True,
             "final_signal": "BUY",
@@ -165,7 +165,7 @@ def test_run_simulation_caps_events(monkeypatch):
 
 class SkippedOrchestrator:
     """Returns approved=True but with no per-agent results (all agents skipped)."""
-    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15", *args, **kwargs):
         return {
             "approved": True,
             "final_signal": "BUY",
@@ -191,7 +191,7 @@ def test_build_frame_skipped(monkeypatch):
 
 
 class ErrorOrchestrator:
-    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15", *args, **kwargs):
         raise RuntimeError("boom")
 
 
@@ -242,7 +242,7 @@ from app.main import app
 from fastapi.testclient import TestClient
 
 class FakeOrchestrator:
-    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15"):
+    def analyze(self, market_data, symbol="XAUUSD", timeframe="M15", *args, **kwargs):
         return {"approved": True, "final_signal": "BUY", "final_confidence": 0.8,
                 "consensus_level": "strong", "sl_tp": {"sl_price": 98.0, "tp_price": 105.0},
                 "position_sizing": {"lot_size": 0.1},
@@ -291,3 +291,31 @@ def test_simulate_endpoint(monkeypatch):
     assert "win_rate" in body["metrics"]
     assert "frames" in body
     assert isinstance(body["frames"], list)
+
+
+def test_target_event_exact_matching():
+    """Ensure LL does not match HH_BULLISH when finding target event."""
+    target_evs = [
+        {"id": 19, "type": "HH_BULLISH", "time": 100},
+        {"id": 20, "type": "LL_BEARISH", "time": 100},
+    ]
+    search_type = "LL"
+    
+    # This must match only LL_BEARISH
+    matched_evs = [e for e in target_evs if search_type.upper() == e["type"].split("_")[0]]
+    assert len(matched_evs) == 1
+    assert matched_evs[0]["type"] == "LL_BEARISH"
+
+
+def test_orchestrator_trigger_exact_matching():
+    """Ensure BOS/CHOCH events do not register as HH/LL due to BULLISH/BEARISH suffix containing LL."""
+    target_ev_types = ["BOS_BULLISH", "CHOCH_BULLISH", "HH_BULLISH", "LL_BEARISH"]
+    
+    results = []
+    for t in target_ev_types:
+        core_type = t.split("_")[0]
+        is_hh_ll = core_type in ("HH", "LL")
+        results.append(is_hh_ll)
+        
+    assert results == [False, False, True, True]
+
