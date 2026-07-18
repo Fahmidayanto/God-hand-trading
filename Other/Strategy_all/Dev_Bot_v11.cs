@@ -6300,7 +6300,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //--------------------------------------------------------------------------------------+
                     // --- START: Logika Reset lastAcceptedLL setelah CHoCH Bearish dan LL valid (MODE 1) M15 --|
                     //--------------------------------------------------------------------------------------|
-                    if (!llAfterChochConfirmedFlag_M15) 
+                    if (!llAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bearish_M15) // guard: bar harus setelah CHoCH Bearish (mirror bullish 5761)
                         {
                             // lastAcceptedHH_M15 = preChochHH_M15;
                             lastAcceptedLL_M15 = rates_M15[i].low;  // last AcceptedLL direset ke LL sebelum CHoCH Bullish
@@ -6328,9 +6328,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
                             continue; // Lewati update HH ini
                         }
-                    else if (rates_M15[i].low < lastAcceptedLL_M15) 
+                    else if (llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15) // guard: MODE 1.2 hanya lanjutan MODE 1 yang sudah confirmed
                         {
                             lastAcceptedLL_M15 = rates_M15[i].low; // Update lastAcceptedLL jika lebih rendah
+                            postChoCH_LL_M15      = rates_M15[i].low;  // Sync target BoS Bearish ke LL terendah baru
+                            time_postChoCH_LL_M15 = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1.2 M15] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                                     lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                             // 🔥 HAPUS OBJEK RECTANGLE LL SEBELUMNYA ---
@@ -6339,7 +6341,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time); // Update visual setelah semua kondisi
                         }
-                    else if (rates_M15[i].low > lastAcceptedLL_M15) 
+                    else if (llAfterChochConfirmedFlag_M15 && rates_M15[i].low > lastAcceptedLL_M15)
                         {
                             if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
                                     rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
@@ -6379,12 +6381,12 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //     PrintFormat("🎯 [TARGET SET M15] BoS Bearish Target LL Lebih Rendah set ke: %.2f @ %s", postChoCH_LL_M15, TimeToString(time_postChoCH_LL_M15)); // Log tambahan untuk kejelasan
             // }
             
-            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
+            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15 && rates_M15[i].time > time_choch_bearish_M15) // guard: bar harus setelah CHoCH Bearish (mirror bullish 5804)
             {
                 postChoCH_LL_M15      = rates_M15[i].low; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_LL_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
                 PrintFormat("🎯 [TARGET SET M15] BoS Bearish Target LL set ke: %.2f @ %s", postChoCH_LL_M15, TimeToString(time_postChoCH_LL_M15)); // Log tambahan untuk kejelasan
-            } 
+            }
 
             if (chochBearish_M15 && isInTrendBearish_M15 && rates_M15[i].low < lastAcceptedLL_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
             {
@@ -8265,9 +8267,11 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
 
                     continue;
                 }
-                else if (rates_H1[i].low < lastAcceptedLL_H1) 
+                else if (rates_H1[i].low < lastAcceptedLL_H1)
                 {
                     lastAcceptedLL_H1 = rates_H1[i].low;
+                    postChoCH_LL_H1      = rates_H1[i].low;  // Sync target BoS Bearish ke LL terendah baru
+                    time_postChoCH_LL_H1 = rates_H1[i].time;
                     PrintFormat("✅ H1: [MODE 1.2] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                             lastAcceptedLL_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, previousLLBoxName_H1) >= 0)

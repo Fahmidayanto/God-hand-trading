@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghost Loading Engine - Three.js Demo</title>
+  
+  <!-- Font Google Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* Reset Dasar */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: #050505;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Canvas 3D */
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* =======================================================
+       GHOST LOADING SYSTEM WITH 3 MOTION LAYERS
+       ======================================================= */
+    
+    /* 1. PRIMARY & AMBIENT LAYER (Latar Belakang & Efek Bernafas) */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      
+      /* Ambient Layer: Gradasi dinamis yang seolah bernafas */
+      background: radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.7) 0%, rgba(8, 8, 8, 0.85) 100%);
+      animation: ambientPulse 8s ease-in-out infinite alternate;
+      
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), 
+                  visibility 0.8s;
+    }
+
+    /* 2. SECONDARY LAYER: Card Popup dengan Motion Pegas & Shadow Lag */
+    .loading-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 340px;
+      text-align: center;
+      
+      /* Shadow Lag: Bayangan berpendar lembut */
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5),
+                  0 0 40px rgba(59, 130, 246, 0.03),
+                  inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      
+      /* Animasi Transisi Masuk/Keluar */
+      transform: scale(1);
+      transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 0.9s ease; /* Shadow melambat sedikit */
+    }
+
+    /* Spinner Animasi Berkurva */
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border: 2px solid rgba(255, 255, 255, 0.06);
+      border-top-color: #3b82f6; 
+      border-radius: 50%;
+      margin: 0 auto 28px;
+      animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      position: relative;
+    }
+
+    .spinner::after {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
+      opacity: 0.6;
+    }
+
+    .loading-title {
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      margin-bottom: 24px;
+      color: rgba(255, 255, 255, 0.9);
+      text-transform: uppercase;
+    }
+
+    /* Progress Tracker (Primary Layer visual feedback) */
+    .progress-container {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #60a5fa);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.6);
+      transition: width 0.15s ease-out;
+    }
+
+    .progress-text {
+      color: rgba(255, 255, 255, 0.45);
+      font-family: monospace;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+    }
+
+    /* Keadaan Saat Selesai Pemuatan */
+    .loading-overlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loading-overlay.fade-out .loading-card {
+      transform: scale(0.85); /* Squash/Shrink out */
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); /* Shadow menyusut */
+    }
+
+    /* INTERAKTIF BUTTON: Dengan Anticipation & Squash */
+    .btn-reload {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) scale(1);
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.8);
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      
+      /* Transisi pegas untuk tombol */
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                  background 0.3s ease,
+                  border-color 0.3s ease,
+                  color 0.3s ease,
+                  box-shadow 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Hover State (Slight stretch & glow) */
+    .btn-reload:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: #3b82f6;
+      color: #ffffff;
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.25);
+      transform: translateX(-50%) scale(1.05); /* Stretch */
+    }
+
+    /* Active Press State (Anticipation / Squash) */
+    .btn-reload:active {
+      transform: translateX(-50%) scale(0.96); /* Squash/Anticipate */
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+      transition-duration: 0.1s; /* Respons instan saat ditekan */
+    }
+
+    /* Animasi Keyframes */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes ambientPulse {
+      0% { background-color: rgba(8, 8, 8, 0.8); }
+      100% { background-color: rgba(15, 23, 42, 0.85); }
+    }
+
+    /* Ikon Ghost Floating */
+    .ghost-container {
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: center;
+      perspective: 1000px;
+    }
+
+    .ghost-icon {
+      width: 56px;
+      height: 56px;
+      color: #60a5fa;
+      filter: drop-shadow(0 8px 16px rgba(96, 165, 250, 0.4));
+      animation: floatGhost 3s ease-in-out infinite;
+    }
+
+    @keyframes floatGhost {
+      0% {
+        transform: translateY(0px) rotate(0deg) scale(1);
+      }
+      50% {
+        transform: translateY(-10px) rotate(4deg) scale(1.02);
+      }
+      100% {
+        transform: translateY(0px) rotate(0deg) scale(1);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Canvas WebGL untuk render Three.js -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Overlay Loading System -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-card">
+      <div class="ghost-container">
+        <svg class="ghost-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 10h.01M15 10h.01" />
+          <path d="M12 2a8 8 0 0 0-8 8v12l3-3 3 3 2-3 2 3 3-3 3 3V10a8 8 0 0 0-8-8z" />
+        </svg>
+      </div>
+      <div class="spinner"></div>
+      <h2 class="loading-title">Loading 3D Engine</h2>
+      <div class="progress-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <span id="progress-text" class="progress-text">0%</span>
+    </div>
+  </div>
+
+  <!-- Tombol Toggle Load (Memicu Pemuatan Ulang) -->
+  <button id="btn-reload" class="btn-reload">Trigger Reload</button>
+
+  <!-- Menggunakan ImportMap untuk mempermudah pemuatan modul ES6 Three.js -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // =======================================================
+    // INITIALIZATION & SCENE SETUP
+    // =======================================================
+    const canvas = document.getElementById('webgl-canvas');
+    const scene = new THREE.Scene();
+    
+    // Ambient Light halus
+    scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+    // Directional Light dengan warna cyan lembut
+    const dirLight1 = new THREE.DirectionalLight(0x3b82f6, 1.5);
+    dirLight1.position.set(5, 5, 2);
+    scene.add(dirLight1);
+
+    // Point Light merah jambu neon sebagai aksen tambahan
+    const pointLight = new THREE.PointLight(0xec4899, 2, 20);
+    pointLight.position.set(-3, -2, 3);
+    scene.add(pointLight);
+
+    // Setup Kamera
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 3.5; // Mulai dekat untuk efek Dramatic Reveal
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    // Orbit Controls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Membuat Objek TorusKnot Mewah dengan Material PBR
+    const geometry = new THREE.TorusKnotGeometry(1.2, 0.4, 150, 20);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      metalness: 0.9,
+      roughness: 0.1,
+      wireframe: false
+    });
+    const torusKnot = new THREE.Mesh(geometry, material);
+    scene.add(torusKnot);
+
+    // =======================================================
+    // MOTION LOGIC & LERP (JS ANIMATION SYSTEM)
+    // =======================================================
+    const overlay = document.getElementById('loading-overlay');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const btnReload = document.getElementById('btn-reload');
+
+    let currentProgress = 0;
+    let targetProgress = 0;
+    let isLoading = true;
+
+    // Simulasi Fungsi Unduh dengan Interval
+    function simulateAssetLoading() {
+      // Reset variabel progress
+      currentProgress = 0;
+      targetProgress = 0;
+      isLoading = true;
+      overlay.classList.remove('fade-out');
+      
+      // Reset skala objek & posisi kamera untuk animasi reveal
+      torusKnot.scale.set(0.01, 0.01, 0.01);
+      camera.position.z = 3.5;
+      
+      // Mengacak kenaikan progress download secara bertahap
+      const interval = setInterval(() => {
+        if (targetProgress < 100) {
+          targetProgress += Math.floor(Math.random() * 20) + 5;
+          if (targetProgress > 100) targetProgress = 100;
+        } else {
+          clearInterval(interval);
+        }
+      }, 550);
+    }
+
+    // Pemicu Klik Tombol Muat Ulang
+    btnReload.addEventListener('click', () => {
+      if (!isLoading) {
+        simulateAssetLoading();
+      }
+    });
+
+    // Jalankan pertama kali saat halaman dibuka
+    simulateAssetLoading();
+
+    // Fungsi Render & Update Loop Animasi
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // Update Orbit Controls
+      controls.update();
+
+      // ==========================================
+      // LINEAR INTERPOLATION (LERP) PROGRESS BAR & 3D MOTION
+      // ==========================================
+      if (isLoading) {
+        // currentProgress bergerak mulus mengejar targetProgress
+        currentProgress += (targetProgress - currentProgress) * 0.08;
+
+        // 3D Motion 1: Skala objek membesar dinamis selaras progress loading
+        const scaleVal = (currentProgress / 100) * 1.3;
+        torusKnot.scale.set(scaleVal, scaleVal, scaleVal);
+
+        // 3D Motion 2: Spin-up kecepatan rotasi objek
+        const spinSpeed = 0.2 + (currentProgress / 100) * 2.5;
+        torusKnot.rotation.x = elapsed * spinSpeed;
+        torusKnot.rotation.y = elapsed * (spinSpeed * 1.2);
+
+        // Jika visual progress sudah sangat dekat dengan 100%
+        if (targetProgress === 100 && Math.abs(100 - currentProgress) < 0.1) {
+          currentProgress = 100;
+          isLoading = false;
+          
+          // Sembunyikan Overlay dengan Transisi Fade Out
+          setTimeout(() => {
+            overlay.classList.add('fade-out');
+          }, 300);
+        }
+
+        // Perbarui Element visual progress bar dan teks
+        progressBar.style.width = `${currentProgress}%`;
+        progressText.textContent = `${Math.round(currentProgress)}%`;
+      } else {
+        // 3D Motion 3: Settle scale mereda ke ukuran ideal 1.0 (efek spring)
+        torusKnot.scale.x += (1.0 - torusKnot.scale.x) * 0.08;
+        torusKnot.scale.y = torusKnot.scale.x;
+        torusKnot.scale.z = torusKnot.scale.x;
+
+        // 3D Motion 4: Dramatic Zoom-Out Kamera (kamera menjauh perlahan)
+        camera.position.z += (7.5 - camera.position.z) * 0.05;
+
+        // Rotasi normal sinematik setelah selesai dimuat
+        torusKnot.rotation.x += delta * 0.3;
+        torusKnot.rotation.y += delta * 0.4;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // Penanganan Penyesuaian Ukuran Layar (Resize)
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>

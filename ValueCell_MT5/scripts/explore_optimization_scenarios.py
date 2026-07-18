@@ -6,6 +6,7 @@ All metrics are base-scaled to 0.05 lot size for comparison.
 
 from __future__ import annotations
 
+import glob
 import json
 from pathlib import Path
 import numpy as np
@@ -14,6 +15,30 @@ from loguru import logger
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCORED_CSV_PATH = REPO_ROOT / "ValueCell_MT5" / "python" / "valuecell" / "models" / "saved" / "filter_latest" / "scored_v5_unconstrained.csv"
+STRUCTURE_LOG_GLOB = str(REPO_ROOT / "Backtest_result" / "LLHHBOSData_XAUUSD_*.csv")
+
+
+def build_bos_cycle_table() -> pd.DataFrame:
+    """Parse market structure event logs and number each BoS by its cycle
+    since the last CHoCH (1 = first BoS after a CHoCH, 2 = the next one, etc.)."""
+    frames = []
+    for path in sorted(glob.glob(STRUCTURE_LOG_GLOB)):
+        raw = pd.read_csv(path, skiprows=1)
+        raw.columns = [c.strip() for c in raw.columns]
+        frames.append(raw)
+    events = pd.concat(frames, ignore_index=True).drop_duplicates()
+    events["Time"] = pd.to_datetime(events["Time"], format="%Y.%m.%d %H:%M:%S")
+    events = events[events["Type"].isin(["BoS", "CHoCH"])].sort_values("Time")
+
+    cycle = 0
+    rows = []
+    for _, row in events.iterrows():
+        if row["Type"] == "CHoCH":
+            cycle = 0
+        else:
+            cycle += 1
+            rows.append({"entry_time": row["Time"].strftime("%Y-%m-%d %H:%M:%S"), "cycle": cycle})
+    return pd.DataFrame(rows).drop_duplicates(subset="entry_time")
 
 
 def max_drawdown(values: pd.Series) -> float:
@@ -187,7 +212,54 @@ def main():
         
     df["dyn_exit_dyn_lot_profit"] = dyn_exit_dyn_lot_profits
     dyn_exit_dyn_lot_active = df[df["expected_rr"] >= 1.0]["dyn_exit_dyn_lot_profit"]
-    
+
+    # Scenario 5: BoS-Only (all cycles) + Optimized Threshold + Extended Lot Tier
+    # Base filter: entry must be triggered directly by a BoS event (any cycle since
+    # last CHoCH -- CHoCH-triggered entries and non-structural entries are excluded)
+    # AND expected_rr >= best_th (instead of fixed 1.0).
+    # Lot tiers: R:R >= 3.0 -> 0.10, R:R >= 1.5 -> 0.08, R:R >= 1.2 -> 0.06, else 0.05
+    # Exit: same dynamic SL/TP logic as Scenario 3/4
+    bos_cycles = build_bos_cycle_table()
+    df = df.merge(bos_cycles, on="entry_time", how="left")
+    df["is_bos_entry"] = df["cycle"].notna()
+    logger.info("BoS-triggered entries matched: {} / {}", int(df["is_bos_entry"].sum()), len(df))
+
+    s5_profits = []
+    for _, row in df.iterrows():
+        err = row["expected_rr"]
+        if err < best_th or not row["is_bos_entry"]:
+            s5_profits.append(0.0)
+            continue
+
+        if err >= 3.0:
+            lot = 0.10
+        elif err >= 1.5:
+            lot = 0.08
+        elif err >= 1.2:
+            lot = 0.06
+        else:
+            lot = 0.05
+
+        p_mfe = row["predicted_mfe"]
+        p_mae = row["predicted_mae"]
+        act_mfe = row["mfe_target"]
+        act_mae = row["mae_target"]
+
+        if act_mae >= p_mae and act_mfe >= p_mfe:
+            points_pnl = -p_mae
+        elif act_mae >= p_mae:
+            points_pnl = -p_mae
+        elif act_mfe >= p_mfe:
+            points_pnl = p_mfe
+        else:
+            points_pnl = (row["actual_net_profit"] / 0.1) * 10.0
+
+        usd_profit = (points_pnl / 10.0) * (lot / 0.1)
+        s5_profits.append(usd_profit)
+
+    df["s5_profit"] = s5_profits
+    s5_active = df[(df["expected_rr"] >= best_th) & (df["is_bos_entry"])]["s5_profit"]
+
     # -------------------------------------------------------------
     # COMPILE AND REPORT RESULTS
     # -------------------------------------------------------------
@@ -199,6 +271,7 @@ def main():
         (f"Scenario 2: Opt R:R Threshold (R:R >= {best_th})", optimal_th_profit),
         ("Scenario 3: Dynamic SL/TP Exits", dyn_exit_active),
         ("Scenario 4: Combined S1 + S3", dyn_exit_dyn_lot_active),
+        (f"Scenario 5: BoS-Only + Opt Th + Ext Lot (R:R>={best_th})", s5_active),
     ]
     
     print("\n" + "=" * 95)

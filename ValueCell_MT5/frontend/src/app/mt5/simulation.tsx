@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import * as THREE from "three";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import {
   createChart,
   createSeriesMarkers,
@@ -269,7 +271,7 @@ interface StrategyParams {
   sl_safety_buffer: number;    // USD, default 10.00 (1000 poin)
 }
 
-export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
+const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   trailing_distance: 30.00,
   tp_trigger: 10.00,
   tp_ekspansi: 20.00,
@@ -497,6 +499,40 @@ const AGENT_PANEL_DEFS = [
   { key: "risk_management" as const, name: "Risk Manager", icon: "🛡️", color: "var(--neon-amber)", bg: "rgba(251,191,36,0.2)" },
 ];
 
+// Helper to dynamically resolve CHoCH and BOS cycle count from a chronological event list
+const getEventCycleInfo = (event: any, allEvents: any[]) => {
+  const typeUpper = event.type?.toUpperCase() || "";
+  if (typeUpper.includes("CHOCH")) {
+    return { isChoch: true, isBos: false, cycle: 0 };
+  }
+  if (typeUpper.includes("BOS")) {
+    // Find index of the last CHoCH event before this event
+    let lastChochIndex = -1;
+    for (let i = allEvents.length - 1; i >= 0; i--) {
+      const e = allEvents[i];
+      if (e.time < event.time && e.type?.toUpperCase().includes("CHOCH")) {
+        lastChochIndex = i;
+        break;
+      }
+    }
+
+    if (lastChochIndex === -1) {
+      // If no CHoCH found, count all BOS up to this event
+      const bosBefore = allEvents.filter(e => e.time <= event.time && e.type?.toUpperCase().includes("BOS"));
+      return { isChoch: false, isBos: true, cycle: bosBefore.length };
+    }
+
+    const lastChochTime = allEvents[lastChochIndex].time;
+    const bosSince = allEvents.filter(e => 
+      e.time > lastChochTime && 
+      e.time <= event.time && 
+      e.type?.toUpperCase().includes("BOS")
+    );
+    return { isChoch: false, isBos: true, cycle: bosSince.length };
+  }
+  return { isChoch: false, isBos: false, cycle: 0 };
+};
+
 // ── Types for simulation helper ──────────────────────────────────────────────
 
 export default function SimulationOfDead() {
@@ -569,6 +605,10 @@ export default function SimulationOfDead() {
   // ── Strategy params state
   const [strategyParams, setStrategyParams] = useState({ ...DEFAULT_STRATEGY_PARAMS });
   const [vetoMode, setVetoMode] = useState<'hard' | 'soft' | 'none'>('hard');
+  const [allowChochEntry, setAllowChochEntry] = useState(false);
+  const [allowBosCycle1, setAllowBosCycle1] = useState(true);
+  const [allowBosCycle2, setAllowBosCycle2] = useState(false);
+  const [allowBosCycle3Plus, setAllowBosCycle3Plus] = useState(false);
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [scenarioName, setScenarioName] = useState("");
   const [isStrategyPanelOpen, setIsStrategyPanelOpen] = useState(false);
@@ -933,7 +973,7 @@ export default function SimulationOfDead() {
       .catch(() => { });
   }, []);
 
-  // Reset simulation cache and playback when vetoMode changes
+  // Reset simulation cache and playback when parameters change
   useEffect(() => {
     if (activeFrameAbortControllerRef.current) {
       activeFrameAbortControllerRef.current.abort();
@@ -947,7 +987,7 @@ export default function SimulationOfDead() {
     pendingSimTimesRef.current.clear();
     setCurrentIndex(0);
     setIsPlaying(false);
-  }, [vetoMode]);
+  }, [vetoMode, allowChochEntry, allowBosCycle1, allowBosCycle2, allowBosCycle3Plus]);
 
   // Re-simulate active positions and chart markers whenever strategy parameters change
   useEffect(() => {
@@ -1972,7 +2012,22 @@ export default function SimulationOfDead() {
 
           // Add marker and dynamic position when a new tradeable signal is approved by agent
           if (frame) {
-            const isApproved = frame.approved && ["BUY", "SELL"].includes(frame.final_signal);
+            // Evaluate event cycle dynamically
+            const cycleInfo = getEventCycleInfo(latestEvent, triggerEvents);
+            let isEntryAllowed = false;
+            if (cycleInfo.isChoch && allowChochEntry) {
+              isEntryAllowed = true;
+            } else if (cycleInfo.isBos) {
+              if (cycleInfo.cycle === 1 && allowBosCycle1) {
+                isEntryAllowed = true;
+              } else if (cycleInfo.cycle === 2 && allowBosCycle2) {
+                isEntryAllowed = true;
+              } else if (cycleInfo.cycle >= 3 && allowBosCycle3Plus) {
+                isEntryAllowed = true;
+              }
+            }
+
+            const isApproved = frame.approved && ["BUY", "SELL"].includes(frame.final_signal) && isEntryAllowed;
             if (isApproved) {
               setSimSignals(prev => {
                 if (prev.some(s => s.time === frame.event_time)) return prev;
@@ -2582,290 +2637,218 @@ export default function SimulationOfDead() {
 
             {isStrategyPanelOpen && (
               <div className="mt-5 space-y-6">
-                {/* Load existing scenario */}
-                {scenarios.length > 0 && (
-                  <div className="p-3.5 rounded-lg bg-slate-900/30 border border-slate-800/60 flex flex-col gap-2">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Muat Skenario Tersimpan</span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {scenarios.map((sc: any) => (
-                        <div key={sc.id} className="flex items-center gap-1 bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/20 hover:border-cyan-500/40 rounded-lg pl-3 pr-1 py-1 transition-all">
-                          <button
-                            onClick={() => {
-                              setStrategyParams({
-                                trailing_distance: sc.trailing_distance,
-                                tp_trigger: sc.tp_trigger,
-                                tp_ekspansi: sc.tp_ekspansi,
-                                max_ekspansi: sc.max_ekspansi,
-                                enable_breakeven: sc.enable_breakeven,
-                                breakeven_trigger: sc.breakeven_trigger,
-                                breakeven_buffer: sc.breakeven_buffer,
-                                lot_override: sc.lot_override ?? 0.00,
-                                initial_sl_dist: sc.initial_sl_dist ?? DEFAULT_STRATEGY_PARAMS.initial_sl_dist,
-                                initial_tp_dist: sc.initial_tp_dist ?? DEFAULT_STRATEGY_PARAMS.initial_tp_dist,
-                                sl_min_distance: sc.sl_min_distance ?? DEFAULT_STRATEGY_PARAMS.sl_min_distance,
-                                sl_safety_buffer: sc.sl_safety_buffer ?? DEFAULT_STRATEGY_PARAMS.sl_safety_buffer,
-                              });
-                              setScenarioName(sc.name);
-                            }}
-                            className="text-xs font-semibold text-cyan-400 cursor-pointer focus:outline-none"
-                          >
-                            {sc.name}
-                          </button>
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                const res = await fetch(`${BASE_URL}/scenarios/${sc.id}`, { method: "DELETE" });
-                                if (res.ok) {
-                                  setScenarios(prev => prev.filter(item => item.id !== sc.id));
-                                  if (scenarioName === sc.name) {
-                                    setScenarioName("");
-                                    setStrategyParams({ ...DEFAULT_STRATEGY_PARAMS });
-                                  }
-                                }
-                              } catch { }
-                            }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer text-[10px] font-bold"
-                            title="Hapus skenario"
-                          >
-                            ×
-                          </button>
-                        </div>
+                {/* Emil Kowalski style overrides block for layout hover glows */}
+                <style>{`
+                  .filter-card {
+                    transition: border-color 200ms ease-out, background-color 200ms ease-out !important;
+                  }
+                  .filter-card:hover {
+                    border-color: rgba(6, 182, 212, 0.2) !important;
+                    background-color: rgba(255, 255, 255, 0.03) !important;
+                  }
+                  .premium-switch-bullet {
+                    transition: width 150ms cubic-bezier(0.23, 1, 0.32, 1) !important;
+                  }
+                  .premium-switch:active .premium-switch-bullet {
+                    width: 24px !important;
+                  }
+                `}</style>
+
+                {/* Section C & D Consolidated: Strategy Settings Container */}
+                <div className="p-5 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-6">
+                  
+                  {/* Veto Mode Row */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs pb-4 border-b border-slate-800/30">
+                    <div className="flex flex-col gap-0.5 max-w-[320px]">
+                      <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                        🤖 Market Veto Mode
+                        <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R >= 1.35. No Veto -> Mengikuti voting demokratis." />
+                      </span>
+                      <span className="text-[10px] text-slate-500">Toleransi Veto terhadap ketidakselarasan EMA H1/H4</span>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                      {[
+                        { value: "hard", label: "🔒 Hard Veto" },
+                        { value: "soft", label: "🛡️ Soft Veto" },
+                        { value: "none", label: "🗳️ No Veto" }
+                      ].map(opt => (
+                        <motion.button
+                          key={opt.value}
+                          whileTap={{ scale: 0.97 }}
+                          onClick={() => setVetoMode(opt.value as any)}
+                          className={cn(
+                            "px-3.5 py-2 rounded-lg font-bold border cursor-pointer text-center text-xs transition-colors duration-200 min-w-[90px]",
+                            vetoMode === opt.value 
+                              ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" 
+                              : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/10 hover:bg-white/[0.04]"
+                          )}
+                        >
+                          {opt.label}
+                        </motion.button>
                       ))}
                     </div>
                   </div>
-                )}
 
-                {/* Parameters Grid layout */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Section A: Stop Loss & Break Even */}
-                  <div className="p-4 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-4">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">🛡️ Stop Loss & Break-Even</h3>
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Trailing SL (USD) <StrategyTooltip fungsi="Jarak Stop Loss dinamis yang menyeret naik (BUY) / turun (SELL) mengikuti harga tertinggi/terendah baru." contoh="Jarak 3.00 USD. Entry BUY di 2000.00. Jika harga naik ke 2005.00, SL terseret naik ke 2002.00. Jika harga turun, SL tetap diam di 2002.00." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0.1}
-                          value={strategyParams.trailing_distance}
-                          onChange={e => setStrategyParams(p => ({ ...p, trailing_distance: parseFloat(e.target.value) || 0.1 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
+                  {/* 3D Map Visualizer Row */}
+                  <div className="space-y-2">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider select-none">🎯 Trend & Cycle Schema Map</div>
+                    <MarketStructure3DVisualizer
+                      allowChoch={allowChochEntry}
+                      allowBos1={allowBosCycle1}
+                      allowBos2={allowBosCycle2}
+                      allowBos3Plus={allowBosCycle3Plus}
+                    />
+                  </div>
+
+                  {/* Toggle Filters List */}
+                  <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
+                    {/* CHoCH Toggle */}
+                    <div className="flex items-center justify-between py-3 filter-card px-1">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-200">CHoCH Entries</span>
+                        <span className="text-[10px] text-slate-500">Change of Character patterns</span>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Break-Even State <StrategyTooltip fungsi="Mengaktifkan pemindahan SL otomatis ke level aman (di atas entry) ketika target profit tercapai." contoh="Aktif -> Mengunci resiko transaksi menjadi nol setelah harga bergerak menguntungkan." /></label>
-                        <button
-                          onClick={() => setStrategyParams(p => ({ ...p, enable_breakeven: !p.enable_breakeven }))}
-                          className="w-full py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer"
-                          style={{
-                            background: strategyParams.enable_breakeven ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.02)",
-                            borderColor: strategyParams.enable_breakeven ? "rgba(34,197,94,0.3)" : "rgba(255,255,255,0.06)",
-                            color: strategyParams.enable_breakeven ? "#4ade80" : "#94a3b8",
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setAllowChochEntry(p => !p)}
+                        className={cn(
+                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                          allowChochEntry ? "border-cyan-500/30" : "border-slate-800/60"
+                        )}
+                      >
+                        <motion.div 
+                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                          initial={false}
+                          animate={{ opacity: allowChochEntry ? 1 : 0 }}
+                          transition={{ duration: 0.25 }}
+                        />
+                        <motion.div
+                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30,
+                            mass: 0.8
                           }}
-                        >
-                          {strategyParams.enable_breakeven ? "✓ BE Aktif" : "✗ BE Nonaktif"}
-                        </button>
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">BE Trigger (USD Profit) <StrategyTooltip fungsi="Target profit minimum (jarak dari entry) yang harus dicapai agar SL dipindahkan ke Break-Even." contoh="Trigger 15.00 USD. Entry BUY di 2000.00. BE baru terpicu saat harga menyentuh 2015.00." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0.1}
-                          disabled={!strategyParams.enable_breakeven}
-                          value={strategyParams.breakeven_trigger}
-                          onChange={e => setStrategyParams(p => ({ ...p, breakeven_trigger: parseFloat(e.target.value) || 0.1 }))}
-                          className="bg-slate-950/60 disabled:opacity-30 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
+                          animate={{
+                            x: allowChochEntry ? 20 : 0,
+                            backgroundColor: allowChochEntry ? "#06b6d4" : "#475569",
+                            boxShadow: allowChochEntry ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                          }}
                         />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">BE Buffer (USD) <StrategyTooltip fungsi="Jarak aman untuk meletakkan SL di atas harga entry (BUY) atau di bawah harga entry (SELL)." contoh="Buffer 1.00 USD. Entry BUY di 2000.00. Saat BE terpicu, SL dikunci di level aman 2001.00." /></label>
-                        <input
-                          type="number"
-                          step={0.1}
-                          min={0}
-                          disabled={!strategyParams.enable_breakeven}
-                          value={strategyParams.breakeven_buffer}
-                          onChange={e => setStrategyParams(p => ({ ...p, breakeven_buffer: parseFloat(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 disabled:opacity-30 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">SL Min Distance (USD) <StrategyTooltip fungsi="Batas minimal jarak SL awal (LL/HH) ke harga entry. Jika jarak aktual kurang dari nilai ini, maka SL dipasang di SL_lama - safety_buffer (untuk BUY)." contoh="Min Distance 5.00 USD. Jika jarak Entry ke LL/HH kurang dari 5.00 USD (500 poin), maka aturan safety buffer akan aktif." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0.1}
-                          value={strategyParams.sl_min_distance}
-                          onChange={e => setStrategyParams(p => ({ ...p, sl_min_distance: parseFloat(e.target.value) || 0.1 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">SL Safety Buffer (USD) <StrategyTooltip fungsi="Buffer/jarak tambahan yang dikurangkan dari LL (BUY) atau ditambahkan ke HH (SELL) jika SL awal terlalu dekat." contoh="Safety Buffer 10.00 USD. Jika jarak LL ke Entry hanya 1.50 USD (di bawah 5.00 USD), maka SL baru dipasang di LL - 10.00 USD." /></label>
-                        <input
-                          type="number"
-                          step={0.1}
-                          min={0}
-                          value={strategyParams.sl_safety_buffer}
-                          onChange={e => setStrategyParams(p => ({ ...p, sl_safety_buffer: parseFloat(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
+                      </motion.button>
                     </div>
-                  </div>
 
-                  {/* Section B: Take Profit & Lot Override */}
-                  <div className="p-4 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-4">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">🎯 Take Profit & Volume</h3>
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Initial SL (USD Jarak) <StrategyTooltip fungsi="Jarak SL awal kustom sejak pembukaan transaksi baru (0 = pakai SL asli database)." contoh="Jarak 3.00 USD. Entry BUY di 2000.00. SL awal langsung terpasang di 1997.00." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0}
-                          value={strategyParams.initial_sl_dist}
-                          onChange={e => setStrategyParams(p => ({ ...p, initial_sl_dist: parseFloat(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
+                    {/* Cycle 1 Toggle */}
+                    <div className="flex items-center justify-between py-3 filter-card px-1">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-200">BOS Cycle 1 Entries</span>
+                        <span className="text-[10px] text-slate-500">First BOS after CHoCH</span>
                       </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Initial TP (USD Jarak) <StrategyTooltip fungsi="Jarak TP awal kustom sejak pembukaan transaksi baru (0 = pakai TP asli database)." contoh="Jarak 30.00 USD. Entry BUY di 2000.00. TP awal langsung terpasang di 2030.00." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0}
-                          value={strategyParams.initial_tp_dist}
-                          onChange={e => setStrategyParams(p => ({ ...p, initial_tp_dist: parseFloat(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setAllowBosCycle1(p => !p)}
+                        className={cn(
+                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                          allowBosCycle1 ? "border-cyan-500/30" : "border-slate-800/60"
+                        )}
+                      >
+                        <motion.div 
+                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                          initial={false}
+                          animate={{ opacity: allowBosCycle1 ? 1 : 0 }}
+                          transition={{ duration: 0.25 }}
                         />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">TP Trigger (USD Jarak) <StrategyTooltip fungsi="Batas jarak harga berjalan mendekati TP aktif sebelum memicu ekspansi (pelebaran) TP baru." contoh="Trigger 10.00 USD. TP aktif di 2030.00. Jika harga naik mendekati TP ke level 2020.00, ekspansi TP akan berjalan." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0.1}
-                          value={strategyParams.tp_trigger}
-                          onChange={e => setStrategyParams(p => ({ ...p, tp_trigger: parseFloat(e.target.value) || 0.1 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
+                        <motion.div
+                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30,
+                            mass: 0.8
+                          }}
+                          animate={{
+                            x: allowBosCycle1 ? 20 : 0,
+                            backgroundColor: allowBosCycle1 ? "#06b6d4" : "#475569",
+                            boxShadow: allowBosCycle1 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                          }}
                         />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">TP Ekspansi (USD) <StrategyTooltip fungsi="Jarak pelebaran target profit baru ketika TP Trigger tersentuh." contoh="Ekspansi 20.00 USD. TP aktif di 2030.00 akan diundur sejauh 20.00 USD ke 2050.00 saat harga mendekat." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0.1}
-                          value={strategyParams.tp_ekspansi}
-                          onChange={e => setStrategyParams(p => ({ ...p, tp_ekspansi: parseFloat(e.target.value) || 0.1 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Max Ekspansi (0=∞) <StrategyTooltip fungsi="Batasan berapa kali target TP boleh diperluas/ekspansi." contoh="Setel 2. TP hanya bisa mundur/bertambah jauh sebanyak maksimal 2 kali. Setel 0 untuk ekspansi tidak terbatas." /></label>
-                        <input
-                          type="number"
-                          step={1}
-                          min={0}
-                          value={strategyParams.max_ekspansi}
-                          onChange={e => setStrategyParams(p => ({ ...p, max_ekspansi: parseInt(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Lot Override (0=Auto) <StrategyTooltip fungsi="Mengubah volume ukuran lot transaksi secara manual untuk simulasi PnL kustom." contoh="Lot 0.10. Semua transaksi akan disimulasikan menggunakan ukuran 0.10 lot, mengesampingkan lot asli dari database." /></label>
-                        <input
-                          type="number"
-                          step={0.01}
-                          min={0}
-                          value={strategyParams.lot_override}
-                          onChange={e => setStrategyParams(p => ({ ...p, lot_override: parseFloat(e.target.value) || 0 }))}
-                          className="bg-slate-950/60 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3 py-1.5 font-mono text-cyan-300 focus:outline-none transition-all w-full"
-                        />
-                      </div>
+                      </motion.button>
                     </div>
-                  </div>
 
-                  {/* Section C: Agent Consensus & Veto Mode */}
-                  <div className="p-4 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-4 md:col-span-2">
-                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/50 pb-2">🤖 Agent Consensus & Veto Mode</h3>
-                    <div className="flex flex-col gap-3 text-xs">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="text-slate-400 font-medium">Market Structure Agent Veto Mode <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R >= 1.35. No Veto -> Mengikuti voting demokratis." /></label>
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                          {[
-                            { value: "hard", label: "🔒 Hard Veto (Default)" },
-                            { value: "soft", label: "🛡️ Soft Veto (R:R >= 1.35)" },
-                            { value: "none", label: "🗳️ No Veto (Democratic)" }
-                          ].map(opt => (
-                            <button
-                              key={opt.value}
-                              onClick={() => setVetoMode(opt.value as any)}
-                              className="px-4 py-2 rounded-lg font-bold border transition-all cursor-pointer flex-1 text-center text-xs"
-                              style={{
-                                background: vetoMode === opt.value ? "rgba(6,182,212,0.08)" : "rgba(255,255,255,0.02)",
-                                borderColor: vetoMode === opt.value ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)",
-                                color: vetoMode === opt.value ? "#06b6d4" : "#94a3b8",
-                              }}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
+                    {/* Cycle 2 Toggle */}
+                    <div className="flex items-center justify-between py-3 filter-card px-1">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-200">BOS Cycle 2 Entries</span>
+                        <span className="text-[10px] text-slate-500">Second BOS after CHoCH</span>
                       </div>
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setAllowBosCycle2(p => !p)}
+                        className={cn(
+                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                          allowBosCycle2 ? "border-cyan-500/30" : "border-slate-800/60"
+                        )}
+                      >
+                        <motion.div 
+                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                          initial={false}
+                          animate={{ opacity: allowBosCycle2 ? 1 : 0 }}
+                          transition={{ duration: 0.25 }}
+                        />
+                        <motion.div
+                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30,
+                            mass: 0.8
+                          }}
+                          animate={{
+                            x: allowBosCycle2 ? 20 : 0,
+                            backgroundColor: allowBosCycle2 ? "#06b6d4" : "#475569",
+                            boxShadow: allowBosCycle2 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                          }}
+                        />
+                      </motion.button>
                     </div>
-                  </div>
-                </div>
 
-                {/* Save scenario form actions */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-4 border-t border-slate-800/40">
-                  <input
-                    type="text"
-                    placeholder="Nama skenario baru (misal: Trailing 2000 + BE)..."
-                    value={scenarioName}
-                    onChange={e => setScenarioName(e.target.value)}
-                    className="flex-1 bg-slate-950/50 border border-slate-800 focus:border-cyan-500/40 rounded-lg px-3.5 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none transition-all"
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      disabled={!scenarioName.trim()}
-                      onClick={async () => {
-                        if (!scenarioName.trim()) return;
-                        try {
-                          const res = await fetch(`${BASE_URL}/scenarios`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ name: scenarioName.trim(), ...strategyParams }),
-                          });
-                          if (res.ok) {
-                            const saved = await res.json();
-                            setScenarios(prev => [saved, ...prev]);
-                            setScenarioName("");
-                          }
-                        } catch { }
-                      }}
-                      className="px-4 py-2 rounded-lg text-xs font-bold border cursor-pointer transition-all disabled:opacity-40"
-                      style={{
-                        background: "rgba(6, 182, 212, 0.12)",
-                        borderColor: "rgba(6, 182, 212, 0.35)",
-                        color: "#67e8f9",
-                        boxShadow: "0 0 10px rgba(6, 182, 212, 0.1)"
-                      }}
-                    >
-                      💾 Simpan Skenario
-                    </button>
-                    <button
-                      onClick={() => {
-                        setStrategyParams({ ...DEFAULT_STRATEGY_PARAMS });
-                        setScenarioName("");
-                      }}
-                      className="px-4 py-2 rounded-lg text-xs font-bold border border-slate-800 hover:bg-slate-800/30 text-slate-400 hover:text-slate-300 transition-all cursor-pointer"
-                    >
-                      Reset
-                    </button>
+                    {/* Cycle 3+ Toggle */}
+                    <div className="flex items-center justify-between py-3 filter-card px-1">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-semibold text-slate-200">BOS Cycle 3+ Entries</span>
+                        <span className="text-[10px] text-slate-500">Subsequent BOS cycles</span>
+                      </div>
+                      <motion.button
+                        whileTap={{ scale: 0.94 }}
+                        onClick={() => setAllowBosCycle3Plus(p => !p)}
+                        className={cn(
+                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                          allowBosCycle3Plus ? "border-cyan-500/30" : "border-slate-800/60"
+                        )}
+                      >
+                        <motion.div 
+                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                          initial={false}
+                          animate={{ opacity: allowBosCycle3Plus ? 1 : 0 }}
+                          transition={{ duration: 0.25 }}
+                        />
+                        <motion.div
+                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                          transition={{
+                            type: "spring",
+                            stiffness: 500,
+                            damping: 30,
+                            mass: 0.8
+                          }}
+                          animate={{
+                            x: allowBosCycle3Plus ? 20 : 0,
+                            backgroundColor: allowBosCycle3Plus ? "#06b6d4" : "#475569",
+                            boxShadow: allowBosCycle3Plus ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                          }}
+                        />
+                      </motion.button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3148,31 +3131,61 @@ export default function SimulationOfDead() {
 
       {/* Progress popup for Loading Replay Data */}
       {loadProgress.visible && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[200] animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-auto">
+          {/* Radial Gradient Ambient Pulse Lapis 1 */}
           <div 
-            className="bg-slate-900/90 border border-purple-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(168,85,247,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+            className="absolute inset-0 bg-slate-950/80 backdrop-blur-[28px] animate-in fade-in duration-700" 
+            style={{ 
+              backgroundImage: "radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.7) 0%, rgba(8, 8, 8, 0.85) 100%)",
+              animation: "ambientPulse 8s ease-in-out infinite alternate" 
+            }} 
+          />
+          
+          {/* ThreeJS WebGL Canvas */}
+          <GhostLoaderCanvas percent={loadProgress.percent} />
+
+          {/* Lapis 2: Card Popup Glassmorphism dengan pendaran neon */}
+          <div 
+            className="relative bg-white/[0.02] border border-white/[0.07] rounded-3xl p-10 w-[340px] text-center shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_40px_rgba(59,130,246,0.03),inset_0_1px_0_rgba(255,255,255,0.1)] transform perspective-1000 rotate-x-6 animate-in zoom-in-95 duration-500 z-10"
             style={{ transformStyle: "preserve-3d" }}
           >
-            <div className="flex flex-col items-center justify-center text-center mb-5">
-              <div className="relative flex items-center justify-center w-12 h-12 mb-3 bg-purple-500/10 rounded-full border border-purple-500/25 shadow-[0_0_15px_rgba(168,85,247,0.2)]">
-                <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
-              </div>
-              <div className="text-purple-300 font-semibold text-xs tracking-wider uppercase mb-1">
-                Loading Replay Data
-              </div>
-              <div className="text-3xl font-mono font-bold text-white mb-1 shadow-sm">
-                {loadProgress.percent}%
-              </div>
-              <div className="text-[10px] font-medium text-slate-400 max-w-[240px] truncate">{loadProgress.step}</div>
-            </div>
-            <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(168,85,247,0.5)] relative overflow-hidden"
-                style={{ width: `${loadProgress.percent}%` }}
+            {/* Lapis 3: Floating Ghost SVG Icon */}
+            <div className="mb-6 flex justify-center">
+              <svg 
+                className="w-14 h-14 text-blue-400 drop-shadow-[0_8px_16px_rgba(96,165,250,0.4)]"
+                style={{ animation: "floatGhost 3s ease-in-out infinite" }}
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="1.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
               >
-                {/* cylindrical light reflection gloss overlay */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.15),transparent)]" />
-              </div>
+                <path d="M9 10h.01M15 10h.01" />
+                <path d="M12 2a8 8 0 0 0-8 8v12l3-3 3 3 2-3 2 3 3-3 3 3V10a8 8 0 0 0-8-8z" />
+              </svg>
+            </div>
+
+            {/* Spinner Berkepala Neon */}
+            <div className="relative w-11 h-11 border-2 border-white/5 border-t-blue-500 rounded-full mx-auto mb-7 animate-spin shadow-[0_0_16px_rgba(59,130,246,0.4)]" />
+
+            <h2 className="text-xs font-semibold tracking-[0.08em] text-white/90 uppercase mb-6">
+              Loading 3D Engine
+            </h2>
+
+            {/* Progress Container & Bar */}
+            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mb-4">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-400 shadow-[0_0_12px_rgba(59,130,246,0.6)] transition-all duration-150"
+                style={{ width: `${loadProgress.percent}%` }}
+              />
+            </div>
+
+            <span className="text-[11px] font-mono tracking-wider text-white/45">
+              {loadProgress.percent}%
+            </span>
+            <div className="text-[9px] font-medium text-slate-500 max-w-[240px] truncate mt-2">
+              {loadProgress.step}
             </div>
           </div>
         </div>
@@ -3648,3 +3661,362 @@ export default function SimulationOfDead() {
     </div>
   );
 }
+
+interface GhostLoaderCanvasProps {
+  percent: number;
+}
+
+function GhostLoaderCanvas({ percent }: GhostLoaderCanvasProps) {
+  const mountRef = useRef<HTMLCanvasElement>(null);
+  const percentRef = useRef(percent);
+
+  // Sync percent to ref to avoid re-initializing the ThreeJS scene on every percentage change
+  useEffect(() => {
+    percentRef.current = percent;
+  }, [percent]);
+
+  useEffect(() => {
+    const canvas = mountRef.current;
+    if (!canvas) return;
+
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    // Standard Setup
+    const scene = new THREE.Scene();
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+    const dirLight1 = new THREE.DirectionalLight(0x3b82f6, 1.5);
+    dirLight1.position.set(5, 5, 2);
+    scene.add(dirLight1);
+
+    const pointLight = new THREE.PointLight(0xec4899, 2, 20);
+    pointLight.position.set(-3, -2, 3);
+    scene.add(pointLight);
+
+    // Camera with temporary aspect ratio of 1
+    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    camera.position.z = 3.5; // Start close for dramatic reveal
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+    // TorusKnot
+    const geometry = new THREE.TorusKnotGeometry(1.2, 0.4, 150, 20);
+    const material = new THREE.MeshStandardMaterial({
+      color: 0x1f2937,
+      metalness: 0.9,
+      roughness: 0.1,
+      wireframe: false
+    });
+    const torusKnot = new THREE.Mesh(geometry, material);
+    scene.add(torusKnot);
+
+    let currentProgress = 0;
+    let reqId: number;
+    let elapsed = 0;
+    const clock = new THREE.Clock();
+
+    const animate = () => {
+      reqId = requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      elapsed += delta;
+
+      const target = percentRef.current;
+      const isLoading = target < 100;
+
+      if (isLoading) {
+        // Smoothly interpolate currentProgress to target
+        currentProgress += (target - currentProgress) * 0.08;
+
+        const scaleVal = (currentProgress / 100) * 1.3;
+        torusKnot.scale.set(scaleVal, scaleVal, scaleVal);
+
+        const spinSpeed = 0.2 + (currentProgress / 100) * 2.5;
+        torusKnot.rotation.x = elapsed * spinSpeed;
+        torusKnot.rotation.y = elapsed * (spinSpeed * 1.2);
+      } else {
+        // Settle scale back to 1.0 (spring easing effect)
+        torusKnot.scale.x += (1.0 - torusKnot.scale.x) * 0.08;
+        torusKnot.scale.y = torusKnot.scale.x;
+        torusKnot.scale.z = torusKnot.scale.x;
+
+        // Dramatic Zoom-Out Camera
+        camera.position.z += (7.5 - camera.position.z) * 0.05;
+
+        // Cinematic spin
+        torusKnot.rotation.x += delta * 0.3;
+        torusKnot.rotation.y += delta * 0.4;
+      }
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    // ResizeObserver to always match parent dimensions perfectly (critical for Tauri desktop client)
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const width = parent.clientWidth || entry.contentRect.width || window.innerWidth;
+        const height = parent.clientHeight || entry.contentRect.height || window.innerHeight;
+        
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        renderer.setSize(width, height);
+      }
+    });
+    resizeObserver.observe(parent);
+
+    // Cleanup
+    return () => {
+      cancelAnimationFrame(reqId);
+      resizeObserver.disconnect();
+      geometry.dispose();
+      material.dispose();
+      renderer.dispose();
+    };
+  }, []);
+
+  return (
+    <>
+      <style>{`
+        @keyframes floatGhost {
+          0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+          50% { transform: translateY(-10px) rotate(4deg) scale(1.02); }
+        }
+        @keyframes ambientPulse {
+          0% { background-color: rgba(8, 8, 8, 0.8); }
+          100% { background-color: rgba(15, 23, 42, 0.85); }
+        }
+      `}</style>
+      <canvas
+        ref={mountRef}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          zIndex: 0
+        }}
+      />
+    </>
+  );
+}
+
+// ── 3D Market Structure Skema Visualizer Component ──────────────────────────
+interface MarketStructure3DVisualizerProps {
+  allowChoch: boolean;
+  allowBos1: boolean;
+  allowBos2: boolean;
+  allowBos3Plus: boolean;
+}
+
+export function MarketStructure3DVisualizer({
+  allowChoch,
+  allowBos1,
+  allowBos2,
+  allowBos3Plus
+}: MarketStructure3DVisualizerProps) {
+  const mountRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep state variables synchronized for frame loop
+  const stateRef = useRef({ allowChoch, allowBos1, allowBos2, allowBos3Plus });
+  useEffect(() => {
+    stateRef.current = { allowChoch, allowBos1, allowBos2, allowBos3Plus };
+  }, [allowChoch, allowBos1, allowBos2, allowBos3Plus]);
+
+  useEffect(() => {
+    const canvas = mountRef.current;
+    const parent = containerRef.current;
+    if (!canvas || !parent) return;
+
+    // Scene setup with ambient fog matching theme background
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020617, 0.04);
+
+    // Camera setup (slightly skewed for 3D depth grid perspective)
+    const camera = new THREE.PerspectiveCamera(40, parent.clientWidth / parent.clientHeight, 0.1, 50);
+    camera.position.set(0.75, 1.1, 8.5);
+    camera.lookAt(0.75, 0.35, 0);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(parent.clientWidth, parent.clientHeight);
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    // Cyberpunk grid plane
+    const gridHelper = new THREE.GridHelper(40, 40, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -1.2;
+    gridHelper.position.z = -0.5;
+    scene.add(gridHelper);
+
+    // Trend path nodes coordinates (representing market structural stages)
+    const points = [
+      new THREE.Vector3(-4.5, -0.8, 0),
+      new THREE.Vector3(-3.2, 0.8, 0),
+      new THREE.Vector3(-1.9, -0.2, 0),
+      new THREE.Vector3(-0.6, 1.2, 0), // CHoCH (Index 3)
+      new THREE.Vector3(0.7, 0.2, 0),
+      new THREE.Vector3(2.0, 1.2, 0),  // BOS 1 (Index 5)
+      new THREE.Vector3(3.3, 0.2, 0),
+      new THREE.Vector3(4.6, 1.2, 0),  // BOS 2 (Index 7)
+      new THREE.Vector3(5.9, 0.2, 0),
+      new THREE.Vector3(7.2, 1.2, 0)   // BOS 3+ (Index 9)
+    ];
+
+    // Build Connecting Line Paths
+    const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x334155,
+      linewidth: 2
+    });
+    const line = new THREE.Line(lineGeometry, lineMaterial);
+    scene.add(line);
+
+    // Spherical nodes
+    const nodeGeometry = new THREE.SphereGeometry(0.18, 32, 32);
+
+    const materialChoch = new THREE.MeshBasicMaterial();
+    const materialBos1 = new THREE.MeshBasicMaterial();
+    const materialBos2 = new THREE.MeshBasicMaterial();
+    const materialBos3Plus = new THREE.MeshBasicMaterial();
+
+    const meshChoch = new THREE.Mesh(nodeGeometry, materialChoch);
+    meshChoch.position.copy(points[3]);
+    scene.add(meshChoch);
+
+    const meshBos1 = new THREE.Mesh(nodeGeometry, materialBos1);
+    meshBos1.position.copy(points[5]);
+    scene.add(meshBos1);
+
+    const meshBos2 = new THREE.Mesh(nodeGeometry, materialBos2);
+    meshBos2.position.copy(points[7]);
+    scene.add(meshBos2);
+
+    const meshBos3 = new THREE.Mesh(nodeGeometry, materialBos3Plus);
+    meshBos3.position.copy(points[9]);
+    scene.add(meshBos3);
+
+    let containerWidth = parent.clientWidth;
+    let containerHeight = parent.clientHeight;
+
+    const clock = new THREE.Clock();
+    let reqId: number;
+
+    // Project coordinates from 3D to 2D HTML absolute divs overlaying canvas
+    const updateLabels = () => {
+      const { allowChoch, allowBos1, allowBos2, allowBos3Plus } = stateRef.current;
+      const nodes = [
+        { id: "label-choch", pos: points[3], active: allowChoch },
+        { id: "label-bos1", pos: points[5], active: allowBos1 },
+        { id: "label-bos2", pos: points[7], active: allowBos2 },
+        { id: "label-bos3", pos: points[9], active: allowBos3Plus }
+      ];
+
+      const tempV = new THREE.Vector3();
+      nodes.forEach(n => {
+        const el = document.getElementById(n.id);
+        if (!el) return;
+        tempV.copy(n.pos);
+        tempV.project(camera);
+        const x = (tempV.x * 0.5 + 0.5) * containerWidth;
+        const y = (-(tempV.y * 0.5) + 0.5) * containerHeight;
+        el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y - 8}px)`;
+        el.style.color = n.active ? "#06b6d4" : "#475569";
+        el.style.textShadow = n.active ? "0 0 8px rgba(6, 182, 212, 0.7)" : "none";
+        el.style.fontWeight = n.active ? "bold" : "normal";
+      });
+    };
+
+    const animate = () => {
+      reqId = requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+      const { allowChoch, allowBos1, allowBos2, allowBos3Plus } = stateRef.current;
+
+      // Constant breathing neon cycle size oscillation
+      const pulse = 1.0 + Math.sin(elapsed * 4) * 0.08;
+
+      // CHoCH Node Lerping
+      const targetScaleChoch = allowChoch ? 1.35 * pulse : 0.85;
+      meshChoch.scale.setScalar(meshChoch.scale.x + (targetScaleChoch - meshChoch.scale.x) * 0.1);
+      materialChoch.color.lerp(new THREE.Color(allowChoch ? 0x06b6d4 : 0x334155), 0.15);
+
+      // BOS 1 Node Lerping
+      const targetScaleBos1 = allowBos1 ? 1.35 * pulse : 0.85;
+      meshBos1.scale.setScalar(meshBos1.scale.x + (targetScaleBos1 - meshBos1.scale.x) * 0.1);
+      materialBos1.color.lerp(new THREE.Color(allowBos1 ? 0x06b6d4 : 0x334155), 0.15);
+
+      // BOS 2 Node Lerping
+      const targetScaleBos2 = allowBos2 ? 1.35 * pulse : 0.85;
+      meshBos2.scale.setScalar(meshBos2.scale.x + (targetScaleBos2 - meshBos2.scale.x) * 0.1);
+      materialBos2.color.lerp(new THREE.Color(allowBos2 ? 0x06b6d4 : 0x334155), 0.15);
+
+      // BOS 3+ Node Lerping
+      const targetScaleBos3 = allowBos3Plus ? 1.35 * pulse : 0.85;
+      meshBos3.scale.setScalar(meshBos3.scale.x + (targetScaleBos3 - meshBos3.scale.x) * 0.1);
+      materialBos3Plus.color.lerp(new THREE.Color(allowBos3Plus ? 0x06b6d4 : 0x334155), 0.15);
+
+      // Add gentle cinematic dynamic drift camera angle
+      camera.position.x = 0.75 + Math.sin(elapsed * 0.3) * 0.25;
+
+      renderer.render(scene, camera);
+      updateLabels();
+    };
+
+    animate();
+
+    // ResizeObserver to always update viewport dynamic scaling
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        containerWidth = parent.clientWidth || entry.contentRect.width;
+        containerHeight = parent.clientHeight || entry.contentRect.height;
+        camera.aspect = containerWidth / containerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(containerWidth, containerHeight);
+      }
+    });
+    resizeObserver.observe(parent);
+
+    // Garbage collection on component unmount
+    return () => {
+      cancelAnimationFrame(reqId);
+      resizeObserver.disconnect();
+      renderer.dispose();
+      lineGeometry.dispose();
+      lineMaterial.dispose();
+      nodeGeometry.dispose();
+      materialChoch.dispose();
+      materialBos1.dispose();
+      materialBos2.dispose();
+      materialBos3Plus.dispose();
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2">
+      <canvas ref={mountRef} className="w-full h-full block" />
+      
+      {/* 2D Projected labels */}
+      <div id="label-choch" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">CHoCH</div>
+      <div id="label-bos1" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 1</div>
+      <div id="label-bos2" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 2</div>
+      <div id="label-bos3" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 3+</div>
+    </div>
+  );
+}
+
