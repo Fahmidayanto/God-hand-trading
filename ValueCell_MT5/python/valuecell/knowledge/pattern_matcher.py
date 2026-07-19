@@ -39,7 +39,7 @@ class PatternMatcher:
         ema200: float,
         session: str,
         timeframe: str = "M15",
-        limit: int = 20,
+        limit: int = 1000,
         min_similarity: float = 0.7,
         prior_choch: bool = False,
     ) -> Dict[str, Any]:
@@ -112,7 +112,7 @@ class PatternMatcher:
             
             # Generate recommendation (based on completed trades for statistical significance)
             recommendation, confidence = self._generate_recommendation(
-                win_rate, avg_profit, completed_trades
+                win_rate, avg_profit, completed_trades, direction
             )
             
             # Generate reasoning
@@ -121,7 +121,7 @@ class PatternMatcher:
             )
             
             result = {
-                "patterns": similar_patterns[:10],  # Top 10 most similar
+                "patterns": similar_patterns,  # Show all matching patterns
                 "win_rate": win_rate,
                 "avg_profit": avg_profit,
                 "total_count": total,
@@ -156,7 +156,8 @@ class PatternMatcher:
         self,
         win_rate: float,
         avg_profit: float,
-        sample_size: int
+        sample_size: int,
+        direction: str = "Bullish"
     ) -> tuple[str, float]:
         """
         Generate trading recommendation based on statistics.
@@ -171,13 +172,17 @@ class PatternMatcher:
         # Calculate confidence based on sample size
         confidence_multiplier = min(1.0, sample_size / 20.0)
         
-        # Strong buy: high win rate + good profit
-        if win_rate >= 0.75 and avg_profit >= 30.0:
-            return "STRONG_BUY", min(0.9, 0.75 + confidence_multiplier * 0.15)
+        is_bearish = direction.upper().startswith("BEAR")
         
-        # Buy: decent win rate + profit
+        # Strong: high win rate + good profit
+        if win_rate >= 0.75 and avg_profit >= 30.0:
+            rec = "STRONG_SELL" if is_bearish else "STRONG_BUY"
+            return rec, min(0.9, 0.75 + confidence_multiplier * 0.15)
+        
+        # Buy/Sell: decent win rate + profit
         elif win_rate >= 0.60 and avg_profit >= 20.0:
-            return "BUY", min(0.75, 0.60 + confidence_multiplier * 0.15)
+            rec = "SELL" if is_bearish else "BUY"
+            return rec, min(0.75, 0.60 + confidence_multiplier * 0.15)
         
         # Neutral: moderate win rate
         elif win_rate >= 0.45:

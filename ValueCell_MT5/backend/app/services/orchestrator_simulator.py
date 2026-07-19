@@ -400,10 +400,10 @@ def reconstruct_market_data(
         is_bos = core_type == "BOS"
         is_hh_ll = core_type in ("HH", "LL")
         
-        is_counter_swing = is_post_bos or (is_setup_active and (
+        is_counter_swing = (core_type != "CHOCH") and (is_post_bos or (is_setup_active and (
             (core_type == "LL" and recent_choch_dir == "BULLISH") or
             (core_type == "HH" and recent_choch_dir == "BEARISH")
-        ))
+        )))
 
         should_run_llm = is_bos or (is_hh_ll and is_setup_active and not is_counter_swing)
 

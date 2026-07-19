@@ -1,0 +1,80 @@
+{
+  "model_type": "regression_v8_walk_forward_atr_normalized",
+  "training_script": "train_ml_prediction_v8_walk_forward_normalized.py",
+  "test_years": [
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "note": "Same walk-forward folds as v7, but targets are ATR-normalized (mfe_target/atr_14, mae_target/atr_14) to fix extrapolation failure across gold's 2020->2026 price regime shift (~2.6x). Predictions converted back to points via * atr_14 before scoring.",
+  "atr_floor": 0.5,
+  "folds": [
+    {
+      "test_year": 2022,
+      "train_samples": 481,
+      "test_samples": 245,
+      "mfe_winner": "RandomForest_d5_n200_leaf15_f20",
+      "mfe_test_r2": 0.0500761022316506,
+      "mfe_test_mae": 847.3612848105591,
+      "mfe_bias_ratio": 0.8638182917121673,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f15",
+      "mae_test_r2": 0.009390435475108538,
+      "mae_test_mae": 919.623571800618,
+      "mae_bias_ratio": 0.9531808571240208
+    },
+    {
+      "test_year": 2023,
+      "train_samples": 726,
+      "test_samples": 261,
+      "mfe_winner": "XGBoost_d3_n120_lr002_f30",
+      "mfe_test_r2": -0.1494731240642173,
+      "mfe_test_mae": 1009.7373854708876,
+      "mfe_bias_ratio": 0.8840485494175536,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f20",
+      "mae_test_r2": 0.06791045537279083,
+      "mae_test_mae": 772.2719599315265,
+      "mae_bias_ratio": 0.9339066254241665
+    },
+    {
+      "test_year": 2024,
+      "train_samples": 987,
+      "test_samples": 219,
+      "mfe_winner": "RandomForest_d5_n200_leaf15_f15",
+      "mfe_test_r2": 0.14192969224658059,
+      "mfe_test_mae": 1157.4470499695444,
+      "mfe_bias_ratio": 0.8881814846543223,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f15",
+      "mae_test_r2": 0.1167321095147682,
+      "mae_test_mae": 1089.9542968057103,
+      "mae_bias_ratio": 1.032400922436847
+    },
+    {
+      "test_year": 2025,
+      "train_samples": 1206,
+      "test_samples": 254,
+      "mfe_winner": "XGBoost_d3_n120_lr002_f25",
+      "mfe_test_r2": 0.1808703717179504,
+      "mfe_test_mae": 2117.6957646246206,
+      "mfe_bias_ratio": 1.0001615545454516,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f25",
+      "mae_test_r2": 0.10246025283056903,
+      "mae_test_mae": 1706.4065047454692,
+      "mae_bias_ratio": 0.8466373862743132
+    },
+    {
+      "test_year": 2026,
+      "train_samples": 1460,
+      "test_samples": 133,
+      "mfe_winner": "XGBoost_d3_n120_lr002_f10",
+      "mfe_test_r2": 0.3150051762826198,
+      "mfe_test_mae": 6521.669119212216,
+      "mfe_bias_ratio": 0.8645815864896432,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f20",
+      "mae_test_r2": -0.015465851244143902,
+      "mae_test_mae": 3921.9694355633223,
+      "mae_bias_ratio": 0.9599133183721618
+    }
+  ]
+}

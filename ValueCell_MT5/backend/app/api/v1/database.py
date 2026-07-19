@@ -328,7 +328,9 @@ def get_database_stats():
             import lancedb
             db = lancedb.connect(str(lancedb_path))
             lancedb_active = True
-            for table_name in db.list_tables():
+            tables = db.list_tables()
+            table_names = tables.tables if hasattr(tables, "tables") else tables
+            for table_name in table_names:
                 tbl = db.open_table(table_name)
                 count = tbl.count_rows()
                 lancedb_collections.append(
@@ -411,7 +413,9 @@ def preview_lancedb_collection(
 
         db = lancedb.connect(str(lancedb_path))
 
-        if collection not in db.list_tables():
+        tables = db.list_tables()
+        table_names = tables.tables if hasattr(tables, "tables") else tables
+        if collection not in table_names:
             raise HTTPException(
                 status_code=404,
                 detail=f"Collection '{collection}' not found in LanceDB",

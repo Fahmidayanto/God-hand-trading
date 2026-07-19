@@ -74,7 +74,8 @@ class MLPredictionAgent:
         self.feature_engineer = FeatureEngineer()
         
         # Override threshold if regression metadata defines a custom optimal_rr_threshold
-        if self.model_type in ("regression_v5", "regression_v5_unconstrained") and self.metadata and "optimal_rr_threshold" in self.metadata:
+        is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8")
+        if is_regression and self.metadata and "optimal_rr_threshold" in self.metadata:
             self.threshold = float(self.metadata["optimal_rr_threshold"])
         
         logger.info(
@@ -95,16 +96,31 @@ class MLPredictionAgent:
             # Check model type
             self.model_type = self.metadata.get("model_type", "classification")
             
+            # Targets are ATR-normalized (mfe_target/atr_14, mae_target/atr_14) in v8+;
+            # predictions must be multiplied back by current atr_14 to get points.
+            self.norm_target = self.model_type.startswith("regression_v8")
+
             if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
                 # Load MFE model and scaler
                 self.mfe_model = joblib.load(self.model_path / "model_v5_mfe.pkl")
                 self.mfe_scaler = joblib.load(self.model_path / "scaler_v5_mfe.pkl")
-                
+
                 # Load MAE model and scaler
                 self.mae_model = joblib.load(self.model_path / "model_v5_mae.pkl")
                 self.mae_scaler = joblib.load(self.model_path / "scaler_v5_mae.pkl")
-                
+
                 logger.info("✅ v5 Dual Regression Models and Scalers loaded successfully.")
+            elif self.model_type.startswith("regression_v8"):
+                # v8: walk-forward fold model, trained on 2020-2025 with ATR-normalized
+                # targets (fixes extrapolation failure across gold's price regime shift).
+                fold = self.metadata.get("production_fold", "2026")
+                self.mfe_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mfe.pkl")
+                self.mfe_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mfe.pkl")
+
+                self.mae_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mae.pkl")
+                self.mae_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mae.pkl")
+
+                logger.info(f"✅ v8 Dual Regression Models (fold{fold}, ATR-normalized) and Scalers loaded successfully.")
             else:
                 # Load standard classification model and scaler
                 model_file = self.model_path / "filter_model_xgb.pkl"
@@ -173,11 +189,15 @@ class MLPredictionAgent:
         # Momentum lookbacks
         momentum_3_atr = 0.0
         momentum_5_atr = 0.0
+        momentum_10_atr = 0.0
         if m15_history is not None and not m15_history.empty and len(m15_history) > 5:
             close_3 = float(m15_history.iloc[-4].get("close", entry_price))
             momentum_3_atr = (entry_price - close_3) / atr_14
             close_5 = float(m15_history.iloc[-6].get("close", entry_price))
             momentum_5_atr = (entry_price - close_5) / atr_14
+        if m15_history is not None and not m15_history.empty and len(m15_history) > 10:
+            close_10 = float(m15_history.iloc[-11].get("close", entry_price))
+            momentum_10_atr = (entry_price - close_10) / atr_14
             
         # H1 and H4 context
         h1_atr_14 = 0.0
@@ -370,6 +390,7 @@ class MLPredictionAgent:
             "session_is_dst_NO": session_is_dst_NO,
             "momentum_3_atr": momentum_3_atr,
             "momentum_5_atr": momentum_5_atr,
+            "momentum_10_atr": momentum_10_atr,
             "h4_ema200_distance_atr": h4_ema200_distance_atr,
             "h1_ext_ema200_distance_pct": h1_ext_ema200_distance_pct,
             "h4_vol_ratio": h4_vol_ratio,
@@ -394,6 +415,21 @@ class MLPredictionAgent:
         
         return features
 
+    def _resolve_feature_value(self, features: Dict[str, Any], name: str) -> float:
+        """Resolve a model feature value, deriving one-hot dummy columns
+        (e.g. 'session_name_Asia') from their categorical source field when
+        the exact column isn't already present in `features`."""
+        if name in features:
+            return features[name]
+
+        for cat_col in ("session_name", "session_is_dst", "session_zone_name", "session_zone_is_dst", "signal"):
+            prefix = f"{cat_col}_"
+            if name.startswith(prefix):
+                category_value = features.get(cat_col)
+                return 1.0 if str(category_value) == name[len(prefix):] else 0.0
+
+        logger.warning(f"⚠️ {self.name} feature '{name}' not found and not a recognized dummy; defaulting to 0.0")
+        return 0.0
 
     def analyze(
         self,
@@ -412,34 +448,42 @@ class MLPredictionAgent:
             if entry_price <= 0:
                 raise ValueError("Entry price must be greater than zero")
                 
-            if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
-                # Extract v5 regression features
+            is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8")
+            if is_regression:
+                # Extract v5/v8 regression features (shared extractor; v8 reuses
+                # the same feature set plus a few additions like momentum_10_atr)
                 features = self._extract_v5_features(market_data, entry_price, structure_signal)
-                
+
                 # Make prediction for MFE
                 mfe_feat_names = self.metadata["mfe_features"]
                 mfe_df = pd.DataFrame(
-                    [[features[name] for name in mfe_feat_names]],
+                    [[self._resolve_feature_value(features, name) for name in mfe_feat_names]],
                     columns=mfe_feat_names,
                 )
                 mfe_scaled = self.mfe_scaler.transform(mfe_df)
                 mfe_scaled_df = pd.DataFrame(mfe_scaled, columns=mfe_feat_names)
                 predicted_mfe = float(self.mfe_model.predict(mfe_scaled_df)[0])
-                
+
                 # Make prediction for MAE
                 mae_feat_names = self.metadata["mae_features"]
                 mae_df = pd.DataFrame(
-                    [[features[name] for name in mae_feat_names]],
+                    [[self._resolve_feature_value(features, name) for name in mae_feat_names]],
                     columns=mae_feat_names,
                 )
                 mae_scaled = self.mae_scaler.transform(mae_df)
                 mae_scaled_df = pd.DataFrame(mae_scaled, columns=mae_feat_names)
                 predicted_mae = float(self.mae_model.predict(mae_scaled_df)[0])
-                
+
+                # v8 targets are ATR-normalized (mfe_target/atr_14) -- convert back to points
+                if getattr(self, "norm_target", False):
+                    atr_14_now = max(0.5, float(features.get("atr_14", 0.5)))
+                    predicted_mfe *= atr_14_now
+                    predicted_mae *= atr_14_now
+
                 # Ensure predicted values are reasonable/positive
                 predicted_mfe = max(0.0, predicted_mfe)
                 predicted_mae = max(1.0, predicted_mae)
-                
+
                 expected_rr = predicted_mfe / predicted_mae
                 
                 # Consensus signal based on expected_rr vs threshold

@@ -282,6 +282,32 @@ class MarketStructureAgent:
 
             # ── Pemeriksaan Skenario ──
 
+            # 0. CHoCH Aggressive Entry
+            if "CHOCH" in t1:
+                is_bullish = "BULL" in t1 or "BULL" in d1
+                signal_result = self._on_choch_confirmed(
+                    direction="Bullish" if is_bullish else "Bearish",
+                    price=e1["price"],
+                    current_price=current_price,
+                    ema200_m15=ema200_m15,
+                    ema200_h1=ema200_h1,
+                    ema200_h4=ema200_h4,
+                    session=session,
+                    veto_mode=veto_mode,
+                )
+                return self._build_response(
+                    signal=signal_result["signal"],
+                    confidence=signal_result["confidence"],
+                    reasoning=signal_result["reasoning"],
+                    phase=self._phase,
+                    pre_signal=None,
+                    events=events,
+                    pattern_analysis=signal_result.get("pattern_analysis"),
+                    current_price=current_price,
+                    ema200=ema200_m15,
+                    symbol=symbol,
+                )
+
             # 1. PENDING_SETUP - Bullish (CHoCH anywhere in recent events + HH terbentuk)
             if t1.startswith("HH") and _has_recent_choch("Bullish"):
                 pre_signal = self._on_choch_hh_formed(
@@ -515,6 +541,89 @@ class MarketStructureAgent:
         logger.info(f"[OK] Tahap 1 Selesai | State: PENDING_SETUP | Win Rate: {win_rate:.1%}")
         return pre_signal
 
+    def _on_choch_confirmed(
+        self,
+        direction: str,
+        price: float,
+        current_price: float,
+        ema200_m15: float,
+        ema200_h1: Optional[float],
+        ema200_h4: Optional[float],
+        session: str,
+        veto_mode: str = "hard",
+    ) -> Dict[str, Any]:
+        """Dijalankan saat CHoCH langsung terkonfirmasi untuk entri agresif."""
+        logger.info(f"[TRIGGER] CHoCH langsung terkonfirmasi @ {price:.2f}")
+
+        is_bullish = direction == "Bullish"
+
+        # Kalkulasi multi-TF EMA
+        tf_score, tf_reasoning = self._calculate_multi_tf_score(
+            is_bullish=is_bullish,
+            current_price=current_price,
+            ema200_m15=ema200_m15,
+            ema200_h1=ema200_h1,
+            ema200_h4=ema200_h4,
+        )
+
+        confidence = 0.5 + tf_score
+
+        # Boost/Penalty dari win rate historis pola CHoCH
+        win_rate = 0.0
+        pattern_count = 0
+        pattern_reasoning = ""
+        
+        # Query LanceDB untuk pola CHoCH
+        pattern_analysis = None
+        if self.use_patterns and self.pattern_matcher:
+            try:
+                pattern_analysis = self._analyze_patterns(
+                    event_type="CHoCH",
+                    direction=direction,
+                    price=price,
+                    ema200=ema200_m15,
+                    session=session,
+                    timeframe=self.timeframe,
+                    prior_choch=False,
+                )
+            except Exception as e:
+                logger.warning(f"Gagal mencari pola CHoCH di LanceDB: {e}")
+                
+        if pattern_analysis and pattern_analysis.get("total_count", 0) >= 5:
+            win_rate = pattern_analysis.get("win_rate", 0.0)
+            pattern_count = pattern_analysis.get("total_count", 0)
+            avg_profit = pattern_analysis.get("avg_profit", 0.0)
+            confidence = self._apply_winrate_boost(confidence, win_rate)
+            pattern_reasoning = self._winrate_reasoning(win_rate, pattern_count, avg_profit)
+        else:
+            pattern_reasoning = "Data historis tidak mencukupi untuk penyesuaian skor."
+
+        confidence = round(max(0.0, min(1.0, confidence)), 3)
+        signal = "BUY" if is_bullish else "SELL"
+
+        # Veto jika confidence kurang dari 60% dan veto_mode adalah hard
+        if confidence < 0.6 and veto_mode == "hard":
+            signal = "HOLD"
+            logger.warning(f"[VETO] Sinyal CHoCH diubah ke HOLD karena confidence ({confidence:.2f}) < 0.60")
+
+        reasoning = (
+            f"CHoCH {direction} langsung terkonfirmasi pada level {price:.2f}. "
+            f"{tf_reasoning} "
+            f"{pattern_reasoning}"
+        )
+
+        logger.info(f"[OK] Sinyal CHoCH Final: {signal} | Confidence: {confidence:.2f}")
+
+        return {
+            "signal": signal,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "win_rate": win_rate,
+            "pattern_count": pattern_count,
+            "tf_score": tf_score,
+            "pattern_analysis": pattern_analysis,
+        }
+
     # ── Tahap 2: Execution Trigger ─────────────────────────────────────────
 
     def _on_bos_confirmed(
@@ -676,7 +785,7 @@ class MarketStructureAgent:
                 ema200=ema200,
                 session=session,
                 timeframe=timeframe,
-                limit=20,
+                limit=1000,
                 min_similarity=0.7,
                 prior_choch=prior_choch,
             )

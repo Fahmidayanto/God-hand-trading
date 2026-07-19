@@ -1,0 +1,69 @@
+{
+  "model_type": "regression_v7_walk_forward",
+  "training_script": "train_ml_prediction_v7_walk_forward.py",
+  "test_years": [
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "note": "Each fold trained ONLY on data strictly before its test year. Predictions in scored_v7_walk_forward.csv are genuinely out-of-sample.",
+  "folds": [
+    {
+      "test_year": 2022,
+      "train_samples": 481,
+      "test_samples": 245,
+      "mfe_winner": "RandomForest_d4_n150_leaf12_f25",
+      "mfe_test_r2": 0.11194754524718287,
+      "mfe_test_mae": 844.5193036053653,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f15",
+      "mae_test_r2": 0.0795174851977325,
+      "mae_test_mae": 889.1080387135763
+    },
+    {
+      "test_year": 2023,
+      "train_samples": 726,
+      "test_samples": 261,
+      "mfe_winner": "RandomForest_d5_n200_leaf15_f30",
+      "mfe_test_r2": 0.11493550085215254,
+      "mfe_test_mae": 880.948837494713,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f30",
+      "mae_test_r2": 0.020824530230814098,
+      "mae_test_mae": 817.0071134618354
+    },
+    {
+      "test_year": 2024,
+      "train_samples": 987,
+      "test_samples": 219,
+      "mfe_winner": "Ridge_alpha10.0_f30",
+      "mfe_test_r2": 0.15635450949769913,
+      "mfe_test_mae": 1122.1362471943842,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f20",
+      "mae_test_r2": 0.11171953892318276,
+      "mae_test_mae": 1071.4725689596628
+    },
+    {
+      "test_year": 2025,
+      "train_samples": 1206,
+      "test_samples": 254,
+      "mfe_winner": "XGBoost_d3_n120_lr002_f15",
+      "mfe_test_r2": -0.06174397562682721,
+      "mfe_test_mae": 2155.5868246724294,
+      "mae_winner": "RandomForest_d5_n200_leaf15_f25",
+      "mae_test_r2": 0.03131218512813594,
+      "mae_test_mae": 1652.3388983709647
+    },
+    {
+      "test_year": 2026,
+      "train_samples": 1460,
+      "test_samples": 133,
+      "mfe_winner": "Ridge_alpha10.0_f10",
+      "mfe_test_r2": -0.012125552704497666,
+      "mfe_test_mae": 6095.306481951342,
+      "mae_winner": "Ridge_alpha10.0_f25",
+      "mae_test_r2": -0.09736593180449349,
+      "mae_test_mae": 4037.8655589481045
+    }
+  ]
+}

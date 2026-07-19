@@ -260,6 +260,7 @@ interface StrategyParams {
   initial_tp_dist: number;     // USD, default 30.00 (3000 poin)
   sl_min_distance: number;     // USD, default 5.00 (500 poin)
   sl_safety_buffer: number;    // USD, default 10.00 (1000 poin)
+  force_24h_close: boolean;
 }
 
 export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
@@ -275,6 +276,7 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   initial_tp_dist: 30.00,
   sl_min_distance: 5.00,
   sl_safety_buffer: 10.00,
+  force_24h_close: false,
 };
 
 const simulateTrailingSLTP = (
@@ -326,6 +328,14 @@ const simulateTrailingSLTP = (
 
   for (const c of activeCandles) {
     const price = c.close;
+
+    // Force 24h Close
+    if (params.force_24h_close && (c.time - (t.entry_time ?? 0)) >= 86400) {
+      isClosedSimulated = true;
+      exitPriceSimulated = price;
+      exitTimeSimulated = c.time;
+      break;
+    }
 
     if (typeLower === "buy") {
       // 1. Check if stopped out by SL first

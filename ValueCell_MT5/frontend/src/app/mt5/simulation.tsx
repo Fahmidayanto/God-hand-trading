@@ -269,6 +269,7 @@ interface StrategyParams {
   initial_tp_dist: number;     // USD, default 30.00 (3000 poin)
   sl_min_distance: number;     // USD, default 5.00 (500 poin)
   sl_safety_buffer: number;    // USD, default 10.00 (1000 poin)
+  force_24h_close: boolean;
 }
 
 const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
@@ -284,6 +285,7 @@ const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   initial_tp_dist: 30.00,
   sl_min_distance: 5.00,
   sl_safety_buffer: 10.00,
+  force_24h_close: false,
 };
 
 const simulateTrailingSLTP = (
@@ -335,6 +337,14 @@ const simulateTrailingSLTP = (
 
   for (const c of activeCandles) {
     const price = c.close;
+
+    // Force 24h Close
+    if (params.force_24h_close && (c.time - (t.entry_time ?? 0)) >= 86400) {
+      isClosedSimulated = true;
+      exitPriceSimulated = price;
+      exitTimeSimulated = c.time;
+      break;
+    }
 
     if (typeLower === "buy") {
       // 1. Check if stopped out by SL first
@@ -609,6 +619,7 @@ export default function SimulationOfDead() {
   const [allowBosCycle1, setAllowBosCycle1] = useState(true);
   const [allowBosCycle2, setAllowBosCycle2] = useState(false);
   const [allowBosCycle3Plus, setAllowBosCycle3Plus] = useState(false);
+  const [force24hClose, setForce24hClose] = useState(false);
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [scenarioName, setScenarioName] = useState("");
   const [isStrategyPanelOpen, setIsStrategyPanelOpen] = useState(false);
@@ -987,10 +998,11 @@ export default function SimulationOfDead() {
     pendingSimTimesRef.current.clear();
     setCurrentIndex(0);
     setIsPlaying(false);
-  }, [vetoMode, allowChochEntry, allowBosCycle1, allowBosCycle2, allowBosCycle3Plus]);
+  }, [vetoMode, allowChochEntry, allowBosCycle1, allowBosCycle2, allowBosCycle3Plus, force24hClose]);
 
   // Re-simulate active positions and chart markers whenever strategy parameters change
   useEffect(() => {
+    if (isPlaying) return; // Bypass re-simulation while replay is playing to prevent screen flickering glitch
     if (!replayData || currentIndex === 0) return;
     const activeIdx = Math.max(0, currentIndex - 1);
     const candle = replayData.candles[activeIdx];
@@ -1041,6 +1053,14 @@ export default function SimulationOfDead() {
         let tradeProfit = 0;
 
         for (const c of activeCandles) {
+          // Force 24h Close
+          if (force24hClose && (c.time - entryTs) >= 86400) {
+            isClosed = true;
+            exitPrice = c.close;
+            exitTime = c.time;
+            break;
+          }
+
           if (typeLower === "buy") {
             if (slPrice !== null && c.low <= slPrice) {
               isClosed = true;
@@ -1156,6 +1176,14 @@ export default function SimulationOfDead() {
           let finalProfit = 0;
 
           for (const c of activeCandles) {
+            // Force 24h Close
+            if (force24hClose && (c.time - entryTs) >= 86400) {
+              isClosed = true;
+              exitPrice = c.close;
+              exitTime = c.time;
+              break;
+            }
+
             if (typeLower === "buy") {
               if (slPrice !== null && c.low <= slPrice) {
                 isClosed = true;
@@ -1205,7 +1233,7 @@ export default function SimulationOfDead() {
         });
       tradesPrimitiveRef.current.setTrades(mapped);
     }
-  }, [strategyParams, replayData, currentIndex, agentTrades, activeTimeframe]);
+  }, [strategyParams, replayData, currentIndex, agentTrades, activeTimeframe, force24hClose, isPlaying]);
 
 
 
@@ -1644,6 +1672,14 @@ export default function SimulationOfDead() {
           let finalProfit = 0;
 
           for (const c of activeCandles) {
+            // Force 24h Close
+            if (force24hClose && (c.time - entryTs) >= 86400) {
+              isClosed = true;
+              exitPrice = c.close;
+              exitTime = c.time;
+              break;
+            }
+
             if (typeLower === "buy") {
               if (slPrice !== null && c.low <= slPrice) {
                 isClosed = true;
@@ -1835,7 +1871,7 @@ export default function SimulationOfDead() {
     setActivePositions(activePosList);
 
     return idx + 1;
-  }, [strategyParams, simSignals, agentTrades, replayData]);
+  }, [strategyParams, simSignals, agentTrades, replayData, force24hClose]);
 
   // ── Playback controls (continued) ──
 
@@ -1941,10 +1977,10 @@ export default function SimulationOfDead() {
 
     const isPostBos = recentBaseline === "BOS";
     const isSetupActive = recentBaseline === "CHOCH";
-    const isCounterSwing = isPostBos || (isSetupActive && (
+    const isCounterSwing = !isChochOrBos && (isPostBos || (isSetupActive && (
       ((latestType.includes("LL") || latestType.includes("BEAR")) && recentChochDir === "BULLISH") ||
       ((latestType.includes("HH") || latestType.includes("BULL")) && recentChochDir === "BEARISH")
-    ));
+    )));
 
     const cacheKey = `${latestEvent.time}_${latestEvent.type}`;
 
@@ -2112,6 +2148,30 @@ export default function SimulationOfDead() {
         });
     }
   }, [currentCandle, replayData, activeTimeframe, simFramesMap, orchestratorEnabled, activeFrame, vetoMode]);
+
+  // Keep selectedAgent in sync with activeFrame updates while the modal is open
+  useEffect(() => {
+    if (isAgentModalOpen && selectedAgent && activeFrame) {
+      const currentAgentData = (activeFrame.agents as Record<string, any>)?.[selectedAgent.key];
+      if (currentAgentData) {
+        setSelectedAgent((prev: any) => {
+          if (!prev) return prev;
+          if (
+            prev.reasoning === currentAgentData.reasoning && 
+            prev.signal === currentAgentData.signal &&
+            prev.confidence === currentAgentData.confidence
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            ...currentAgentData
+          };
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFrame, isAgentModalOpen, selectedAgent?.key]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -2532,80 +2592,98 @@ export default function SimulationOfDead() {
             )}
           </div>
 
-          {replayData && activeFrame ? (
-            <>
-              {AGENT_PANEL_DEFS.map((def) => {
-                const agent = activeFrame.agents[def.key] as SimAgentState | undefined;
-                if (!agent) return null;
-                const prediction = agent.signal || 'HOLD';
-                const confidence = agent.confidence ?? 0;
+          {/* Always render the 4 agents panel directly */}
+          <div className="flex flex-col gap-3">
+            {AGENT_PANEL_DEFS.map((def) => {
+              const agent = activeFrame?.agents?.[def.key] as SimAgentState | undefined;
+              const prediction = agent?.signal || 'HOLD';
+              const confidence = agent?.confidence ?? 0;
+              const isActive = !!activeFrame && !!agent;
 
-                return (
-                  <div
-                    key={def.key}
-                    className="agent-row hover:bg-slate-800/30 cursor-pointer rounded-xl p-1.5 transition-all duration-200"
-                    onClick={() => {
-                      setSelectedAgent({
-                        key: def.key,
-                        name: def.name,
-                        icon: def.icon,
-                        color: def.color,
-                        bg: def.bg,
-                        ...agent
-                      });
-                      setIsAgentModalOpen(true);
-                    }}
-                  >
-                    <div className="agent-info">
-                      <div className="agent-icon" style={{ background: def.bg, borderColor: def.color }}>
-                        {def.icon}
-                      </div>
-                      <div className="agent-details">
-                        <div className="agent-name">{def.name}</div>
-                        <div className="agent-signal">
-                          Signal: <span className="neon-text">{prediction}</span>
-                        </div>
-                      </div>
+              return (
+                <div
+                  key={def.key}
+                  className={cn(
+                    "agent-row rounded-xl p-3 border transition-all duration-300 flex items-center justify-between",
+                    isActive 
+                      ? "hover:bg-slate-800/30 cursor-pointer border-slate-800/60 bg-slate-950/20" 
+                      : "opacity-40 border-slate-800/20 bg-slate-950/10 pointer-events-none select-none"
+                  )}
+                  onClick={() => {
+                    if (!isActive || !agent) return;
+                    setSelectedAgent({
+                      key: def.key,
+                      name: def.name,
+                      icon: def.icon,
+                      color: def.color,
+                      bg: def.bg,
+                      ...agent
+                    });
+                    setIsAgentModalOpen(true);
+                  }}
+                >
+                  <div className="agent-info flex items-center gap-3">
+                    <div 
+                      className="agent-icon size-8 rounded-lg flex items-center justify-center border font-bold text-base" 
+                      style={{ 
+                        background: isActive ? def.bg : 'rgba(30, 41, 59, 0.1)', 
+                        borderColor: isActive ? def.color : 'rgba(71, 85, 105, 0.2)' 
+                      }}
+                    >
+                      {def.icon}
                     </div>
-                    <div style={{ minWidth: '100px' }}>
-                      <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
-                        Confidence
-                      </div>
-                      <div className="progress-bar" style={{ width: '100px' }}>
-                        <div className="progress-fill" style={{ width: `${Math.min(100, Math.max(0, confidence * 100))}%` }}></div>
+                    <div className="agent-details">
+                      <div className="agent-name font-semibold text-xs text-slate-200">{def.name}</div>
+                      <div className="agent-signal text-[10px] text-slate-500 mt-0.5">
+                        Signal: <span className={cn("font-bold", isActive ? "neon-text text-cyan-400" : "text-slate-600")}>{prediction}</span>
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                  
+                  <div style={{ minWidth: '100px' }}>
+                    <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
+                      Confidence
+                    </div>
+                    <div className="progress-bar h-1.5 w-[100px] bg-slate-950 rounded-full overflow-hidden">
+                      <div 
+                        className="progress-fill h-full rounded-full transition-all duration-300" 
+                        style={{ 
+                          width: `${Math.min(100, Math.max(0, confidence * 100))}%`,
+                          backgroundColor: isActive ? def.color : '#334155'
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-              {/* Consensus Summary */}
-              <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(31, 41, 55, 0.3)', borderRadius: '12px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontWeight: 600 }}>Overall Consensus</span>
-                  <span style={{ fontSize: '18px', fontWeight: 700, color: 'var(--neon-amber)' }}>
-                    {activeFrame.final_signal || 'HOLD'}
-                  </span>
-                </div>
-                <div className="progress-bar" style={{ marginTop: '12px' }}>
-                  <div
-                    className="progress-fill"
-                    style={{
-                      width: `${Math.min(100, Math.max(0, (activeFrame.consensus_confidence ?? 0) * 100))}%`,
-                      background: 'linear-gradient(90deg, var(--neon-amber), var(--neon-ruby))'
-                    }}
-                  ></div>
-                </div>
-                <div className="text-xs text-[var(--text-tertiary)] mt-2">
-                  {activeFrame.consensus_level
-                    ? `${activeFrame.consensus_level} (${Math.round((activeFrame.consensus_confidence ?? 0) * 100)}%)`
-                    : "—"}
-                </div>
-              </div>
-            </>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>No consensus data available (Start replay to view)</p>
-          )}
+          {/* Consensus Summary */}
+          <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(31, 41, 55, 0.3)', borderRadius: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontWeight: 600, fontSize: '12px' }} className="text-slate-300">Overall Consensus</span>
+              <span className="text-sm font-bold transition-all duration-300" style={{ color: activeFrame ? 'var(--neon-amber)' : '#475569' }}>
+                {activeFrame?.final_signal || 'HOLD'}
+              </span>
+            </div>
+            <div className="progress-bar h-1.5 bg-slate-950 rounded-full overflow-hidden mt-3">
+              <div
+                className="progress-fill h-full rounded-full transition-all duration-300"
+                style={{
+                  width: `${Math.min(100, Math.max(0, (activeFrame?.consensus_confidence ?? 0) * 100))}%`,
+                  background: activeFrame 
+                    ? 'linear-gradient(90deg, var(--neon-amber), var(--neon-ruby))' 
+                    : '#1e293b'
+                }}
+              />
+            </div>
+            <div className="text-[10px] text-[var(--text-tertiary)] mt-2">
+              {activeFrame?.consensus_level
+                ? `${activeFrame.consensus_level} (${Math.round((activeFrame.consensus_confidence ?? 0) * 100)}%)`
+                : "Consensus Standby (Start replay to view)"}
+            </div>
+          </div>
         </div>
 
         {/* ── Strategy Params Panel ── */}
@@ -2654,201 +2732,338 @@ export default function SimulationOfDead() {
                   }
                 `}</style>
 
-                {/* Section C & D Consolidated: Strategy Settings Container */}
-                <div className="p-5 rounded-xl bg-slate-900/20 border border-slate-800/40 space-y-6">
-                  
-                  {/* Veto Mode Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs pb-4 border-b border-slate-800/30">
-                    <div className="flex flex-col gap-0.5 max-w-[320px]">
-                      <span className="font-bold text-slate-200 flex items-center gap-1.5">
-                        🤖 Market Veto Mode
-                        <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R >= 1.35. No Veto -> Mengikuti voting demokratis." />
-                      </span>
-                      <span className="text-[10px] text-slate-500">Toleransi Veto terhadap ketidakselarasan EMA H1/H4</span>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-                      {[
-                        { value: "hard", label: "🔒 Hard Veto" },
-                        { value: "soft", label: "🛡️ Soft Veto" },
-                        { value: "none", label: "🗳️ No Veto" }
-                      ].map(opt => (
-                        <motion.button
-                          key={opt.value}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => setVetoMode(opt.value as any)}
-                          className={cn(
-                            "px-3.5 py-2 rounded-lg font-bold border cursor-pointer text-center text-xs transition-colors duration-200 min-w-[90px]",
-                            vetoMode === opt.value 
-                              ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-400" 
-                              : "bg-white/[0.02] border-white/[0.06] text-slate-400 hover:border-white/10 hover:bg-white/[0.04]"
-                          )}
-                        >
-                          {opt.label}
-                        </motion.button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* 3D Map Visualizer Row */}
-                  <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider select-none">🎯 Trend & Cycle Schema Map</div>
-                    <MarketStructure3DVisualizer
-                      allowChoch={allowChochEntry}
-                      allowBos1={allowBosCycle1}
-                      allowBos2={allowBosCycle2}
-                      allowBos3Plus={allowBosCycle3Plus}
-                    />
-                  </div>
-
-                  {/* Toggle Filters List */}
-                  <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
-                    {/* CHoCH Toggle */}
-                    <div className="flex items-center justify-between py-3 filter-card px-1">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-200">CHoCH Entries</span>
-                        <span className="text-[10px] text-slate-500">Change of Character patterns</span>
+                {/* Section C & D Consolidated: Strategy Settings Split Layout */}
+                <div className="p-5 rounded-xl bg-slate-900/20 border border-slate-800/40">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    {/* Left Column: Trend & Cycle Schema Map */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">🎯 Trend &amp; Cycle Schema Map</span>
                       </div>
-                      <motion.button
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => setAllowChochEntry(p => !p)}
-                        className={cn(
-                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                          allowChochEntry ? "border-cyan-500/30" : "border-slate-800/60"
-                        )}
-                      >
-                        <motion.div 
-                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
-                          initial={false}
-                          animate={{ opacity: allowChochEntry ? 1 : 0 }}
-                          transition={{ duration: 0.25 }}
-                        />
-                        <motion.div
-                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30,
-                            mass: 0.8
-                          }}
-                          animate={{
-                            x: allowChochEntry ? 20 : 0,
-                            backgroundColor: allowChochEntry ? "#06b6d4" : "#475569",
-                            boxShadow: allowChochEntry ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
-                          }}
-                        />
-                      </motion.button>
+                      
+                      <MarketStructure3DVisualizer
+                        allowChoch={allowChochEntry}
+                        allowBos1={allowBosCycle1}
+                        allowBos2={allowBosCycle2}
+                        allowBos3Plus={allowBosCycle3Plus}
+                      />
+
+                      {/* Toggle Filters List */}
+                      <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
+                        {/* CHoCH Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">CHoCH Entries</span>
+                            <span className="text-[10px] text-slate-500">Change of Character patterns</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setAllowChochEntry(p => !p)}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              allowChochEntry ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: allowChochEntry ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: allowChochEntry ? 20 : 0,
+                                backgroundColor: allowChochEntry ? "#06b6d4" : "#475569",
+                                boxShadow: allowChochEntry ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* Cycle 1 Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">BOS Cycle 1 Entries</span>
+                            <span className="text-[10px] text-slate-500">First BOS after CHoCH</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setAllowBosCycle1(p => !p)}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              allowBosCycle1 ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: allowBosCycle1 ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: allowBosCycle1 ? 20 : 0,
+                                backgroundColor: allowBosCycle1 ? "#06b6d4" : "#475569",
+                                boxShadow: allowBosCycle1 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* Cycle 2 Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">BOS Cycle 2 Entries</span>
+                            <span className="text-[10px] text-slate-500">Second BOS after CHoCH</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setAllowBosCycle2(p => !p)}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              allowBosCycle2 ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: allowBosCycle2 ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: allowBosCycle2 ? 20 : 0,
+                                backgroundColor: allowBosCycle2 ? "#06b6d4" : "#475569",
+                                boxShadow: allowBosCycle2 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* Cycle 3+ Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">BOS Cycle 3+ Entries</span>
+                            <span className="text-[10px] text-slate-500">Subsequent BOS cycles</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setAllowBosCycle3Plus(p => !p)}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              allowBosCycle3Plus ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: allowBosCycle3Plus ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: allowBosCycle3Plus ? 20 : 0,
+                                backgroundColor: allowBosCycle3Plus ? "#06b6d4" : "#475569",
+                                boxShadow: allowBosCycle3Plus ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* Force 24h Close Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1 border-t border-slate-800/30">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">Force 24h Close</span>
+                            <span className="text-[10px] text-slate-500">Automatically close any open trades after 24 hours</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setForce24hClose(p => !p)}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              force24hClose ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: force24hClose ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: force24hClose ? 20 : 0,
+                                backgroundColor: force24hClose ? "#06b6d4" : "#475569",
+                                boxShadow: force24hClose ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Cycle 1 Toggle */}
-                    <div className="flex items-center justify-between py-3 filter-card px-1">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-200">BOS Cycle 1 Entries</span>
-                        <span className="text-[10px] text-slate-500">First BOS after CHoCH</span>
+                    {/* Right Column: Veto Mode & Consensus Map */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none flex items-center gap-1">
+                          🛡️ Veto Mode &amp; Consensus Map
+                          <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R &gt;= 1.35. No Veto -> Mengikuti voting demokratis." />
+                        </span>
                       </div>
-                      <motion.button
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => setAllowBosCycle1(p => !p)}
-                        className={cn(
-                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                          allowBosCycle1 ? "border-cyan-500/30" : "border-slate-800/60"
-                        )}
-                      >
-                        <motion.div 
-                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
-                          initial={false}
-                          animate={{ opacity: allowBosCycle1 ? 1 : 0 }}
-                          transition={{ duration: 0.25 }}
-                        />
-                        <motion.div
-                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30,
-                            mass: 0.8
-                          }}
-                          animate={{
-                            x: allowBosCycle1 ? 20 : 0,
-                            backgroundColor: allowBosCycle1 ? "#06b6d4" : "#475569",
-                            boxShadow: allowBosCycle1 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
-                          }}
-                        />
-                      </motion.button>
+
+                      <VetoConsensus3DVisualizer vetoMode={vetoMode} />
+
+                      {/* Veto Radio-Toggles List */}
+                      <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
+                        {/* Hard Veto Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">Hard Veto (Default)</span>
+                            <span className="text-[10px] text-slate-500">Menolak sepenuhnya sinyal jika EMA H1/H4 tidak selaras</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setVetoMode("hard")}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              vetoMode === "hard" ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: vetoMode === "hard" ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: vetoMode === "hard" ? 20 : 0,
+                                backgroundColor: vetoMode === "hard" ? "#06b6d4" : "#475569",
+                                boxShadow: vetoMode === "hard" ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* Soft Veto Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">Soft Veto (Conditional)</span>
+                            <span className="text-[10px] text-slate-500">Meloloskan jika rasio ML Expected R:R &gt;= 1.35</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setVetoMode("soft")}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              vetoMode === "soft" ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: vetoMode === "soft" ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: vetoMode === "soft" ? 20 : 0,
+                                backgroundColor: vetoMode === "soft" ? "#06b6d4" : "#475569",
+                                boxShadow: vetoMode === "soft" ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+
+                        {/* No Veto Toggle */}
+                        <div className="flex items-center justify-between py-3 filter-card px-1">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-slate-200">No Veto (Democratic)</span>
+                            <span className="text-[10px] text-slate-500">Mengikuti keputusan voting mayoritas konsensus agen</span>
+                          </div>
+                          <motion.button
+                            whileTap={{ scale: 0.94 }}
+                            onClick={() => setVetoMode("none")}
+                            className={cn(
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
+                              vetoMode === "none" ? "border-cyan-500/30" : "border-slate-800/60"
+                            )}
+                          >
+                            <motion.div 
+                              className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
+                              initial={false}
+                              animate={{ opacity: vetoMode === "none" ? 1 : 0 }}
+                              transition={{ duration: 0.25 }}
+                            />
+                            <motion.div
+                              className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
+                              transition={{
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 30,
+                                mass: 0.8
+                              }}
+                              animate={{
+                                x: vetoMode === "none" ? 20 : 0,
+                                backgroundColor: vetoMode === "none" ? "#06b6d4" : "#475569",
+                                boxShadow: vetoMode === "none" ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
+                              }}
+                            />
+                          </motion.button>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Cycle 2 Toggle */}
-                    <div className="flex items-center justify-between py-3 filter-card px-1">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-200">BOS Cycle 2 Entries</span>
-                        <span className="text-[10px] text-slate-500">Second BOS after CHoCH</span>
-                      </div>
-                      <motion.button
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => setAllowBosCycle2(p => !p)}
-                        className={cn(
-                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                          allowBosCycle2 ? "border-cyan-500/30" : "border-slate-800/60"
-                        )}
-                      >
-                        <motion.div 
-                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
-                          initial={false}
-                          animate={{ opacity: allowBosCycle2 ? 1 : 0 }}
-                          transition={{ duration: 0.25 }}
-                        />
-                        <motion.div
-                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30,
-                            mass: 0.8
-                          }}
-                          animate={{
-                            x: allowBosCycle2 ? 20 : 0,
-                            backgroundColor: allowBosCycle2 ? "#06b6d4" : "#475569",
-                            boxShadow: allowBosCycle2 ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
-                          }}
-                        />
-                      </motion.button>
-                    </div>
-
-                    {/* Cycle 3+ Toggle */}
-                    <div className="flex items-center justify-between py-3 filter-card px-1">
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-200">BOS Cycle 3+ Entries</span>
-                        <span className="text-[10px] text-slate-500">Subsequent BOS cycles</span>
-                      </div>
-                      <motion.button
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => setAllowBosCycle3Plus(p => !p)}
-                        className={cn(
-                          "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                          allowBosCycle3Plus ? "border-cyan-500/30" : "border-slate-800/60"
-                        )}
-                      >
-                        <motion.div 
-                          className="absolute inset-0 bg-cyan-500/10 pointer-events-none rounded-full"
-                          initial={false}
-                          animate={{ opacity: allowBosCycle3Plus ? 1 : 0 }}
-                          transition={{ duration: 0.25 }}
-                        />
-                        <motion.div
-                          className="w-4 h-4 rounded-full premium-switch-bullet shadow-[0_1.5px_3px_rgba(0,0,0,0.5)]"
-                          transition={{
-                            type: "spring",
-                            stiffness: 500,
-                            damping: 30,
-                            mass: 0.8
-                          }}
-                          animate={{
-                            x: allowBosCycle3Plus ? 20 : 0,
-                            backgroundColor: allowBosCycle3Plus ? "#06b6d4" : "#475569",
-                            boxShadow: allowBosCycle3Plus ? "0 0 8px rgba(6, 182, 212, 0.6)" : "none",
-                          }}
-                        />
-                      </motion.button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -3415,7 +3630,9 @@ export default function SimulationOfDead() {
                     <div>
                       <div className="text-xs text-slate-400">Pola Serupa Terdeteksi</div>
                       <div className="text-lg font-bold font-mono text-slate-200 mt-1">
-                        {selectedAgent.meta.pattern_count ?? 0} pola
+                        {selectedAgent.meta.patterns
+                          ? selectedAgent.meta.patterns.length
+                          : (selectedAgent.meta.pattern_count ?? 0)} pola
                       </div>
                     </div>
                     <div>
@@ -3434,7 +3651,7 @@ export default function SimulationOfDead() {
                   {/* Matching Patterns List */}
                   {selectedAgent.meta.patterns && selectedAgent.meta.patterns.length > 0 && (
                     <div className="pt-4 border-t border-slate-800/80 space-y-2">
-                      <div className="text-xs font-semibold text-slate-400">10 Pola Historis Paling Mirip (Top 10):</div>
+                      <div className="text-xs font-semibold text-slate-400">Semua Pola Historis Serupa (Diurutkan dari Terbaru):</div>
                       <div className="border border-slate-800/80 rounded-lg overflow-hidden bg-slate-950/40 text-xs">
                         <div className="overflow-x-auto max-h-[580px]">
                           <table className="w-full text-left">
@@ -3448,7 +3665,13 @@ export default function SimulationOfDead() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/40 text-slate-300">
-                              {selectedAgent.meta.patterns.map((p: any, idx: number) => {
+                              {[...selectedAgent.meta.patterns]
+                                .sort((a: any, b: any) => {
+                                  const timeA = a.timestamp || "";
+                                  const timeB = b.timestamp || "";
+                                  return timeB.localeCompare(timeA);
+                                })
+                                .map((p: any, idx: number) => {
                                 const isWin = p.outcome?.toUpperCase() === "WIN";
                                 return (
                                   <tr
@@ -3470,7 +3693,7 @@ export default function SimulationOfDead() {
                                         {p.outcome || "PENDING"}
                                       </span>
                                     </td>
-                                    <td className={`py-2 px-3 text-right font-mono font-semibold ${isWin ? "text-emerald-400" : "text-rose-500"}`}>
+                                    <td className={`py-2 px-3 text-right font-mono font-semibold ${isWin ? "text-emerald-400" : p.outcome?.toUpperCase() === "PENDING" ? "text-slate-400" : "text-rose-500"}`}>
                                       {isWin ? "+" : ""}{(p.profit_pips ?? 0).toFixed(1)} pips
                                     </td>
                                     <td className="py-2 px-3 text-right font-mono text-cyan-400">
@@ -4016,6 +4239,203 @@ export function MarketStructure3DVisualizer({
       <div id="label-bos1" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 1</div>
       <div id="label-bos2" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 2</div>
       <div id="label-bos3" className="absolute left-0 top-0 text-[10px] uppercase tracking-wider pointer-events-none transition-colors duration-150 select-none">BOS 3+</div>
+    </div>
+  );
+}
+
+// ── 3D Veto Consensus Map Visualizer Component ──────────────────────────────
+interface VetoConsensus3DVisualizerProps {
+  vetoMode: "hard" | "soft" | "none";
+}
+
+export function VetoConsensus3DVisualizer({ vetoMode }: VetoConsensus3DVisualizerProps) {
+  const mountRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const stateRef = useRef({ vetoMode });
+  useEffect(() => {
+    stateRef.current = { vetoMode };
+  }, [vetoMode]);
+
+  useEffect(() => {
+    const canvas = mountRef.current;
+    const parent = containerRef.current;
+    if (!canvas || !parent) return;
+
+    // Scene setup with exponential background fog
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x020617, 0.05);
+
+    // Camera setup
+    const camera = new THREE.PerspectiveCamera(40, parent.clientWidth / parent.clientHeight, 0.1, 50);
+    camera.position.set(0, 0, 7.2);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(parent.clientWidth, parent.clientHeight);
+
+    // Cyberpunk grid plane
+    const gridHelper = new THREE.GridHelper(30, 30, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -1.2;
+    gridHelper.position.z = -0.5;
+    scene.add(gridHelper);
+
+    // Node relative coordinates
+    const posMS = new THREE.Vector3(-1.8, 0.7, 0);   // Market Structure Agent
+    const posML = new THREE.Vector3(1.8, 0.7, 0);    // ML Filter Agent
+    const posSR = new THREE.Vector3(0, -0.9, 0);     // Risk & Sentiment Agent
+    const posCore = new THREE.Vector3(0, 0.15, 0);   // Consensus Core
+
+    // Sphere meshes
+    const agentGeom = new THREE.SphereGeometry(0.16, 32, 32);
+    const coreGeom = new THREE.SphereGeometry(0.23, 32, 32);
+
+    const matMS = new THREE.MeshBasicMaterial();
+    const matML = new THREE.MeshBasicMaterial();
+    const matSR = new THREE.MeshBasicMaterial();
+    const matCore = new THREE.MeshBasicMaterial();
+
+    const meshMS = new THREE.Mesh(agentGeom, matMS);
+    meshMS.position.copy(posMS);
+    scene.add(meshMS);
+
+    const meshML = new THREE.Mesh(agentGeom, matML);
+    meshML.position.copy(posML);
+    scene.add(meshML);
+
+    const meshSR = new THREE.Mesh(agentGeom, matSR);
+    meshSR.position.copy(posSR);
+    scene.add(meshSR);
+
+    const meshCore = new THREE.Mesh(coreGeom, matCore);
+    meshCore.position.copy(posCore);
+    scene.add(meshCore);
+
+    // Connective Neon Lines
+    const matLineMS = new THREE.LineBasicMaterial({ linewidth: 2 });
+    const matLineML = new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 });
+    const matLineSR = new THREE.LineBasicMaterial({ color: 0x06b6d4, linewidth: 2 });
+
+    const lineMS = new THREE.Line(new THREE.BufferGeometry().setFromPoints([posMS, posCore]), matLineMS);
+    const lineML = new THREE.Line(new THREE.BufferGeometry().setFromPoints([posML, posCore]), matLineML);
+    const lineSR = new THREE.Line(new THREE.BufferGeometry().setFromPoints([posSR, posCore]), matLineSR);
+
+    scene.add(lineMS);
+    scene.add(lineML);
+    scene.add(lineSR);
+
+    let containerWidth = parent.clientWidth;
+    let containerHeight = parent.clientHeight;
+    
+    const clock = new THREE.Clock();
+    let reqId: number;
+
+    // Track coordinates dynamic projection
+    const updateLabels = () => {
+      const nodes = [
+        { id: "veto-label-ms", pos: posMS },
+        { id: "veto-label-ml", pos: posML },
+        { id: "veto-label-sr", pos: posSR },
+        { id: "veto-label-core", pos: posCore }
+      ];
+
+      const tempV = new THREE.Vector3();
+      nodes.forEach(n => {
+        const el = document.getElementById(n.id);
+        if (!el) return;
+        tempV.copy(n.pos);
+        tempV.project(camera);
+        const x = (tempV.x * 0.5 + 0.5) * containerWidth;
+        const y = (-(tempV.y * 0.5) + 0.5) * containerHeight;
+        el.style.transform = `translate(-50%, -100%) translate(${x}px, ${y - 8}px)`;
+      });
+    };
+
+    const animate = () => {
+      reqId = requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+      const { vetoMode } = stateRef.current;
+
+      const pulse = 1.0 + Math.sin(elapsed * 5) * 0.08;
+
+      // Auxiliary agents bounce animations
+      matML.color.setHex(0x06b6d4);
+      matSR.color.setHex(0x06b6d4);
+      meshML.scale.setScalar(1.0 + Math.sin(elapsed * 3) * 0.04);
+      meshSR.scale.setScalar(1.0 + Math.cos(elapsed * 3) * 0.04);
+
+      // Adaptive color representation based on veto modes
+      if (vetoMode === "hard") {
+        matMS.color.lerp(new THREE.Color(0xef4444), 0.1);
+        matCore.color.lerp(new THREE.Color(0xef4444), 0.1);
+        matLineMS.color.lerp(new THREE.Color(0xef4444), 0.1);
+
+        meshMS.scale.setScalar(1.35 * pulse);
+        meshCore.scale.setScalar(1.0 + Math.sin(elapsed * 8) * 0.08); // rapid alert pulse
+      } else if (vetoMode === "soft") {
+        matMS.color.lerp(new THREE.Color(0xf59e0b), 0.1);
+        matCore.color.lerp(new THREE.Color(0xf59e0b), 0.1);
+        matLineMS.color.lerp(new THREE.Color(0xf59e0b), 0.1);
+
+        meshMS.scale.setScalar(1.2 * pulse);
+        meshCore.scale.setScalar(1.1 + Math.sin(elapsed * 3) * 0.04);
+      } else {
+        matMS.color.lerp(new THREE.Color(0x06b6d4), 0.1);
+        matCore.color.lerp(new THREE.Color(0x10b981), 0.1); // emerald active green
+        matLineMS.color.lerp(new THREE.Color(0x06b6d4), 0.1);
+
+        meshMS.scale.setScalar(1.0 * pulse);
+        meshCore.scale.setScalar(1.25 * pulse);
+      }
+
+      // Orbital parallax drift camera
+      camera.position.x = Math.sin(elapsed * 0.25) * 0.5;
+      camera.position.y = Math.cos(elapsed * 0.2) * 0.15;
+      camera.lookAt(0, 0.1, 0);
+
+      renderer.render(scene, camera);
+      updateLabels();
+    };
+
+    animate();
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        containerWidth = parent.clientWidth || entry.contentRect.width;
+        containerHeight = parent.clientHeight || entry.contentRect.height;
+        camera.aspect = containerWidth / containerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(containerWidth, containerHeight);
+      }
+    });
+    resizeObserver.observe(parent);
+
+    return () => {
+      cancelAnimationFrame(reqId);
+      resizeObserver.disconnect();
+      renderer.dispose();
+      agentGeom.dispose();
+      coreGeom.dispose();
+      matMS.dispose();
+      matML.dispose();
+      matSR.dispose();
+      matCore.dispose();
+      matLineMS.dispose();
+      matLineML.dispose();
+      matLineSR.dispose();
+    };
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2">
+      <canvas ref={mountRef} className="w-full h-full block" />
+      
+      {/* 2D Projected labels */}
+      <div id="veto-label-ms" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">Structure</div>
+      <div id="veto-label-ml" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">ML Filter</div>
+      <div id="veto-label-sr" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">Risk & Sent.</div>
+      <div id="veto-label-core" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-200 select-none">Consensus</div>
     </div>
   );
 }

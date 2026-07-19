@@ -82,9 +82,9 @@ def main():
         logger.info("Fetching data from NeonDB...")
         
         # Load market data
-        df_m15 = pd.read_sql("SELECT time, open, high, low, close, volume, ema200 FROM marketdata_xauusd_m15", conn)
-        df_h1 = pd.read_sql("SELECT time, open, high, low, close, volume, ema200 FROM marketdata_xauusd_h1", conn)
-        df_h4 = pd.read_sql("SELECT time, open, high, low, close, volume, ema200 FROM marketdata_xauusd_h4", conn)
+        df_m15 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_m15", conn)
+        df_h1 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_h1", conn)
+        df_h4 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_h4", conn)
         
         logger.info(f"Loaded market data: M15={len(df_m15)} rows, H1={len(df_h1)} rows, H4={len(df_h4)} rows.")
         
@@ -96,7 +96,7 @@ def main():
         }
 
         # Load backtest results (trade outcomes)
-        df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price, exit_price, profit, net_profit, session, entry_time, exit_time, timeframe, status, Magic_number as magic_number FROM backtest_results_xauusd", conn)
+        df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, Magic_number as magic_number FROM backtest_results_xauusd", conn)
         logger.info(f"Loaded {len(df_results)} trade outcome rows from backtest_results_xauusd.")
 
         # Optimize trade matching using trade lookup dictionaries grouped by (timeframe, type)
@@ -112,7 +112,7 @@ def main():
             trade_lookup[key].sort(key=lambda x: x["entry_time"])
 
         # Load llhhbosdata
-        df_struct = pd.read_sql("SELECT type, direction_action, price, time, timeframe, status FROM llhhbosdata_xauusd", conn)
+        df_struct = pd.read_sql("SELECT type, direction_action, price::float, time, timeframe, status FROM llhhbosdata_xauusd", conn)
         logger.info(f"Loaded {len(df_struct)} structure rows from llhhbosdata_xauusd.")
 
         # Optimize structure lookup for stage 3
@@ -158,6 +158,20 @@ def main():
             tf = str(row["timeframe"]).strip()
             price = float(row["price"])
             struct_time = row["time"] # pandas Timestamp object
+
+            # Resolve prior_choch
+            prior_choch = False
+            struct_candidates = struct_lookup.get(tf, [])
+            for prev_s in reversed(struct_candidates):
+                if prev_s["time"] >= struct_time:
+                    continue
+                prev_raw_type = str(prev_s["type"]).strip().lower()
+                if "choch" in prev_raw_type:
+                    prior_choch = True
+                    break
+                elif "bos" in prev_raw_type:
+                    prior_choch = False
+                    break
 
             # Resolve EMA200 using dictionary lookup
             ema200 = price
@@ -224,6 +238,7 @@ def main():
                 "ema_distance": price - ema200,
                 "session": session,
                 "hour": hour,
+                "prior_choch": prior_choch,
                 "outcome": outcome,
                 "profit_pips": profit_pips,
                 "duration_minutes": duration_minutes

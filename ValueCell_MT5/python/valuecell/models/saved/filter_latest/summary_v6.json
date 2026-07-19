@@ -1,0 +1,65 @@
+{
+  "model_type": "regression_v6_full_sample",
+  "version": "v6_full_20260719_005352",
+  "training_script": "train_ml_prediction_v6_unconstrained.py",
+  "n_samples_total": 1593,
+  "note": "Trained, threshold-tuned, and evaluated on the FULL 2020-2026(Jul) dataset -- no held-out split. Metrics are in-sample.",
+  "mfe_winner_name": "XGBoost_d3_n120_lr002_f10",
+  "mfe_features": [
+    "distance_to_last_ll_pips",
+    "h4_atr_14",
+    "h1_atr_14",
+    "h1_atr_14_pct",
+    "h1_ext_ema200_distance_atr",
+    "init_risk_pct",
+    "h4_atr_14_pct",
+    "last_bos_direction",
+    "atr_14",
+    "h4_ema200_distance_atr"
+  ],
+  "mfe_metrics": {
+    "train": {
+      "r2": 0.6811965672903472,
+      "mae": 1461.2150159358087,
+      "y_mean": 2372.7068424356553,
+      "y_pred_mean": 2354.1123046875,
+      "y_std": 4032.1129364728854
+    }
+  },
+  "mae_winner_name": "XGBoost_d3_n120_lr002_f10",
+  "mae_features": [
+    "h4_atr_14",
+    "init_risk_pct",
+    "atr_14",
+    "h1_atr_14",
+    "spread_to_atr_ratio",
+    "minutes_from_session_open",
+    "vol_ratio",
+    "h4_atr_14_pct",
+    "atr_14_pct",
+    "session_priority"
+  ],
+  "mae_metrics": {
+    "train": {
+      "r2": 0.4940578045975179,
+      "mae": 1185.6692341279474,
+      "y_mean": 2000.5768989328324,
+      "y_pred_mean": 1993.998779296875,
+      "y_std": 2475.0374679705296
+    }
+  },
+  "optimal_rr_threshold": 1.1,
+  "best_threshold_metrics": {
+    "split": "full_2020_2026",
+    "rr_threshold": 1.1,
+    "candidates": 1593,
+    "accepted": 775,
+    "accepted_rate": 0.48650345260514755,
+    "winrate": 0.6283870967741936,
+    "net_profit": 39132.79999999999,
+    "avg_net_profit": 50.493935483870956,
+    "profit_factor": 2.045353279016962,
+    "max_drawdown": -2111.699999999997,
+    "expectancy": 50.493935483870956
+  }
+}

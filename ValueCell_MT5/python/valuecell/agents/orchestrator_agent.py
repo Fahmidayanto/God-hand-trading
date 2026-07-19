@@ -368,11 +368,12 @@ class OrchestratorAgent:
             if "risk_management" in self.agents and consensus["approved"] and consensus["final_signal"] in ["BUY", "SELL"]:
                 logger.debug("💼 Step 5: Risk Management Calculation...")
                 
-                # Check if v5 regression results are available
+                # Check if dynamic MFE/MAE regression results are available (v5 or v8+)
                 ml_res = agent_results.get("ml_prediction")
-                is_v5 = ml_res and ml_res.get("model_type") in ("regression_v5", "regression_v5_unconstrained")
-                
-                if is_v5:
+                ml_model_type = ml_res.get("model_type") if ml_res else None
+                is_dynamic_regression = ml_model_type in ("regression_v5", "regression_v5_unconstrained") or (ml_model_type or "").startswith("regression_v8")
+
+                if is_dynamic_regression:
                     expected_rr = ml_res["expected_rr"]
                     predicted_mfe = ml_res["predicted_mfe"]
                     predicted_mae = ml_res["predicted_mae"]
@@ -445,20 +446,20 @@ class OrchestratorAgent:
                             "tp_price": round(tp_price, 2),
                             "rr_ratio": round(expected_rr, 2),
                             "reasoning": (
-                                f"v5 dynamic approval: {consensus['final_signal']} @ {consensus['final_confidence']:.1%} confidence. "
-                                f"ML regression_v5 predicted MAE={predicted_mae:.1f} / MFE={predicted_mfe:.1f} pips. "
+                                f"{ml_model_type} dynamic approval: {consensus['final_signal']} @ {consensus['final_confidence']:.1%} confidence. "
+                                f"ML {ml_model_type} predicted MAE={predicted_mae:.1f} / MFE={predicted_mfe:.1f} pips. "
                                 f"Lot {round(lot_size, 2)} (base {risk_result['lot_size']:.2f} × {mult}x multiplier from R:R {expected_rr:.2f}). "
                                 f"Risk {actual_risk_pct:.2f}% of balance. SL {round(sl_price, 2)} / TP {round(tp_price, 2)}."
                             ),
-                            "note": f"v5 dynamic parameters: Expected R:R={expected_rr:.2f} (mult: {mult}x)",
+                            "note": f"{ml_model_type} dynamic parameters: Expected R:R={expected_rr:.2f} (mult: {mult}x)",
                         }
                         
-                        logger.debug(f"   → v5 Approved: Lot {lot_size:.2f} (mult: {mult}x) | SL {sl_price:.2f} | TP {tp_price:.2f}")
+                        logger.debug(f"   → {ml_model_type} Approved: Lot {lot_size:.2f} (mult: {mult}x) | SL {sl_price:.2f} | TP {tp_price:.2f}")
                     else:
                         consensus["approved"] = False
                         consensus["risk_approved"] = False
                         consensus["final_signal"] = "HOLD"
-                        logger.debug(f"   → Rejected by risk management (v5)")
+                        logger.debug(f"   → Rejected by risk management ({ml_model_type})")
                 else:
                     # Standard v4 risk management behavior
                     risk_result = self.agents["risk_management"].analyze(
