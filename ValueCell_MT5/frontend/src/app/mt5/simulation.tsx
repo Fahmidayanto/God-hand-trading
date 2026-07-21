@@ -12,7 +12,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -641,7 +641,49 @@ export default function SimulationOfDead() {
   const [selectedAgent, setSelectedAgent] = useState<any>(null);
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false);
   const [selectedPattern, setSelectedPattern] = useState<any>(null);
+  const [patternCandles, setPatternCandles] = useState<any[]>([]);
+  const [patternStructures, setPatternStructures] = useState<any[]>([]);
+  const [patternCandlesLoading, setPatternCandlesLoading] = useState(false);
+  const [patternSort, setPatternSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "similarity", dir: "desc" });
+  const togglePatternSort = (key: string) => {
+    setPatternSort(prev => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
+  };
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+
+  // ── Fetch OHLC window + nearby BOS/CHoCH/HH/LL structures for the pattern-detail popup ──
+  useEffect(() => {
+    if (!selectedPattern) {
+      setPatternCandles([]);
+      setPatternStructures([]);
+      return;
+    }
+    let cancelled = false;
+    setPatternCandlesLoading(true);
+    const params = new URLSearchParams({
+      timestamp: selectedPattern.timestamp ?? "",
+      timeframe: selectedPattern.timeframe ?? "M15",
+    });
+
+    fetch(`${BASE_URL}/trading/pattern-candles?${params.toString()}`)
+      .then(res => (res.ok ? res.json() : Promise.reject(res.status)))
+      .then(data => {
+        if (cancelled) return;
+        setPatternCandles(data.candles ?? []);
+        setPatternStructures(data.structures ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPatternCandles([]);
+        setPatternStructures([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPatternCandlesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPattern]);
 
   // Session zones for replay chart
   const fromDateStr = `${yearFrom}-${String(monthFrom).padStart(2, "0")}-01`;
@@ -3651,25 +3693,54 @@ export default function SimulationOfDead() {
                   {/* Matching Patterns List */}
                   {selectedAgent.meta.patterns && selectedAgent.meta.patterns.length > 0 && (
                     <div className="pt-4 border-t border-slate-800/80 space-y-2">
-                      <div className="text-xs font-semibold text-slate-400">Semua Pola Historis Serupa (Diurutkan dari Terbaru):</div>
+                      <div className="text-xs font-semibold text-slate-400">Semua Pola Historis Serupa:</div>
                       <div className="border border-slate-800/80 rounded-lg overflow-hidden bg-slate-950/40 text-xs">
                         <div className="overflow-x-auto max-h-[580px]">
                           <table className="w-full text-left">
                             <thead className="bg-slate-900/40 border-b border-slate-800/80 text-slate-400 font-semibold sticky top-0 backdrop-blur">
                               <tr>
-                                <th className="py-2 px-3">Waktu (Timestamp)</th>
-                                <th className="py-2 px-3">Sesi</th>
-                                <th className="py-2 px-3 text-right">Hasil</th>
-                                <th className="py-2 px-3 text-right">Profit</th>
-                                <th className="py-2 px-3 text-right">Kemiripan</th>
+                                {[
+                                  { key: "timestamp", label: "Waktu (Timestamp)", align: "left" as const },
+                                  { key: "session", label: "Sesi", align: "left" as const },
+                                  { key: "outcome", label: "Hasil", align: "right" as const },
+                                  { key: "profit_pips", label: "Profit", align: "right" as const },
+                                  { key: "similarity", label: "Kemiripan", align: "right" as const },
+                                ].map(col => (
+                                  <th
+                                    key={col.key}
+                                    onClick={() => togglePatternSort(col.key)}
+                                    className={`py-2 px-3 cursor-pointer select-none hover:text-slate-200 transition-colors ${
+                                      col.align === "right" ? "text-right" : "text-left"
+                                    }`}
+                                  >
+                                    <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : ""}`}>
+                                      {col.label}
+                                      {patternSort.key === col.key ? (
+                                        patternSort.dir === "asc" ? (
+                                          <ArrowUp className="size-3 text-cyan-400" />
+                                        ) : (
+                                          <ArrowDown className="size-3 text-cyan-400" />
+                                        )
+                                      ) : (
+                                        <ArrowUpDown className="size-3 opacity-40" />
+                                      )}
+                                    </span>
+                                  </th>
+                                ))}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/40 text-slate-300">
                               {[...selectedAgent.meta.patterns]
                                 .sort((a: any, b: any) => {
-                                  const timeA = a.timestamp || "";
-                                  const timeB = b.timestamp || "";
-                                  return timeB.localeCompare(timeA);
+                                  const { key, dir } = patternSort;
+                                  const va = key === "timestamp" || key === "session" || key === "outcome"
+                                    ? (a[key] || "")
+                                    : (a[key] ?? 0);
+                                  const vb = key === "timestamp" || key === "session" || key === "outcome"
+                                    ? (b[key] || "")
+                                    : (b[key] ?? 0);
+                                  const cmp = typeof va === "string" ? va.localeCompare(vb) : va - vb;
+                                  return dir === "asc" ? cmp : -cmp;
                                 })
                                 .map((p: any, idx: number) => {
                                 const isWin = p.outcome?.toUpperCase() === "WIN";
@@ -3717,8 +3788,11 @@ export default function SimulationOfDead() {
                   className="fixed inset-0 z-[200] flex items-center justify-center"
                   onClick={() => setSelectedPattern(null)}
                 >
-                  <div
-                    className="relative bg-[#0a0f1c] border border-slate-700/60 rounded-2xl p-6 shadow-2xl w-80 space-y-4"
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
+                    className="relative bg-[#0a0f1c] border border-slate-700/60 rounded-2xl p-6 shadow-2xl w-[640px] max-w-[90vw] space-y-4"
                     onClick={e => e.stopPropagation()}
                   >
                     <button
@@ -3731,6 +3805,19 @@ export default function SimulationOfDead() {
                     <div className="text-[11px] font-mono text-slate-500">
                       {selectedPattern.timestamp ? selectedPattern.timestamp.replace("T", " ").substring(0, 19) : "-"}
                     </div>
+
+                    {patternCandlesLoading ? (
+                      <div className="w-full h-[320px] rounded-xl border border-slate-800/80 bg-slate-950/60 flex items-center justify-center text-[11px] text-slate-500 animate-pulse">
+                        Memuat candle historis...
+                      </div>
+                    ) : patternCandles.length > 0 ? (
+                      <PatternCandle3DVisualizer candles={patternCandles} structures={patternStructures} />
+                    ) : (
+                      <div className="w-full h-[320px] rounded-xl border border-dashed border-slate-800/80 bg-slate-950/40 flex items-center justify-center text-[11px] text-slate-500">
+                        Data candle tidak tersedia
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <div className="text-slate-500 mb-0.5">Entry Price</div>
@@ -3778,7 +3865,7 @@ export default function SimulationOfDead() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               )}
 
@@ -4436,6 +4523,500 @@ export function VetoConsensus3DVisualizer({ vetoMode }: VetoConsensus3DVisualize
       <div id="veto-label-ml" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">ML Filter</div>
       <div id="veto-label-sr" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">Risk & Sent.</div>
       <div id="veto-label-core" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-200 select-none">Consensus</div>
+    </div>
+  );
+}
+
+// ── 3D Pattern Candle Formation Visualizer (MSA "Detail Pola Historis" popup) ──
+interface PatternCandleData {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  ema200: number | null;
+}
+
+// Same UTC-hour session buckets used server-side (orchestrator_simulator._detect_session).
+function sessionAtHour(hour: number): string {
+  if (hour >= 0 && hour < 8) return "Tokyo";
+  if (hour >= 8 && hour < 12) return "London";
+  if (hour >= 12 && hour < 17) return "London_NY_Overlap";
+  if (hour >= 17 && hour < 21) return "NewYork";
+  return "Offmarket";
+}
+const SESSION_COLORS: Record<string, number> = {
+  Tokyo: 0x8b5cf6,
+  London: 0x14b8a6,
+  London_NY_Overlap: 0x2563eb,
+  NewYork: 0xca8a04,
+  Offmarket: 0x475569,
+};
+interface PatternStructureData {
+  type: string;
+  direction: string;
+  price: number | null;
+  time: number | null;
+}
+interface PatternCandle3DVisualizerProps {
+  candles: PatternCandleData[];
+  structures: PatternStructureData[];
+}
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+export function PatternCandle3DVisualizer({ candles, structures }: PatternCandle3DVisualizerProps) {
+  const mountRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const validStructures = structures.filter(s => s.price != null && s.time != null);
+
+  useEffect(() => {
+    const canvas = mountRef.current;
+    const parent = containerRef.current;
+    if (!canvas || !parent || candles.length === 0) return;
+
+    const scene = new THREE.Scene();
+    const fog = new THREE.FogExp2(0x020617, 0.06);
+    scene.fog = fog;
+    // Everything price-related (candles + break lines) lives under this group so
+    // dragging the price-axis handle can rescale it vertically in one place,
+    // like dragging the right price axis on the 2D chart.
+    const contentGroup = new THREE.Group();
+    scene.add(contentGroup);
+    let verticalZoom = 1;
+    // FogExp2 attenuates as (density * distance)^2, so a density tuned for a short
+    // camera distance turns opaque once the camera pulls back for more candles.
+    // Solve density from the camera's actual distance so the fog's visual weight
+    // (target ~15% blend toward fog color) stays constant regardless of candle count.
+    const FOG_TARGET_FACTOR = 0.15;
+    const fogK = Math.sqrt(-Math.log(1 - FOG_TARGET_FACTOR));
+
+    const camera = new THREE.PerspectiveCamera(38, parent.clientWidth / parent.clientHeight, 0.1, 50);
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(parent.clientWidth, parent.clientHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.15);
+    dirLight.position.set(3, 4, 5);
+    scene.add(dirLight);
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    fillLight.position.set(-4, -2, 4);
+    scene.add(fillLight);
+
+    // Price range: anchor on the candles' own high/low + EMA200 (the actual visible
+    // price action). A structure's break price (LL/HH/BoS/CHoCH) can reference a much
+    // older swing far outside this window; including it unconditionally used to blow
+    // up the whole vertical scale and squeeze every candle into a thin band in the
+    // middle of the frame. Nearby structures still expand the range so their line
+    // isn't clipped -- only outliers beyond a reasonable multiple of the candle span
+    // are left to render off toward the frame edge instead of dictating the zoom.
+    const candleLows = candles.map(c => c.low);
+    const candleHighs = candles.map(c => c.high);
+    candles.forEach(c => {
+      if (c.ema200 != null) {
+        candleLows.push(c.ema200);
+        candleHighs.push(c.ema200);
+      }
+    });
+    const candleMinLow = Math.min(...candleLows);
+    const candleMaxHigh = Math.max(...candleHighs);
+    const candleSpan = Math.max(candleMaxHigh - candleMinLow, 0.01);
+    const STRUCTURE_RANGE_EXPANSION = 0.6; // max extra range a structure price may add, as a multiple of candleSpan
+
+    let minLow = candleMinLow;
+    let maxHigh = candleMaxHigh;
+    validStructures.forEach(s => {
+      const p = s.price!;
+      if (p < minLow && minLow - p <= candleSpan * STRUCTURE_RANGE_EXPANSION) minLow = p;
+      if (p > maxHigh && p - maxHigh <= candleSpan * STRUCTURE_RANGE_EXPANSION) maxHigh = p;
+    });
+    const priceSpan = Math.max(maxHigh - minLow, 0.01);
+
+    // Layout
+    const spacingX = 0.5;
+    const totalWidth = spacingX * (candles.length - 1);
+    const startX = -totalWidth / 2;
+    // Break lines extend a bit past the last candle, so include that in the fit width.
+    const sceneWidth = totalWidth + spacingX * 1.2;
+
+    // Size the content's vertical extent to match the container's aspect ratio
+    // (instead of a fixed constant) so the perspective camera binds on both axes
+    // at once -- otherwise whichever axis doesn't need the full zoom-out is left
+    // with unused space around the candles, which is what created the blank
+    // margins in this popup.
+    const containerAspect = parent.clientWidth / parent.clientHeight;
+    // Only a floor, no ceiling: with up to ~70 candles, sceneWidth can be 30+ units,
+    // so matching a ~2:1 container legitimately needs a verticalScale around 15-18,
+    // not the old fixed 2.2. An earlier version of this fix capped verticalScale at
+    // 3.5, which silently defeated the aspect match for wide scenes -- that's why it
+    // didn't visibly change anything.
+    const verticalScale = Math.max(sceneWidth / Math.max(containerAspect, 0.1), 0.8);
+    const normalizeY = (price: number) => ((price - minLow) / priceSpan) * verticalScale - verticalScale / 2;
+
+    // Pull the camera back just far enough that every candle (and the break lines
+    // extending past the last one) stays inside the frustum, at any container size.
+    const fitCamera = () => {
+      const aspect = parent.clientWidth / parent.clientHeight;
+      const vFov = (camera.fov * Math.PI) / 180;
+      // verticalScale is already derived to match containerAspect, so this margin
+      // applies equally to both axes -- keep it tight so the chart reads as filling
+      // the popup, not floating in a padded box. Just enough to keep wicks and the
+      // break-line dashes off the literal edge.
+      const margin = 1.04;
+      const zForHeight = (verticalScale / 2) * margin / Math.tan(vFov / 2);
+      const zForWidth = (sceneWidth / 2) * margin / (Math.tan(vFov / 2) * aspect);
+      camera.position.z = Math.max(zForHeight, zForWidth, 3);
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+      fog.density = fogK / camera.position.z;
+    };
+    camera.position.set(0, 0.1, 6.4);
+    fitCamera();
+    const bodyWidth = spacingX * 0.58;
+    const wickWidth = spacingX * 0.1;
+    const depth = 0.32;
+
+    const bullColor = 0x10b981;
+    const bearColor = 0xf43769;
+
+    // Build one group per candle (body + wick), hidden initially (scale 0, opacity 0)
+    const candleGroups: THREE.Group[] = [];
+    const disposableGeometries: THREE.BufferGeometry[] = [];
+    const disposableMaterials: THREE.Material[] = [];
+
+    candles.forEach((c, i) => {
+      const isBull = c.close >= c.open;
+      const color = isBull ? bullColor : bearColor;
+      const x = startX + i * spacingX;
+
+      const group = new THREE.Group();
+      group.position.x = x;
+
+      const bodyTop = normalizeY(Math.max(c.open, c.close));
+      const bodyBottom = normalizeY(Math.min(c.open, c.close));
+      const bodyHeight = Math.max(bodyTop - bodyBottom, 0.02);
+
+      const bodyGeom = new THREE.BoxGeometry(bodyWidth, bodyHeight, depth);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color,
+        transparent: true,
+        opacity: 0,
+        metalness: 0.1,
+        roughness: 0.3,
+        emissive: color,
+        emissiveIntensity: 0.45,
+      });
+      const bodyMesh = new THREE.Mesh(bodyGeom, bodyMat);
+      bodyMesh.position.y = (bodyTop + bodyBottom) / 2;
+      group.add(bodyMesh);
+
+      const wickTop = normalizeY(c.high);
+      const wickBottom = normalizeY(c.low);
+      const wickGeom = new THREE.BoxGeometry(wickWidth, Math.max(wickTop - wickBottom, 0.01), wickWidth);
+      const wickMat = new THREE.MeshStandardMaterial({
+        color,
+        transparent: true,
+        opacity: 0,
+        metalness: 0.1,
+        roughness: 0.3,
+        emissive: color,
+        emissiveIntensity: 0.45,
+      });
+      const wickMesh = new THREE.Mesh(wickGeom, wickMat);
+      wickMesh.position.y = (wickTop + wickBottom) / 2;
+      group.add(wickMesh);
+
+      group.scale.setScalar(0.9);
+      contentGroup.add(group);
+      candleGroups.push(group);
+      disposableGeometries.push(bodyGeom, wickGeom);
+      disposableMaterials.push(bodyMat, wickMat);
+    });
+
+    // Session background bands, one per contiguous run of same-session candles.
+    // Kept on `scene` (not `contentGroup`) so they stay fixed to the time axis and
+    // don't stretch when the price-axis handle is dragged.
+    const sessionRuns: { session: string; startIdx: number; endIdx: number }[] = [];
+    candles.forEach((c, i) => {
+      const session = sessionAtHour(new Date(c.time * 1000).getUTCHours());
+      const last = sessionRuns[sessionRuns.length - 1];
+      if (last && last.session === session) {
+        last.endIdx = i;
+      } else {
+        sessionRuns.push({ session, startIdx: i, endIdx: i });
+      }
+    });
+    const zoneHeight = verticalScale * 3;
+    sessionRuns.forEach(run => {
+      const runStartX = startX + run.startIdx * spacingX - spacingX / 2;
+      const runEndX = startX + run.endIdx * spacingX + spacingX / 2;
+      const width = Math.max(runEndX - runStartX, 0.01);
+      const geom = new THREE.PlaneGeometry(width, zoneHeight);
+      const mat = new THREE.MeshBasicMaterial({
+        color: SESSION_COLORS[run.session] ?? 0x475569,
+        transparent: true,
+        opacity: 0.07,
+        fog: false,
+        depthWrite: false,
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.set(runStartX + width / 2, 0, -0.4);
+      scene.add(mesh);
+      disposableGeometries.push(geom);
+      disposableMaterials.push(mat);
+    });
+
+    // Dashed separator at every session boundary, same idea as the vertical session
+    // dividers on the 2D chart. Also kept on `scene` so it stays fixed to time.
+    for (let i = 1; i < sessionRuns.length; i++) {
+      const boundaryX = startX + sessionRuns[i].startIdx * spacingX - spacingX / 2;
+      const sepGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(boundaryX, -zoneHeight / 2, -0.35),
+        new THREE.Vector3(boundaryX, zoneHeight / 2, -0.35),
+      ]);
+      const sepMat = new THREE.LineDashedMaterial({
+        color: 0xe2e8f0,
+        transparent: true,
+        opacity: 0.18,
+        dashSize: 0.06,
+        gapSize: 0.05,
+        fog: false,
+      });
+      const sepLine = new THREE.Line(sepGeom, sepMat);
+      sepLine.computeLineDistances();
+      scene.add(sepLine);
+      disposableGeometries.push(sepGeom);
+      disposableMaterials.push(sepMat);
+    }
+
+    // EMA200 line, real data straight from the M15 table.
+    const emaPoints: THREE.Vector3[] = [];
+    candles.forEach((c, i) => {
+      if (c.ema200 != null) {
+        emaPoints.push(new THREE.Vector3(startX + i * spacingX, normalizeY(c.ema200), 0.02));
+      }
+    });
+    let emaMat: THREE.LineBasicMaterial | null = null;
+    if (emaPoints.length >= 2) {
+      const emaGeom = new THREE.BufferGeometry().setFromPoints(emaPoints);
+      emaMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0, fog: false });
+      const emaLine = new THREE.Line(emaGeom, emaMat);
+      contentGroup.add(emaLine);
+      disposableGeometries.push(emaGeom);
+      disposableMaterials.push(emaMat);
+    }
+
+    // Every BOS/CHoCH/HH/LL structure in range gets its own break line, drawn
+    // once the candle it belongs to has finished popping in. Kept short (~9
+    // candles) instead of spanning the whole window.
+    const structureLines = validStructures.map((s, idx) => {
+      // Candles are ascending by open time; the structure is confirmed by whichever
+      // candle's open time it falls on/after, i.e. the last candle whose open <= event time.
+      const structureIndex = candles.reduce((acc, c, i) => (c.time <= s.time! ? i : acc), 0);
+
+      const isBull = (s.direction || "").toLowerCase().includes("bull");
+      const lineColor = isBull ? 0x06b6d4 : 0xf43769;
+      const y = normalizeY(s.price!);
+      // Start the line at the close (right edge) of the confirming candle, not its center.
+      const lineStartX = startX + structureIndex * spacingX + bodyWidth / 2;
+
+      // Stop the line at whichever candle actually closes back through the level --
+      // that's what "breaks" the structure -- instead of always running a fixed
+      // length. If nothing breaks it within the window, fall back to a ~9-candle run.
+      let breakIndex = -1;
+      for (let j = structureIndex + 1; j < candles.length; j++) {
+        const closed = candles[j].close;
+        if (isBull ? closed > s.price! : closed < s.price!) {
+          breakIndex = j;
+          break;
+        }
+      }
+      const fallbackEndX = Math.min(lineStartX + spacingX * 9, startX + totalWidth + spacingX * 0.6);
+      const lineEndX = breakIndex >= 0 ? startX + breakIndex * spacingX + bodyWidth / 2 : fallbackEndX;
+
+      const geom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(lineStartX, y, 0),
+        new THREE.Vector3(lineEndX, y, 0),
+      ]);
+      const mat = new THREE.LineDashedMaterial({
+        color: lineColor,
+        dashSize: 0.08,
+        gapSize: 0.06,
+        transparent: true,
+        opacity: 0,
+      });
+      const line = new THREE.Line(geom, mat);
+      line.computeLineDistances();
+      contentGroup.add(line);
+
+      return { line, geom, mat, structureIndex, lineStartX, y, labelId: `pattern-structure-label-${idx}`, isBull, type: s.type, price: s.price! };
+    });
+
+    let containerWidth = parent.clientWidth;
+    let containerHeight = parent.clientHeight;
+    const clock = new THREE.Clock();
+    let reqId: number;
+
+    const updateStructureLabel = (sl: typeof structureLines[number], visible: boolean) => {
+      const el = document.getElementById(sl.labelId);
+      if (!el) return;
+      if (!visible) {
+        el.style.opacity = "0";
+        return;
+      }
+      el.textContent = `${sl.type} ${sl.price.toFixed(2)}`;
+
+      const tempV = new THREE.Vector3(sl.lineStartX, sl.y * verticalZoom, 0);
+      tempV.project(camera);
+      const rawX = (tempV.x * 0.5 + 0.5) * containerWidth;
+      const rawY = (-(tempV.y * 0.5) + 0.5) * containerHeight;
+
+      // Keep the label fully inside the popup instead of letting it clip at the edge.
+      const halfLabelWidth = (el.offsetWidth || 60) / 2;
+      const x = Math.min(Math.max(rawX, halfLabelWidth + 4), containerWidth - halfLabelWidth - 4);
+
+      // Put the label on whichever side of the line has open space: below a swing
+      // low (the candles cluster above it), above a swing high (they cluster below
+      // it) -- the fixed "always above" offset used to land right on top of the
+      // candle bodies for lows. Then clamp inside the popup: a point pinned to the
+      // very top/bottom edge of the price range would otherwise push its label
+      // past the container and get clipped to invisible instead of just close.
+      const gap = 8;
+      const labelHeight = el.offsetHeight || 18;
+      const placeBelow = sl.y < 0;
+      const rawLabelY = placeBelow ? rawY + gap : rawY - labelHeight - gap;
+      const y = Math.min(Math.max(rawLabelY, 4), containerHeight - labelHeight - 4);
+
+      el.style.transform = `translate(-50%, 0) translate(${x}px, ${y}px)`;
+      el.style.opacity = "1";
+    };
+
+    const STAGGER = 0.09;
+    const DURATION = 0.22;
+
+    const animate = () => {
+      reqId = requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+
+      candleGroups.forEach((group, i) => {
+        const localStart = i * STAGGER;
+        const t = Math.min(Math.max((elapsed - localStart) / DURATION, 0), 1);
+        const eased = easeOutCubic(t);
+        group.scale.setScalar(0.9 + 0.1 * eased);
+        group.children.forEach(child => {
+          const mesh = child as THREE.Mesh;
+          (mesh.material as THREE.MeshStandardMaterial).opacity = eased;
+        });
+      });
+
+      structureLines.forEach(sl => {
+        const revealT = Math.min(
+          Math.max((elapsed - (sl.structureIndex * STAGGER + DURATION)) / DURATION, 0),
+          1
+        );
+        sl.mat.opacity = revealT * 0.9;
+        updateStructureLabel(sl, revealT > 0.05);
+      });
+
+      if (emaMat) {
+        emaMat.opacity = Math.min(elapsed / 0.6, 1) * 0.85;
+      }
+
+      camera.position.x = Math.sin(elapsed * 0.2) * 0.2;
+      camera.lookAt(0, 0, 0);
+
+      renderer.render(scene, camera);
+    };
+
+    animate();
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        containerWidth = parent.clientWidth || entry.contentRect.width;
+        containerHeight = parent.clientHeight || entry.contentRect.height;
+        fitCamera();
+        renderer.setSize(containerWidth, containerHeight);
+      }
+    });
+    resizeObserver.observe(parent);
+
+    // Drag the right-edge price-axis handle up/down to stretch or squash the
+    // vertical scale, same interaction as dragging the price axis on the 2D chart.
+    const axisHandle = document.getElementById("pattern-axis-handle");
+    let isDraggingAxis = false;
+    let dragStartY = 0;
+    let dragStartZoom = 1;
+    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+
+    const onAxisPointerDown = (e: PointerEvent) => {
+      isDraggingAxis = true;
+      dragStartY = e.clientY;
+      dragStartZoom = verticalZoom;
+      if (axisHandle) axisHandle.style.background = "rgba(6, 182, 212, 0.12)";
+      e.preventDefault();
+    };
+    const onAxisPointerMove = (e: PointerEvent) => {
+      if (!isDraggingAxis) return;
+      const deltaY = e.clientY - dragStartY;
+      verticalZoom = clamp(dragStartZoom * Math.pow(2, deltaY / 120), 0.4, 3);
+      contentGroup.scale.y = verticalZoom;
+    };
+    const onAxisPointerUp = () => {
+      isDraggingAxis = false;
+      if (axisHandle) axisHandle.style.background = "transparent";
+    };
+    axisHandle?.addEventListener("pointerdown", onAxisPointerDown);
+    window.addEventListener("pointermove", onAxisPointerMove);
+    window.addEventListener("pointerup", onAxisPointerUp);
+
+    return () => {
+      cancelAnimationFrame(reqId);
+      resizeObserver.disconnect();
+      renderer.dispose();
+      disposableGeometries.forEach(g => g.dispose());
+      disposableMaterials.forEach(m => m.dispose());
+      structureLines.forEach(sl => {
+        sl.geom.dispose();
+        sl.mat.dispose();
+        const el = document.getElementById(sl.labelId);
+        if (el) el.style.opacity = "0";
+      });
+      axisHandle?.removeEventListener("pointerdown", onAxisPointerDown);
+      window.removeEventListener("pointermove", onAxisPointerMove);
+      window.removeEventListener("pointerup", onAxisPointerUp);
+    };
+  }, [candles, structures]);
+
+  if (candles.length === 0) return null;
+
+  return (
+    <div ref={containerRef} className="w-full h-[320px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80">
+      <canvas ref={mountRef} className="w-full h-full block" />
+      <div
+        id="pattern-axis-handle"
+        title="Drag untuk mengubah skala harga"
+        className="absolute right-0 top-0 h-full w-6 cursor-ns-resize transition-colors duration-150"
+        style={{ touchAction: "none" }}
+      />
+      {validStructures.map((s, idx) => {
+        const isBull = (s.direction || "").toLowerCase().includes("bull");
+        return (
+          <div
+            key={idx}
+            id={`pattern-structure-label-${idx}`}
+            className={`absolute left-0 top-0 text-[9px] font-mono font-bold tracking-wide pointer-events-none select-none transition-opacity duration-200 rounded px-1.5 py-0.5 border bg-slate-950/90 whitespace-nowrap ${
+              isBull ? "text-cyan-400 border-cyan-500/40" : "text-rose-400 border-rose-500/40"
+            }`}
+            style={{ opacity: 0 }}
+          />
+        );
+      })}
     </div>
   );
 }

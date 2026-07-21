@@ -168,9 +168,9 @@ class MLPredictionAgent:
         atr_14 = numeric_or_default(base_features.get("atr_14"), 7.5)
         if atr_14 <= 0:
             atr_14 = 7.5
-            
+
         atr_14_pct = (atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
-        
+
         # Spread calculation
         spread = numeric_or_default(market_data.get("spread"), 0.15) # in price units, default 15 points
         if m15_history is not None and not m15_history.empty and "spread" in m15_history.columns:
@@ -199,29 +199,41 @@ class MLPredictionAgent:
             close_10 = float(m15_history.iloc[-11].get("close", entry_price))
             momentum_10_atr = (entry_price - close_10) / atr_14
             
-        # H1 and H4 context
+        # H1 and H4 context -- ATR-14 history is capped to "since Jan 1 of the
+        # entry's own year" to match the offline training dataset, which is built
+        # from per-year CSV files and so never has prior-year bars to draw on for
+        # early-January entries (see train_ml_prediction_v5_unconstrained.py's
+        # per-year file loop). Below ~15 bars into the year this yields the same
+        # 0.0 the training data has; once >=15 bars have accumulated, the ATR-14
+        # window is entirely within the current year anyway, so this cap is a
+        # no-op and matches an uncapped calculation exactly.
+        entry_time = market_data.get("current_bar", {}).get("time")
+        year_start = pd.Timestamp(entry_time).replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0) if entry_time is not None else None
+
         h1_atr_14 = 0.0
         if h1_history is not None and not h1_history.empty:
-            high = h1_history["high"].astype(float).to_numpy()
-            low = h1_history["low"].astype(float).to_numpy()
-            close = h1_history["close"].astype(float).to_numpy()
+            h1_hist_capped = h1_history[h1_history["time"] >= year_start] if year_start is not None and "time" in h1_history.columns else h1_history
+            high = h1_hist_capped["high"].astype(float).to_numpy()
+            low = h1_hist_capped["low"].astype(float).to_numpy()
+            close = h1_hist_capped["close"].astype(float).to_numpy()
             if len(close) >= 15:
                 tr = np.maximum.reduce([high[1:] - low[1:], abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])])
                 h1_atr_14 = float(tr[-14:].mean())
-                
+
         h1_atr_14_pct = (h1_atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
-        
+
         h4_atr_14 = 0.0
         if h4_history is not None and not h4_history.empty:
-            high = h4_history["high"].astype(float).to_numpy()
-            low = h4_history["low"].astype(float).to_numpy()
-            close = h4_history["close"].astype(float).to_numpy()
+            h4_hist_capped = h4_history[h4_history["time"] >= year_start] if year_start is not None and "time" in h4_history.columns else h4_history
+            high = h4_hist_capped["high"].astype(float).to_numpy()
+            low = h4_hist_capped["low"].astype(float).to_numpy()
+            close = h4_hist_capped["close"].astype(float).to_numpy()
             if len(close) >= 15:
                 tr = np.maximum.reduce([high[1:] - low[1:], abs(high[1:] - close[:-1]), abs(low[1:] - close[:-1])])
                 h4_atr_14 = float(tr[-14:].mean())
-                
+
         h4_atr_14_pct = (h4_atr_14 / entry_price) * 100.0 if entry_price > 0 else 0.0
-        
+
         # H4 and H1 EMA distances
         h4_ema200_distance_atr = 0.0
         h4_ema200_distance_pct = 0.0
@@ -339,12 +351,11 @@ class MLPredictionAgent:
             distance_to_session_high_atr = (session_high - entry_price) / atr_14 if atr_14 > 0 else 0.0
             distance_to_session_low_atr = (entry_price - session_low) / atr_14 if atr_14 > 0 else 0.0
             
-            # DST Check
-            session_is_dst_NO = 1.0 # default to NO (standard time, winter)
-            # Check standard DST offset
-            import time as pytime
-            if pytime.localtime().tm_isdst > 0:
-                session_is_dst_NO = 0.0
+            # DST Check -- must be based on the event's own historical date
+            # (current_time), not the server's real-world clock. Approximates
+            # Northern Hemisphere DST (~April-October) to match the IsDST field
+            # recorded in the historical SessionZone_XAUUSD_*.csv data.
+            session_is_dst_NO = 0.0 if 4 <= current_time.month <= 10 else 1.0
             
         # Swing distance features (structural SL/TP context)
         structure_events = market_data.get("structure_events", [])
@@ -378,6 +389,7 @@ class MLPredictionAgent:
             **base_features,
             "h4_ema200_distance_pct": h4_ema200_distance_pct,
             "spread_to_atr_ratio": spread_to_atr_ratio,
+            "spread": spread,
             "body_ratio_ea": body_ratio_ea,
             "distance_to_session_high_atr": distance_to_session_high_atr,
             "h4_atr_14": h4_atr_14,

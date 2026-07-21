@@ -1,0 +1,12 @@
+{
+  "name": "diagram-arsitektur",
+  "version": "1.0.0",
+  "description": "Auto-reloading dev server for architecture diagram",
+  "main": "diagram_arsitektur.html",
+  "scripts": {
+    "dev": "live-server --entry-file=diagram_arsitektur.html"
+  },
+  "dependencies": {
+    "live-server": "^1.2.2"
+  }
+}

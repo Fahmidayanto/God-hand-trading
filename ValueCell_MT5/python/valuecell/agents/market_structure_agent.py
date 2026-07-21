@@ -65,6 +65,7 @@ class MarketStructureAgent:
         self._pending_ll_price: Optional[float] = None
         self._pending_analysis: Optional[Dict] = None
         self._pending_pre_signal: Optional[Dict] = None
+        self._last_bos_direction: Optional[str] = None
 
         logger.info(
             f"[OK] {self.name} v{self.version} initialized | "
@@ -358,9 +359,11 @@ class MarketStructureAgent:
                     is_new_setup=True,
                 )
 
-            # 3. TRIGGER - Bullish BoS (CHoCH -> HH -> BoS)
+            # 3. TRIGGER - Bullish BoS (CHoCH -> HH -> BoS), atau BoS lanjutan
+            # (cycle 2, 3+) di swing bullish yang sama tanpa CHoCH baru.
             elif "BOS" in t1 and ("BULL" in d1 or "UP" in d1) and (
-                self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bullish"
+                (self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bullish")
+                or (self._phase == AgentPhase.BOS_TRIGGERED and self._last_bos_direction == "Bullish")
             ):
                 signal_result = self._on_bos_confirmed(
                     direction="Bullish",
@@ -385,9 +388,11 @@ class MarketStructureAgent:
                     symbol=symbol,
                 )
 
-            # 4. TRIGGER - Bearish BoS (CHoCH -> LL -> BoS)
+            # 4. TRIGGER - Bearish BoS (CHoCH -> LL -> BoS), atau BoS lanjutan
+            # (cycle 2, 3+) di swing bearish yang sama tanpa CHoCH baru.
             elif "BOS" in t1 and "BEAR" in d1 and (
-                self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bearish"
+                (self._phase == AgentPhase.PENDING_SETUP and self._pending_pre_signal and self._pending_pre_signal.get("direction") == "Bearish")
+                or (self._phase == AgentPhase.BOS_TRIGGERED and self._last_bos_direction == "Bearish")
             ):
                 signal_result = self._on_bos_confirmed(
                     direction="Bearish",
@@ -440,6 +445,7 @@ class MarketStructureAgent:
         self._pending_ll_price = None
         self._pending_analysis = None
         self._pending_pre_signal = None
+        self._last_bos_direction = None
         logger.info(f"[RESET] {self.name} state reset -> IDLE")
 
     def get_pending_setup(self) -> Optional[Dict]:
@@ -682,6 +688,7 @@ class MarketStructureAgent:
 
         # Ubah phase
         self._phase = AgentPhase.BOS_TRIGGERED
+        self._last_bos_direction = direction
 
         logger.info(f"[OK] Tahap 2 Selesai | Sinyal Final: {signal} | Confidence: {confidence:.2f}")
 

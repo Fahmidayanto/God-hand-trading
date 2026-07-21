@@ -47,7 +47,7 @@ from train_ml_prediction_v5_unconstrained import (  # noqa: E402
     select_and_fit_regressor,
 )
 
-TEST_YEARS = [2022, 2023, 2024, 2025, 2026]
+TEST_YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
 ATR_FLOOR = 0.5
 
 

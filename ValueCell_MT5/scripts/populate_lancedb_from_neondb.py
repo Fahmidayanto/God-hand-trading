@@ -46,6 +46,58 @@ def get_neon_conn():
         logger.error(f"[ERROR] Failed to connect to Neon DB: {e}")
         raise
 
+def fetch_table_chunked(table: str, columns: str, time_col: str = "time", chunk_days: int = 90, max_retries: int = 3) -> pd.DataFrame:
+    """
+    Fetch a time-series table in date-range chunks, each over its own fresh
+    connection, instead of one query over one long-lived connection.
+
+    In practice, a single ~12-minute query for 224k M15 rows left the connection
+    stale enough that the very next query on it failed with "SSL connection has
+    been closed unexpectedly", and the whole migration silently produced empty
+    LanceDB collections. Keeping every round-trip short and reconnecting between
+    chunks avoids that failure mode.
+    """
+    conn = get_neon_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT MIN({time_col}), MAX({time_col}) FROM {table}")
+            min_time, max_time = cur.fetchone()
+    finally:
+        conn.close()
+
+    if min_time is None:
+        return pd.DataFrame()
+
+    chunks = []
+    step = timedelta(days=chunk_days)
+    chunk_start = min_time
+    while chunk_start <= max_time:
+        chunk_end = min(chunk_start + step, max_time + timedelta(seconds=1))
+        last_err = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                chunk_conn = get_neon_conn()
+                try:
+                    df_chunk = pd.read_sql(
+                        f"SELECT {columns} FROM {table} WHERE {time_col} >= %(start)s AND {time_col} < %(end)s",
+                        chunk_conn,
+                        params={"start": chunk_start, "end": chunk_end},
+                    )
+                finally:
+                    chunk_conn.close()
+                chunks.append(df_chunk)
+                logger.info(f"  {table}: {chunk_start} .. {chunk_end} -> {len(df_chunk)} rows")
+                last_err = None
+                break
+            except Exception as e:
+                last_err = e
+                logger.warning(f"  {table}: chunk {chunk_start}..{chunk_end} attempt {attempt}/{max_retries} failed: {e}")
+        if last_err is not None:
+            raise last_err
+        chunk_start = chunk_end
+
+    return pd.concat(chunks, ignore_index=True) if chunks else pd.DataFrame()
+
 def normalize_session(raw_session: str) -> str:
     """Normalize session string to match LanceDB expectations."""
     if not isinstance(raw_session, str):
@@ -74,20 +126,19 @@ def main():
     db.clear_collection("session_patterns")
     db.clear_collection("trade_outcomes")
 
-    # 3. Connect to NeonDB
-    conn = get_neon_conn()
-    
     try:
         # Load NeonDB tables into DataFrames for fast O(1) in-memory joining
         logger.info("Fetching data from NeonDB...")
-        
-        # Load market data
-        df_m15 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_m15", conn)
-        df_h1 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_h1", conn)
-        df_h4 = pd.read_sql("SELECT time, open::float, high::float, low::float, close::float, volume, ema200::float FROM marketdata_xauusd_h4", conn)
-        
+
+        # Load market data in date-range chunks over fresh connections each (see
+        # fetch_table_chunked docstring for why -- these are the largest tables).
+        MARKET_COLS = "time, open::float, high::float, low::float, close::float, volume, ema200::float"
+        df_m15 = fetch_table_chunked("marketdata_xauusd_m15", MARKET_COLS)
+        df_h1 = fetch_table_chunked("marketdata_xauusd_h1", MARKET_COLS)
+        df_h4 = fetch_table_chunked("marketdata_xauusd_h4", MARKET_COLS)
+
         logger.info(f"Loaded market data: M15={len(df_m15)} rows, H1={len(df_h1)} rows, H4={len(df_h4)} rows.")
-        
+
         # Optimize O(1) timeframe lookup using python dicts
         market_data_dict = {
             "M15": df_m15.set_index("time")["ema200"].to_dict(),
@@ -95,9 +146,26 @@ def main():
             "H4": df_h4.set_index("time")["ema200"].to_dict()
         }
 
-        # Load backtest results (trade outcomes)
-        df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, Magic_number as magic_number FROM backtest_results_xauusd", conn)
+        # Load backtest results (trade outcomes) -- small table, one query is fine,
+        # but still on its own fresh connection rather than one reused for everything.
+        conn = get_neon_conn()
+        try:
+            df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, Magic_number as magic_number FROM backtest_results_xauusd", conn)
+        finally:
+            conn.close()
         logger.info(f"Loaded {len(df_results)} trade outcome rows from backtest_results_xauusd.")
+
+        # REJECTED rows are signals the pre-trade filter blocked before execution -- no
+        # ticket, exit_price=0 and exit_time=NULL as placeholders. historical_structures
+        # (Stage 1) still needs to see these to know "a signal formed here but was
+        # filtered out", so trade_lookup is built from the full, unfiltered df_results;
+        # the REJECTED case is handled explicitly where trade_match is turned into an
+        # outcome below. trade_outcomes (Stage 3) only records real, executed trades,
+        # so it uses the executed-only slice defined here.
+        df_results_executed = df_results[
+            (df_results["status"] != "REJECTED") & df_results["exit_time"].notna()
+        ].reset_index(drop=True)
+        logger.info(f"{len(df_results_executed)} of those rows are actually executed trades.")
 
         # Optimize trade matching using trade lookup dictionaries grouped by (timeframe, type)
         trade_lookup = {}
@@ -111,8 +179,12 @@ def main():
         for key in trade_lookup:
             trade_lookup[key].sort(key=lambda x: x["entry_time"])
 
-        # Load llhhbosdata
-        df_struct = pd.read_sql("SELECT type, direction_action, price::float, time, timeframe, status FROM llhhbosdata_xauusd", conn)
+        # Load llhhbosdata -- also small, own fresh connection.
+        conn = get_neon_conn()
+        try:
+            df_struct = pd.read_sql("SELECT type, direction_action, price::float, time, timeframe, status FROM llhhbosdata_xauusd", conn)
+        finally:
+            conn.close()
         logger.info(f"Loaded {len(df_struct)} structure rows from llhhbosdata_xauusd.")
 
         # Optimize structure lookup for stage 3
@@ -197,20 +269,28 @@ def main():
             profit_pips = 0.0
             duration_minutes = 0
             session = "London"
-            
-            if trade_match is not None:
+
+            if trade_match is not None and str(trade_match.get("status")) == "REJECTED":
+                # A trade was attempted here but the pre-trade quality filter blocked
+                # it -- worth keeping as its own outcome (distinct from "no signal at
+                # all"), but there's no real entry/exit to derive pips or duration from.
+                outcome = "REJECTED"
+                profit_pips = 0.0
+                duration_minutes = 0
+                session = normalize_session(trade_match.get("session"))
+            elif trade_match is not None:
                 net_profit = float(trade_match.get("net_profit", 0))
                 outcome = "WIN" if net_profit > 0 else "LOSS"
-                
+
                 entry_pr = float(trade_match.get("entry_price", 0))
                 exit_pr = float(trade_match.get("exit_price", 0))
-                
+
                 if str(trade_match.get("type")) == "BUY":
                     pips = (exit_pr - entry_pr) * 10.0
                 else:
                     pips = (entry_pr - exit_pr) * 10.0
                 profit_pips = round(pips, 2)
-                
+
                 try:
                     duration_minutes = int((trade_match["exit_time"] - trade_match["entry_time"]).total_seconds() / 60)
                 except:
@@ -309,7 +389,7 @@ def main():
         # -------------------------------------------------------------
         logger.info("Processing trade_outcomes...")
         trades_to_add = []
-        for _, row in df_results.iterrows():
+        for _, row in df_results_executed.iterrows():
             t_entry = row["entry_time"]
             t_exit = row["exit_time"]
             
@@ -449,9 +529,12 @@ def main():
 
     except Exception as e:
         logger.error(f"[ERROR] Error during migration process: {e}", exc_info=True)
-    finally:
-        conn.close()
-        logger.info("NeonDB Connection closed.")
+        logger.error("=" * 60)
+        logger.error("MIGRATION PROCESS FAILED -- LanceDB collections were cleared but")
+        logger.error("NOT fully repopulated. Do not treat this run as successful.")
+        logger.error("=" * 60)
+        raise
+    else:
         logger.info("=" * 60)
         logger.info("MIGRATION PROCESS COMPLETE")
         logger.info("=" * 60)

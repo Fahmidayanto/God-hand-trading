@@ -29,8 +29,9 @@ class VoteWeight(Enum):
     """Agent voting weights"""
     MARKET_STRUCTURE = 0.25  # 25%
     ML_PREDICTION = 0.40     # 40% (highest - ML model is most accurate)
-    RISK_MANAGEMENT = 0.15   # 15%
     SENTIMENT = 0.20         # 20%
+    # Risk management is not a vote weight: it's a post-approval gate that runs
+    # after consensus is decided (sizes the trade or rejects it), see Step 5 in analyze().
 
 
 class ConsensusLevel(Enum):
@@ -318,6 +319,7 @@ class OrchestratorAgent:
                                 "h4_data": market_data.get("h4_data"),
                                 "m15_history": market_data.get("m15_history"),
                                 "session": market_data.get("session", "Other"),
+                                "session_zone": market_data.get("session_zone"),
                                 **{k: v for k, v in {
                                     "spread": market_data.get("spread"),
                                     "init_risk_points": market_data.get("init_risk_points"),
@@ -588,7 +590,8 @@ class OrchestratorAgent:
         
         apply_veto = False
         is_veto_bypassed = False
-        
+        reasoning_parts = []
+
         if ms_signal == "HOLD":
             apply_veto = True
         elif veto_mode == "soft" and ms_confidence < 0.60:
@@ -633,8 +636,7 @@ class OrchestratorAgent:
             (consensus_pct >= self.consensus_threshold or is_veto_bypassed)
         )
         
-        # Build reasoning
-        reasoning_parts = []
+        # Build reasoning (reasoning_parts initialized earlier, before veto handling)
         reasoning_parts.append(f"Consensus: {consensus_level.value} ({consensus_pct:.0%}).")
         reasoning_parts.append(f"Vote scores: BUY={vote_scores['BUY']:.2f}, SELL={vote_scores['SELL']:.2f}, HOLD={vote_scores['HOLD']:.2f}.")
         
@@ -709,9 +711,9 @@ class OrchestratorAgent:
             "voting_weights": {
                 "market_structure": VoteWeight.MARKET_STRUCTURE.value,
                 "ml_prediction": VoteWeight.ML_PREDICTION.value,
-                "risk_management": VoteWeight.RISK_MANAGEMENT.value,
                 "sentiment": VoteWeight.SENTIMENT.value,
             },
+            "risk_management_role": "post-approval gate (sizes/vetoes the trade after consensus, not part of the weighted vote)",
             "consensus_levels": [level.value for level in ConsensusLevel],
             "consensus_threshold": self.consensus_threshold,
             "workflow": [

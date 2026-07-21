@@ -1273,6 +1273,141 @@ async def get_replay_data(
         )
 
 
+@router.get("/pattern-candles")
+async def get_pattern_candles(
+    timestamp: str = Query(..., description="Pattern timestamp (ISO format)"),
+    timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
+):
+    """
+    Fetch a small OHLC window around a historical pattern's timestamp, plus every
+    BOS/CHoCH/HH/LL structure event that falls inside that window, for the MSA
+    pattern-detail popup's candle-formation visualization.
+    """
+    from datetime import datetime, timedelta, timezone
+    from app.core.database import get_db_conn, is_pool_ready
+
+    def _ts(dt) -> int:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+
+    if not is_pool_ready():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    try:
+        pattern_time = datetime.fromisoformat(timestamp)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid timestamp: {timestamp}")
+
+    table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
+    candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    (SELECT time, open, high, low, close, ema200
+                     FROM {candle_table}
+                     WHERE time <= %s
+                     ORDER BY time DESC
+                     LIMIT 50)
+                    UNION ALL
+                    (SELECT time, open, high, low, close, ema200
+                     FROM {candle_table}
+                     WHERE time > %s
+                     ORDER BY time ASC
+                     LIMIT 20)
+                    ORDER BY time ASC
+                    """,
+                    (pattern_time, pattern_time),
+                )
+                candle_rows = cur.fetchall()
+
+                structure_rows = []
+                earliest_time_by_price = {}
+                if candle_rows:
+                    window_start, window_end = candle_rows[0][0], candle_rows[-1][0]
+                    # Look a bit further back than the rendered candles so a structure
+                    # point that lands just outside the window (e.g. by one candle)
+                    # is still caught.
+                    cur.execute(
+                        """
+                        SELECT type, direction_action, price, time, status
+                        FROM llhhbosdata_xauusd
+                        WHERE timeframe = %s
+                          AND time BETWEEN %s AND %s
+                        ORDER BY time ASC
+                        """,
+                        (timeframe.upper(), window_start - timedelta(hours=2), window_end),
+                    )
+                    raw_rows = cur.fetchall()
+
+                    # A raw HH/LL swing point is logged when price first reaches it, then
+                    # re-logged later as a BoS/CHoCH once confirmed as a break -- same
+                    # price, same underlying swing point, two rows. Keep only the
+                    # confirmed row (so it isn't shown twice), but anchor its displayed
+                    # time to when that swing point actually formed, not the later
+                    # confirmation time -- otherwise the break line starts at the wrong
+                    # candle. The gap between formation and confirmation isn't bounded
+                    # (can be hours or several days), so look it up directly by price
+                    # across the whole table instead of relying on the window buffer.
+                    confirmed_prices = [
+                        float(r[2]) for r in raw_rows if r[4] == "Confirmed" and r[2] is not None
+                    ]
+                    if confirmed_prices:
+                        cur.execute(
+                            """
+                            SELECT price, MIN(time)
+                            FROM llhhbosdata_xauusd
+                            WHERE timeframe = %s AND price = ANY(%s)
+                            GROUP BY price
+                            """,
+                            (timeframe.upper(), confirmed_prices),
+                        )
+                        earliest_time_by_price = {float(p): t for p, t in cur.fetchall()}
+
+                    structure_rows = [
+                        r for r in raw_rows
+                        if r[4] == "Confirmed" or r[2] is None or float(r[2]) not in confirmed_prices
+                    ]
+
+        candles = [
+            {
+                "time": _ts(r[0]),
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+                "ema200": float(r[5]) if r[5] is not None else None,
+            }
+            for r in candle_rows
+        ]
+
+        structures = [
+            {
+                "type": r[0].strip() if r[0] else "",
+                "direction": r[1].strip() if r[1] else "",
+                "price": float(r[2]) if r[2] is not None else None,
+                "time": _ts(earliest_time_by_price.get(float(r[2]), r[3])) if r[2] is not None else _ts(r[3]),
+            }
+            for r in structure_rows
+        ]
+
+        return {"candles": candles, "structures": structures}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Pattern candles fetch error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
 @router.get("/simulate")
 async def get_simulation_data(
     year_from: int = Query(..., description="Start year"),

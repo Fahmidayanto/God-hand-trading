@@ -2137,6 +2137,8 @@ input int MaxHoldHours_M15 = 24; // Maximum hold time, force close after this (h
 // --- Trailing Stop Parameters M15 ---
 input bool EnableTrailingStop_M15   = true;  // Aktifkan Trailing Stop M15
 input bool EnableTrailingLogs_M15   = false; // Aktifkan log verbose Trailing Stop M15 (per tick)
+input bool EnableModifyLogs_M15     = false; // Aktifkan log modifikasi posisi M15 (BAR DYNAMIC MODIFY)
+input bool EnableSystemTradeLogs_M15 = false; // Aktifkan log sistem transaksi CTrade (position modified, dkk)
 
 //+------------------------------------------------------------------+
 //| H4 EMA FILTER - Input Parameters                                 |
@@ -3671,6 +3673,17 @@ int OnInit()
     ChartIndicatorAdd(0, 0, handleEMA_H4);
 
     trade.SetExpertMagicNumber(MagicNumber_M15);
+    
+    // Set level log objek CTrade berdasarkan input parameter
+    if(!EnableSystemTradeLogs_M15)
+    {
+        trade.LogLevel(LOG_LEVEL_NO);
+    }
+    else
+    {
+        trade.LogLevel(LOG_LEVEL_ALL);
+    }
+
     Print("✅ EMA200 handle berhasil dibuat untuk M15 & H1");
 
     // ✅ SYNC BACKTEST CSV: Copy backtest history ke MQL5 sandbox SEBELUM load
@@ -4688,12 +4701,18 @@ void ApplyTrailingStop_M15()
                 if(trade.PositionModify(ticket, targetSL, targetTP))
                 {
                     UpdateTrailingSummaryByTicket_M15(ticket, sl, tp, targetSL, targetTP, currentBid, currentAsk);
-                    PrintFormat("🚀 [BAR DYNAMIC MODIFY BUY M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
-                                ticket, targetSL, minSL, targetTP, tp);
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("🚀 [BAR DYNAMIC MODIFY BUY M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
+                                    ticket, targetSL, minSL, targetTP, tp);
+                    }
                 }
                 else
                 {
-                    PrintFormat("❌ [BAR DYNAMIC MODIFY BUY M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("❌ [BAR DYNAMIC MODIFY BUY M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    }
                 }
             }
             
@@ -4742,12 +4761,18 @@ void ApplyTrailingStop_M15()
                 if(trade.PositionModify(ticket, targetSL, targetTP))
                 {
                     UpdateTrailingSummaryByTicket_M15(ticket, sl, tp, targetSL, targetTP, currentBid, currentAsk);
-                    PrintFormat("🚀 [BAR DYNAMIC MODIFY SELL M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
-                                ticket, targetSL, minSL, targetTP, tp);
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("🚀 [BAR DYNAMIC MODIFY SELL M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
+                                    ticket, targetSL, minSL, targetTP, tp);
+                    }
                 }
                 else
                 {
-                    PrintFormat("❌ [BAR DYNAMIC MODIFY SELL M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("❌ [BAR DYNAMIC MODIFY SELL M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    }
                 }
             }
             
@@ -5758,10 +5783,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //START: Logika Reset lastAcceptedLL ke preChoch LL setelah CHoCH Bullish dan HH valid (MODE 1) M15 --|
                 //------------------------------------------------------------------------------------------------+
 
-                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bullish_M15) 
+                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time >= time_choch_bullish_M15) // FIX: >= agar HH yang terbentuk TEPAT di candle breakout CHoCH tidak terlewat
                 {
                     lastAcceptedLL_M15            = preChochLL_M15;
-                    lastAcceptedHH_M15            = rates_M15[i].high;  
+                    lastAcceptedHH_M15            = rates_M15[i].high;
                     // FIX: LL (preChochLL) di-stamp pakai lastTimeLL_M15 (waktu low asli, mis. 05:00),
                     // BUKAN rates_M15[i].time (= waktu candle HH, mis. 21:15) → cegah duplikat LL
                     // di waktu salah. Konsisten dgn fix window-search di CHoCH trigger.
@@ -5801,7 +5826,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //CHoCH Bullish Confirmed, terbentuk HH valid sebagai target BoS Bullish M15|
             //----------------------------------------------------------------------|
 
-            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time > time_choch_bullish_M15) // guard: bar harus setelah CHoCH Bullish
+            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time >= time_choch_bullish_M15) // guard: bar harus setelah/pada CHoCH Bullish (FIX: >= agar candle breakout sendiri tidak terlewat)
             {
                 postChoCH_HH_M15      = rates_M15[i].high; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_HH_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
@@ -6175,10 +6200,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                                         TimeToString(lastTimeLL_M15), previousHH, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         }
                         
-                        // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
-                        lastAcceptedHH_M15 = absoluteHighestHH_M15;
-                        lastTimeHH_M15      = timeAbsoluteHighestHH_M15 > 0 ? timeAbsoluteHighestHH_M15 : rates_M15[i].time;
-                        UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
+                        // // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
+                        // lastAcceptedHH_M15 = absoluteHighestHH_M15;
+                        // lastTimeHH_M15      = timeAbsoluteHighestHH_M15 > 0 ? timeAbsoluteHighestHH_M15 : rates_M15[i].time;
+                        // UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     }
                 }
 
@@ -6300,7 +6325,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //--------------------------------------------------------------------------------------+
                     // --- START: Logika Reset lastAcceptedLL setelah CHoCH Bearish dan LL valid (MODE 1) M15 --|
                     //--------------------------------------------------------------------------------------|
-                    if (!llAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bearish_M15) // guard: bar harus setelah CHoCH Bearish (mirror bullish 5761)
+                    if (!llAfterChochConfirmedFlag_M15 && rates_M15[i].time >= time_choch_bearish_M15) // guard: bar harus setelah/pada CHoCH Bearish (mirror bullish 5786, FIX: >= agar candle breakout sendiri tidak terlewat)
                         {
                             // lastAcceptedHH_M15 = preChochHH_M15;
                             lastAcceptedLL_M15 = rates_M15[i].low;  // last AcceptedLL direset ke LL sebelum CHoCH Bullish
@@ -6381,7 +6406,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //     PrintFormat("🎯 [TARGET SET M15] BoS Bearish Target LL Lebih Rendah set ke: %.2f @ %s", postChoCH_LL_M15, TimeToString(time_postChoCH_LL_M15)); // Log tambahan untuk kejelasan
             // }
             
-            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15 && rates_M15[i].time > time_choch_bearish_M15) // guard: bar harus setelah CHoCH Bearish (mirror bullish 5804)
+            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15 && rates_M15[i].time >= time_choch_bearish_M15) // guard: bar harus setelah/pada CHoCH Bearish (mirror bullish 5829, FIX: >= agar candle breakout sendiri tidak terlewat)
             {
                 postChoCH_LL_M15      = rates_M15[i].low; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_LL_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
@@ -6715,9 +6740,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                                         TimeToString(time_lastHHAfterBos_M15), previousLowest, lowestLLSinceLastHHAfterBos_M15, TimeToString(rates_M15[i].time));
                         }
                         
-                        // ✅ FIX: Simpan LL terendah ke accepted history & export ke CSV
-                        lastAcceptedLL_M15 = lowestLLSinceLastHHAfterBos_M15;
-                        UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
+                        // // ✅ FIX: Simpan LL terendah ke accepted history & export ke CSV
+                        // lastAcceptedLL_M15 = lowestLLSinceLastHHAfterBos_M15;
+                        // UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
                     }
                 }
                 
@@ -7292,8 +7317,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason);
             }
         }
-        // ✅ FULL FIX: LL udah ke-sweep oleh BoS Bullish M15 — reset supaya visual & state bersih
-        lastAcceptedLL_M15 = -1;
+        // 💾 Retain lastAcceptedLL_M15 untuk Mode 3 Bullish (validasi Higher Low)
+        // lastAcceptedLL_M15 = -1;
     } 
 
     // ------------+

@@ -5819,9 +5819,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                                         TimeToString(lastTimeLL_M15), previousHH, absoluteHighestHH_M15, TimeToString(rates_M15[i].time));
                         }
                         
-                        // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
-                        lastAcceptedHH_M15 = absoluteHighestHH_M15;
-                        UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
+                        // // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
+                        // lastAcceptedHH_M15 = absoluteHighestHH_M15;
+                        // UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     }
                 }
 
@@ -6341,9 +6341,9 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                                         TimeToString(time_lastHHAfterBos_M15), previousLowest, lowestLLSinceLastHHAfterBos_M15, TimeToString(rates_M15[i].time));
                         }
                         
-                        // ✅ FIX: Simpan LL terendah ke accepted history & export ke CSV
-                        lastAcceptedLL_M15 = lowestLLSinceLastHHAfterBos_M15;
-                        UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
+                        // // ✅ FIX: Simpan LL terendah ke accepted history & export ke CSV
+                        // lastAcceptedLL_M15 = lowestLLSinceLastHHAfterBos_M15;
+                        // UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
                     }
                 }
                 
@@ -6913,8 +6913,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason);
             }
         }
-        // ✅ FULL FIX: LL udah ke-sweep oleh BoS Bullish M15 — reset supaya visual & state bersih
-        lastAcceptedLL_M15 = -1;
+        // 💾 Retain lastAcceptedLL_M15 untuk Mode 3 Bullish (validasi Higher Low)
+        // lastAcceptedLL_M15 = -1;
     } 
 
     // ------------+

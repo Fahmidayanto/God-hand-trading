@@ -398,6 +398,7 @@ def reconstruct_market_data(
         
         core_type = target_ev_type.split("_")[0]
         is_bos = core_type == "BOS"
+        is_choch = core_type == "CHOCH"
         is_hh_ll = core_type in ("HH", "LL")
         
         is_counter_swing = (core_type != "CHOCH") and (is_post_bos or (is_setup_active and (
@@ -405,7 +406,7 @@ def reconstruct_market_data(
             (core_type == "HH" and recent_choch_dir == "BEARISH")
         )))
 
-        should_run_llm = is_bos or (is_hh_ll and is_setup_active and not is_counter_swing)
+        should_run_llm = is_bos or is_choch or (is_hh_ll and is_setup_active and not is_counter_swing)
 
         if not should_run_llm:
             logger.info(f"💤 Simulator orchestrator is IDLE (event: {target_ev_type}) -> Skipping news LLM generation")
@@ -504,6 +505,8 @@ def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
                         "similarity": p.get("similarity"),
                         "price": p.get("price"),
                         "direction": p.get("direction"),
+                        "event_type": p.get("event_type"),
+                        "timeframe": p.get("timeframe"),
                     }
                     for p in raw_patterns
                 ]

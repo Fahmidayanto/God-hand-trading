@@ -35,6 +35,17 @@ logger = logging.getLogger("populate_lancedb")
 from valuecell.knowledge.lance_db import LanceDBManager
 
 
+def parse_dt_safe(time_str: str) -> datetime:
+    """Parse time string safely supporting multiple formats."""
+    time_str = time_str.strip()
+    for fmt in ("%Y.%m.%d %H:%M:%S", "%Y.%m.%d %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(time_str, fmt)
+        except ValueError:
+            continue
+    return datetime.fromisoformat(time_str)
+
+
 def load_structure_data(filepath: Path) -> pd.DataFrame:
     """Read LLHHBOSData CSV safely by skipping introduction headers."""
     with open(filepath, 'r') as f:
@@ -93,6 +104,31 @@ def main():
     market_files = sorted(glob.glob(str(BACKTEST_DIR / "MarketData_XAUUSD_*.csv")))
     
     logger.info(f"Found {len(structure_files)} structure files, {len(result_files)} result files, and {len(market_files)} market data files.")
+    
+    # 2. Build global structure lookup dictionary to resolve prior_choch
+    logger.info("Building global structure lookup dictionary...")
+    struct_lookup = {"M15": [], "H1": [], "H4": []}
+    for s_file in structure_files:
+        try:
+            df_temp = load_structure_data(Path(s_file))
+            for _, s_row in df_temp.iterrows():
+                tf_temp = str(s_row.get("Timeframe")).strip()
+                if tf_temp not in struct_lookup:
+                    struct_lookup[tf_temp] = []
+                
+                time_str_temp = str(s_row.get("Time")).strip()
+                dt_obj = parse_dt_safe(time_str_temp)
+                struct_lookup[tf_temp].append({
+                    "time": dt_obj,
+                    "type": str(s_row.get("Type")).strip(),
+                })
+        except Exception as e:
+            logger.warning(f"Failed to index structure file {s_file} for global lookup: {e}")
+            
+    # Sort chronologically
+    for tf_key in struct_lookup:
+        struct_lookup[tf_key].sort(key=lambda x: x["time"])
+    logger.info("Global structure lookup dictionary built.")
     
     # Extract years
     years = [Path(f).stem.split("_")[-1] for f in structure_files]
@@ -167,6 +203,24 @@ def main():
             tf = str(row.get("Timeframe")).strip()
             price = float(row.get("Price"))
             time_str = str(row.get("Time")).strip()
+            
+            # Resolve prior_choch
+            prior_choch = False
+            try:
+                row_dt = parse_dt_safe(time_str)
+                candidates = struct_lookup.get(tf, [])
+                for prev_s in reversed(candidates):
+                    if prev_s["time"] >= row_dt:
+                        continue
+                    prev_raw_type = str(prev_s["type"]).strip().lower()
+                    if "choch" in prev_raw_type:
+                        prior_choch = True
+                        break
+                    elif "bos" in prev_raw_type:
+                        prior_choch = False
+                        break
+            except Exception as e:
+                logger.warning(f"Error resolving prior_choch: {e}")
             
             # Get EMA200 value
             ema200 = price
@@ -275,7 +329,8 @@ def main():
                 "session": session,
                 "outcome": outcome,
                 "profit_pips": profit_pips,
-                "duration_minutes": duration_minutes
+                "duration_minutes": duration_minutes,
+                "prior_choch": prior_choch
             })
             
         # Add to LanceDB
@@ -298,6 +353,7 @@ def main():
                     "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
                     "session": pattern.get("session", "Unknown"),
                     "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
+                    "prior_choch": bool(pattern.get("prior_choch", False)),
                     "outcome": pattern.get("outcome", "PENDING"),
                     "profit_pips": float(pattern.get("profit_pips", 0)),
                     "duration_minutes": int(pattern.get("duration_minutes", 0)),
