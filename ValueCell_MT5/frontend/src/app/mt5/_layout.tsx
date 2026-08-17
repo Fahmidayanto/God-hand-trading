@@ -9,6 +9,7 @@ import Agents from "./agents";
 import Settings from "./settings";
 import Database from "./database";
 import ReplayTrades from "./replay";
+import ReplayOriginal from "./replay-original";
 import SimulationOfDead from "./simulation";
 
 const pages = [
@@ -20,6 +21,7 @@ const pages = [
   { path: "/mt5/settings", Component: Settings },
   { path: "/mt5/database", Component: Database },
   { path: "/mt5/replay", Component: ReplayTrades },
+  { path: "/mt5/replay-original", Component: ReplayOriginal },
   { path: "/mt5/simulation", Component: SimulationOfDead },
 ];
 

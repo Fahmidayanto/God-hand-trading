@@ -2,8 +2,8 @@ import type {
   IChartApi,
   ISeriesApi,
   ISeriesPrimitive,
-  ISeriesPrimitivePaneView,
-  ISeriesPrimitivePaneRenderer,
+  IPrimitivePaneView,
+  IPrimitivePaneRenderer,
   SeriesType,
   Time,
   UTCTimestamp,
@@ -91,7 +91,7 @@ export function sessionLabelColor(session: string): string {
   }
 }
 
-class SessionZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
+class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
   constructor(
     private readonly source: SessionZonesPrimitive,
   ) {}
@@ -224,7 +224,7 @@ class SessionZonesPaneRenderer implements ISeriesPrimitivePaneRenderer {
   }
 }
 
-class SessionZonesPaneView implements ISeriesPrimitivePaneView {
+class SessionZonesPaneView implements IPrimitivePaneView {
   private readonly _renderer: SessionZonesPaneRenderer;
 
   constructor(source: SessionZonesPrimitive) {
@@ -236,7 +236,7 @@ class SessionZonesPaneView implements ISeriesPrimitivePaneView {
     return "bottom";
   }
 
-  renderer(): ISeriesPrimitivePaneRenderer {
+  renderer(): IPrimitivePaneRenderer {
     return this._renderer;
   }
 }
@@ -325,7 +325,7 @@ export class SessionZonesPrimitive implements ISeriesPrimitive<Time> {
     // Coordinates are recomputed on every draw, nothing cached to refresh here.
   }
 
-  paneViews(): readonly ISeriesPrimitivePaneView[] {
+  paneViews(): readonly IPrimitivePaneView[] {
     return this._paneViews;
   }
 }

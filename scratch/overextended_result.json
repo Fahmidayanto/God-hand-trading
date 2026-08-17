@@ -1,0 +1,10 @@
+{
+  "signal": "HOLD",
+  "confidence": 0.4,
+  "risk_pct": 0.5,
+  "sl_price": 0,
+  "tp_price": 0,
+  "lot_size": 0.01,
+  "cycle_stage": "🔴 OVEREXTENDED (BOS #4+ / Stretch >3.5x ATR)",
+  "reasoning": "• Arah & Struktur: Struktur M15 mengonfirmasi BOS Bullish, namun siklus sudah overextended (BOS #5, jarak EMA 4.15x ATR) sehingga risiko kelelahan tinggi. Kualitas candle breakout moderat (55% body) dan sesi New York aktif, tetapi adanya supply zone ketat di atas membatasi potensi TP.\n• Stop Loss & Invalidasi: SL defensif ditempatkan di 4546.10 (1.2x ATR dari entry) untuk menghindari noise, namun jarak ke TP terlalu dekat sehingga tidak memenuhi rasio risk/reward minimum.\n• Target Profit: Supply zone di 4570-4578 hanya berjarak 9.5-17.5 poin dari entry. TP yang aman sebelum supply (4568) hanya memberikan R:R < 1, melanggar aturan minimum 1:1.5. Tidak ada target ekspansi yang valid tanpa menembus supply.\n• Alokasi Risiko: Karena tidak ada setup yang memenuhi kriteria TP, sinyal HOLD dipilih untuk menghindari risiko. Tidak ada alokasi modal."
+}

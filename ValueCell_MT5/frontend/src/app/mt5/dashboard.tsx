@@ -96,7 +96,7 @@ export default function MT5Dashboard() {
         minHeight: "100vh",
         width: "100%",
         position: "relative",
-        overflowX: "hidden",
+        overflowX: "auto",
         overflowY: "auto"
       }}
     >
@@ -261,6 +261,11 @@ export default function MT5Dashboard() {
                           <div className="agent-name">{agent.agent_name || names[idx]}</div>
                           <div className="agent-signal">
                             Signal: <span className="neon-text">{agent.prediction || 'HOLD'}</span>
+                            {(agent.agent_name === 'Sentiment Agent' || names[idx] === 'Sentiment Agent' || idx === 2) && (
+                              <span style={{ marginLeft: '8px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', fontSize: '10px', fontWeight: 600 }}>
+                                📰 LLM News
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

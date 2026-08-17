@@ -68,7 +68,7 @@ export default defineConfig(async () => ({
   ],
 
   optimizeDeps: {
-    include: ['lightweight-charts'],
+    include: ['lightweight-charts', 'lucide-react', 'clsx', 'tailwind-merge'],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

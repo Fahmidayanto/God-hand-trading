@@ -1012,7 +1012,6 @@ async def get_session_zones(
             try:
                 # Parse as naive datetime (no timezone) to match _server_now() behavior
                 start_dt = datetime.strptime(from_date, "%Y-%m-%d")
-                loguru_logger.info(f"Using from_date: {from_date} -> {start_dt}")
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -1020,17 +1019,11 @@ async def get_session_zones(
                 )
         else:
             start_dt = server_now - timedelta(days=days)
-            loguru_logger.info(f"Using days lookback: {days} -> {start_dt}")
 
         all_zones = _generate_session_zones(start_dt, server_now)
 
         # Sort by start time (oldest first) so historical data is prioritized
         all_zones.sort(key=lambda x: x['start_time'], reverse=False)
-
-        loguru_logger.info(
-            f"Generated {len(all_zones)} session zones for {symbol} "
-            f"({start_dt} -> {server_now} server time)"
-        )
 
         return {
             "zones": all_zones,
@@ -1089,6 +1082,190 @@ async def get_replay_months():
         )
 
 
+@router.get("/strategies")
+async def get_strategies():
+    """
+    Get list of available C# strategy files in Other/Strategy_all directory.
+    """
+    try:
+        from pathlib import Path
+        root_dir = Path(__file__).resolve().parents[4]
+        strategy_dir = root_dir / "Other" / "Strategy_all"
+        if not strategy_dir.exists():
+            strategy_dir = Path("B:/Project MT5/Other/Strategy_all")
+        
+        strategies = []
+        if strategy_dir.exists():
+            for f in sorted(strategy_dir.glob("*.cs")):
+                name_clean = f.stem.replace("_", " ")
+                strategies.append({
+                    "id": f.name,
+                    "filename": f.name,
+                    "label": name_clean,
+                    "path": str(f)
+                })
+        return {"strategies": strategies, "count": len(strategies)}
+    except Exception as e:
+        logger.error(f"Error listing strategies: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/replay-original")
+async def get_replay_original_data(
+    strategy_file: str = Query("Dev_Bot_v12_GoldO.cs", description="Strategy C# filename"),
+    year_from: int = Query(..., description="Start year"),
+    month_from: int = Query(..., ge=1, le=12, description="Start month (1-12)"),
+    year_to: int = Query(..., description="End year"),
+    month_to: int = Query(..., ge=1, le=12, description="End month (1-12)"),
+    timeframe: str = Query("M15", description="Timeframe (M15, H1, H4)"),
+):
+    """
+    Fetch replay data for a strategy script (without consensus agent scoring).
+    Returns M15/H1/H4 candles, LLHH structure events, and original backtest trades for selected strategy.
+    """
+    from datetime import date, timezone
+    import calendar
+    from app.core.database import get_db_conn, is_pool_ready
+
+    def _ts(dt) -> int:
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+
+    if not is_pool_ready():
+        raise HTTPException(status_code=503, detail="Database not ready")
+
+    try:
+        date_from = date(year_from, month_from, 1)
+        last_day = calendar.monthrange(year_to, month_to)[1]
+        date_to = date(year_to, month_to, last_day)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid date range: {e}")
+
+    if date_from > date_to:
+        raise HTTPException(status_code=400, detail="Start date must be before end date")
+
+    table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
+    candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
+
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                # Fetch candles
+                cur.execute(
+                    f"""
+                    SELECT time, open, high, low, close, volume, ema200
+                    FROM {candle_table}
+                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    ORDER BY time ASC
+                    """,
+                    (date_from, date_to),
+                )
+                candle_rows = cur.fetchall()
+
+                # Fetch LLHH/BoS structure events
+                cur.execute(
+                    """
+                    SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time
+                    FROM llhhbosdata_xauusd
+                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    AND timeframe = %s
+                    ORDER BY time ASC
+                    """,
+                    (date_from, date_to, timeframe.upper()),
+                )
+                structure_rows = cur.fetchall()
+
+                # Fetch backtest trades
+                cur.execute(
+                    """
+                          SELECT ticket, type, status, reject_reason, entry_price, exit_price, sl, tp,
+                              net_profit, session, entry_time, exit_time, lot_size
+                    FROM backtest_results_xauusd
+                    WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s
+                    ORDER BY entry_time ASC
+                    """,
+                    (date_from, date_to),
+                )
+                trade_rows = cur.fetchall()
+
+                # Fetch available months
+                cur.execute(
+                    """
+                    SELECT DISTINCT EXTRACT(YEAR FROM time)::int AS y,
+                                    EXTRACT(MONTH FROM time)::int AS m
+                    FROM marketdata_xauusd_m15
+                    ORDER BY y, m
+                    """
+                )
+                month_rows = cur.fetchall()
+
+        candles = [
+            {
+                "time": _ts(r[0]),
+                "open": float(r[1]),
+                "high": float(r[2]),
+                "low": float(r[3]),
+                "close": float(r[4]),
+                "volume": int(r[5]) if r[5] is not None else 0,
+                "ema200": float(r[6]) if r[6] is not None else None,
+            }
+            for r in candle_rows
+        ]
+
+        structures = [
+            {
+                "type": r[0],
+                "direction": r[1],
+                "price": float(r[2]),
+                "time": _ts(r[3]),
+                "timeframe": r[4],
+                "status": r[5],
+                "prev_price": float(r[6]) if r[6] is not None else None,
+                "prev_time": _ts(r[7]),
+            }
+            for r in structure_rows
+        ]
+
+        trades = [
+            {
+                "ticket": int(r[0]),
+                "type": r[1],
+                "entry_price": float(r[2]),
+                "exit_price": float(r[3]) if r[3] is not None else None,
+                "sl": float(r[4]) if r[4] is not None else None,
+                "tp": float(r[5]) if r[5] is not None else None,
+                "net_profit": float(r[6]) if r[6] is not None else 0.0,
+                "session": r[7],
+                "entry_time": _ts(r[8]),
+                "exit_time": _ts(r[9]),
+                "lot_size": float(r[10]) if r[10] is not None else 0.01,
+            }
+            for r in trade_rows
+        ]
+
+        available_months = [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
+
+        return {
+            "strategy": strategy_file,
+            "candles": candles,
+            "structures": structures,
+            "trades": trades,
+            "available_months": available_months,
+            "total_candles": len(candles),
+            "total_trades": len(trades),
+        }
+
+    except Exception as e:
+        logger.error(f"Replay original fetch error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
+
+
 @router.get("/replay")
 async def get_replay_data(
     year_from: int = Query(..., description="Start year"),
@@ -1134,20 +1311,6 @@ async def get_replay_data(
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
-                # Delete existing simulation decisions for this range to avoid duplicates
-                try:
-                    cur.execute(
-                        "DELETE FROM simulation_decisions WHERE event_time >= %s AND event_time <= %s",
-                        (date_from, date_to),
-                    )
-                    if hasattr(conn, "commit"):
-                        conn.commit()
-                    logger.info(f"Deleted existing simulation decisions between {date_from} and {date_to}")
-                except Exception as de:
-                    logger.warning(f"Could not delete old decisions (might not exist yet): {de}")
-                    if hasattr(conn, "rollback"):
-                        conn.rollback()
-
                 # Fetch candles
                 cur.execute(
                     f"""
@@ -1176,8 +1339,8 @@ async def get_replay_data(
                 # Fetch backtest trades
                 cur.execute(
                     """
-                    SELECT ticket, type, entry_price, exit_price, sl, tp,
-                           net_profit, session, entry_time, exit_time, lot_size
+                          SELECT ticket, type, status, reject_reason, entry_price, exit_price, sl, tp,
+                              net_profit, session, entry_time, exit_time, lot_size
                     FROM backtest_results_xauusd
                     WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s
                     ORDER BY entry_time ASC
@@ -1228,15 +1391,17 @@ async def get_replay_data(
             {
                 "ticket": r[0],
                 "type": r[1],
-                "entry_price": float(r[2]) if r[2] else None,
-                "exit_price": float(r[3]) if r[3] else None,
-                "sl": float(r[4]) if r[4] else None,
-                "tp": float(r[5]) if r[5] else None,
-                "net_profit": float(r[6]) if r[6] else None,
-                "session": r[7],
-                "entry_time": _ts(r[8]),
-                "exit_time": _ts(r[9]),
-                "lot_size": float(r[10]) if r[10] else None,
+                "status": r[2].strip() if r[2] else "EXECUTED",
+                "reject_reason": r[3].strip() if r[3] else None,
+                "entry_price": float(r[4]) if r[4] else None,
+                "exit_price": float(r[5]) if r[5] else None,
+                "sl": float(r[6]) if r[6] else None,
+                "tp": float(r[7]) if r[7] else None,
+                "net_profit": float(r[8]) if r[8] else None,
+                "session": r[9],
+                "entry_time": _ts(r[10]),
+                "exit_time": _ts(r[11]),
+                "lot_size": float(r[12]) if r[12] else None,
             }
             for r in trade_rows
         ]
@@ -1244,7 +1409,7 @@ async def get_replay_data(
         available_months = [{"year": int(r[0]), "month": int(r[1])} for r in month_rows]
 
         logger.info(
-            f"[Replay] Fetched {len(candles)} candles, {len(structures)} structures, "
+            f"[Replay {timeframe.upper()}] Fetched {len(candles)} candles, {len(structures)} structures, "
             f"{len(trades)} trades for {date_from} → {date_to}"
         )
 
@@ -1572,6 +1737,69 @@ async def get_simulation_data(
 _sim_event_endpoint_cache = {}
 
 
+@router.get("/sentiment-tick")
+async def get_sentiment_tick(
+    time: int = Query(..., description="Replay clock time (unix seconds) that crossed a 3h anchor boundary"),
+    symbol: str = "XAUUSD",
+):
+    """Independent 3h sentiment tick for the interactive Ghost Engine replay.
+
+    Fired by the frontend replay loop each time its clock crosses a daily anchor
+    boundary (00/03/06/09/12/15 UTC), independent of structure events. Runs the
+    sentiment LLM once for that slot (cumulative + cached), so a later structure
+    event's /simulate-event reuses the nearest slot's score without a fresh LLM
+    call. This is the clock-driven "blind" tick, mirrored for the UI path.
+    """
+    from datetime import datetime, timezone
+    from app.services.orchestrator_simulator import (
+        get_orchestrator,
+        _nearest_daily_anchor_slot,
+        _get_daily_anchor_slot,
+    )
+
+    dt = datetime.fromtimestamp(time, tz=timezone.utc)
+    if dt.weekday() >= 5:  # weekend: market closed -> clock idle, no tick
+        return {"skipped": True, "reason": "weekend", "slot_time": None}
+
+    slot_hour = _nearest_daily_anchor_slot(dt.hour)
+    slot_dt = datetime(dt.year, dt.month, dt.day, slot_hour, 0, 0, tzinfo=timezone.utc)
+
+    orch = get_orchestrator()
+    sentiment_agent = getattr(orch, "agents", {}).get("sentiment")
+    if sentiment_agent is None:
+        return {"skipped": True, "reason": "sentiment_disabled", "slot_time": int(slot_dt.timestamp())}
+
+    def _run_tick():
+        return _get_daily_anchor_slot(slot_dt.date(), slot_hour, sentiment_agent)
+
+    try:
+        anchor = await run_in_threadpool(_run_tick)
+    except Exception as e:
+        logger.warning(f"sentiment-tick failed for {slot_dt}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    raw = anchor.get("sentiment_analysis_raw") or {}
+    sent = raw.get("sentiment")
+    sent = getattr(sent, "value", sent) or "n/a"
+    score = raw.get("score", 0.0) or 0.0
+    n_news = len(anchor.get("news_headlines") or [])
+
+    logger.info(
+        f"🕒 {slot_dt.strftime('%m-%d %H:%M')} UTC tick | SENT LLM fired (ghost) | "
+        f"{n_news} news | verdict={sent} | score={score:+.2f}"
+    )
+
+    return {
+        "skipped": False,
+        "slot_time": int(slot_dt.timestamp()),
+        "slot_hour": slot_hour,
+        "news_count": n_news,
+        "verdict": str(sent),
+        "score": round(float(score), 3),
+        "news_headlines": anchor.get("news_headlines") or [],
+    }
+
+
 @router.get("/simulate-event")
 async def get_single_event_simulation(
     time: int = Query(..., description="Timestamp of the structure event"),
@@ -1794,15 +2022,15 @@ async def get_single_event_simulation(
                 "range_points": float(session_row[8]) if session_row[8] is not None else None,
             }
 
+        orch = get_orchestrator()
         md = reconstruct_market_data(
             base_df, time, structure_events, generate_news=True, event_type_hint=type,
-            h1_df=h1_df, h4_df=h4_df, target_event_id=target_ev.get("id"), session_zone=session_zone
+            h1_df=h1_df, h4_df=h4_df, target_event_id=target_ev.get("id"), session_zone=session_zone,
+            sentiment_agent=getattr(orch, "agents", {}).get("sentiment"),
         )
         _news_count = len(md.get("news_headlines", []))
         _cal_count = len(md.get("upcoming_events", []))
         loguru_logger.info(f"   📰 News: {_news_count} headlines | 📅 Calendar: {_cal_count} events")
-
-        orch = get_orchestrator()
         result = await run_in_threadpool(
             analyze_with_orchestrator_lock, orch, md, symbol, timeframe, veto_mode
         )
@@ -1968,6 +2196,36 @@ async def clear_replay_cache(
 
     loguru_logger.info("[Replay] Simulation candle cache cleared successfully")
     return {"status": "success", "message": "Replay cache cleared"}
+
+
+@router.post("/llm-setup")
+async def llm_trade_setup(payload: dict):
+    """Decide a full trade setup (signal/SL/TP/lot) via LLM for the Replay feature.
+
+    Body: { structure, entry_price, atr, balance, risk_pct, news, timeframe, candles_summary }
+    Returns the LLM's recommendation as JSON.
+    """
+    from app.services.llm_trade_setup import get_llm_trade_setup
+
+    context = {
+        "structure": payload.get("structure", "unknown"),
+        "entry_price": payload.get("entry_price"),
+        "atr": payload.get("atr"),
+        "balance": payload.get("balance", 1000.0),
+        "risk_pct": payload.get("risk_pct", 2.0),
+        "news": payload.get("news", "no news"),
+        "timeframe": payload.get("timeframe", "M15"),
+        "candles_summary": payload.get("candles_summary", "n/a"),
+        "ea_filters": payload.get("ea_filters") or {},
+        "market_context": payload.get("market_context") or {},
+    }
+
+    try:
+        result = await run_in_threadpool(get_llm_trade_setup().analyze, context)
+        return result
+    except Exception as e:
+        logger.error(f"LLM trade setup error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 

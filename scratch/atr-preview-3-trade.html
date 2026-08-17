@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview 3 — ATR Band dengan Trade SL/TP</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 720px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .title { font-size: 15px; font-weight: 700; }
+  .badge {
+    background: rgba(34,211,238,.15);
+    color: #22d3ee;
+    border: 1px solid rgba(34,211,238,.3);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .chart {
+    position: relative;
+    height: 300px;
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .band {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: rgba(34,211,238,.08);
+    border-top: 2px solid #22d3ee;
+    border-bottom: 2px solid #22d3ee;
+  }
+  .candle { position: absolute; bottom: 40px; width: 10px; border-radius: 2px; }
+  .wick { position: absolute; width: 2px; background: #64748b; left: 50%; transform: translateX(-50%); }
+  .up { background: #22c55e; }
+  .down { background: #ef4444; }
+  .atr-label {
+    position: absolute;
+    background: #0e7490;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #22d3ee;
+    white-space: nowrap;
+  }
+  .entry-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #22c55e;
+  }
+  .sl-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #ef4444;
+    border-top: 1px dashed #ef4444;
+  }
+  .tp-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #22d3ee;
+    border-top: 1px dashed #22d3ee;
+  }
+  .trade-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: monospace;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #94a3b8;
+    flex-wrap: wrap;
+  }
+  .legend span b { color: #22d3ee; }
+  .legend .sl { color: #ef4444; }
+  .legend .tp { color: #22d3ee; }
+  .legend .en { color: #22c55e; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title">ATR Band — Preview 3 (Dengan Trade SL/TP)</div>
+      <span class="badge">ATR ON</span>
+    </div>
+
+    <div class="chart" id="chart"></div>
+
+    <div class="legend">
+      <span>ATR: <b>$40.00</b></span>
+      <span class="en">Entry</span>
+      <span class="sl">SL (1.5× ATR)</span>
+      <span class="tp">TP (2.0× ATR)</span>
+    </div>
+  </div>
+
+<script>
+  const chart = document.getElementById('chart');
+  const W = 720, H = 300;
+  const base = 150;
+  const n = 14;
+
+  const candles = [];
+  let price = base;
+  for (let i = 0; i < n; i++) {
+    const up = Math.random() > 0.5;
+    const body = 8 + Math.random() * 22;
+    const wick = 4 + Math.random() * 10;
+    const open = up ? price : price + body;
+    const close = up ? price + body : price;
+    candles.push({ open, close, high: Math.max(open, close) + wick, low: Math.min(open, close) - wick, up });
+    price = close;
+  }
+
+  let trSum = 0;
+  for (let i = 1; i < n; i++) {
+    const c = candles[i], p = candles[i-1];
+    const tr = Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+    trSum += tr;
+  }
+  const atr = trSum / (n - 1);
+
+  const stepX = W / (n + 1);
+  const minP = Math.min(...candles.map(c => c.low));
+  const maxP = Math.max(...candles.map(c => c.high));
+  const range = (maxP - minP) || 1;
+  const toY = (p) => H - 50 - ((p - minP) / range) * (H - 100);
+
+  // Band area
+  const midP = (minP + maxP) / 2;
+  const bandTop = toY(midP + atr);
+  const bandBottom = toY(midP - atr);
+  const band = document.createElement('div');
+  band.className = 'band';
+  band.style.top = bandTop + 'px';
+  band.style.height = (bandBottom - bandTop) + 'px';
+  chart.appendChild(band);
+
+  candles.forEach((c, i) => {
+    const x = stepX * (i + 1);
+    const yOpen = toY(c.open), yClose = toY(c.close);
+    const yHigh = toY(c.high), yLow = toY(c.low);
+    const yTop = Math.min(yOpen, yClose);
+    const h = Math.max(2, Math.abs(yClose - yOpen));
+
+    const wick = document.createElement('div');
+    wick.className = 'wick';
+    wick.style.left = x + 'px';
+    wick.style.top = yHigh + 'px';
+    wick.style.height = (yLow - yHigh) + 'px';
+    chart.appendChild(wick);
+
+    const body = document.createElement('div');
+    body.className = 'candle ' + (c.up ? 'up' : 'down');
+    body.style.left = (x - 5) + 'px';
+    body.style.top = yTop + 'px';
+    body.style.height = h + 'px';
+    chart.appendChild(body);
+  });
+
+  // Label ATR
+  const label = document.createElement('div');
+  label.className = 'atr-label';
+  label.textContent = 'ATR $' + atr.toFixed(2);
+  label.style.top = (bandTop - 26) + 'px';
+  label.style.left = (stepX * 1) + 'px';
+  chart.appendChild(label);
+
+  // Trade: entry di candle 7, SL = entry - 1.5×ATR, TP = entry + 2.0×ATR
+  const entryP = candles[6].close;
+  const slP = entryP - atr * 1.5;
+  const tpP = entryP + atr * 2.0;
+
+  const entryY = toY(entryP);
+  const slY = toY(slP);
+  const tpY = toY(tpP);
+
+  const entryLine = document.createElement('div');
+  entryLine.className = 'entry-line';
+  entryLine.style.top = entryY + 'px';
+  chart.appendChild(entryLine);
+
+  const slLine = document.createElement('div');
+  slLine.className = 'sl-line';
+  slLine.style.top = slY + 'px';
+  chart.appendChild(slLine);
+
+  const tpLine = document.createElement('div');
+  tpLine.className = 'tp-line';
+  tpLine.style.top = tpY + 'px';
+  chart.appendChild(tpLine);
+
+  const entryLabel = document.createElement('div');
+  entryLabel.className = 'trade-label';
+  entryLabel.style.cssText = 'background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);';
+  entryLabel.textContent = 'Entry $' + entryP.toFixed(2);
+  entryLabel.style.top = (entryY - 18) + 'px';
+  entryLabel.style.left = (stepX * 7) + 'px';
+  chart.appendChild(entryLabel);
+
+  const slLabel = document.createElement('div');
+  slLabel.className = 'trade-label';
+  slLabel.style.cssText = 'background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);';
+  slLabel.textContent = 'SL $' + slP.toFixed(2) + ' (' + (atr*1.5).toFixed(1) + ' pips)';
+  slLabel.style.top = (slY + 4) + 'px';
+  slLabel.style.left = (stepX * 7) + 'px';
+  chart.appendChild(slLabel);
+
+  const tpLabel = document.createElement('div');
+  tpLabel.className = 'trade-label';
+  tpLabel.style.cssText = 'background:rgba(34,211,238,.15);color:#22d3ee;border:1px solid rgba(34,211,238,.3);';
+  tpLabel.textContent = 'TP $' + tpP.toFixed(2) + ' (' + (atr*2.0).toFixed(1) + ' pips)';
+  tpLabel.style.top = (tpY - 18) + 'px';
+  tpLabel.style.left = (stepX * 7) + 'px';
+  chart.appendChild(tpLabel);
+</script>
+</body>
+</html>

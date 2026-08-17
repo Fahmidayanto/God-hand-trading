@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ValueCell MT5 - Ultra Premium Draggable Position Tools Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --card-bg: rgba(13, 20, 36, 0.88);
+      --card-border: rgba(56, 75, 112, 0.45);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.35);
+      --emerald: #10b981;
+      --emerald-glow: rgba(16, 185, 129, 0.3);
+      --rose: #f43f5e;
+      --rose-glow: rgba(244, 63, 94, 0.3);
+      --fuchsia: #d946ef;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 15% 25%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 75%, rgba(217, 70, 239, 0.06) 0%, transparent 40%),
+        linear-gradient(to bottom, #070b14, #0b1120);
+      font-family: 'Outfit', sans-serif;
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #chart-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      opacity: 0.6;
+    }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+      position: absolute;
+      z-index: 20;
+      font-family: 'JetBrains Mono', monospace;
+      transition: box-shadow 0.2s, border-color 0.2s;
+    }
+
+    .glass-panel:hover {
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.8), 0 0 25px rgba(6, 182, 212, 0.15);
+    }
+
+    .drag-handle {
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      transition: color 0.15s;
+    }
+
+    .drag-handle:hover {
+      color: #38bdf8;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    /* Floating Toolbar */
+    #floating-toolbar {
+      top: 30px;
+      left: 30px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 14px;
+    }
+
+    .btn-tool {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+      background: transparent;
+    }
+
+    .btn-long {
+      color: var(--emerald);
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .btn-long.active, .btn-long:hover {
+      background: var(--emerald);
+      color: #022c22;
+      box-shadow: 0 0 16px var(--emerald-glow);
+    }
+
+    .btn-short {
+      color: var(--rose);
+      background: rgba(244, 63, 94, 0.08);
+      border-color: rgba(244, 63, 94, 0.25);
+    }
+    .btn-short.active, .btn-short:hover {
+      background: var(--rose);
+      color: #4c0519;
+      box-shadow: 0 0 16px var(--rose-glow);
+    }
+
+    .divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(100, 116, 139, 0.4);
+    }
+
+    .rr-pill {
+      padding: 4px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(51, 65, 85, 0.6);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .rr-pill.active, .rr-pill:hover {
+      background: var(--cyan);
+      color: #082f49;
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    /* Floating HUD Card */
+    #floating-hud-card {
+      top: 90px;
+      left: 30px;
+      width: 380px;
+      padding: 16px;
+    }
+
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.6);
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+
+    .badge-snap {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(217, 70, 239, 0.12);
+      border: 1px solid rgba(217, 70, 239, 0.35);
+      color: #f0abfc;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .badge-snap:hover {
+      background: rgba(217, 70, 239, 0.25);
+      box-shadow: 0 0 12px rgba(217, 70, 239, 0.3);
+    }
+
+    .hud-section {
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid;
+    }
+
+    .hud-section.entry {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(51, 65, 85, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .hud-section.tp {
+      background: linear-gradient(135deg, rgba(6, 78, 59, 0.25), rgba(13, 20, 36, 0.4));
+      border-color: rgba(16, 185, 129, 0.3);
+      box-shadow: inset 0 0 15px rgba(16, 185, 129, 0.05);
+    }
+
+    .hud-section.sl {
+      background: linear-gradient(135deg, rgba(136, 19, 55, 0.25), rgba(13, 20, 36, 0.4));
+      border-color: rgba(244, 63, 94, 0.3);
+      box-shadow: inset 0 0 15px rgba(244, 63, 94, 0.05);
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .custom-input {
+      background: #050811;
+      border: 1px solid rgba(51, 65, 85, 0.8);
+      border-radius: 8px;
+      color: #f8fafc;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 6px 10px;
+      width: 110px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .custom-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+    }
+
+    .btn-stepper {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      border-radius: 6px;
+      color: #94a3b8;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-stepper:hover {
+      background: rgba(56, 189, 248, 0.2);
+      color: #38bdf8;
+      border-color: #38bdf8;
+    }
+
+    /* Top HUD Notification Pill */
+    #top-hud-pill {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      background: rgba(13, 20, 36, 0.9);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(56, 75, 112, 0.6);
+      border-radius: 30px;
+      padding: 6px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 35px rgba(0, 0, 0, 0.6);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Chart Canvas Simulation -->
+  <canvas id="chart-bg"></canvas>
+
+  <!-- Top Center Live HUD Pill -->
+  <div id="top-hud-pill">
+    <span style="color: #10b981;">🎯 Target TP: $4,474.18 (+249.3 Pips)</span>
+    <span style="color: #475569;">|</span>
+    <span style="color: #38bdf8;">Est. Profit: +$99.71 (+10.0% modal)</span>
+    <span style="color: #475569;">|</span>
+    <span style="color: #f0abfc;">RR 1:2.0</span>
+  </div>
+
+  <!-- ── 1. Draggable Floating Toolbar ── -->
+  <div id="floating-toolbar" class="glass-panel">
+    <div class="drag-handle" title="Tarik untuk geser toolbar">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+    </div>
+
+    <button id="btn-long" class="btn-tool btn-long active">
+      <span>📈 Long</span>
+    </button>
+    <button id="btn-short" class="btn-tool btn-short">
+      <span>📉 Short</span>
+    </button>
+
+    <div class="divider"></div>
+
+    <span style="font-size: 10px; color: #64748b; font-weight: 700;">RR</span>
+    <button class="rr-pill">1:1</button>
+    <button class="rr-pill">1:1.5</button>
+    <button class="rr-pill active">1:2</button>
+    <button class="rr-pill">1:3</button>
+
+    <div class="divider"></div>
+
+    <button style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 13px;" title="Tutup Toolbar">✕</button>
+  </div>
+
+  <!-- ── 2. Draggable Floating HUD Card ── -->
+  <div id="floating-hud-card" class="glass-panel">
+    <!-- Header -->
+    <div class="hud-header">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div class="drag-handle" title="Tarik untuk geser kartu">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+        </div>
+        <span style="font-size: 12px; font-weight: 800; color: #10b981; background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.3); padding: 3px 8px; border-radius: 6px;">LONG ⇄</span>
+        <button class="badge-snap">🎯 Snap HH/LL</button>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="background: rgba(6,182,212,0.12); color: #38bdf8; border: 1px solid rgba(6,182,212,0.3); font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 6px;">RR 1:2.0</span>
+        <button style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 12px;">_</button>
+        <button style="background: none; border: none; color: #64748b; cursor: pointer; font-size: 12px;">✕</button>
+      </div>
+    </div>
+
+    <!-- Entry Row -->
+    <div class="hud-section entry">
+      <span style="font-size: 11px; font-weight: 700; color: #94a3b8;">ENTRY PRICE</span>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <input type="text" class="custom-input" value="4449.25" style="text-align: right;">
+        <button class="btn-stepper" style="color: #38bdf8; border-color: rgba(6,182,212,0.4);">📍 Candle</button>
+      </div>
+    </div>
+
+    <!-- Take Profit Section -->
+    <div class="hud-section tp">
+      <div class="section-title" style="color: #34d399;">
+        <span>TARGET (TAKE PROFIT)</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn-stepper">-$10</button>
+          <button class="btn-stepper">+$10</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <input type="text" class="custom-input" value="4474.18" style="border-color: rgba(16,185,129,0.5); color: #6ee7b7;">
+        <span style="font-size: 11px; color: #34d399; font-weight: 600;">+249.3 Pips (+2493 pts)</span>
+      </div>
+      <div style="font-size: 11px; font-weight: 700; color: #6ee7b7; margin-top: 6px;">
+        Est. Profit: +$99.71 <span style="font-weight: 400; color: rgba(52,211,153,0.7);">(+10.0% modal)</span>
+      </div>
+    </div>
+
+    <!-- Stop Loss Section -->
+    <div class="hud-section sl">
+      <div class="section-title" style="color: #fb7185;">
+        <span>STOP LOSS (SL)</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn-stepper">-$5</button>
+          <button class="btn-stepper">+$5</button>
+          <button class="btn-stepper">+$10</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <input type="text" class="custom-input" value="4418.95" style="border-color: rgba(244,63,94,0.5); color: #fda4af;">
+        <span style="font-size: 11px; color: #fb7185; font-weight: 600;">-303.0 Pips (-3030 pts)</span>
+      </div>
+      <div style="font-size: 11px; font-weight: 700; color: #fda4af; margin-top: 6px;">
+        Risk Loss: -$121.19 <span style="font-weight: 400; color: rgba(251,113,133,0.7);">(-12.1% modal)</span>
+      </div>
+    </div>
+
+    <!-- Footer Controls -->
+    <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(51,65,85,0.6); padding-top: 10px; font-size: 11px;">
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="color: #64748b; font-weight: 700;">Mode:</span>
+        <button class="rr-pill active" style="font-size: 10px; padding: 2px 6px;">Fixed Lot</button>
+        <button class="rr-pill" style="font-size: 10px; padding: 2px 6px;">Auto Risk ($)</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="color: #64748b;">Lot:</span>
+        <input type="text" class="custom-input" value="0.04" style="width: 55px; padding: 3px 6px; font-size: 11px; text-align: center; color: #38bdf8; border-color: rgba(6,182,212,0.4);">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Interactive Drag & Drop Script ──
+    function makeDraggable(element) {
+      let isDragging = false;
+      let startX, startY, initialX, initialY;
+
+      const handle = element.querySelector('.drag-handle') || element;
+
+      handle.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        initialX = element.offsetLeft;
+        initialY = element.offsetTop;
+        element.style.zIndex = 50;
+        e.preventDefault();
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        element.style.left = `${Math.max(10, Math.min(window.innerWidth - element.offsetWidth - 10, initialX + dx))}px`;
+        element.style.top = `${Math.max(10, Math.min(window.innerHeight - element.offsetHeight - 10, initialY + dy))}px`;
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          element.style.zIndex = 20;
+        }
+      });
+    }
+
+    makeDraggable(document.getElementById('floating-toolbar'));
+    makeDraggable(document.getElementById('floating-hud-card'));
+
+    // Simulated Chart Canvas Drawing
+    const canvas = document.getElementById('chart-bg');
+    const ctx = canvas.getContext('2d');
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawCandles();
+    }
+    window.addEventListener('resize', resize);
+
+    function drawCandles() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const candleWidth = 14;
+      const gap = 8;
+      const count = Math.floor(canvas.width / (candleWidth + gap));
+      let currentPrice = canvas.height * 0.5;
+
+      for (let i = 0; i < count; i++) {
+        const x = i * (candleWidth + gap);
+        const change = (Math.random() - 0.48) * 35;
+        const open = currentPrice;
+        const close = open + change;
+        const high = Math.min(open, close) - Math.random() * 15;
+        const low = Math.max(open, close) + Math.random() * 15;
+        currentPrice = close;
+
+        const isGreen = close < open;
+        ctx.strokeStyle = isGreen ? '#10b981' : '#f43f5e';
+        ctx.fillStyle = isGreen ? '#10b981' : '#f43f5e';
+
+        // Wick
+        ctx.beginPath();
+        ctx.moveTo(x + candleWidth / 2, high);
+        ctx.lineTo(x + candleWidth / 2, low);
+        ctx.stroke();
+
+        // Body
+        ctx.fillRect(x, Math.min(open, close), candleWidth, Math.max(2, Math.abs(close - open)));
+      }
+    }
+    resize();
+  </script>
+</body>
+</html>

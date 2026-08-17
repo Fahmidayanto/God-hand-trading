@@ -145,42 +145,44 @@ class SentimentAgent:
         nvidia_397b_api_key: str = "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",
         nvidia_397b_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_397b_model_id: str = "qwen/qwen3.5-397b-a17b",
-        nvidia_122b_api_key: str = "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",
-        nvidia_122b_base_url: str = "https://integrate.api.nvidia.com/v1",
-        nvidia_122b_model_id: str = "qwen/qwen3.5-122b-a10b",
+        nvidia_120b_api_key: str = "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",
+        nvidia_120b_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_120b_model_id: str = "nvidia/nemotron-3-super-120b-a12b",
+        nvidia_550b_api_key: str = "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",
+        nvidia_550b_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_550b_model_id: str = "nvidia/nemotron-3-ultra-550b-a55b",
+        nvidia_minimax_api_key: str = "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",
+        nvidia_minimax_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_minimax_model_id: str = "minimaxai/minimax-m3",
+        nvidia_inkling_api_key: str = "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",
+        nvidia_inkling_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_inkling_model_id: str = "thinkingmachines/inkling",
+        nvidia_laguna_api_key: str = "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",
+        nvidia_laguna_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_laguna_model_id: str = "poolside/laguna-xs-2.1",
+        nvidia_glm_api_key: str = "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",
+        nvidia_glm_base_url: str = "https://integrate.api.nvidia.com/v1",
+        nvidia_glm_model_id: str = "z-ai/glm-5.2",
         agentrouter_api_key: str = "sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
         agentrouter_base_url: str = "https://agentrouter.org/v1",
         agentrouter_model_id: str = "glm-5.2",
+        groq_api_key: str = "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",
+        groq_base_url: str = "https://api.groq.com/openai/v1",
+        groq_model_id: str = "qwen/qwen3.6-27b",
+        nineinference_api_key: str = "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f",
+        nineinference_base_url: str = "https://9inference.cloud/v1/package",
+        nineinference_model_id: str = "deepseek-v4-flash-0731",
     ):
         """
         Initialize Sentiment Agent.
 
         Args:
             news_recency_hours: Consider news from last N hours (default: 24).
-                Headlines outside this window are dropped entirely.
             sentiment_threshold: Minimum sentiment strength to affect confidence (0-1)
             enable_event_filtering: Whether to filter trades during high-impact events
-            recency_decay_hours: Half-life for recency weighting. Headlines exactly
-                this many hours old contribute 0.5 weight; newer contributes more,
-                older less. Set equal to ``news_recency_hours`` for a linear decay
-                over the window. Default 12.
-            shadow_mode: When True, compute veto/adjustment as usual but DO NOT
-                apply them to ``final_signal`` / ``final_confidence``. The would-be
-                decision is exposed under ``shadow_decision`` so it can be logged
-                and replayed offline. Production behavior is unchanged when False.
-            use_llm: Enable LLM-based sentiment analysis with Gemini fallback.
-            iamhc_api_key: IAMHC API Key for DeepSeek.
-            iamhc_base_url: IAMHC Base URL.
-            iamhc_model_id: IAMHC Model ID.
-            nvidia_397b_api_key: NVIDIA 397B API Key.
-            nvidia_397b_base_url: NVIDIA 397B Base URL.
-            nvidia_397b_model_id: NVIDIA 397B Model ID.
-            nvidia_122b_api_key: NVIDIA 122B API Key.
-            nvidia_122b_base_url: NVIDIA 122B Base URL.
-            nvidia_122b_model_id: NVIDIA 122B Model ID.
-            agentrouter_api_key: AgentRouter API Key.
-            agentrouter_base_url: AgentRouter Base URL.
-            agentrouter_model_id: AgentRouter Model ID.
+            recency_decay_hours: Half-life for recency weighting.
+            shadow_mode: Enable shadow mode execution.
+            use_llm: Enable LLM-based sentiment analysis with sequential 9-tier fallback.
         """
         self.name = "SentimentAgent"
         self.version = "1.1.0-sprint1"
@@ -199,14 +201,43 @@ class SentimentAgent:
         self.nvidia_397b_api_key = nvidia_397b_api_key
         self.nvidia_397b_base_url = nvidia_397b_base_url
         self.nvidia_397b_model_id = nvidia_397b_model_id
-        
-        self.nvidia_122b_api_key = nvidia_122b_api_key
-        self.nvidia_122b_base_url = nvidia_122b_base_url
-        self.nvidia_122b_model_id = nvidia_122b_model_id
+
+        self.nvidia_120b_api_key = nvidia_120b_api_key
+        self.nvidia_120b_base_url = nvidia_120b_base_url
+        self.nvidia_120b_model_id = nvidia_120b_model_id
+
+        self.nvidia_550b_api_key = nvidia_550b_api_key
+        self.nvidia_550b_base_url = nvidia_550b_base_url
+        self.nvidia_550b_model_id = nvidia_550b_model_id
+
+        self.nvidia_minimax_api_key = nvidia_minimax_api_key
+        self.nvidia_minimax_base_url = nvidia_minimax_base_url
+        self.nvidia_minimax_model_id = nvidia_minimax_model_id
+
+        self.nvidia_inkling_api_key = nvidia_inkling_api_key
+        self.nvidia_inkling_base_url = nvidia_inkling_base_url
+        self.nvidia_inkling_model_id = nvidia_inkling_model_id
+
+        self.nvidia_laguna_api_key = nvidia_laguna_api_key
+        self.nvidia_laguna_base_url = nvidia_laguna_base_url
+        self.nvidia_laguna_model_id = nvidia_laguna_model_id
+
+        self.nvidia_glm_api_key = nvidia_glm_api_key
+        self.nvidia_glm_base_url = nvidia_glm_base_url
+        self.nvidia_glm_model_id = nvidia_glm_model_id
 
         self.agentrouter_api_key = agentrouter_api_key
         self.agentrouter_base_url = agentrouter_base_url
         self.agentrouter_model_id = agentrouter_model_id
+
+        import os
+        self.groq_api_key = os.getenv("GROQ_API_KEY", groq_api_key)
+        self.groq_base_url = groq_base_url
+        self.groq_model_id = os.getenv("GROQ_MODEL", groq_model_id)
+
+        self.nineinference_api_key = nineinference_api_key
+        self.nineinference_base_url = nineinference_base_url
+        self.nineinference_model_id = nineinference_model_id
 
         # Convert keywords to lowercase for case-insensitive matching
         self.bullish_keywords = [kw.lower() for kw in self.BULLISH_KEYWORDS]
@@ -219,8 +250,12 @@ class SentimentAgent:
             f"Sentiment threshold: {sentiment_threshold} | "
             f"Event filtering: {enable_event_filtering} | "
             f"Shadow mode: {shadow_mode} | "
-            f"Use LLM: {use_llm} (GLM-5.2 -> Qwen-397B -> Qwen-122B -> Gemini)"
+            f"Use LLM: {use_llm}"
         )
+
+    def _get_effective_base_url(self, default_url: str) -> str:
+        """Return official provider default_url for AgentRouter and NVIDIA keys to prevent 401 proxy errors."""
+        return default_url
 
 
     
@@ -231,7 +266,8 @@ class SentimentAgent:
         current_time: datetime,
         news_headlines: Optional[Union[List[str], List[Dict[str, Any]]]] = None,
         upcoming_events: Optional[List[Dict[str, Any]]] = None,
-        symbol: str = "XAUUSD"
+        symbol: str = "XAUUSD",
+        precomputed_sentiment: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Analyze sentiment and adjust trading confidence.
@@ -255,8 +291,12 @@ class SentimentAgent:
         try:
             logger.info(f"🔍 {self.name} analyzing {symbol} {signal}...")
 
-            # Analyze news sentiment
-            if news_headlines:
+            # Analyze news sentiment (reuse a precomputed score when the caller
+            # already scored this news set -- e.g. the daily 09:00/12:00 UTC
+            # anchor cache in the simulator -- skips a redundant LLM call).
+            if precomputed_sentiment is not None:
+                sentiment_analysis = precomputed_sentiment
+            elif news_headlines:
                 sentiment_analysis = self._analyze_news_sentiment(
                     news_headlines, current_time
                 )
@@ -346,6 +386,11 @@ class SentimentAgent:
                 "confidence_adjustment": round(adjustment["total"], 3),
                 "reasoning": " ".join(reasoning_parts),
 
+                # Raw scored sentiment, reusable as `precomputed_sentiment` in a
+                # later analyze() call against the same news set without
+                # re-invoking the LLM classifier.
+                "sentiment_analysis_raw": sentiment_analysis,
+
                 # Sentiment details
                 "sentiment": {
                     "type": sentiment_analysis["sentiment"].value,
@@ -399,7 +444,96 @@ class SentimentAgent:
         except Exception as e:
             logger.error(f"❌ {self.name} analysis failed: {e}")
             return self._error_response(str(e), signal, confidence)
-    
+
+    def score_news(
+        self,
+        news_headlines: Optional[Union[List[str], List[Dict[str, Any]]]],
+        current_time: datetime,
+    ) -> Dict[str, Any]:
+        """Score a news set standalone, without a trade signal.
+
+        Lets a caller precompute a reusable sentiment score at a fixed anchor
+        time (e.g. daily 09:00/12:00 UTC) and pass it back into `analyze()` via
+        `precomputed_sentiment` later, skipping a repeat LLM classification.
+        """
+        if not news_headlines:
+            return {
+                "sentiment": SentimentType.NEUTRAL,
+                "score": 0.0,
+                "strength": "none",
+                "keyword_matches": [],
+                "weighted_bullish_count": 0.0,
+                "weighted_bearish_count": 0.0,
+                "headlines_total": 0,
+                "headlines_kept": 0,
+                "headlines_filtered_by_recency": 0,
+                "oldest_kept": None,
+                "newest_kept": None,
+            }
+        return self._analyze_news_sentiment(news_headlines, current_time)
+
+    def _robust_json_parse(self, content: str) -> dict:
+        """Robustly clean and parse JSON from LLM responses, repairing truncated strings or raw newlines."""
+        import json
+        import re
+
+        if not content:
+            raise ValueError("Empty response content from LLM")
+
+        cleaned = content.strip()
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
+        if match:
+            cleaned = match.group(1).strip()
+        else:
+            brace_match = re.search(r"(\{[\s\S]*\})", cleaned)
+            if brace_match:
+                cleaned = brace_match.group(1).strip()
+            else:
+                idx = cleaned.find("{")
+                if idx != -1:
+                    cleaned = cleaned[idx:]
+
+        # Attempt 1: Standard json.loads with strict=False (allows unescaped newlines/control chars)
+        try:
+            return json.loads(cleaned, strict=False)
+        except Exception:
+            pass
+
+        # Attempt 2: Auto-repair unclosed string quotes or unclosed braces if truncated
+        repaired = cleaned.strip()
+        unescaped_quotes = len(re.findall(r'(?<!\\)"', repaired))
+        if unescaped_quotes % 2 != 0:
+            repaired += '"'
+
+        open_braces = repaired.count("{")
+        close_braces = repaired.count("}")
+        if open_braces > close_braces:
+            repaired += "}" * (open_braces - close_braces)
+
+        try:
+            return json.loads(repaired, strict=False)
+        except Exception:
+            pass
+
+        # Attempt 3: Regex key-value extraction fallback
+        extracted = {}
+        for match in re.finditer(r'"([^"]+)"\s*:\s*"([^"]*)', cleaned):
+            k, v = match.group(1), match.group(2)
+            extracted[k] = v
+
+        for match in re.finditer(r'"([^"]+)"\s*:\s*([0-9\.-]+)', cleaned):
+            k, v = match.group(1), match.group(2)
+            if k not in extracted:
+                try:
+                    extracted[k] = float(v) if "." in v else int(v)
+                except Exception:
+                    extracted[k] = v
+
+        if extracted and ("sentiment" in extracted or "score" in extracted):
+            return extracted
+
+        raise ValueError(f"Failed to parse or repair JSON content: {content}")
+
     def _analyze_news_sentiment_llm(
         self,
         kept_headlines: List[Dict[str, Any]],
@@ -411,12 +545,12 @@ class SentimentAgent:
         import re
         from agno.agent import Agent
         from agno.models.openai import OpenAILike
-        
+
         headlines_str = ""
         for i, item in enumerate(kept_headlines, 1):
             text = item["text"]
             ts = item["timestamp"]
-            
+
             from datetime import timezone as _tz
             ref = current_time
             ts_ref = ts
@@ -447,176 +581,322 @@ Headlines:
         content = None
         data = None
 
-        # 1. AgentRouter GLM-5.2
+        # 1. 9inference DeepSeek V4 Flash 0731
         try:
-            logger.info("Initializing AgentRouter GLM-5.2 for sentiment analysis...")
-            model_glm = OpenAILike(
-                id=self.agentrouter_model_id,
-                api_key=self.agentrouter_api_key,
-                base_url=self.agentrouter_base_url,
+            logger.info("Initializing 9inference DeepSeek V4 Flash 0731 for sentiment analysis...")
+            model_nine = OpenAILike(
+                id=self.nineinference_model_id,
+                api_key=self.nineinference_api_key,
+                base_url=self.nineinference_base_url,
                 temperature=0.6,
                 top_p=0.95,
                 max_tokens=4096,
-                timeout=15.0,
-                max_retries=0,
-                default_headers={
-                    "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
-                    "anthropic-version": "2023-06-01",
-                    "anthropic-beta": "claude-code-20250219",
-                    "x-app": "cli"
-                }
+                timeout=45.0,
+                max_retries=1,
             )
-            agent_glm = Agent(
-                model=model_glm,
+            agent_nine = Agent(
+                model=model_nine,
                 description="You are a market sentiment analyst for Gold (XAUUSD).",
             )
-            response = agent_glm.run(prompt)
+            response = agent_nine.run(prompt)
             if not response or not response.content:
-                raise ValueError("Empty response content from AgentRouter GLM-5.2")
+                raise ValueError("Empty response content from 9inference DeepSeek V4 Flash 0731")
             content = response.content.strip()
             if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                raise ValueError(f"Invalid content returned from AgentRouter GLM-5.2: {content}")
-            
-            # Clean markdown code block or extract JSON object robustly via regex
-            cleaned_content = content.strip()
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
-            if match:
-                cleaned_content = match.group(1).strip()
-            else:
-                brace_match = re.search(r"(\{[\s\S]*\})", cleaned_content)
-                if brace_match:
-                    cleaned_content = brace_match.group(1).strip()
-                    
-            data = json.loads(cleaned_content)
-            logger.info("✅ Successfully analyzed sentiment via AgentRouter GLM-5.2")
-        except Exception as glm_err:
-            logger.warning(f"AgentRouter GLM-5.2 sentiment analysis failed, trying Qwen 397B: {glm_err}")
+                raise ValueError(f"Invalid content returned from 9inference DeepSeek V4 Flash 0731: {content}")
+
+            data = self._robust_json_parse(content)
+            logger.info("✅ Successfully analyzed sentiment via 9inference DeepSeek V4 Flash 0731")
+        except Exception as nine_err:
+            logger.warning(f"9inference DeepSeek V4 Flash 0731 sentiment analysis failed, trying AgentRouter GLM-5.2: {nine_err}")
             if content:
                 logger.warning(f"Raw LLM content was: {content}")
 
-            # 2. NVIDIA Qwen 397B
+            # 2. AgentRouter GLM-5.2
             try:
-                logger.info("Initializing NVIDIA Qwen 397B for sentiment analysis...")
-                model_397b = OpenAILike(
-                    id=self.nvidia_397b_model_id,
-                    api_key=self.nvidia_397b_api_key,
-                    base_url=self.nvidia_397b_base_url,
+                logger.info("Initializing AgentRouter GLM-5.2 for sentiment analysis...")
+                model_glm = OpenAILike(
+                    id=self.agentrouter_model_id,
+                    api_key=self.agentrouter_api_key,
+                    base_url=self._get_effective_base_url(self.agentrouter_base_url),
+                    temperature=0.6,
+                    top_p=0.95,
+                    max_tokens=4096,
+                    timeout=15.0,
+                    max_retries=0,
+                    default_headers={
+                        "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
+                        "anthropic-version": "2023-06-01",
+                        "anthropic-beta": "claude-code-20250219",
+                        "x-app": "cli"
+                    }
+                )
+                agent_glm = Agent(
+                    model=model_glm,
+                    description="You are a market sentiment analyst for Gold (XAUUSD).",
+                )
+                response = agent_glm.run(prompt)
+                if not response or not response.content:
+                    raise ValueError("Empty response content from AgentRouter GLM-5.2")
+                content = response.content.strip()
+                if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                    raise ValueError(f"Invalid content returned from AgentRouter GLM-5.2: {content}")
+
+                data = self._robust_json_parse(content)
+                logger.info("✅ Successfully analyzed sentiment via AgentRouter GLM-5.2")
+            except Exception as glm_err:
+                logger.warning(f"AgentRouter GLM-5.2 sentiment analysis failed, trying Groq Qwen 3.6 27B: {glm_err}")
+                if content:
+                    logger.warning(f"Raw LLM content was: {content}")
+
+                # 3. Groq Qwen 3.6 27B
+            try:
+                logger.info("Initializing Groq Qwen 3.6 27B for sentiment analysis...")
+                model_groq = OpenAILike(
+                    id=self.groq_model_id,
+                    api_key=self.groq_api_key,
+                    base_url=self.groq_base_url,
                     temperature=0.6,
                     top_p=0.95,
                     max_tokens=1024,
                     timeout=15.0,
                     max_retries=0,
                 )
-                agent_397b = Agent(
-                    model=model_397b,
+                agent_groq = Agent(
+                    model=model_groq,
                     description="You are a market sentiment analyst for Gold (XAUUSD).",
                 )
-                response = agent_397b.run(prompt)
+                response = agent_groq.run(prompt)
                 if not response or not response.content:
-                    raise ValueError("Empty response content from NVIDIA Qwen 397B")
+                    raise ValueError("Empty response content from Groq Qwen 3.6 27B")
                 content = response.content.strip()
                 if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                    raise ValueError(f"Invalid content returned from NVIDIA Qwen 397B: {content}")
-                
-                # Clean markdown code block or extract JSON object robustly via regex
-                cleaned_content = content.strip()
-                match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
-                if match:
-                    cleaned_content = match.group(1).strip()
-                else:
-                    brace_match = re.search(r"(\{[\s\S]*\})", cleaned_content)
-                    if brace_match:
-                        cleaned_content = brace_match.group(1).strip()
-                        
-                data = json.loads(cleaned_content)
-                logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 397B")
-            except Exception as qwen397_err:
-                logger.warning(f"NVIDIA Qwen 397B sentiment analysis failed, trying Qwen 122B: {qwen397_err}")
+                    raise ValueError(f"Invalid content returned from Groq Qwen 3.6 27B: {content}")
+
+                data = self._robust_json_parse(content)
+                logger.info("✅ Successfully analyzed sentiment via Groq Qwen 3.6 27B")
+            except Exception as groq_err:
+                logger.warning(f"Groq Qwen 3.6 27B sentiment analysis failed, trying Nemotron 120B: {groq_err}")
                 if content:
                     logger.warning(f"Raw LLM content was: {content}")
-            
-                # 3. NVIDIA Qwen 122B (DeepSeek V4 Pro bypassed)
+
+                # 4. NVIDIA Nemotron 120B
                 try:
-                    logger.info("Initializing NVIDIA Qwen 122B for sentiment analysis...")
-                    model_122b = OpenAILike(
-                        id=self.nvidia_122b_model_id,
-                        api_key=self.nvidia_122b_api_key,
-                        base_url=self.nvidia_122b_base_url,
+                    logger.info("Initializing NVIDIA Nemotron 120B for sentiment analysis...")
+                    model_120b = OpenAILike(
+                        id=self.nvidia_120b_model_id,
+                        api_key=self.nvidia_120b_api_key,
+                        base_url=self._get_effective_base_url(self.nvidia_120b_base_url),
                         temperature=0.6,
                         top_p=0.95,
                         max_tokens=1024,
                         timeout=15.0,
                         max_retries=0,
                     )
-                    agent_122b = Agent(
-                        model=model_122b,
+                    agent_120b = Agent(
+                        model=model_120b,
                         description="You are a market sentiment analyst for Gold (XAUUSD).",
                     )
-                    response = agent_122b.run(prompt)
+                    response = agent_120b.run(prompt)
                     if not response or not response.content:
-                        raise ValueError("Empty response content from NVIDIA Qwen 122B")
+                        raise ValueError("Empty response content from NVIDIA Nemotron 120B")
                     content = response.content.strip()
                     if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                        raise ValueError(f"Invalid content returned from NVIDIA Qwen 122B: {content}")
-                    
-                    # Clean markdown code block or extract JSON object robustly via regex
-                    cleaned_content = content.strip()
-                    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
-                    if match:
-                        cleaned_content = match.group(1).strip()
-                    else:
-                        brace_match = re.search(r"(\{[\s\S]*\})", cleaned_content)
-                        if brace_match:
-                            cleaned_content = brace_match.group(1).strip()
-                            
-                    data = json.loads(cleaned_content)
-                    logger.info("✅ Successfully analyzed sentiment via NVIDIA Qwen 122B")
-                except Exception as qwen122_err:
-                    logger.warning(f"NVIDIA Qwen 122B sentiment analysis failed, trying Gemini: {qwen122_err}")
+                        raise ValueError(f"Invalid content returned from NVIDIA Nemotron 120B: {content}")
+
+                    data = self._robust_json_parse(content)
+                    logger.info("✅ Successfully analyzed sentiment via NVIDIA Nemotron 120B")
+                except Exception as nemo120_err:
+                    logger.warning(f"NVIDIA Nemotron 120B sentiment analysis failed, trying Nemotron 550B: {nemo120_err}")
                     if content:
                         logger.warning(f"Raw LLM content was: {content}")
-                    
-                    # 4. Gemini Fallback
+
+                    # 6. NVIDIA Nemotron 550B
                     try:
-                        google_api_key = os.getenv("GOOGLE_API_KEY")
-                        if not google_api_key:
-                            raise ValueError("GOOGLE_API_KEY not found in environment.")
-    
-                        from agno.models.google import Gemini
-    
-                        model_gemini = Gemini(
-                            id="gemini-2.5-flash",
-                            api_key=google_api_key,
-                            max_output_tokens=1024,
+                        logger.info("Initializing NVIDIA Nemotron 550B for sentiment analysis...")
+                        model_550b = OpenAILike(
+                            id=self.nvidia_550b_model_id,
+                            api_key=self.nvidia_550b_api_key,
+                            base_url=self._get_effective_base_url(self.nvidia_550b_base_url),
+                            temperature=0.6,
+                            top_p=0.95,
+                            max_tokens=1024,
+                            timeout=15.0,
+                            max_retries=0,
                         )
-                        agent_gemini = Agent(
-                            model=model_gemini,
+                        agent_550b = Agent(
+                            model=model_550b,
                             description="You are a market sentiment analyst for Gold (XAUUSD).",
                         )
-                        response = agent_gemini.run(prompt)
+                        response = agent_550b.run(prompt)
                         if not response or not response.content:
-                            raise ValueError("Empty response content from Gemini Fallback")
+                            raise ValueError("Empty response content from NVIDIA Nemotron 550B")
                         content = response.content.strip()
                         if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                            raise ValueError(f"Invalid content returned from Gemini Fallback: {content}")
-                        
-                        # Clean markdown code block or extract JSON object robustly via regex
-                        cleaned_content = content.strip()
-                        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned_content)
-                        if match:
-                            cleaned_content = match.group(1).strip()
-                        else:
-                            brace_match = re.search(r"(\{[\s\S]*\})", cleaned_content)
-                            if brace_match:
-                                cleaned_content = brace_match.group(1).strip()
-                                
-                        data = json.loads(cleaned_content)
-                        logger.info("✅ Successfully analyzed sentiment via Gemini Fallback")
-                    except Exception as gemini_err:
-                        logger.error(f"Gemini fallback also failed: {gemini_err}")
+                            raise ValueError(f"Invalid content returned from NVIDIA Nemotron 550B: {content}")
+
+                        data = self._robust_json_parse(content)
+                        logger.info("✅ Successfully analyzed sentiment via NVIDIA Nemotron 550B")
+                    except Exception as nemo550_err:
+                        logger.warning(f"NVIDIA Nemotron 550B sentiment analysis failed, trying MiniMax M3: {nemo550_err}")
                         if content:
-                            logger.error(f"Raw LLM content was: {content}")
-                        return None
+                            logger.warning(f"Raw LLM content was: {content}")
+
+                        # 7. NVIDIA MiniMax M3
+                        try:
+                            logger.info("Initializing NVIDIA MiniMax M3 for sentiment analysis...")
+                            model_minimax = OpenAILike(
+                                id=self.nvidia_minimax_model_id,
+                                api_key=self.nvidia_minimax_api_key,
+                                base_url=self._get_effective_base_url(self.nvidia_minimax_base_url),
+                                temperature=0.6,
+                                top_p=0.95,
+                                max_tokens=1024,
+                                timeout=15.0,
+                                max_retries=0,
+                            )
+                            agent_minimax = Agent(
+                                model=model_minimax,
+                                description="You are a market sentiment analyst for Gold (XAUUSD).",
+                            )
+                            response = agent_minimax.run(prompt)
+                            if not response or not response.content:
+                                raise ValueError("Empty response content from NVIDIA MiniMax M3")
+                            content = response.content.strip()
+                            if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                                raise ValueError(f"Invalid content returned from NVIDIA MiniMax M3: {content}")
+
+                            data = self._robust_json_parse(content)
+                            logger.info("✅ Successfully analyzed sentiment via NVIDIA MiniMax M3")
+                        except Exception as minimax_err:
+                            logger.warning(f"NVIDIA MiniMax M3 sentiment analysis failed, trying Inkling: {minimax_err}")
+                            if content:
+                                logger.warning(f"Raw LLM content was: {content}")
+
+                            # 8. NVIDIA ThinkingMachines Inkling
+                            try:
+                                logger.info("Initializing NVIDIA Inkling for sentiment analysis...")
+                                model_inkling = OpenAILike(
+                                    id=self.nvidia_inkling_model_id,
+                                    api_key=self.nvidia_inkling_api_key,
+                                    base_url=self._get_effective_base_url(self.nvidia_inkling_base_url),
+                                    temperature=0.6,
+                                    top_p=0.95,
+                                    max_tokens=1024,
+                                    timeout=15.0,
+                                    max_retries=0,
+                                )
+                                agent_inkling = Agent(
+                                    model=model_inkling,
+                                    description="You are a market sentiment analyst for Gold (XAUUSD).",
+                                )
+                                response = agent_inkling.run(prompt)
+                                if not response or not response.content:
+                                    raise ValueError("Empty response content from NVIDIA Inkling")
+                                content = response.content.strip()
+                                if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                                    raise ValueError(f"Invalid content returned from NVIDIA Inkling: {content}")
+
+                                data = self._robust_json_parse(content)
+                                logger.info("✅ Successfully analyzed sentiment via NVIDIA Inkling")
+                            except Exception as inkling_err:
+                                logger.warning(f"NVIDIA Inkling sentiment analysis failed, trying Laguna: {inkling_err}")
+                                if content:
+                                    logger.warning(f"Raw LLM content was: {content}")
+
+                                # 9. NVIDIA Poolside Laguna XS 2.1
+                                try:
+                                    logger.info("Initializing NVIDIA Laguna XS for sentiment analysis...")
+                                    model_laguna = OpenAILike(
+                                        id=self.nvidia_laguna_model_id,
+                                        api_key=self.nvidia_laguna_api_key,
+                                        base_url=self._get_effective_base_url(self.nvidia_laguna_base_url),
+                                        temperature=0.6,
+                                        top_p=0.95,
+                                        max_tokens=1024,
+                                        timeout=15.0,
+                                        max_retries=0,
+                                    )
+                                    agent_laguna = Agent(
+                                        model=model_laguna,
+                                        description="You are a market sentiment analyst for Gold (XAUUSD).",
+                                    )
+                                    response = agent_laguna.run(prompt)
+                                    if not response or not response.content:
+                                        raise ValueError("Empty response content from NVIDIA Laguna")
+                                    content = response.content.strip()
+                                    if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                                        raise ValueError(f"Invalid content returned from NVIDIA Laguna: {content}")
+
+                                    data = self._robust_json_parse(content)
+                                    logger.info("✅ Successfully analyzed sentiment via NVIDIA Laguna")
+                                except Exception as laguna_err:
+                                    logger.warning(f"NVIDIA Laguna sentiment analysis failed, trying NVIDIA GLM: {laguna_err}")
+                                    if content:
+                                        logger.warning(f"Raw LLM content was: {content}")
+
+                                    # 10. NVIDIA GLM 5.2
+                                    try:
+                                        logger.info("Initializing NVIDIA GLM 5.2 for sentiment analysis...")
+                                        model_nvglm = OpenAILike(
+                                            id=self.nvidia_glm_model_id,
+                                            api_key=self.nvidia_glm_api_key,
+                                            base_url=self._get_effective_base_url(self.nvidia_glm_base_url),
+                                            temperature=0.6,
+                                            top_p=0.95,
+                                            max_tokens=1024,
+                                            timeout=15.0,
+                                            max_retries=0,
+                                        )
+                                        agent_nvglm = Agent(
+                                            model=model_nvglm,
+                                            description="You are a market sentiment analyst for Gold (XAUUSD).",
+                                        )
+                                        response = agent_nvglm.run(prompt)
+                                        if not response or not response.content:
+                                            raise ValueError("Empty response content from NVIDIA GLM 5.2")
+                                        content = response.content.strip()
+                                        if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                                            raise ValueError(f"Invalid content returned from NVIDIA GLM 5.2: {content}")
+
+                                        data = self._robust_json_parse(content)
+                                        logger.info("✅ Successfully analyzed sentiment via NVIDIA GLM 5.2")
+                                    except Exception as nvglm_err:
+                                        logger.warning(f"NVIDIA GLM 5.2 sentiment analysis failed, trying Gemini: {nvglm_err}")
+                                        if content:
+                                            logger.warning(f"Raw LLM content was: {content}")
+
+                                        # 11. Gemini Fallback
+                                        try:
+                                            google_api_key = os.getenv("GOOGLE_API_KEY")
+                                            if not google_api_key:
+                                                raise ValueError("GOOGLE_API_KEY not found in environment.")
+
+                                            from agno.models.google import Gemini
+
+                                            model_gemini = Gemini(
+                                                id="gemini-2.5-flash",
+                                                api_key=google_api_key,
+                                                max_output_tokens=1024,
+                                            )
+                                            agent_gemini = Agent(
+                                                model=model_gemini,
+                                                description="You are a market sentiment analyst for Gold (XAUUSD).",
+                                            )
+                                            response = agent_gemini.run(prompt)
+                                            if not response or not response.content:
+                                                raise ValueError("Empty response content from Gemini Fallback")
+                                            content = response.content.strip()
+                                            if "Unknown model error" in content or ("{" not in content and "}" not in content):
+                                                raise ValueError(f"Invalid content returned from Gemini Fallback: {content}")
+
+                                            data = self._robust_json_parse(content)
+                                            logger.info("✅ Successfully analyzed sentiment via Gemini Fallback")
+                                        except Exception as gemini_err:
+                                            logger.error(f"Gemini fallback also failed: {gemini_err}")
+                                            if content:
+                                                logger.error(f"Raw LLM content was: {content}")
+                                            return None
 
 
 

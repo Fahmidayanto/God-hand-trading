@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Toggle · AirFlow Unified Hybrid AI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: radial-gradient(120% 80% at 50% 50%, #0e0524 0%, #06010f 70%, #03000a 100%);
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    canvas { display: block; cursor: pointer; }
+
+    .meta {
+      position: fixed;
+      top: 18px; left: 22px;
+      color: #a78bfa;
+      font-family: ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace;
+      font-size: 11px; letter-spacing: 0.18em;
+      text-transform: uppercase; opacity: 0.55;
+      pointer-events: none; user-select: none;
+    }
+    .meta b { color: #d8b4fe; font-weight: 600; }
+
+    .stage { position: fixed; inset: 0; display: grid; place-items: center; }
+
+    .hint {
+      position: fixed; bottom: 38px; left: 50%;
+      transform: translateX(-50%);
+      color: #c4b5fd;
+      font-family: ui-monospace, "JetBrains Mono", monospace;
+      font-size: 12px; letter-spacing: 0.14em;
+      text-transform: uppercase; opacity: 0.55;
+      transition: opacity 0.4s ease-out;
+      pointer-events: none; user-select: none;
+      text-align: center;
+    }
+    .hint kbd {
+      display: inline-block;
+      padding: 2px 7px; margin: 0 4px;
+      background: rgba(168, 130, 255, 0.12);
+      border: 1px solid rgba(168, 130, 255, 0.28);
+      border-radius: 4px;
+      font-family: inherit; font-size: 11px;
+      color: #ddd6fe;
+    }
+    .hint.gone { opacity: 0; }
+
+    .err {
+      position: fixed; top: 60px; left: 22px; right: 22px;
+      padding: 14px 18px;
+      background: rgba(127, 29, 29, 0.35);
+      border: 1px solid rgba(248, 113, 113, 0.45);
+      border-radius: 10px;
+      color: #fecaca;
+      font-family: ui-monospace, "JetBrains Mono", monospace;
+      font-size: 12px; line-height: 1.55;
+      display: none;
+      z-index: 100;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 50vh; overflow: auto;
+    }
+    .err.show { display: block; }
+    .err b { color: #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="meta">Three.js · <b>toggle</b> · unified hybrid AI</div>
+  <div class="stage"><canvas id="c"></canvas></div>
+  <div class="hint" id="hint">click the badge — or press <kbd>Space</kbd></div>
+  <div class="err" id="err"></div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/[email protected]/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+
+    // ────────────────────────────────────────────────────────────
+    // Error display + global handlers
+    // ────────────────────────────────────────────────────────────
+    const errBox = document.getElementById("err");
+    function showError(msg) {
+      if (errBox) {
+        errBox.textContent = msg;
+        errBox.classList.add("show");
+      }
+      console.error(msg);
+    }
+    window.addEventListener("error", (e) => {
+      showError(`Runtime error:\n${e.message}\n${e.filename || ""}:${e.lineno || ""}`);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      const reason = e.reason && e.reason.message ? e.reason.message : e.reason;
+      showError(`Promise error:\n${reason}`);
+    });
+
+    try {
+
+    // ────────────────────────────────────────────────────────────
+    // Renderer / scene / camera
+    // ────────────────────────────────────────────────────────────
+    const canvas = document.getElementById("c");
+
+    // WebGL availability check
+    const testGL = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!testGL) {
+      showError("WebGL is not available in this browser. Try Chrome/Edge/Firefox with hardware acceleration enabled.");
+      throw new Error("No WebGL");
+    }
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 0);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -10, 10);
+    camera.position.z = 5;
+
+    // ────────────────────────────────────────────────────────────
+    // Layout constants
+    // ────────────────────────────────────────────────────────────
+    const PILL_W = 2.4;
+    const PILL_H = 0.55;
+    const PILL_R = 0.275;
+    const ICON_CX = -PILL_W / 2 + 0.34;
+    const TEXT_CX = 0.28;
+    const TEXT_PLANE_W = 1.78;
+    const TEXT_PLANE_H = 0.42;
+
+    // Camera frustum must contain the pill + padding on the constraining axis.
+    // Previously this used halfW=1 / halfH=1 as the "max" — but the pill is
+    // 2.4 wide, so halfW=1 (camera width 2) clipped both sides. Now we size
+    // the camera from the pill dimensions with a padding factor.
+    const VIEW_PADDING = 1.4;
+    function applyOrtho() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const viewAspect = w / h;
+      const pillAspect = PILL_W / PILL_H;
+      let halfW, halfH;
+      if (viewAspect > pillAspect) {
+        // Viewport is wider than the pill → fit by height
+        halfH = (PILL_H / 2) * VIEW_PADDING;
+        halfW = halfH * viewAspect;
+      } else {
+        // Viewport is taller than the pill → fit by width
+        halfW = (PILL_W / 2) * VIEW_PADDING;
+        halfH = halfW / viewAspect;
+      }
+      camera.left = -halfW;
+      camera.right = halfW;
+      camera.top = halfH;
+      camera.bottom = -halfH;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Helpers
+    // ────────────────────────────────────────────────────────────
+    function roundedRectShape(w, h, r) {
+      const s = new THREE.Shape();
+      const x = -w / 2, y = -h / 2;
+      s.moveTo(x + r, y);
+      s.lineTo(x + w - r, y);
+      s.quadraticCurveTo(x + w, y, x + w, y + r);
+      s.lineTo(x + w, y + h - r);
+      s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      s.lineTo(x + r, y + h);
+      s.quadraticCurveTo(x, y + h, x, y + h - r);
+      s.lineTo(x, y + r);
+      s.quadraticCurveTo(x, y, x + r, y);
+      return s;
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Root group
+    // ────────────────────────────────────────────────────────────
+    const root = new THREE.Group();
+    scene.add(root);
+
+    // ────────────────────────────────────────────────────────────
+    // Outer additive glow
+    // ────────────────────────────────────────────────────────────
+    const glowMat = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uIntensity: { value: 0.12 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform float uIntensity;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float r = length(p);
+          float breath = 0.78 + 0.22 * sin(uTime * 1.4);
+          float a = uIntensity * breath * smoothstep(0.5, 0.05, r);
+          vec3 col = mix(vec3(0.45, 0.18, 0.95), vec3(0.85, 0.55, 1.0), vUv.x);
+          gl_FragColor = vec4(col, a);
+        }
+      `
+    });
+    const glow = new THREE.Mesh(
+      new THREE.ShapeGeometry(roundedRectShape(PILL_W + 0.22, PILL_H + 0.22, PILL_R + 0.11)),
+      glowMat
+    );
+    glow.position.z = -0.04;
+    root.add(glow);
+
+    // ────────────────────────────────────────────────────────────
+    // Pill background
+    // ────────────────────────────────────────────────────────────
+    const pillMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uColorA: { value: new THREE.Color(0x2a0e50) },
+        uColorB: { value: new THREE.Color(0x5b21b6) },
+        uGlow: { value: 0.0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform vec3 uColorA;
+        uniform vec3 uColorB;
+        uniform float uGlow;
+        void main() {
+          float t = smoothstep(0.0, 1.0, vUv.x * 0.7 + 0.2);
+          vec3 col = mix(uColorA, uColorB, t);
+          vec2 p = vUv - 0.5;
+          p.x += sin(uTime * 0.6) * 0.08;
+          float r = length(p * vec2(1.4, 2.2));
+          col += uGlow * vec3(0.45, 0.25, 0.85) * (1.0 - smoothstep(0.0, 0.55, r));
+          col *= 1.0 - r * 0.35;
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    });
+    const pill = new THREE.Mesh(
+      new THREE.ShapeGeometry(roundedRectShape(PILL_W, PILL_H, PILL_R)),
+      pillMat
+    );
+    root.add(pill);
+
+    // ────────────────────────────────────────────────────────────
+    // Stacked-layers icon
+    // ────────────────────────────────────────────────────────────
+    const iconGroup = new THREE.Group();
+    iconGroup.position.set(ICON_CX, 0, 0.02);
+    root.add(iconGroup);
+
+    const iconGlowMat = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: { uTime: { value: 0 }, uIntensity: { value: 0.15 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform float uIntensity;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float r = length(p);
+          float pulse = 0.65 + 0.35 * sin(uTime * 2.4);
+          float a = smoothstep(0.5, 0.0, r) * 0.55 * pulse * uIntensity;
+          gl_FragColor = vec4(0.35, 0.95, 0.9, a);
+        }
+      `
+    });
+    const iconGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.42), iconGlowMat);
+    iconGlow.position.z = -0.005;
+    iconGroup.add(iconGlow);
+
+    const LAYER_W = 0.26, LAYER_H = 0.075, LAYER_R = 0.022, LAYER_DY = 0.07;
+    const BASE_Y = [LAYER_DY, 0, -LAYER_DY];
+
+    function buildLayerGeometry() {
+      const plate = roundedRectShape(LAYER_W, LAYER_H, LAYER_R);
+      const innerW = LAYER_W * 0.55, innerH = LAYER_H * 0.45, innerR = LAYER_R * 0.45;
+      const hole = new THREE.Path();
+      const ix = -innerW / 2, iy = -innerH / 2;
+      hole.moveTo(ix + innerR, iy);
+      hole.lineTo(ix + innerW - innerR, iy);
+      hole.quadraticCurveTo(ix + innerW, iy, ix + innerW, iy + innerR);
+      hole.lineTo(ix + innerW, iy + innerH - innerR);
+      hole.quadraticCurveTo(ix + innerW, iy + innerH, ix + innerW - innerR, iy + innerH);
+      hole.lineTo(ix + innerR, iy + innerH);
+      hole.quadraticCurveTo(ix, iy + innerH, ix, iy + innerH - innerR);
+      hole.lineTo(ix, iy + innerR);
+      hole.quadraticCurveTo(ix, iy, ix + innerR, iy);
+      plate.holes.push(hole);
+      return new THREE.ShapeGeometry(plate);
+    }
+    function buildOutlineGeometry() {
+      return new THREE.ShapeGeometry(roundedRectShape(LAYER_W, LAYER_H, LAYER_R));
+    }
+
+    const layerColors = [
+      new THREE.Color(0x5eead4),
+      new THREE.Color(0x67e8f9),
+      new THREE.Color(0x99f6e4)
+    ];
+    const layerFill = layerColors.map(c => new THREE.MeshBasicMaterial({ color: c.clone() }));
+    const layerOutline = layerColors.map(c => new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(1.25) }));
+
+    const layerPlates = [];
+    const layerOutlines = [];
+    for (let i = 0; i < 3; i++) {
+      const plate = new THREE.Mesh(buildLayerGeometry(), layerFill[i]);
+      plate.position.y = BASE_Y[i];
+      iconGroup.add(plate);
+      layerPlates.push(plate);
+
+      const stroke = new THREE.Mesh(buildOutlineGeometry(), layerOutline[i]);
+      stroke.position.y = BASE_Y[i];
+      stroke.position.z = 0.001;
+      iconGroup.add(stroke);
+      layerOutlines.push(stroke);
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Two text planes (crossfade between idle / thinking)
+    // ────────────────────────────────────────────────────────────
+    const textCanvasW = 1024, textCanvasH = 256;
+    const FONT = '600 76px ui-monospace, "JetBrains Mono", "SF Mono", Consolas, monospace';
+
+    function makeTextPlane() {
+      const c = document.createElement("canvas");
+      c.width = textCanvasW; c.height = textCanvasH;
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.anisotropy = 4;
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(TEXT_PLANE_W, TEXT_PLANE_H),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1 })
+      );
+      mesh.position.set(TEXT_CX, 0, 0.03);
+      return { canvas: c, ctx: c.getContext("2d"), tex, mesh };
+    }
+
+    function drawLabel(ctx, text) {
+      ctx.clearRect(0, 0, textCanvasW, textCanvasH);
+      ctx.font = FONT;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = "left";
+      // soft purple glow
+      ctx.fillStyle = "rgba(168, 130, 255, 0.55)";
+      ctx.shadowColor = "rgba(168, 130, 255, 0.9)";
+      ctx.shadowBlur = 26;
+      ctx.fillText(text, 40, textCanvasH / 2);
+      // crisp foreground
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, 40, textCanvasH / 2);
+    }
+
+    const idleText = makeTextPlane();
+    drawLabel(idleText.ctx, "Send to AirFlow  ▸");
+    idleText.tex.needsUpdate = true;
+    root.add(idleText.mesh);
+
+    const thinkText = makeTextPlane();
+    thinkText.mesh.position.z = 0.031; // sit just above idle plane
+    const baseThink = "Thinking: AirFlow TaskFlow";
+    const dotStates = ["", ".", "..", "..."];
+    let dotIndex = 0;
+    let lastDotAt = 0;
+    const DOT_PERIOD = 0.32;
+    function drawThinkLabel() {
+      drawLabel(thinkText.ctx, baseThink + dotStates[dotIndex]);
+      thinkText.tex.needsUpdate = true;
+    }
+    drawThinkLabel();
+    thinkText.mesh.material.opacity = 0; // start hidden
+    root.add(thinkText.mesh);
+
+    // ────────────────────────────────────────────────────────────
+    // Scanline (only when thinking)
+    // ────────────────────────────────────────────────────────────
+    const scanMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      uniforms: { uTime: { value: 0 }, uOpacity: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform float uOpacity;
+        void main() {
+          float period = 3.6;
+          float x = mod(uTime / period, 1.0);
+          float d = vUv.x - x;
+          float band = exp(-d * d * 90.0);
+          float vmask = smoothstep(0.0, 0.18, vUv.y) * smoothstep(1.0, 0.82, vUv.y);
+          gl_FragColor = vec4(1.0, 1.0, 1.0, band * 0.35 * uOpacity * vmask);
+        }
+      `
+    });
+    const scan = new THREE.Mesh(
+      new THREE.ShapeGeometry(roundedRectShape(PILL_W, PILL_H, PILL_R)),
+      scanMat
+    );
+    scan.position.z = 0.04;
+    root.add(scan);
+
+    // top-edge highlight (subtle gloss)
+    const topEdgeMat = new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        void main() {
+          float band = smoothstep(0.78, 1.0, vUv.y) * (1.0 - smoothstep(0.95, 1.0, vUv.y));
+          gl_FragColor = vec4(1.0, 1.0, 1.0, band * 0.18);
+        }
+      `
+    });
+    const topEdge = new THREE.Mesh(
+      new THREE.ShapeGeometry(roundedRectShape(PILL_W, PILL_H, PILL_R)),
+      topEdgeMat
+    );
+    topEdge.position.z = 0.05;
+    root.add(topEdge);
+
+    // ────────────────────────────────────────────────────────────
+    // State machine: idle ↔ thinking
+    // ────────────────────────────────────────────────────────────
+    let state = 'idle';
+    let stateProgress = 0;          // 0 = idle, 1 = thinking (smoothly eased)
+    let pressTime = -1;             // last click time
+    let wakeTime = -1;              // one-shot bounce when entering thinking
+    const hintEl = document.getElementById('hint');
+
+    function toggle() {
+      const next = (state === 'idle') ? 'thinking' : 'idle';
+      if (next === 'thinking') wakeTime = clock.getElapsedTime();
+      state = next;
+      pressTime = clock.getElapsedTime();
+      if (!hintEl.classList.contains('gone')) hintEl.classList.add('gone');
+    }
+
+    canvas.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      toggle();
+    });
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') { e.preventDefault(); toggle(); }
+    });
+
+    // ────────────────────────────────────────────────────────────
+    // Animation loop
+    // ────────────────────────────────────────────────────────────
+    applyOrtho();
+    window.addEventListener("resize", applyOrtho);
+
+    const clock = new THREE.Clock();
+    const FLOW_PERIOD = 1.6;
+
+    // Press pulse: depress → bounce up → settle (damped oscillation)
+    function pressCurve(age) {
+      if (age < 0 || age > 0.42) return 0;
+      if (age < 0.05) return (age / 0.05) * 0.045;            // 0 → 0.045 (squash)
+      if (age < 0.20) {
+        const x = (age - 0.05) / 0.15;
+        return 0.045 - x * 0.075;                              // 0.045 → -0.03 (overshoot)
+      }
+      const x = (age - 0.20) / 0.22;
+      return -0.03 * Math.exp(-x * 6.5);                       // -0.03 → 0 (settle)
+    }
+
+    function frame() {
+      const t = clock.getElapsedTime();
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      // Eased state interpolation (snappy but not abrupt)
+      const target = (state === 'thinking') ? 1 : 0;
+      const speed = 6;                                          // ~170ms full transition
+      stateProgress += (target - stateProgress) * Math.min(1, dt * speed);
+      const sp = stateProgress;
+
+      // One-shot press pulse
+      const press = pressCurve(t - pressTime);
+
+      // One-shot wake bounce (only when entering thinking)
+      let wake = 0;
+      if (wakeTime >= 0) {
+        const age = t - wakeTime;
+        if (age < 0.55) {
+          wake = Math.sin(age * Math.PI * 2.2) * (1 - age / 0.55) * 0.12;
+        } else wakeTime = -1;
+      }
+
+      // ── Apply stateProgress to all visual layers ──
+      pillMat.uniforms.uTime.value = t;
+      pillMat.uniforms.uGlow.value = 0.025 + 0.10 * sp + 0.04 * Math.sin(t * 1.4) * sp;
+
+      glowMat.uniforms.uTime.value = t;
+      glowMat.uniforms.uIntensity.value = 0.12 + 0.36 * sp + 0.04 * Math.sin(t * 1.4) * sp;
+
+      iconGlowMat.uniforms.uTime.value = t;
+      iconGlowMat.uniforms.uIntensity.value = 0.20 + 0.45 * sp;
+
+      scanMat.uniforms.uTime.value = t;
+      scanMat.uniforms.uOpacity.value = sp * 0.85;
+      topEdgeMat.uniforms.uTime.value = t;
+
+      // Text crossfade
+      idleText.mesh.material.opacity = Math.max(0, 1 - sp);
+      thinkText.mesh.material.opacity = sp;
+
+      // Dots cycling (only meaningful when mostly visible)
+      if (sp > 0.4 && t - lastDotAt > DOT_PERIOD) {
+        lastDotAt = t;
+        dotIndex = (dotIndex + 1) % dotStates.length;
+        drawThinkLabel();
+      }
+
+      // Layer cascade (ping intensity scales with sp)
+      for (let i = 0; i < 3; i++) {
+        const phase = ((t / FLOW_PERIOD) - i * 0.22 + 1) % 1;
+        const ping = Math.max(0, Math.sin(phase * Math.PI));
+        const sx = 1.0 + ping * 0.22 * sp;
+        const sy = 1.0 + ping * 0.18 * sp;
+        layerPlates[i].scale.set(sx, sy, 1);
+        layerOutlines[i].scale.set(sx, sy, 1);
+        const base = layerColors[i];
+        const hot = base.clone().lerp(new THREE.Color(0xffffff), ping * 0.55 * sp);
+        layerFill[i].color.copy(base.clone().lerp(hot, sp));
+        layerOutline[i].color.copy(base.clone().lerp(new THREE.Color(0xffffff), ping * 0.7 * sp));
+        layerPlates[i].position.y = BASE_Y[i] + Math.sin(phase * Math.PI) * 0.012 * sp;
+        layerOutlines[i].position.y = BASE_Y[i] + Math.sin(phase * Math.PI) * 0.012 * sp;
+      }
+
+      // Icon group: wake bounce + subtle sway (both scale with sp)
+      const sway = Math.sin(t * 0.6) * 0.04 * sp;
+      iconGroup.rotation.z = sway;
+      iconGroup.scale.set(1 + wake, 1 + wake, 1);
+
+      // Root: press pulse + idle breathing
+      const breathe = 1.0 + Math.sin(t * 0.9) * 0.004;
+      const pressScale = 1 - press;
+      root.scale.set(pressScale * breathe, pressScale * breathe, 1);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+
+    } catch (e) {
+      showError(`Init error:\n${e.message}\n${e.stack || ""}`);
+    }
+  </script>
+</body>
+</html>

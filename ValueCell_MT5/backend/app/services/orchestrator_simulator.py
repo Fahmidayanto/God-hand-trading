@@ -3,7 +3,7 @@ import threading
 import time as _time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import pandas as pd
 
@@ -111,120 +111,92 @@ Return raw JSON ONLY. No markdown code blocks.
 """
 
     content = None
+    NV_BASE = "https://integrate.api.nvidia.com/v1"
+    AGENTROUTER_BASE = "https://agentrouter.org/v1"
+    LLM_DESCRIPTION = "You are a historical financial market news and economic calendar archiver for Gold (XAUUSD)."
 
-    # 1. Try AgentRouter GLM-5.2
-    try:
-        logger.info("Initializing AgentRouter GLM-5.2 for sentiment/news generation...")
-        model_glm = OpenAILike(
+    model_chain = [
+        ("Groq Qwen 3.6 27B", lambda: OpenAILike(
+            id=os.getenv("GROQ_MODEL", "qwen/qwen3.6-27b"),
+            api_key=os.getenv("GROQ_API_KEY", "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"),
+            base_url="https://api.groq.com/openai/v1",
+            temperature=0.6, top_p=0.95, max_tokens=2048, timeout=15.0, max_retries=0,
+        )),
+        ("AgentRouter GLM-5.2", lambda: OpenAILike(
             id="glm-5.2",
             api_key="sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
-            base_url="https://agentrouter.org/v1",
-            temperature=0.6,
-            top_p=0.95,
-            max_tokens=4096,
-            timeout=15.0,
-            max_retries=0,
+            base_url=AGENTROUTER_BASE,
+            temperature=0.6, top_p=0.95, max_tokens=4096, timeout=15.0, max_retries=0,
             default_headers={
                 "User-Agent": "claude-cli/2.1.158 (external, sdk-cli)",
                 "anthropic-version": "2023-06-01",
                 "anthropic-beta": "claude-code-20250219",
-                "x-app": "cli"
-            }
-        )
-        agent_glm = Agent(
-            model=model_glm,
-            description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
-        )
-        response = agent_glm.run(prompt)
-        if not response or not response.content:
-            raise ValueError("Empty response content from AgentRouter GLM-5.2")
-        content = response.content.strip()
-        if "Unknown model error" in content or ("{" not in content and "}" not in content):
-            raise ValueError(f"Invalid content returned from AgentRouter GLM-5.2: {content}")
-        logger.info("✅ Successfully generated sentiment data via AgentRouter GLM-5.2")
-    except Exception as glm_err:
-        logger.warning(f"AgentRouter GLM-5.2 generation failed, trying Qwen 397B: {glm_err}")
+                "x-app": "cli",
+            },
+        )),
+        ("NVIDIA Nemotron 120B", lambda: OpenAILike(
+            id="nvidia/nemotron-3-super-120b-a12b",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("NVIDIA Nemotron 550B", lambda: OpenAILike(
+            id="nvidia/nemotron-3-ultra-550b-a55b",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("NVIDIA MiniMax M3", lambda: OpenAILike(
+            id="minimaxai/minimax-m3",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("NVIDIA Inkling", lambda: OpenAILike(
+            id="thinkingmachines/inkling",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("NVIDIA Laguna XS 2.1", lambda: OpenAILike(
+            id="poolside/laguna-xs-2.1",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("NVIDIA GLM 5.2", lambda: OpenAILike(
+            id="z-ai/glm-5.2",
+            api_key="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",
+            base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
+        )),
+        ("Gemini Fallback", lambda: Gemini(
+            id="gemini-2.5-flash",
+            api_key=os.getenv("GOOGLE_API_KEY"),
+            max_output_tokens=1024,
+        )),
+    ]
 
-        # 2. Try NVIDIA Qwen 397B
-        try:
-            logger.info("Initializing NVIDIA Qwen 397B for sentiment/news generation...")
-            model_397b = OpenAILike(
-                id="qwen/qwen3.5-397b-a17b",
-                api_key="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",
-                base_url="https://integrate.api.nvidia.com/v1",
-                temperature=0.6,
-                top_p=0.95,
-                max_tokens=1024,
-                timeout=15.0,
-                max_retries=0,
-            )
-            agent_397b = Agent(
-                model=model_397b,
-                description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
-            )
-            response = agent_397b.run(prompt)
-            if not response or not response.content:
-                raise ValueError("Empty response content from NVIDIA Qwen 397B")
-            content = response.content.strip()
-            if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                raise ValueError(f"Invalid content returned from NVIDIA Qwen 397B: {content}")
-            logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 397B")
-        except Exception as qwen397_err:
-            logger.warning(f"NVIDIA Qwen 397B generation failed, trying Qwen 122B: {qwen397_err}")
-
-        # 3. Try NVIDIA Qwen-122B (DeepSeek V4 Pro bypassed)
-        try:
-            logger.info("Initializing NVIDIA Qwen 122B for sentiment/news generation...")
-            model_122b = OpenAILike(
-                id="qwen/qwen3.5-122b-a10b",
-                api_key="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",
-                base_url="https://integrate.api.nvidia.com/v1",
-                temperature=0.6,
-                top_p=0.95,
-                max_tokens=1024,
-                timeout=15.0,
-                max_retries=0,
-            )
-            agent_122b = Agent(
-                model=model_122b,
-                description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
-            )
-            response = agent_122b.run(prompt)
-            if not response or not response.content:
-                raise ValueError("Empty response content from NVIDIA Qwen 122B")
-            content = response.content.strip()
-            if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                raise ValueError(f"Invalid content returned from NVIDIA Qwen 122B: {content}")
-            logger.info("✅ Successfully generated sentiment data via NVIDIA Qwen 122B")
-        except Exception as qwen122_err:
-            logger.warning(f"NVIDIA Qwen 122B generation failed, falling back to Gemini: {qwen122_err}")
-            
-            # 4. Fallback to Gemini
+    MAX_FULL_RETRIES = 3
+    for attempt in range(1, MAX_FULL_RETRIES + 1):
+        for name, factory in model_chain:
+            if name == "Gemini Fallback" and not os.getenv("GOOGLE_API_KEY"):
+                logger.error("GOOGLE_API_KEY not found in environment for fallback.")
+                continue
             try:
-                google_api_key = os.getenv("GOOGLE_API_KEY")
-                if not google_api_key:
-                    logger.error("GOOGLE_API_KEY not found in environment for fallback.")
-                    return {"news_headlines": [], "upcoming_events": []}
-                    
-                model_gemini = Gemini(
-                    id="gemini-2.5-flash",
-                    api_key=google_api_key,
-                    max_output_tokens=1024,
-                )
-                agent_gemini = Agent(
-                    model=model_gemini,
-                    description="You are a historical financial market news and economic calendar archiver for Gold (XAUUSD).",
-                )
-                response = agent_gemini.run(prompt)
+                logger.info(f"Initializing {name} for sentiment/news generation...")
+                agent = Agent(model=factory(), description=LLM_DESCRIPTION)
+                response = agent.run(prompt)
                 if not response or not response.content:
-                    raise ValueError("Empty response content from Gemini Fallback")
-                content = response.content.strip()
-                if "Unknown model error" in content or ("{" not in content and "}" not in content):
-                    raise ValueError(f"Invalid content returned from Gemini Fallback: {content}")
-                logger.info("✅ Successfully generated sentiment data via Gemini Fallback")
-            except Exception as gemini_err:
-                logger.error(f"Gemini fallback also failed: {gemini_err}")
-                return {"news_headlines": [], "upcoming_events": []}
+                    raise ValueError(f"Empty response content from {name}")
+                candidate = response.content.strip()
+                if "Unknown model error" in candidate or ("{" not in candidate and "}" not in candidate):
+                    raise ValueError(f"Invalid content returned from {name}: {candidate}")
+                content = candidate
+                logger.info(f"✅ Successfully generated sentiment data via {name}")
+                break
+            except Exception as model_err:
+                logger.warning(f"{name} generation failed: {model_err}")
+        if content:
+            break
+        if attempt < MAX_FULL_RETRIES:
+            logger.warning(f"All {len(model_chain)} models failed on attempt {attempt}/{MAX_FULL_RETRIES} — retrying from tier 1")
+        else:
+            logger.error(f"All {len(model_chain)} models failed after {MAX_FULL_RETRIES} full retry cycles.")
 
     if not content:
         return {"news_headlines": [], "upcoming_events": []}
@@ -241,7 +213,19 @@ Return raw JSON ONLY. No markdown code blocks.
             cleaned_content = brace_match.group(1).strip()
 
     try:
-        data = json.loads(cleaned_content)
+        try:
+            data = json.loads(cleaned_content, strict=False)
+        except Exception:
+            # Auto-repair truncated quotes and braces
+            repaired = cleaned_content.strip()
+            unescaped_quotes = len(re.findall(r'(?<!\\)"', repaired))
+            if unescaped_quotes % 2 != 0:
+                repaired += '"'
+            open_b = repaired.count("{")
+            close_b = repaired.count("}")
+            if open_b > close_b:
+                repaired += "}" * (open_b - close_b)
+            data = json.loads(repaired, strict=False)
         
         # Parse headlines
         for item in data.get("news_headlines", []):
@@ -306,6 +290,98 @@ Return raw JSON ONLY. No markdown code blocks.
     return result
 
 
+_daily_anchor_cache: Dict[str, Dict[int, Dict[str, Any]]] = {}
+_daily_anchor_lock = threading.RLock()
+
+# Every structure event (CHoCH/HH/LL/BOS) reuses a daily anchor instead of
+# triggering its own fresh LLM call. Slots are UTC hours; the last slot
+# (21:00) covers the rest of the day (21:00-23:59).
+DAILY_ANCHOR_SLOTS = [0, 3, 6, 9, 12, 15, 18, 21]
+
+
+def _dedup_news(*news_lists: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    merged = []
+    for lst in news_lists:
+        for item in lst:
+            hl = item.get("headline", "").strip()
+            if hl and hl not in seen:
+                seen.add(hl)
+                merged.append(item)
+    return merged
+
+
+def _dedup_events(*event_lists: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    merged = []
+    for lst in event_lists:
+        for item in lst:
+            evt = item.get("event", "").strip()
+            if evt and evt not in seen:
+                seen.add(evt)
+                merged.append(item)
+    return merged
+
+
+def _nearest_daily_anchor_slot(hour: int) -> int:
+    """Largest anchor slot <= hour (the last slot absorbs the rest of the day)."""
+    slot = DAILY_ANCHOR_SLOTS[0]
+    for h in DAILY_ANCHOR_SLOTS:
+        if h <= hour:
+            slot = h
+        else:
+            break
+    return slot
+
+
+def _get_daily_anchor_slot(event_date, slot_hour: int, sentiment_agent=None) -> Dict[str, Any]:
+    """Lazy per-day, per-slot cumulative cache of scored news anchors.
+
+    Each slot combines its own fresh news with every earlier slot the same
+    day (00:00 -> 03:00 -> ... -> 15:00), so later-day anchors carry more
+    context. News is fetched and scored once per slot per date; every later
+    event landing in the same 3h window/date reuses the cached score instead
+    of re-invoking the LLM classifier.
+    """
+    date_str = event_date.strftime("%Y-%m-%d")
+    with _daily_anchor_lock:
+        day_cache = _daily_anchor_cache.setdefault(date_str, {})
+        cached = day_cache.get(slot_hour)
+        if cached is not None:
+            return cached
+
+        idx = DAILY_ANCHOR_SLOTS.index(slot_hour)
+        if idx == 0:
+            prev_news, prev_events = [], []
+        else:
+            prev = _get_daily_anchor_slot(event_date, DAILY_ANCHOR_SLOTS[idx - 1], sentiment_agent)
+            prev_news, prev_events = prev["news_headlines"], prev["upcoming_events"]
+
+        slot_dt = datetime(event_date.year, event_date.month, event_date.day, slot_hour, 0, 0, tzinfo=timezone.utc)
+        fresh = _generate_historical_sentiment_data(slot_dt)
+        news = _dedup_news(prev_news, fresh.get("news_headlines", []))
+        events = _dedup_events(prev_events, fresh.get("upcoming_events", []))
+
+        sentiment_analysis_raw = None
+        if sentiment_agent is not None:
+            try:
+                sentiment_analysis_raw = sentiment_agent.score_news(news, slot_dt)
+            except Exception as e:
+                logger.warning(f"Anchor sentiment scoring failed for {date_str} slot {slot_hour:02d}:00: {e}")
+
+        combined = {
+            "news_headlines": news,
+            "upcoming_events": events,
+            "sentiment_analysis_raw": sentiment_analysis_raw,
+        }
+        day_cache[slot_hour] = combined
+        logger.info(
+            f"📌 Daily anchor slot {slot_hour:02d}:00 ready for {date_str}: {len(news)} headlines "
+            f"scored once (reused by every structure event in this 3h window/date)"
+        )
+        return combined
+
+
 def reconstruct_market_data(
     df: pd.DataFrame,
     event_time: int,
@@ -316,6 +392,7 @@ def reconstruct_market_data(
     h4_df: Optional[pd.DataFrame] = None,
     target_event_id: Optional[int] = None,
     session_zone: Optional[Dict[str, Any]] = None,
+    sentiment_agent=None,
 ) -> Dict[str, Any]:
     df = df[df["time"] <= _to_dt(event_time)].copy()
     if h1_df is not None and not h1_df.empty:
@@ -361,6 +438,7 @@ def reconstruct_market_data(
 
     news_headlines = []
     upcoming_events = []
+    precomputed_sentiment = None
     if generate_news:
         # Use the API-provided event type hint (reliable) or fall back to DB lookup
         # DB lookup can fail when multiple events share the same timestamp
@@ -411,11 +489,17 @@ def reconstruct_market_data(
         if not should_run_llm:
             logger.info(f"💤 Simulator orchestrator is IDLE (event: {target_ev_type}) -> Skipping news LLM generation")
         else:
-            # Rely on the local file cache inside _generate_historical_sentiment_data.
-            # This avoids reusing news across different dates/events from the singleton orchestrator memory.
-            sentiment_data = _generate_historical_sentiment_data(_to_dt(event_time))
-            news_headlines = sentiment_data["news_headlines"]
-            upcoming_events = sentiment_data["upcoming_events"]
+            # No structure event (CHoCH/HH/LL/BOS) triggers its own fresh LLM
+            # call at its own timestamp anymore. Every event reuses the daily
+            # anchor slot (00/03/06/09/12/15 UTC) that its timestamp falls
+            # into, scored once per slot/date and shared by all events in
+            # that 3h window.
+            event_hour = _to_dt(event_time).hour
+            slot_hour = _nearest_daily_anchor_slot(event_hour)
+            anchor = _get_daily_anchor_slot(_to_dt(event_time).date(), slot_hour, sentiment_agent)
+            news_headlines = anchor["news_headlines"]
+            upcoming_events = anchor["upcoming_events"]
+            precomputed_sentiment = anchor["sentiment_analysis_raw"]
 
     return {
         "df": df,
@@ -427,6 +511,7 @@ def reconstruct_market_data(
         "session_zone": session_zone,
         "news_headlines": news_headlines,
         "upcoming_events": upcoming_events,
+        "precomputed_sentiment": precomputed_sentiment,
         "is_counter_swing": is_counter_swing if generate_news else False,
         "h1_data": h1_df,
         "h4_data": h4_df,
@@ -717,36 +802,67 @@ def run_simulation(
     signals: List[Dict[str, Any]] = []
     frames: List[Dict[str, Any]] = []
     _total_ev = len(structure_events)
-    last_event_date = None
+
+    sentiment_agent = getattr(orch, "agents", {}).get("sentiment")
+
+    # BLIND clock-driven sentiment ticks (opsi A). The sentiment LLM is a fully
+    # independent 3h-cadence job: it fires at every anchor boundary
+    # (00/03/06/09/12/15 UTC) the replay clock crosses, WITHOUT ever peeking at
+    # the event list to decide when to run/stop. The clock span is derived only
+    # from the loaded candle data range (like live wall-clock would drive it);
+    # ticks keep firing until the data runs out -- even on days/windows with zero
+    # structure events. Each tick calls the sentiment scorer inline (B1),
+    # generates+scores news for that window, logs the verdict, and caches it.
+    # Structure events later just reuse the nearest already-fired slot.
+    _boundaries: List[tuple] = []
+    if sentiment_agent is not None and not base_df.empty:
+        _replay_start = base_df["time"].iloc[0].to_pydatetime()
+        _replay_end = base_df["time"].iloc[-1].to_pydatetime()
+        if _replay_start.tzinfo is None:
+            _replay_start = _replay_start.replace(tzinfo=timezone.utc)
+        if _replay_end.tzinfo is None:
+            _replay_end = _replay_end.replace(tzinfo=timezone.utc)
+        _d = _replay_start.date()
+        while _d <= _replay_end.date():
+            if _d.weekday() < 5:  # weekend: market closed -> clock idle, no ticks
+                for slot_hour in DAILY_ANCHOR_SLOTS:
+                    slot_dt = datetime(_d.year, _d.month, _d.day, slot_hour, 0, 0, tzinfo=timezone.utc)
+                    if _replay_start <= slot_dt <= _replay_end:
+                        _boundaries.append((slot_dt, _d, slot_hour))
+            _d += timedelta(days=1)
+        _boundaries.sort(key=lambda x: x[0])
+        logger.info(
+            f"🕒 BLIND sentiment clock armed: {len(_boundaries)} 3h tick(s) over "
+            f"{_replay_start.strftime('%Y-%m-%d %H:%M')} → {_replay_end.strftime('%Y-%m-%d %H:%M')} UTC "
+            f"(fires independent of structure events)"
+        )
+    _bnd_i = 0
+
+    def _fire_boundary_tick(b_dt, b_date, b_slot) -> None:
+        """Run the independent 3h sentiment tick (B1: inline scorer call)."""
+        anchor = _get_daily_anchor_slot(b_date, b_slot, sentiment_agent)
+        _raw = anchor.get("sentiment_analysis_raw") or {}
+        _sent = _raw.get("sentiment")
+        _sent = getattr(_sent, "value", _sent) or "n/a"
+        _score = _raw.get("score", 0.0) or 0.0
+        _n = len(anchor.get("news_headlines") or [])
+        logger.info(
+            f"🕒 {b_dt.strftime('%m-%d %H:%M')} UTC tick | SENT LLM fired | "
+            f"{_n} news | verdict={_sent} | score={_score:+.2f}"
+        )
+
     for _ev_idx, ev in enumerate(structure_events, 1):
         ev_time = ev.get("time")
         if ev_time is None:
             continue
-        try:
-            ev_dt = _to_dt(ev_time)
-            current_date = ev_dt.date()
-            if last_event_date is not None and current_date > last_event_date:
-                # Skenario 2: Skip weekend
-                if ev_dt.weekday() < 5:
-                    events_before = [e for e in structure_events if e.get("time", 0) < ev_time]
-                    recent_baseline = None
-                    for old_ev in reversed(events_before):
-                        old_ev_type = old_ev.get("type", "").upper()
-                        if old_ev_type in ("CHOCH", "BOS"):
-                            recent_baseline = old_ev_type
-                            break
-                    if recent_baseline == "CHOCH":
-                        prefetch_time = datetime(current_date.year, current_date.month, current_date.day, 1, 0, 0, tzinfo=timezone.utc)
-                        logger.info(f"🌅 Day Change Setup Active: Pre-fetching news for {current_date} at 01:00:00...")
-                        import threading
-                        threading.Thread(
-                            target=_generate_historical_sentiment_data,
-                            args=(prefetch_time,),
-                            daemon=True
-                        ).start()
-            last_event_date = current_date
-        except Exception as pfe:
-            logger.warning(f"Failed to check day change pre-fetch: {pfe}")
+
+        # Advance the blind clock: fire every 3h tick whose boundary the replay
+        # clock has passed up to this event's time. Cached -> reconstruct reuses.
+        ev_dt = _to_dt(ev_time)
+        while _bnd_i < len(_boundaries) and _boundaries[_bnd_i][0] <= ev_dt:
+            _fire_boundary_tick(*_boundaries[_bnd_i])
+            _bnd_i += 1
+
         session_zone = None
         for sz in session_zones:
             sz_start = int(sz["start_time"].timestamp())
@@ -762,7 +878,8 @@ def run_simulation(
         try:
             md = reconstruct_market_data(
                 base_df, ev_time, structure_events, generate_news=True, event_type_hint=ev.get("type"),
-                h1_df=h1_df, h4_df=h4_df, target_event_id=ev.get("id"), session_zone=session_zone
+                h1_df=h1_df, h4_df=h4_df, target_event_id=ev.get("id"), session_zone=session_zone,
+                sentiment_agent=sentiment_agent,
             )
         except Exception as e:
             logger.warning(f"sim: skip event {ev_time}: {e}")
@@ -915,6 +1032,14 @@ def run_simulation(
             })
         except Exception as _le:
             logger.debug(f"[SimLogger] approved log skipped: {_le}")
+
+    # Blind clock keeps ticking after the last structure event until the replay
+    # data runs out -- fire any remaining 3h sentiment ticks (no event will use
+    # them; they run because the independent clock says so, mirroring live).
+    while _bnd_i < len(_boundaries):
+        _fire_boundary_tick(*_boundaries[_bnd_i])
+        _bnd_i += 1
+
     metrics = compute_metrics(signals, backtest_trades)
     frames.sort(key=lambda f: f["event_time"])
 

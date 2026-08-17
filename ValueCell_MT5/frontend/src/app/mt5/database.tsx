@@ -360,7 +360,7 @@ export default function Database() {
   });
 
   return (
-    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "hidden" }} className="db-inspector-scroll">
+    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "auto" }} className="db-inspector-scroll">
       <style>{`
         .db-inspector-scroll::-webkit-scrollbar {
           width: 8px;

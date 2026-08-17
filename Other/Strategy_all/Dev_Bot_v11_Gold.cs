@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| File: HH_LL_Extraction_M15.mq5                                  |
-//| Purpose: Isolate HH/LL Detection and Horizontal Zone Drawing     |
+//| Purpose: Isolate HH/LL Detection and Horizontal Zone Drawing    |
 //| Timeframe: M15 (15-minute) specific implementation              |
 //| Note: This version is specifically optimized for M15 timeframe  |
 //+------------------------------------------------------------------+
@@ -15,14 +15,14 @@ bool DeleteFileW(string lpFileName);
 CTrade trade;  // Objek untuk eksekusi trading
 
 //+------------------------------------------------------------------+
-//| BACKTEST DATA EXPORT - Struct & Global Variables                  |
+//| BACKTEST DATA EXPORT - Struct & Global Variables                 |
 //+------------------------------------------------------------------+
 struct BacktestTrade
 {
     ulong     ticket;
     string    symbol;
     string    type;
-    string    session;          // "BUY" atau "SELL"
+    string    session;       // "BUY" atau "SELL"
     double    entry_price;
     double    exit_price;
     double    sl;
@@ -42,6 +42,25 @@ struct BacktestTrade
     bool      is_dst;        // true = trade entry saat broker dalam mode DST (GMT+3)
     string    status;        // "EXECUTED" atau "REJECTED"
     string    reject_reason; // Alasan jika ditolak, "N/A" jika dieksekusi
+    double    body_ratio;
+    double    body_ratio_min;
+    bool      body_ratio_passed;
+    string    body_ratio_mode;
+    double    initial_sl;
+    double    initial_tp;
+    double    final_sl;
+    double    final_tp;
+    double    initial_risk_points;
+    double    initial_reward_points;
+    double    final_risk_points;
+    double    final_reward_points;
+    bool      trailing_modified;
+    int       trailing_count;
+    bool      tp_expanded;
+    int       tp_expand_count;
+    double    max_favorable_points;
+    double    max_adverse_points;
+    string    close_reason;
 };
 
 BacktestTrade g_BacktestTrades[];   // Array dinamis untuk menyimpan semua trade
@@ -58,12 +77,12 @@ datetime g_LastProcessedBarTime_H1 = 0;    // Last processed bar time H1 (untuk 
 string   g_StateFilePath = "";             // Path ke state file
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK LL, HH, BOS, CHoCH                             |
+//| STRUKTUR DATA UNTUK LL, HH, BOS, CHoCH                           |
 //+------------------------------------------------------------------+
 struct LLHHBOSData
 {
     string    type;
-    string    session;           // "LL", "HH", "BoS", "CHoCH"
+    string    session;        // "LL", "HH", "BoS", "CHoCH"
     string    direction;      // "Bullish" atau "Bearish"
     double    price;          // Harga level
     datetime  time;           // Waktu terdeteksi
@@ -77,18 +96,18 @@ LLHHBOSData g_LLHHBOSData[];        // Array dinamis untuk menyimpan LL, HH, BOS
 int         g_LLHHBOSCount = 0;     // Jumlah data yang tersimpan
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK HISTORY ACCEPTED LEVELS (HH & LL)             |
+//| STRUKTUR DATA UNTUK HISTORY ACCEPTED LEVELS (HH & LL)            |
 //+------------------------------------------------------------------+
 struct AcceptedLevelHistory
 {
     string    type;
-    string    session;           // "HH" atau "LL"
+    string    session;        // "HH" atau "LL"
     double    price;          // Harga level
     datetime  time;           // Waktu terdeteksi
     string    timeframe;      // "M15" atau "H1"
 };
 
-AcceptedLevelHistory g_AcceptedLevelHistory[];  // Array untuk menyimpan semua update HH & LL
+AcceptedLevelHistory g_AcceptedLevelHistory[];        // Array untuk menyimpan semua update HH & LL
 int                  g_AcceptedLevelHistoryCount = 0; // Jumlah history yang tersimpan
 
 // Forward declarations
@@ -96,13 +115,13 @@ void WarmUp_M15(int bars);
 void WarmUp_H1(int bars);
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNIFIED EVENT (untuk sorting berdasarkan waktu)      |
+//| STRUKTUR DATA UNIFIED EVENT (untuk sorting berdasarkan waktu)    |
 //+------------------------------------------------------------------+
 struct UnifiedEvent
 {
     datetime  time;           // Waktu untuk sorting
     string    type;
-    string    session;           // "CHoCH", "BoS", "HH", "LL"
+    string    session;        // "CHoCH", "BoS", "HH", "LL"
     string    direction;      // "Bullish", "Bearish", "Update"
     double    price;          // Harga
     string    timeframe;      // "M15" atau "H1"
@@ -115,7 +134,7 @@ UnifiedEvent g_UnifiedEvents[];  // Array untuk menyimpan semua events tergabung
 int          g_UnifiedEventCount = 0; // Jumlah unified events
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK MARKET STRUCTURE RECORD (Comprehensive)       |
+//| STRUKTUR DATA UNTUK MARKET STRUCTURE RECORD (Comprehensive)      |
 //+------------------------------------------------------------------+
 struct MarketStructureRecord
 {
@@ -152,7 +171,8 @@ int                   g_StructureRecordsCount = 0; // Jumlah records
 //+------------------------------------------------------------------+
 void SaveLLHHBOSToArray(string type, string direction, double price,
                         datetime time, string timeframe, string status,
-                        double prev_price = 0, datetime prev_time = 0)
+                        double prev_price = 0, datetime prev_time = 0
+                        )
 {
     // ✅ DUPLICATE CHECK: Cegah duplikasi event (type + time + timeframe)
     for (int i = 0; i < g_LLHHBOSCount; i++)
@@ -241,6 +261,41 @@ void SaveMarketStructureRecord(datetime time, string timeframe,
     g_StructureRecordsCount = newSize;
 }
 
+double CalculateRiskPoints(string type, double entryPrice, double slPrice)
+{
+    if(slPrice <= 0) return 0;
+    if(type == "BUY") return (entryPrice - slPrice) / _Point;
+    return (slPrice - entryPrice) / _Point;
+}
+
+double CalculateRewardPoints(string type, double entryPrice, double tpPrice)
+{
+    if(tpPrice <= 0) return 0;
+    if(type == "BUY") return (tpPrice - entryPrice) / _Point;
+    return (entryPrice - tpPrice) / _Point;
+}
+
+double g_LastBodyRatio = 0;
+double g_LastBodyRatioMin = 0;
+bool   g_LastBodyRatioPassed = false;
+string g_LastBodyRatioMode = "N/A";
+
+void ResetLastBodyRatioMetrics()
+{
+    g_LastBodyRatio = 0;
+    g_LastBodyRatioMin = 0;
+    g_LastBodyRatioPassed = false;
+    g_LastBodyRatioMode = "N/A";
+}
+
+void SetLastBodyRatioMetrics(double ratio, double minRatio, bool passed, string mode)
+{
+    g_LastBodyRatio = ratio;
+    g_LastBodyRatioMin = minRatio;
+    g_LastBodyRatioPassed = passed;
+    g_LastBodyRatioMode = mode;
+}
+
 //+------------------------------------------------------------------+
 //| Simpan trade yang sudah ditutup ke array global                   |
 //+------------------------------------------------------------------+
@@ -249,7 +304,15 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
                       double sl, double tp, double profit,
                       datetime entry_time, datetime exit_time,
                       double lot_size, ulong magic, string tf,
-                      double spread_cost = 0, double commission = 0, double swap = 0, string session = "")
+                      double spread_cost = 0, double commission = 0, double swap = 0, string session = "",
+                      double initial_sl = 0, double initial_tp = 0,
+                      double final_sl = 0, double final_tp = 0,
+                      bool trailing_modified = false, int trailing_count = 0,
+                      bool tp_expanded = false, int tp_expand_count = 0,
+                      double max_favorable_points = 0, double max_adverse_points = 0,
+                      string close_reason = "",
+                      double body_ratio = 0, double body_ratio_min = 0,
+                      bool body_ratio_passed = false, string body_ratio_mode = "N/A")
 {
     for (int i = 0; i < g_TradeCount; i++)
     {
@@ -284,6 +347,31 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
     g_BacktestTrades[g_TradeCount].is_dst       = IsServerInDST(entry_time);
     g_BacktestTrades[g_TradeCount].status       = "EXECUTED";
     g_BacktestTrades[g_TradeCount].reject_reason = "N/A";
+    g_BacktestTrades[g_TradeCount].body_ratio        = body_ratio;
+    g_BacktestTrades[g_TradeCount].body_ratio_min    = body_ratio_min;
+    g_BacktestTrades[g_TradeCount].body_ratio_passed = body_ratio_passed;
+    g_BacktestTrades[g_TradeCount].body_ratio_mode   = body_ratio_mode;
+
+    if(initial_sl == 0) initial_sl = sl;
+    if(initial_tp == 0) initial_tp = tp;
+    if(final_sl == 0) final_sl = sl;
+    if(final_tp == 0) final_tp = tp;
+
+    g_BacktestTrades[g_TradeCount].initial_sl            = initial_sl;
+    g_BacktestTrades[g_TradeCount].initial_tp            = initial_tp;
+    g_BacktestTrades[g_TradeCount].final_sl              = final_sl;
+    g_BacktestTrades[g_TradeCount].final_tp              = final_tp;
+    g_BacktestTrades[g_TradeCount].initial_risk_points   = CalculateRiskPoints(type, entry_price, initial_sl);
+    g_BacktestTrades[g_TradeCount].initial_reward_points = CalculateRewardPoints(type, entry_price, initial_tp);
+    g_BacktestTrades[g_TradeCount].final_risk_points     = CalculateRiskPoints(type, entry_price, final_sl);
+    g_BacktestTrades[g_TradeCount].final_reward_points   = CalculateRewardPoints(type, entry_price, final_tp);
+    g_BacktestTrades[g_TradeCount].trailing_modified     = trailing_modified;
+    g_BacktestTrades[g_TradeCount].trailing_count        = trailing_count;
+    g_BacktestTrades[g_TradeCount].tp_expanded           = tp_expanded;
+    g_BacktestTrades[g_TradeCount].tp_expand_count       = tp_expand_count;
+    g_BacktestTrades[g_TradeCount].max_favorable_points  = max_favorable_points;
+    g_BacktestTrades[g_TradeCount].max_adverse_points    = max_adverse_points;
+    g_BacktestTrades[g_TradeCount].close_reason          = close_reason;
     
     g_TradeCount = newSize;
     // MT5 commission & swap are already negative numbers representing costs, so we add them.
@@ -321,6 +409,35 @@ void RecordRejectedToBacktestTrades(string type, double price, string reason)
     g_BacktestTrades[g_TradeCount].is_dst        = IsServerInDST(TimeCurrent());
     g_BacktestTrades[g_TradeCount].status        = "REJECTED";
     g_BacktestTrades[g_TradeCount].reject_reason = reason;
+    if(reason == "Body Ratio Filter")
+    {
+        g_BacktestTrades[g_TradeCount].body_ratio        = g_LastBodyRatio;
+        g_BacktestTrades[g_TradeCount].body_ratio_min    = g_LastBodyRatioMin;
+        g_BacktestTrades[g_TradeCount].body_ratio_passed = g_LastBodyRatioPassed;
+        g_BacktestTrades[g_TradeCount].body_ratio_mode   = g_LastBodyRatioMode;
+    }
+    else
+    {
+        g_BacktestTrades[g_TradeCount].body_ratio        = 0;
+        g_BacktestTrades[g_TradeCount].body_ratio_min    = 0;
+        g_BacktestTrades[g_TradeCount].body_ratio_passed = false;
+        g_BacktestTrades[g_TradeCount].body_ratio_mode   = "N/A";
+    }
+    g_BacktestTrades[g_TradeCount].initial_sl            = 0;
+    g_BacktestTrades[g_TradeCount].initial_tp            = 0;
+    g_BacktestTrades[g_TradeCount].final_sl              = 0;
+    g_BacktestTrades[g_TradeCount].final_tp              = 0;
+    g_BacktestTrades[g_TradeCount].initial_risk_points   = 0;
+    g_BacktestTrades[g_TradeCount].initial_reward_points = 0;
+    g_BacktestTrades[g_TradeCount].final_risk_points     = 0;
+    g_BacktestTrades[g_TradeCount].final_reward_points   = 0;
+    g_BacktestTrades[g_TradeCount].trailing_modified     = false;
+    g_BacktestTrades[g_TradeCount].trailing_count        = 0;
+    g_BacktestTrades[g_TradeCount].tp_expanded           = false;
+    g_BacktestTrades[g_TradeCount].tp_expand_count       = 0;
+    g_BacktestTrades[g_TradeCount].max_favorable_points  = 0;
+    g_BacktestTrades[g_TradeCount].max_adverse_points    = 0;
+    g_BacktestTrades[g_TradeCount].close_reason          = "REJECTED";
     
     g_TradeCount = newSize;
     PrintFormat("💾 [SAVED REJECT] Recorded reject signal #%d: %s | Price: %.5f | Reason: %s",
@@ -404,7 +521,10 @@ void CaptureOpenTrades()
                         sl, tp, estimated_profit,
                         entry_time, exit_time,
                         lot_size, MagicNumber_M15, "M15",
-                        0, 0, 0, GetCurrentSession());  // Assume no spread/commission/swap for open trades at capture time
+                        0, 0, 0, GetCurrentSession(),
+                        sl, tp, sl, tp,
+                        false, 0, false, 0,
+                        0, 0, "OPEN");  // Assume no spread/commission/swap for open trades at capture time
     }
 }
 
@@ -437,8 +557,11 @@ void ExportBacktestToCSV()
         int handleRead = FileOpen(filename, FILE_READ|FILE_CSV|FILE_ANSI, ",");
         if (handleRead != INVALID_HANDLE)
         {
-            // Skip header
-            string line = FileReadString(handleRead);
+            // Skip header (schema lama/baru sama-sama aman)
+            while(!FileIsEnding(handleRead) && !FileIsLineEnding(handleRead))
+            {
+                FileReadString(handleRead);
+            }
             
             // Read all tickets
             while (!FileIsEnding(handleRead))
@@ -453,12 +576,12 @@ void ExportBacktestToCSV()
                         existingTickets[existingCount] = ticket;
                         existingCount++;
                     }
-                    
-                    // Skip sisa kolom di baris ini (20 kolom total, sudah baca 1)
-                    for (int col = 1; col < 20; col++)
-                    {
-                        FileReadString(handleRead);
-                    }
+                }
+
+                // Skip sisa kolom di baris ini, tanpa asumsi jumlah kolom.
+                while(!FileIsEnding(handleRead) && !FileIsLineEnding(handleRead))
+                {
+                    FileReadString(handleRead);
                 }
             }
             FileClose(handleRead);
@@ -489,7 +612,15 @@ void ExportBacktestToCSV()
                   "SL", "TP", "Profit", "Spread_Cost", "Commission", "Swap", "Net_Profit",
                   "Session", "Session_IsDST",
                   "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
-                  "Status", "Reject_Reason");
+                  "Status", "Reject_Reason",
+                  "BodyRatio", "BodyRatioMin", "BodyRatioPassed", "BodyRatioMode",
+                  "InitialSL", "InitialTP", "FinalSL", "FinalTP",
+                  "InitialRiskPoints", "InitialRewardPoints",
+                  "FinalRiskPoints", "FinalRewardPoints",
+                  "TrailingModified", "TrailingCount",
+                  "TPExpanded", "TPExpandCount",
+                  "MaxFavorablePoints", "MaxAdversePoints",
+                  "CloseReason");
     }
     else
     {
@@ -548,7 +679,26 @@ void ExportBacktestToCSV()
                   IntegerToString(g_BacktestTrades[i].magic_number),
                   g_BacktestTrades[i].timeframe,
                   g_BacktestTrades[i].status,
-                  g_BacktestTrades[i].reject_reason);
+                  g_BacktestTrades[i].reject_reason,
+                  DoubleToString(g_BacktestTrades[i].body_ratio, 2),
+                  DoubleToString(g_BacktestTrades[i].body_ratio_min, 2),
+                  g_BacktestTrades[i].body_ratio_passed ? "YES" : "NO",
+                  g_BacktestTrades[i].body_ratio_mode,
+                  DoubleToString(g_BacktestTrades[i].initial_sl, _Digits),
+                  DoubleToString(g_BacktestTrades[i].initial_tp, _Digits),
+                  DoubleToString(g_BacktestTrades[i].final_sl, _Digits),
+                  DoubleToString(g_BacktestTrades[i].final_tp, _Digits),
+                  DoubleToString(g_BacktestTrades[i].initial_risk_points, 0),
+                  DoubleToString(g_BacktestTrades[i].initial_reward_points, 0),
+                  DoubleToString(g_BacktestTrades[i].final_risk_points, 0),
+                  DoubleToString(g_BacktestTrades[i].final_reward_points, 0),
+                  g_BacktestTrades[i].trailing_modified ? "YES" : "NO",
+                  IntegerToString(g_BacktestTrades[i].trailing_count),
+                  g_BacktestTrades[i].tp_expanded ? "YES" : "NO",
+                  IntegerToString(g_BacktestTrades[i].tp_expand_count),
+                  DoubleToString(g_BacktestTrades[i].max_favorable_points, 0),
+                  DoubleToString(g_BacktestTrades[i].max_adverse_points, 0),
+                  g_BacktestTrades[i].close_reason);
         
         newTradesAdded++;
     }
@@ -1751,6 +1901,8 @@ void UpdateAcceptedLevelVisuals_H1(double level, string type, datetime time)
 
     ObjectDelete(0, lineName);
     ObjectDelete(0, labelName);
+    ObjectDelete(0, "redraw_last" + type + "_H1"); // Hapus redraw_last H1 lama
+    ObjectDelete(0, "redraw_last" + type + "_H1_label"); // Hapus label redraw_last H1 lama
 
     if (level != -1) {
         // Gunakan OBJ_TREND dengan OBJPROP_RAY_RIGHT untuk membuat garis hanya ke depan
@@ -1986,6 +2138,8 @@ input int MaxHoldHours_M15 = 24; // Maximum hold time, force close after this (h
 // --- Trailing Stop Parameters M15 ---
 input bool EnableTrailingStop_M15   = true;  // Aktifkan Trailing Stop M15
 input bool EnableTrailingLogs_M15   = false; // Aktifkan log verbose Trailing Stop M15 (per tick)
+input bool EnableModifyLogs_M15     = false; // Aktifkan log modifikasi posisi M15 (BAR DYNAMIC MODIFY)
+input bool EnableSystemTradeLogs_M15 = false; // Aktifkan log sistem transaksi CTrade (position modified, dkk)
 
 //+------------------------------------------------------------------+
 //| H4 EMA FILTER - Input Parameters                                 |
@@ -2109,6 +2263,20 @@ struct TradeRecord_M15
     string    type;
     string    session;
     int       trailing_step; // Langkah trailing stop aktif (0 = belum aktif, 1, 2, 3)
+    double    initial_sl;
+    double    initial_tp;
+    double    final_sl;
+    double    final_tp;
+    bool      trailing_modified;
+    int       trailing_count;
+    bool      tp_expanded;
+    int       tp_expand_count;
+    double    max_favorable_points;
+    double    max_adverse_points;
+    double    body_ratio;
+    double    body_ratio_min;
+    bool      body_ratio_passed;
+    string    body_ratio_mode;
 };
 
 TradeRecord_M15 currentBuyTrade_M15;   // Untuk posisi buy aktif M15
@@ -2119,6 +2287,98 @@ TradeRecord_M15 activeBuyTrades_M15[10];   // Array untuk multiple buy entries M
 TradeRecord_M15 activeSellTrades_M15[10];  // Array untuk multiple sell entries M15
 int activeBuyCount_M15 = 0;                // Counter untuk active buy trades M15
 int activeSellCount_M15 = 0;               // Counter untuk active sell trades M15
+
+void InitTrailingSummary_M15(TradeRecord_M15 &tradeRec, double sl, double tp)
+{
+    tradeRec.initial_sl           = sl;
+    tradeRec.initial_tp           = tp;
+    tradeRec.final_sl             = sl;
+    tradeRec.final_tp             = tp;
+    tradeRec.trailing_modified    = false;
+    tradeRec.trailing_count       = 0;
+    tradeRec.tp_expanded          = false;
+    tradeRec.tp_expand_count      = 0;
+    tradeRec.max_favorable_points = 0;
+    tradeRec.max_adverse_points   = 0;
+    tradeRec.body_ratio           = 0;
+    tradeRec.body_ratio_min       = 0;
+    tradeRec.body_ratio_passed    = false;
+    tradeRec.body_ratio_mode      = "N/A";
+}
+
+void ApplyBodyRatioSummary_M15(TradeRecord_M15 &tradeRec)
+{
+    tradeRec.body_ratio        = g_LastBodyRatio;
+    tradeRec.body_ratio_min    = g_LastBodyRatioMin;
+    tradeRec.body_ratio_passed = g_LastBodyRatioPassed;
+    tradeRec.body_ratio_mode   = g_LastBodyRatioMode;
+}
+
+void UpdateExcursion_M15(TradeRecord_M15 &tradeRec, double bid, double ask)
+{
+    if(tradeRec.ticket == 0 || tradeRec.entry_price <= 0) return;
+
+    double favorable = 0;
+    double adverse = 0;
+
+    if(tradeRec.type == "BUY")
+    {
+        favorable = MathMax(0, (bid - tradeRec.entry_price) / _Point);
+        adverse   = MathMax(0, (tradeRec.entry_price - bid) / _Point);
+    }
+    else if(tradeRec.type == "SELL")
+    {
+        favorable = MathMax(0, (tradeRec.entry_price - ask) / _Point);
+        adverse   = MathMax(0, (ask - tradeRec.entry_price) / _Point);
+    }
+
+    tradeRec.max_favorable_points = MathMax(tradeRec.max_favorable_points, favorable);
+    tradeRec.max_adverse_points   = MathMax(tradeRec.max_adverse_points, adverse);
+}
+
+void ApplyTrailingSummary_M15(TradeRecord_M15 &tradeRec,
+                              double oldSL, double oldTP,
+                              double newSL, double newTP,
+                              double bid, double ask)
+{
+    if(tradeRec.ticket == 0) return;
+
+    bool slChanged = (MathAbs(newSL - oldSL) >= 10 * _Point);
+    bool tpChanged = (MathAbs(newTP - oldTP) >= 10 * _Point);
+    if(!slChanged && !tpChanged) return;
+
+    tradeRec.final_sl = newSL;
+    tradeRec.final_tp = newTP;
+    tradeRec.trailing_modified = true;
+    tradeRec.trailing_count++;
+
+    if(tpChanged)
+    {
+        tradeRec.tp_expanded = true;
+        tradeRec.tp_expand_count++;
+    }
+
+    UpdateExcursion_M15(tradeRec, bid, ask);
+}
+
+void UpdateTrailingSummaryByTicket_M15(ulong ticket,
+                                       double oldSL, double oldTP,
+                                       double newSL, double newTP,
+                                       double bid, double ask)
+{
+    if(currentBuyTrade_M15.ticket == ticket)
+        ApplyTrailingSummary_M15(currentBuyTrade_M15, oldSL, oldTP, newSL, newTP, bid, ask);
+    if(currentSellTrade_M15.ticket == ticket)
+        ApplyTrailingSummary_M15(currentSellTrade_M15, oldSL, oldTP, newSL, newTP, bid, ask);
+
+    for(int i = 0; i < 10; i++)
+    {
+        if(activeBuyTrades_M15[i].ticket == ticket)
+            ApplyTrailingSummary_M15(activeBuyTrades_M15[i], oldSL, oldTP, newSL, newTP, bid, ask);
+        if(activeSellTrades_M15[i].ticket == ticket)
+            ApplyTrailingSummary_M15(activeSellTrades_M15[i], oldSL, oldTP, newSL, newTP, bid, ask);
+    }
+}
 
 //+------------------------------------------------------------------+
 //| FUNGSI BARU: Mengelola objek visual lastAcceptedHH dan lastAcceptedLL M15 |
@@ -2138,6 +2398,8 @@ void UpdateAcceptedLevelVisuals_M15(double level, string type, datetime time)
     
     ObjectDelete(0, lineName); // Hapus garis lama jika ada
     ObjectDelete(0, labelName); // Hapus label lama jika ada
+    ObjectDelete(0, "redraw_last" + type + "_M15"); // Hapus redraw_last lama
+    ObjectDelete(0, "redraw_last" + type + "_M15_label"); // Hapus label redraw_last lama
     
     if (level != -1) { // Jika level valid (bukan -1)
         // --- Gambar Garis Horizontal dengan OBJ_TREND + RAY_RIGHT ---
@@ -2557,6 +2819,26 @@ datetime OldestTimeForPrice(double &priceArr[], datetime &timeArr[], int cnt, do
 }
 
 //+------------------------------------------------------------------+
+//| Find next formation time for capping historical lines             |
+//+------------------------------------------------------------------+
+datetime FindNextFormationTime(datetime &formTimeArr[], int formCnt, datetime currentTimeVal)
+{
+    datetime nextTime = 0;
+    for (int i = 0; i < formCnt; i++)
+    {
+        if (formTimeArr[i] > currentTimeVal)
+        {
+            if (nextTime == 0 || formTimeArr[i] < nextTime)
+            {
+                nextTime = formTimeArr[i];
+            }
+        }
+    }
+    return nextTime;
+}
+
+
+//+------------------------------------------------------------------+
 //| LOAD CSV TO ARRAYS - Load LLHHBOSData CSV ke memory arrays       |
 //| Mencegah ExportLLHHBOSToCSV overwrite file dengan data kosong    |
 //| Dipanggil saat EA di-attach (live trading) SEBELUM export        |
@@ -2733,8 +3015,20 @@ void RedrawVisualsFromCSV()
     for (int c = ObjectsTotal(0) - 1; c >= 0; c--)
     {
         string nmDel = ObjectName(0, c);
-        if (StringFind(nmDel, "redraw_") == 0)
+        if (StringFind(nmDel, "redraw_") == 0 ||
+            StringFind(nmDel, "CHoCH_") == 0 ||
+            StringFind(nmDel, "BoS_") == 0 ||
+            StringFind(nmDel, "H1_CHoCH_") == 0 ||
+            StringFind(nmDel, "H1_BoS_") == 0 ||
+            StringFind(nmDel, "zone_ll_M15_") == 0 ||
+            StringFind(nmDel, "zone_hh_M15_") == 0 ||
+            StringFind(nmDel, "H1_zone_ll_") == 0 ||
+            StringFind(nmDel, "H1_zone_hh_") == 0 ||
+            StringFind(nmDel, "line_lastAccepted") == 0 ||
+            StringFind(nmDel, "label_lastAccepted") == 0)
+        {
             ObjectDelete(0, nmDel);
+        }
     }
 
     // ponytail: scan mundur dari hari ini sampai tanggal 1 di bulan yang sama.
@@ -2994,7 +3288,26 @@ void RedrawVisualsFromCSV()
         {
             datetime lenCap = time + MaxLineLengthBars * m15PeriodSec;
             if (lineEndTime > lenCap) lineEndTime = lenCap;
+            
+            // Capping: akhiri garis jika HH/LL baru berikutnya sudah terbentuk
+            if (type == "HH")
+            {
+                datetime nextHHTime = isM15
+                    ? FindNextFormationTime(hhFormTimeM15, hhFormCntM15, time)
+                    : FindNextFormationTime(hhFormTimeH1,  hhFormCntH1,  time);
+                if (nextHHTime > 0 && lineEndTime > nextHHTime)
+                    lineEndTime = nextHHTime;
+            }
+            else // LL
+            {
+                datetime nextLLTime = isM15
+                    ? FindNextFormationTime(llFormTimeM15, llFormCntM15, time)
+                    : FindNextFormationTime(llFormTimeH1,  llFormCntH1,  time);
+                if (nextLLTime > 0 && lineEndTime > nextLLTime)
+                    lineEndTime = nextLLTime;
+            }
         }
+        
         
         // === Draw HH Accepted ===
         if (type == "HH" && status == "Accepted")
@@ -3361,6 +3674,17 @@ int OnInit()
     ChartIndicatorAdd(0, 0, handleEMA_H4);
 
     trade.SetExpertMagicNumber(MagicNumber_M15);
+    
+    // Set level log objek CTrade berdasarkan input parameter
+    if(!EnableSystemTradeLogs_M15)
+    {
+        trade.LogLevel(LOG_LEVEL_NO);
+    }
+    else
+    {
+        trade.LogLevel(LOG_LEVEL_ALL);
+    }
+
     Print("✅ EMA200 handle berhasil dibuat untuk M15 & H1");
 
     // ✅ SYNC BACKTEST CSV: Copy backtest history ke MQL5 sandbox SEBELUM load
@@ -4377,12 +4701,19 @@ void ApplyTrailingStop_M15()
             {
                 if(trade.PositionModify(ticket, targetSL, targetTP))
                 {
-                    PrintFormat("🚀 [BAR DYNAMIC MODIFY BUY M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
-                                ticket, targetSL, minSL, targetTP, tp);
+                    UpdateTrailingSummaryByTicket_M15(ticket, sl, tp, targetSL, targetTP, currentBid, currentAsk);
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("🚀 [BAR DYNAMIC MODIFY BUY M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
+                                    ticket, targetSL, minSL, targetTP, tp);
+                    }
                 }
                 else
                 {
-                    PrintFormat("❌ [BAR DYNAMIC MODIFY BUY M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("❌ [BAR DYNAMIC MODIFY BUY M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    }
                 }
             }
             
@@ -4430,12 +4761,19 @@ void ApplyTrailingStop_M15()
             {
                 if(trade.PositionModify(ticket, targetSL, targetTP))
                 {
-                    PrintFormat("🚀 [BAR DYNAMIC MODIFY SELL M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
-                                ticket, targetSL, minSL, targetTP, tp);
+                    UpdateTrailingSummaryByTicket_M15(ticket, sl, tp, targetSL, targetTP, currentBid, currentAsk);
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("🚀 [BAR DYNAMIC MODIFY SELL M15] Ticket %I64u: SL disesuaikan ke %.5f (Limit=%.5f), TP disesuaikan ke %.5f (TP awal/lama=%.5f)",
+                                    ticket, targetSL, minSL, targetTP, tp);
+                    }
                 }
                 else
                 {
-                    PrintFormat("❌ [BAR DYNAMIC MODIFY SELL M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    if(EnableModifyLogs_M15)
+                    {
+                        PrintFormat("❌ [BAR DYNAMIC MODIFY SELL M15] Gagal modify ticket %I64u: %d", ticket, GetLastError());
+                    }
                 }
             }
             
@@ -4502,6 +4840,9 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
     {
         double positionProfit = PositionGetDouble(POSITION_PROFIT);
         datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
+        UpdateExcursion_M15(tradeRec,
+                            SymbolInfoDouble(_Symbol, SYMBOL_BID),
+                            SymbolInfoDouble(_Symbol, SYMBOL_ASK));
         
         bool shouldClose = false;
         string closeReason = "";
@@ -4621,6 +4962,8 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
             
             // Get current session saat trade entry
             string entrySession = (tradeRec.session != "") ? tradeRec.session : GetCurrentSession();
+            double finalSL = (tradeRec.final_sl != 0) ? tradeRec.final_sl : tradeRec.sl;
+            double finalTP = (tradeRec.final_tp != 0) ? tradeRec.final_tp : tradeRec.tp;
             
             // Hitung spread cost dan commission dari history deals
             double spreadCost = 0;
@@ -4654,10 +4997,18 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
             
             SaveTradeToArray(tradeRec.ticket, _Symbol, tradeRec.type,
                              tradeRec.entry_price, exitPrice,
-                             tradeRec.sl, tradeRec.tp, profit,
+                             finalSL, finalTP, profit,
                              tradeRec.entry_time, exitTime,
                              lotSize, MagicNumber_M15, "M15",
-                             spreadCost, commission, swapVal, entrySession);
+                             spreadCost, commission, swapVal, entrySession,
+                             tradeRec.initial_sl, tradeRec.initial_tp,
+                             finalSL, finalTP,
+                             tradeRec.trailing_modified, tradeRec.trailing_count,
+                             tradeRec.tp_expanded, tradeRec.tp_expand_count,
+                             tradeRec.max_favorable_points, tradeRec.max_adverse_points,
+                             exitType,
+                             tradeRec.body_ratio, tradeRec.body_ratio_min,
+                             tradeRec.body_ratio_passed, tradeRec.body_ratio_mode);
                         
             // Reset trade record
             tradeRec.ticket = 0;
@@ -4838,7 +5189,11 @@ bool IsH4ConfirmedBearish()
 bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
 {
     // Jika filter dinonaktifkan total, selalu izinkan entry
-    if (!EnableBodyRatioFilter) return true;
+    if (!EnableBodyRatioFilter)
+    {
+        SetLastBodyRatioMetrics(0, 0, true, "DISABLED");
+        return true;
+    }
 
     double bodySize   = MathAbs(rates[1].close - rates[1].open); // bar[1] = confirmed closed bar
     double totalRange = rates[1].high - rates[1].low;
@@ -4858,6 +5213,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
     // ================================================================
     double effectiveMinBR = MinBodyRatio; // Default: threshold ketat (40%)
     string overrideReason = "";
+    string bodyRatioMode = "STRICT";
 
     if (Enable_H4_BR_Override)
     {
@@ -4903,6 +5259,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                 if (absGapPct > H4_MaxStretch_Pct)
                 {
                     effectiveMinBR = MinBodyRatio;
+                    bodyRatioMode = "H4_STRETCHED_STRICT";
                     overrideReason = StringFormat("RULE_A: H4 Gap=%.2f%% > %.1f%% (stretched) → strict BR %.0f%%",
                                                   h4GapPct, H4_MaxStretch_Pct, effectiveMinBR * 100);
                 }
@@ -4914,12 +5271,14 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                     if (h4AlignedWithTrade && momAlignedWithTrade)
                     {
                         effectiveMinBR = H4_TrendMinBody; // Longgarkan ke 15%
+                        bodyRatioMode = "H4_ADAPTIVE_TREND";
                         overrideReason = StringFormat("RULE_B: H4 Gap=%.2f%% moderate+mom=%.1f aligned → override BR min %.0f%%",
                                                       h4GapPct, h4Mom16h, effectiveMinBR * 100);
                     }
                     else
                     {
                         effectiveMinBR = MinBodyRatio;
+                        bodyRatioMode = "H4_MODERATE_STRICT";
                         overrideReason = StringFormat("RULE_B: H4 Gap=%.2f%% moderate tapi mom/direction tidak aligned → strict BR %.0f%%",
                                                       h4GapPct, effectiveMinBR * 100);
                     }
@@ -4929,6 +5288,7 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
                 else
                 {
                     effectiveMinBR = MinBodyRatio;
+                    bodyRatioMode = "H4_NEAR_EMA_STRICT";
                     overrideReason = StringFormat("ZONE_C: H4 Gap=%.2f%% near EMA (sideways) → strict BR %.0f%%",
                                                   h4GapPct, effectiveMinBR * 100);
                 }
@@ -4953,6 +5313,9 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
     // KEPUTUSAN FINAL BERDASARKAN EFFECTIVE THRESHOLD
     // ================================================================
     bool isStrong = (bodyRatio >= effectiveMinBR);
+    if (BodyRatio_LogOnly)
+        bodyRatioMode = bodyRatioMode + "_LOG_ONLY";
+    SetLastBodyRatioMetrics(bodyRatio, effectiveMinBR, isStrong, bodyRatioMode);
 
     if (!isStrong)
     {
@@ -5157,11 +5520,13 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     {
                         preChochHH_M15     = highestHH_BF;
                         lastAcceptedHH_M15 = highestHH_BF;
+                        lastTimeHH_M15     = highestHHTime_BF;
                         preChochHHTime_BF  = highestHHTime_BF;
                     }
                     else
                     {
                         lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                        lastTimeHH_M15     = lastLoggedValidHHTime_M15;
                     }
                 }
                 UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_BF);
@@ -5419,10 +5784,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //START: Logika Reset lastAcceptedLL ke preChoch LL setelah CHoCH Bullish dan HH valid (MODE 1) M15 --|
                 //------------------------------------------------------------------------------------------------+
 
-                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time > time_choch_bullish_M15)
+                if (!hhAfterChochConfirmedFlag_M15 && rates_M15[i].time >= time_choch_bullish_M15) // FIX: >= agar HH yang terbentuk TEPAT di candle breakout CHoCH tidak terlewat
                 {
                     lastAcceptedLL_M15            = preChochLL_M15;
-                    lastAcceptedHH_M15            = rates_M15[i].high;  
+                    lastAcceptedHH_M15            = rates_M15[i].high;
                     // FIX: LL (preChochLL) di-stamp pakai lastTimeLL_M15 (waktu low asli, mis. 05:00),
                     // BUKAN rates_M15[i].time (= waktu candle HH, mis. 21:15) → cegah duplikat LL
                     // di waktu salah. Konsisten dgn fix window-search di CHoCH trigger.
@@ -5462,7 +5827,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //CHoCH Bullish Confirmed, terbentuk HH valid sebagai target BoS Bullish M15|
             //----------------------------------------------------------------------|
 
-            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time > time_choch_bullish_M15) // guard: bar harus setelah CHoCH Bullish
+            if (chochBullish_M15 && !isInTrendBullish_M15 && !hhAfterChochConfirmedFlag_M15 && rates_M15[i].high > lastAcceptedHH_M15 && rates_M15[i].time >= time_choch_bullish_M15) // guard: bar harus setelah/pada CHoCH Bullish (FIX: >= agar candle breakout sendiri tidak terlewat)
             {
                 postChoCH_HH_M15      = rates_M15[i].high; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_HH_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
@@ -5517,13 +5882,19 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //-------------------------------------------------------------------------------+
                     if (rates_M15[i].high > lastAcceptedHH_M15) // <-- Pembaruan utama dalam tren bullish
                         {
+                            double oldHH = lastAcceptedHH_M15;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1 M15]Update last Accepted HH After Bos: %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time); // Update visual setelah semua kondisi
                             hhAfterBosConfirmedFlag_M15 = true;           // Tandai HH setelah BoS bullish terkonfirmasi
                             timeHHAfterBosConfirmed_M15 = TimeCurrent();  // Simpan waktu konfirmasi
                             postChoCH_HH_M15            = rates_M15[i].high;  // Update postChoCH_HH
                             time_postChoCH_HH_M15       = rates_M15[i].time; // Update time postChoCH_HH
+                            
+                            // SAVE HH UPDATE
+                            if (oldHH != -1)
+                                SaveLLHHBOSToArray("HH", "Bullish", lastAcceptedHH_M15, rates_M15[i].time, "M15", "Updated", oldHH, 0);
                             
                             // PrintFormat("✅ Post CHoCH HH M15: %s | Time: %s", DoubleToString(postChoCH_HH_M15, _Digits), TimeToString(rates_M15[i].time));
                             PrintFormat("✅ HH After BoS Confirmed M15: %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
@@ -5541,9 +5912,15 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     // Lanjutkan mencari Higher High secara default
                     if (rates_M15[i].high > lastAcceptedHH_M15) // <-- Pembaruan utama
                         {
+                            double oldHH = lastAcceptedHH_M15;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1 M15] Update Last Accepted HH (Default): %s | Time: %s", DoubleToString(lastAcceptedHH_M15, _Digits), TimeToString(rates_M15[i].time));
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time); // Update visual setelah semua kondisi
+                            
+                            // SAVE HH UPDATE
+                            if (oldHH != -1)
+                                SaveLLHHBOSToArray("HH", "Bullish", lastAcceptedHH_M15, rates_M15[i].time, "M15", "Updated", oldHH, 0);
                         }
                 }  
 
@@ -5605,6 +5982,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // HH PERTAMA setelah CHoCH Bearish - jadikan sebagai lastAcceptedHH baru untuk tren bearish
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     hhAfterChochConfirmedFlag_M15 = true;
                     PrintFormat("✅ [HH AFTER CHoCH BEARISH M15] HH baru setelah CHoCH Bearish: %.5f | Time: %s",
                                 lastAcceptedHH_M15, TimeToString(rates_M15[i].time));
@@ -5660,6 +6038,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         timeAbsoluteHighestHH_M15 = rates_M15[i].time;
                         absoluteHighFound_M15 = true;
                         lastAcceptedHH_M15 = rates_M15[i].high;
+                        lastTimeHH_M15      = rates_M15[i].time;
                         PrintFormat("🎯 [MODE 2 BEARISH M15 - ABS HIGH INIT] HH Tertinggi Absolut Awal: %.2f | Time: %s", absoluteHighestHH_M15, TimeToString(timeAbsoluteHighestHH_M15));
                         UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
 
@@ -5682,6 +6061,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                             absoluteHighestHH_M15 = rates_M15[i].high;
                             timeAbsoluteHighestHH_M15 = rates_M15[i].time;
                             lastAcceptedHH_M15 = rates_M15[i].high;
+                            lastTimeHH_M15      = rates_M15[i].time;
 
                             PrintFormat("📈 [MODE 2.1 BEARISH M15 - ABS HIGH UPDATE] HH Tertinggi Absolut Diperbarui: %.2f -> %.2f | Time: %s",
                                         previousHigh, absoluteHighestHH_M15, TimeToString(timeAbsoluteHighestHH_M15));
@@ -5748,6 +6128,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     double previousHH = lastAcceptedHH_M15;
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     PrintFormat("✅ [MODE 3 M15] Update last Accepted HH sebelum Bos dan paling tinggi (Belum Ada LL After BoS): %.2f < HH_sebelumnya (%.2f) | Time: %s",
                                 lastAcceptedHH_M15, previousHH, TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
@@ -5759,6 +6140,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     double previousHH = lastAcceptedHH_M15;
                     lastAcceptedHH_M15 = rates_M15[i].high;
+                    lastTimeHH_M15      = rates_M15[i].time;
                     PrintFormat("✅ [MODE 3 M15] Update last Accepted HH After Bos (Belum Ada LL After BoS): %.2f > HH_sebelumnya (%.2f) | Time: %s",
                                 lastAcceptedHH_M15, previousHH, TimeToString(rates_M15[i].time));
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
@@ -5821,6 +6203,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         
                         // // ✅ FIX: Simpan HH tertinggi ke accepted history & export ke CSV
                         // lastAcceptedHH_M15 = absoluteHighestHH_M15;
+                        // lastTimeHH_M15      = timeAbsoluteHighestHH_M15 > 0 ? timeAbsoluteHighestHH_M15 : rates_M15[i].time;
                         // UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", rates_M15[i].time);
                     }
                 }
@@ -5943,7 +6326,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //--------------------------------------------------------------------------------------+
                     // --- START: Logika Reset lastAcceptedLL setelah CHoCH Bearish dan LL valid (MODE 1) M15 --|
                     //--------------------------------------------------------------------------------------|
-                    if (!llAfterChochConfirmedFlag_M15) 
+                    if (!llAfterChochConfirmedFlag_M15 && rates_M15[i].time >= time_choch_bearish_M15) // guard: bar harus setelah/pada CHoCH Bearish (mirror bullish 5786, FIX: >= agar candle breakout sendiri tidak terlewat)
                         {
                             // lastAcceptedHH_M15 = preChochHH_M15;
                             lastAcceptedLL_M15 = rates_M15[i].low;  // last AcceptedLL direset ke LL sebelum CHoCH Bullish
@@ -5971,9 +6354,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
                             continue; // Lewati update HH ini
                         }
-                    else if (rates_M15[i].low < lastAcceptedLL_M15) 
+                    else if (llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15) // guard: MODE 1.2 hanya lanjutan MODE 1 yang sudah confirmed
                         {
                             lastAcceptedLL_M15 = rates_M15[i].low; // Update lastAcceptedLL jika lebih rendah
+                            postChoCH_LL_M15      = rates_M15[i].low;  // Sync target BoS Bearish ke LL terendah baru
+                            time_postChoCH_LL_M15 = rates_M15[i].time;
                             PrintFormat("✅ [MODE 1.2 M15] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                                     lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                             // 🔥 HAPUS OBJEK RECTANGLE LL SEBELUMNYA ---
@@ -5982,7 +6367,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
 
                             UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time); // Update visual setelah semua kondisi
                         }
-                    else if (rates_M15[i].low > lastAcceptedLL_M15) 
+                    else if (llAfterChochConfirmedFlag_M15 && rates_M15[i].low > lastAcceptedLL_M15)
                         {
                             if(CanPrintRejectLogs()) PrintFormat("❌ [REJECTED M15] LL %.2f DITOLAK karena > Lebih Tinggi dari CHoCH+LL last Accepted LL %.2f | Time: %s",
                                     rates_M15[i].low, lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
@@ -6022,12 +6407,12 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             //     PrintFormat("🎯 [TARGET SET M15] BoS Bearish Target LL Lebih Rendah set ke: %.2f @ %s", postChoCH_LL_M15, TimeToString(time_postChoCH_LL_M15)); // Log tambahan untuk kejelasan
             // }
             
-            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
+            if (chochBearish_M15 && !isInTrendBearish_M15 && !llAfterChochConfirmedFlag_M15 && rates_M15[i].low < lastAcceptedLL_M15 && rates_M15[i].time >= time_choch_bearish_M15) // guard: bar harus setelah/pada CHoCH Bearish (mirror bullish 5829, FIX: >= agar candle breakout sendiri tidak terlewat)
             {
                 postChoCH_LL_M15      = rates_M15[i].low; // <-- Sekarang hanya di-set sekali
                 time_postChoCH_LL_M15 = rates_M15[i].time; // <-- Sekarang hanya di-set sekali
                 PrintFormat("🎯 [TARGET SET M15] BoS Bearish Target LL set ke: %.2f @ %s", postChoCH_LL_M15, TimeToString(time_postChoCH_LL_M15)); // Log tambahan untuk kejelasan
-            } 
+            }
 
             if (chochBearish_M15 && isInTrendBearish_M15 && rates_M15[i].low < lastAcceptedLL_M15) // <-- PENAMBAHAN KONDISI !hhAfterChochConfirmedFlag_M15
             {
@@ -6078,6 +6463,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 //-------------------------------------------------------------------------------+
                 if (rates_M15[i].low < lastAcceptedLL_M15) // <-- Pembaruan utama dalam tren bullish
                 {
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low;
                     lastTimeLL_M15 = rates_M15[i].time; // Update time LL terakhir
                     PrintFormat("✅ [MODE 2.2 M15]Update last Accepted LL After Bos: %s | Time: %s", DoubleToString(lastAcceptedLL_M15, _Digits), TimeToString(rates_M15[i].time));
@@ -6086,6 +6472,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     //timeLLAfterBosConfirmed_M15 = TimeCurrent(); // Simpan waktu konfirmasi
                     postChoCH_LL_M15            = rates_M15[i].low;  // Update postChoCH_LL
                     time_postChoCH_LL_M15       = rates_M15[i].time; // Update time postChoCH_LL
+                    
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
                     
                     // ✅ Reset absoluteHighestHH untuk mulai tracking HH tertinggi sejak LL baru ini
                     // Ini penting untuk MODE 3 BEARISH Part 2: setiap LL baru = tracking HH baru dimulai
@@ -6102,12 +6492,17 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 }
                 else if (rates_M15[i].low < lastAcceptedLL_M15) 
                 {
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low; // Update lastAcceptedLL jika lebih rendah
                     PrintFormat("✅ [MODE 1.2 M15] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                             lastAcceptedLL_M15, TimeToString(rates_M15[i].time));
                     // 🔥 HAPUS OBJEK RECTANGLE LL SEBELUMNYA ---
                     if (ObjectFind(0, previousLLBoxName_M15) >= 0)
                         ObjectDelete(0, previousLLBoxName_M15);
+
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
 
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time); // Update visual setelah semua kondisi
                 }
@@ -6135,9 +6530,14 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 if (lastAcceptedLL_M15 == -1 || rates_M15[i].low < lastAcceptedLL_M15) 
                 {
                     // ✅ Update LL jika lebih rendah
+                    double oldLL = lastAcceptedLL_M15;
                     lastAcceptedLL_M15 = rates_M15[i].low;
                     Print("✅ [MODE 1 M15] Update LL (Pre-CHoCH): ", lastAcceptedLL_M15);
                     UpdateAcceptedLevelVisuals_M15(lastAcceptedLL_M15, "LL", rates_M15[i].time);
+                    
+                    // SAVE LL UPDATE
+                    if (oldLL != -1)
+                        SaveLLHHBOSToArray("LL", "Bearish", lastAcceptedLL_M15, rates_M15[i].time, "M15", "Updated", oldLL, 0);
                 }
             //---------------------------------------------------------------+
             // Sebelum Choch Bearish dan HH After CHoCH M15----------------------+
@@ -6579,6 +6979,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     preChochHH_M15     = highestHHInWindow_M15;
                     lastAcceptedHH_M15 = highestHHInWindow_M15;
+                    lastTimeHH_M15     = highestHHInWindowTime_M15;
                     preChochHHTime_M15 = highestHHInWindowTime_M15;
                     PrintFormat("🔧 [CHoCH BEARISH M15] HH referensi (LH) = high tertinggi window LL→break: %.2f @ %s",
                                 preChochHH_M15, TimeToString(preChochHHTime_M15));
@@ -6587,6 +6988,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // Fallback (window kosong): perilaku lama — HH terdekat terakhir yang ter-log.
                     lastAcceptedHH_M15 = lastLoggedValidHH_M15;
+                    lastTimeHH_M15     = lastLoggedValidHHTime_M15;
                 }
             }
             UpdateAcceptedLevelVisuals_M15(lastAcceptedHH_M15, "HH", preChochHHTime_M15); // waktu high asli (bukan candle break)
@@ -6779,6 +7181,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             rates_M15[0].close > ema200_M15 &&
             entryCountBuy_M15 < MaxEntriesPerCycle_M15)
         {
+            ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
@@ -6864,6 +7267,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentBuyTrade_M15.type = "BUY";
                     currentBuyTrade_M15.session = GetCurrentSession();
                     currentBuyTrade_M15.trailing_step = 0;
+                    InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
+                    ApplyBodyRatioSummary_M15(currentBuyTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
                     int buyTradeIndex = -1;
@@ -6992,6 +7397,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             rates_M15[0].close < ema200_M15 &&
             entryCountSell_M15 < MaxEntriesPerCycle_M15)
         {
+            ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
@@ -7085,6 +7491,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentSellTrade_M15.type = "SELL";
                     currentSellTrade_M15.session = GetCurrentSession();
                     currentSellTrade_M15.trailing_step = 0;
+                    InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
+                    ApplyBodyRatioSummary_M15(currentSellTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
                     int sellTradeIndex = -1;
@@ -7885,9 +8293,11 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
 
                     continue;
                 }
-                else if (rates_H1[i].low < lastAcceptedLL_H1) 
+                else if (rates_H1[i].low < lastAcceptedLL_H1)
                 {
                     lastAcceptedLL_H1 = rates_H1[i].low;
+                    postChoCH_LL_H1      = rates_H1[i].low;  // Sync target BoS Bearish ke LL terendah baru
+                    time_postChoCH_LL_H1 = rates_H1[i].time;
                     PrintFormat("✅ H1: [MODE 1.2] Update Last Accepted LL Lebih Rendah: %.2f | Time: %s",
                             lastAcceptedLL_H1, TimeToString(rates_H1[i].time));
                     if (ObjectFind(0, previousLLBoxName_H1) >= 0)
@@ -8613,20 +9023,6 @@ void OnTick()
         if (rates_M15[0].time == lastBarTime_M15) return;
         lastBarTime_M15 = rates_M15[0].time;
 
-        //+------------------------------------------------------------------+
-        //| M15 BAR CLOSE: Export semua data + Save State + Reverse Sync      |
-        //| Setiap M15 candle close, export semua file lalu sync ke project  |
-        //| ✅ HANYA live trading — backtest export di OnTester/OnDeinit      |
-        //+------------------------------------------------------------------+
-        if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
-        {
-            SetExportDate();            // Handle date rollover
-            ExportAllData();            // Export semua CSV per candle close
-            SaveMarketStructureState(); // ponytail: state selalu fresh tiap candle
-            // ReverseSyncCSV();           // Sync ke Backtest_result\
-        }
-        //+------------------------------------------------------------------+
-
         static bool isScriptLoadedLogged_M15 = false; // Variabel statis untuk memastikan log hanya sekali
         if (!isScriptLoadedLogged_M15)
         {
@@ -8648,6 +9044,20 @@ void OnTick()
         }
 
         DetectAndDraw_M15(rates_M15, /*backfillMode=*/false);
+
+        //+------------------------------------------------------------------+
+        //| M15 BAR CLOSE: Export semua data + Save State + Reverse Sync      |
+        //| Setiap M15 candle close, export semua file lalu sync ke project  |
+        //| ✅ HANYA live trading — backtest export di OnTester/OnDeinit      |
+        //+------------------------------------------------------------------+
+        if (!MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+        {
+            SetExportDate();            // Handle date rollover
+            ExportAllData();            // Export semua CSV per candle close
+            SaveMarketStructureState(); // ponytail: state selalu fresh tiap candle
+            // ReverseSyncCSV();           // Sync ke Backtest_result\
+        }
+        //+------------------------------------------------------------------+
     }
     else if(Period() == PERIOD_H1)
     {
@@ -8680,4 +9090,3 @@ void OnTick()
         // DetectAndDraw_H1(rates_H1, /*backfillMode=*/false);
     }
 }
-

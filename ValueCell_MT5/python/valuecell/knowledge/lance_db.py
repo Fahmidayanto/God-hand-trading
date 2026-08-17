@@ -650,18 +650,6 @@ class LanceDBManager:
                     "event_type": row["event_type"],
                 }
             
-            # Date-only fallback: if timestamp has space, extract YYYY-MM-DD
-            if " " in timestamp:
-                date_str = timestamp.split(" ")[0]
-                results = tbl.search().where(f"timestamp LIKE '{date_str}%'").limit(1).to_pandas()
-                if not results.empty:
-                    row = results.iloc[0]
-                    import json
-                    return {
-                        "news_headlines": json.loads(row["news_headlines"]),
-                        "upcoming_events": json.loads(row["upcoming_events"]),
-                        "event_type": row["event_type"],
-                    }
             return None
         except Exception as e:
             logger.error(f"Failed to read news cache from LanceDB: {e}")

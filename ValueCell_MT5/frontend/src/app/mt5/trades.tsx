@@ -1959,7 +1959,7 @@ export default function TradesPage() {
         minHeight: "100vh",
         width: "100%",
         position: "relative",
-        overflowX: "hidden",
+        overflowX: "auto",
         overflowY: "auto"
       }}
     >
@@ -2018,10 +2018,10 @@ export default function TradesPage() {
         style={{
           width: "100%",
           paddingLeft: "240px", // Space for sidebar (exact sidebar width)
-          minHeight: "calc(149vh - 0px)" // Full height minus any top offset
+          minHeight: "calc(100vh - 0px)" // Full height minus any top offset
         }}
       >
-        <div className="w-full px-12 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 max-w-[1920px] mx-auto py-6 md:py-8">
 
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
@@ -2038,8 +2038,8 @@ export default function TradesPage() {
             </div>
           </div>
 
-          {/* Stats Grid - Fixed Position */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
+          {/* Stats Grid - Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
             <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
               <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
                 Total Trades

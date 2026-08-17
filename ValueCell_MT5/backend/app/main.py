@@ -51,6 +51,7 @@ class QuietAccessLogFilter(logging.Filter):
                 "/api/v1/trading/session-zones",
                 "/api/v1/trading/trades/history",
                 "/api/v1/trading/simulate-event",
+                "/api/v1/trading/sentiment-tick",
             ]
             method = str(record.args[1])
             if method == "OPTIONS" or any(path.startswith(prefix) for prefix in quiet_prefixes):

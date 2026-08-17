@@ -53,14 +53,14 @@ def test_sentiment_agent_llm_qwen397_fallback():
         assert "Qwen 397B" in result["reasoning"]
         assert run_mock.call_count == 2
 
-def test_sentiment_agent_llm_qwen122_fallback():
-    """Test fallback from GLM-5.2, Qwen 397B to Qwen 122B."""
+def test_sentiment_agent_llm_nemo120_fallback():
+    """Test fallback from GLM-5.2, Qwen 397B to Nemotron 120B."""
     agent = SentimentAgent(use_llm=True)
     
-    qwen122_response = '{"sentiment": "bullish", "score": 0.85, "reasoning": "Qwen 122B sentiment"}'
+    nemo120_response = '{"sentiment": "bullish", "score": 0.85, "reasoning": "Nemotron 120B sentiment"}'
     
     run_mock = MagicMock()
-    run_mock.side_effect = [Exception("GLM-5.2 offline"), Exception("Qwen 397B offline"), MockAgentRunResponse(qwen122_response)]
+    run_mock.side_effect = [Exception("GLM-5.2 offline"), Exception("Qwen 397B offline"), MockAgentRunResponse(nemo120_response)]
     
     with patch("agno.agent.Agent.run", run_mock):
         result = agent.analyze(
@@ -73,11 +73,11 @@ def test_sentiment_agent_llm_qwen122_fallback():
         
         assert result["sentiment"]["type"] == "bullish"
         assert result["sentiment"]["score"] == 0.85
-        assert "Qwen 122B" in result["reasoning"]
+        assert "Nemotron 120B" in result["reasoning"]
         assert run_mock.call_count == 3
 
 def test_sentiment_agent_llm_gemini_fallback():
-    """Test fallback from GLM-5.2, Qwen 397B, Qwen 122B to Gemini."""
+    """Test fallback across 8 NVIDIA LLM tiers to Gemini."""
     agent = SentimentAgent(use_llm=True)
     
     gemini_response = '{"sentiment": "bearish", "score": -0.6, "reasoning": "Strong US dollar pressures gold (Gemini)"}'
@@ -86,7 +86,12 @@ def test_sentiment_agent_llm_gemini_fallback():
     run_mock.side_effect = [
         Exception("GLM-5.2 offline"), 
         Exception("Qwen 397B offline"), 
-        Exception("Qwen 122B offline"), 
+        Exception("Nemotron 120B offline"), 
+        Exception("Nemotron 550B offline"), 
+        Exception("MiniMax M3 offline"), 
+        Exception("Inkling offline"), 
+        Exception("Laguna offline"), 
+        Exception("NVIDIA GLM offline"), 
         MockAgentRunResponse(gemini_response)
     ]
     
@@ -103,7 +108,7 @@ def test_sentiment_agent_llm_gemini_fallback():
             assert result["sentiment"]["type"] == "bearish"
             assert result["sentiment"]["score"] == -0.6
             assert "Gemini" in result["reasoning"]
-            assert run_mock.call_count == 4
+            assert run_mock.call_count == 9
 
 def test_sentiment_agent_llm_all_failed_keyword_fallback():
     """Test fallback to keyword-based analysis if all LLMs fail."""

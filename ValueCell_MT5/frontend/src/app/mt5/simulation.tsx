@@ -27,6 +27,11 @@ import {
 } from "@/components/valuecell/charts/session-zones-primitive";
 import { useSessionZones } from "@/api/mt5_agents";
 import { selectSetupExtremeEvents } from "./structure-extremes";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -541,6 +546,106 @@ const getEventCycleInfo = (event: any, allEvents: any[]) => {
     return { isChoch: false, isBos: true, cycle: bosSince.length };
   }
   return { isChoch: false, isBos: false, cycle: 0 };
+};
+
+// Helper to derive the signal type (CHOCH / BOS) from a structure event type
+const getSignalType = (eventType: string | null | undefined): string => {
+  const t = (eventType || "").toUpperCase();
+  if (t.includes("CHOCH")) return "CHOCH";
+  if (t.includes("BOS")) return "BOS";
+  return t || "-";
+};
+
+// Helper to derive a human-readable reject reason from a simulation frame.
+// Returns { label, detail } — label is the short column text, detail is a
+// plain-language explanation shown in a hover popup.
+const getRejectReason = (frame: any): { label: string; detail: string } => {
+  if (!frame) return { label: "unknown", detail: "Tidak ada data frame." };
+  const agents = frame.agents || {};
+  const ms = agents.market_structure || {};
+  const ml = agents.ml_prediction || {};
+  const sent = agents.sentiment || {};
+  const rm = agents.risk_management || {};
+
+  const consensusPct = Math.round((frame.consensus_confidence ?? 0) * 100);
+  const thresholdPct = 60;
+
+  // Explicit filter flags (sentiment is the main one that hard-filters)
+  if (sent.filtered) {
+    return {
+      label: "Sentiment filter",
+      detail: "Sinyal ditolak karena ada berita atau peristiwa penting yang akan rilis. Sistem menghindari masuk pasar saat berita besar karena harga bisa bergerak liar dan tak terduga.",
+    };
+  }
+  if (ml.filtered) {
+    return {
+      label: "ML filter",
+      detail: "Sinyal ditolak karena model ML menilai peluang untung-rugi kurang menarik. Rasio R:R di bawah batas minimal, artinya risiko lebih besar daripada potensi profit, jadi sistem memilih tidak masuk.",
+    };
+  }
+  if (ms.filtered) {
+    return {
+      label: "Market structure filter",
+      detail: "Sinyal ditolak karena struktur pasar tidak mendukung. Pola harga yang terbentuk tidak memenuhi syarat untuk entry yang aman.",
+    };
+  }
+
+  // Risk management veto (only runs after consensus approves)
+  if (rm.approved === false) {
+    return {
+      label: "Risk management",
+      detail: "Sinyal ditolak karena risikonya terlalu besar. Posisi ini akan mempertaruhkan lebih dari batas maksimal yang diizinkan, jadi sistem menjaga modal agar tidak terlalu berisiko.",
+    };
+  }
+
+  // Market structure is the primary signal source — if it's HOLD, no setup
+  if (ms.signal === "HOLD") {
+    return {
+      label: "Market structure HOLD",
+      detail: "Sinyal ditolak karena struktur pasar belum membentuk pola yang jelas. Tidak ada setup yang valid untuk masuk, jadi sistem menahan diri.",
+    };
+  }
+
+  // ML filter rejected the structure signal
+  if (ml.signal === "HOLD") {
+    return {
+      label: "ML filter",
+      detail: "Sinyal ditolak karena model ML tidak mendukung. Peluang profit yang diprediksi terlalu kecil atau tidak meyakinkan, jadi sistem memilih tidak masuk.",
+    };
+  }
+
+  // Sentiment turned the signal to HOLD
+  if (sent.signal === "HOLD") {
+    return {
+      label: "Sentiment filter",
+      detail: "Sinyal ditolak karena sentimen pasar tidak mendukung. Berita atau kondisi ekonomi saat ini tidak sejalan dengan arah sinyal, jadi sistem menahan diri.",
+    };
+  }
+
+  // Consensus level tells us how strong the agreement was
+  if (frame.consensus_level === "no_consensus") {
+    return {
+      label: "No consensus",
+      detail: `Sinyal ditolak karena para agen tidak sepakat. Kekuatan konsensus hanya ${consensusPct}%, padahal minimal dibutuhkan ${thresholdPct}%. Semua agen memilih HOLD (tidak ada sinyal jelas), jadi sistem menahan diri.`,
+    };
+  }
+  if (frame.consensus_level === "weak" || frame.consensus_level === "moderate") {
+    return {
+      label: "Consensus too weak",
+      detail: `Sinyal ditolak karena konsensus para agen terlalu lemah. Kekuatan konsensus hanya ${consensusPct}%, padahal minimal dibutuhkan ${thresholdPct}%. Sistem butuh kesepakatan yang lebih kuat sebelum masuk.`,
+    };
+  }
+
+  if (frame.final_signal === "HOLD") {
+    return {
+      label: "No tradeable signal",
+      detail: "Sinyal ditolak karena tidak ada sinyal yang layak diperdagangkan. Hasil akhir dari semua agen adalah HOLD (tidak ada arah yang jelas).",
+    };
+  }
+  return {
+    label: "Consensus too weak",
+    detail: `Sinyal ditolak karena konsensus para agen terlalu lemah. Kekuatan konsensus hanya ${consensusPct}%, padahal minimal dibutuhkan ${thresholdPct}%.`,
+  };
 };
 
 // ── Types for simulation helper ──────────────────────────────────────────────
@@ -1076,6 +1181,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
           continue;
         }
@@ -1160,6 +1269,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
         } else {
           // Open trade (active position)
@@ -1188,6 +1301,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
         }
       }
@@ -1800,6 +1917,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
           continue;
         }
@@ -1876,6 +1997,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
         } else {
           // Open trade (active position)
@@ -1904,6 +2029,10 @@ export default function SimulationOfDead() {
             is_be_active: false,
             tp_trigger_price: null,
             is_tp_maxed: false,
+            signal_type: t.signal_type,
+            reject_reason: t.reject_reason,
+            reject_detail: t.reject_detail,
+            entry_time: t.entry_time,
           });
         }
       }
@@ -2148,6 +2277,9 @@ export default function SimulationOfDead() {
                   net_profit: null,
                   is_agent_trade: true,
                   status: "Running",
+                  signal_type: getSignalType(frame.event_type),
+                  reject_reason: null,
+                  reject_detail: null,
                 }];
               });
             } else {
@@ -2158,6 +2290,7 @@ export default function SimulationOfDead() {
                   if (prev.some(t => t.entry_time === frame.event_time)) return prev;
                   const entryVal = frame.event_price || 0.0;
                   const typeVal = frame.final_signal || "HOLD";
+                  const reject = getRejectReason(frame);
 
                   return [...prev, {
                     ticket: prev.length + 1,
@@ -2172,6 +2305,9 @@ export default function SimulationOfDead() {
                     net_profit: 0,
                     is_agent_trade: true,
                     status: "Rejected",
+                    signal_type: getSignalType(frame.event_type),
+                    reject_reason: reject.label,
+                    reject_detail: reject.detail,
                   }];
                 });
               }
@@ -2220,7 +2356,7 @@ export default function SimulationOfDead() {
   return (
     <div
       className="flex flex-col size-full text-[var(--text-primary)]"
-      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "240px", overflow: "hidden" }}
+      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "var(--sidebar-offset, 250px)", overflow: "hidden" }}
     >
       {/* ── Header ── */}
       <div
@@ -3131,6 +3267,7 @@ export default function SimulationOfDead() {
                   <thead className="bg-slate-900/40 text-slate-400 text-[11px] font-semibold tracking-wider uppercase">
                     <tr>
                       <th className="py-3 px-4 text-left">Ticket</th>
+                      <th className="py-3 px-4 text-left">Signal Type</th>
                       <th className="py-3 px-4 text-left">Type</th>
                       <th className="py-3 px-4 text-right">Lot</th>
                       <th className="py-3 px-4 text-right">Entry Price</th>
@@ -3140,10 +3277,14 @@ export default function SimulationOfDead() {
                       <th className="py-3 px-4 text-left">Triggers (BE | TP-Ex)</th>
                       <th className="py-3 px-4 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Floating PnL</th>
+                      <th className="py-3 px-4 text-left">Reject Reason</th>
+                      <th className="py-3 px-4 text-left">Entry Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-200 text-xs font-medium">
-                    {activePositions.map((pos) => {
+                    {[...activePositions]
+                      .sort((a, b) => (b.entry_time ?? 0) - (a.entry_time ?? 0))
+                      .map((pos) => {
                       const isWin = pos.pnl >= 0;
                       const isBuy = pos.type === "BUY";
 
@@ -3171,6 +3312,16 @@ export default function SimulationOfDead() {
                       return (
                         <tr key={pos.ticket} className="hover:bg-slate-800/20 transition-colors">
                           <td className="py-3.5 px-4 font-mono text-slate-400">#{pos.ticket}</td>
+                          <td className="py-3.5 px-4">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${pos.signal_type === "CHOCH"
+                              ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                              : pos.signal_type === "BOS"
+                              ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
+                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                              }`}>
+                              {pos.signal_type || "-"}
+                            </span>
+                          </td>
                           <td className="py-3.5 px-4">
                             <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${pos.type === "BUY"
                               ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
@@ -3236,6 +3387,41 @@ export default function SimulationOfDead() {
                           <td className={`py-3.5 px-4 text-right font-mono font-bold text-sm ${isWin ? "text-emerald-400" : "text-rose-500"
                             }`}>
                             {isWin ? "+" : ""}${pos.pnl.toFixed(2)}
+                          </td>
+                          <td className="py-3.5 px-4 text-left">
+                            {pos.reject_reason ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 cursor-help">
+                                    {pos.reject_reason}
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  side="top"
+                                  sideOffset={8}
+                                  className="max-w-xs border border-rose-500/30 bg-slate-950/95 text-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-md"
+                                >
+                                  <div className="space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
+                                        {pos.reject_reason}
+                                      </span>
+                                    </div>
+                                    <p className="text-[11px] leading-relaxed text-slate-300">
+                                      {pos.reject_detail || pos.reject_reason}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-slate-600">-</span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-left font-mono text-slate-400 whitespace-nowrap">
+                            {pos.entry_time ? new Date(pos.entry_time * 1000).toLocaleString("en-GB", {
+                              day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+                            }) : "-"}
                           </td>
                         </tr>
                       );

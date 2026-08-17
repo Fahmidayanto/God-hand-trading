@@ -50,6 +50,7 @@ class ApiClient {
   private async handleResponse<T>(
     response: Response,
     wrapError: boolean,
+    method: string,
   ): Promise<T> {
     if (wrapError && !response.ok) {
       const errorData = await response.json().catch(() => ({}));
@@ -85,7 +86,10 @@ class ApiClient {
           toast.error(JSON.stringify(error));
           useSystemStore.getState().clearSystemInfo();
         }
-      } else {
+      } else if (method !== "GET") {
+        // Only toast for user-initiated mutations (POST/PUT/PATCH/DELETE).
+        // GET requests are usually background polling/reads — toasting on
+        // every failed poll (e.g. MT5 disconnected) spams the UI.
         toast.error(message);
       }
 
@@ -136,7 +140,7 @@ class ApiClient {
     }
 
     const response = await fetch(url, requestConfig);
-    return this.handleResponse<T>(response, config.wrapError ?? true);
+    return this.handleResponse<T>(response, config.wrapError ?? true, method);
   }
 
   async get<T>(endpoint: string, config?: RequestConfig): Promise<T> {

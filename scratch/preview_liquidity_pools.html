@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Visualisasi Liquidity Pools (BSL / SSL) & SMC - ValueCell MT5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(15, 23, 42, 0.85);
+      --border-subtle: rgba(51, 65, 85, 0.6);
+      --bsl-cyan: #38bdf8;
+      --ssl-orange: #fb923c;
+      --supply-purple: #a855f7;
+      --demand-amber: #f59e0b;
+      --sl-red: #f43f5e;
+      --tp-green: #10b981;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      overflow-x: hidden;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 20px;
+    }
+
+    .title-group h1 {
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #38bdf8 0%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .title-group p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      border-radius: 9999px;
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .badge-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 8px #38bdf8;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+      flex: 1;
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(16px);
+    }
+
+    .chart-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .symbol-pill {
+      font-weight: 700;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    #chart-container {
+      flex: 1;
+      min-height: 520px;
+      border-radius: 8px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 25px -10px rgba(0, 0, 0, 0.4);
+    }
+
+    .panel-card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #cbd5e1;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .toggle-desc {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #1e293b;
+      border: 1px solid #475569;
+      transition: .3s;
+      border-radius: 22px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #94a3b8;
+      transition: .3s;
+      border-radius: 50%;
+    }
+
+    .switch-sky input:checked + .slider {
+      background-color: rgba(56, 189, 248, 0.3);
+      border-color: rgba(56, 189, 248, 0.8);
+    }
+    .switch-sky input:checked + .slider:before {
+      transform: translateX(18px);
+      background-color: #38bdf8;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+    }
+
+    .switch-purple input:checked + .slider {
+      background-color: rgba(168, 85, 247, 0.3);
+      border-color: rgba(168, 85, 247, 0.8);
+    }
+    .switch-purple input:checked + .slider:before {
+      transform: translateX(18px);
+      background-color: #c084fc;
+      box-shadow: 0 0 8px rgba(168, 85, 247, 0.8);
+    }
+
+    .switch-green input:checked + .slider {
+      background-color: rgba(16, 185, 129, 0.3);
+      border-color: rgba(16, 185, 129, 0.8);
+    }
+    .switch-green input:checked + .slider:before {
+      transform: translateX(18px);
+      background-color: #34d399;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: #334155;
+      border-color: #64748b;
+      color: #38bdf8;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(168, 85, 247, 0.2) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      color: #38bdf8;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%);
+      border-color: #38bdf8;
+    }
+
+    .legend-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(51, 65, 85, 0.4);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .color-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .swatch-bsl { background: rgba(56, 189, 248, 0.3); border: 1.5px dashed #38bdf8; }
+    .swatch-ssl { background: rgba(251, 146, 60, 0.3); border: 1.5px dashed #fb923c; }
+    .swatch-supply { background: rgba(168, 85, 247, 0.25); border: 1.5px solid #a855f7; }
+    .swatch-demand { background: rgba(245, 158, 11, 0.25); border: 1.5px solid #f59e0b; }
+    .swatch-sl { background: rgba(244, 63, 94, 0.25); border: 1.5px solid #f43f5e; }
+    .swatch-tp { background: rgba(16, 185, 129, 0.25); border: 1.5px solid #10b981; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="title-group">
+      <h1>🎯 Visual Liquidity Pools (BSL / SSL) &amp; SMC Harmony Preview</h1>
+      <p>Menampilkan target likuiditas <strong>BSL (Cyan)</strong> dan <strong>SSL (Orange)</strong> dalam harmoni visual tanpa tabrakan dengan <strong>Supply (Ungu)</strong>, <strong>Demand (Emas)</strong>, <strong>SL (Merah)</strong>, &amp; <strong>TP (Hijau)</strong>.</p>
+    </div>
+    <div class="badge-status">
+      <span class="badge-dot"></span>
+      <span>XAUUSD M15 SMC REPLAY</span>
+    </div>
+  </div>
+
+  <!-- Main Grid -->
+  <div class="main-grid">
+
+    <!-- Chart Column -->
+    <div class="chart-card">
+      <div class="chart-hud">
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span class="symbol-pill">XAUUSD</span>
+          <span style="color: #64748b;">M15 Liquidity Pools &amp; SMC Zones Overlay</span>
+        </div>
+        <div id="price-hud" style="color: #38bdf8;">Loading Data...</div>
+      </div>
+      <div id="chart-container"></div>
+    </div>
+
+    <!-- Controls Column -->
+    <div class="controls-panel">
+
+      <!-- Settings Card -->
+      <div class="panel-card">
+        <h3>⚙️ Pengaturan Indikator Visual</h3>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" style="color: #38bdf8;">🎯 Liquidity Pools (BSL / SSL)</div>
+            <div class="toggle-desc">Garis target likuiditas Cyan &amp; Orange</div>
+          </div>
+          <label class="switch switch-sky">
+            <input type="checkbox" id="toggle-pools" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" style="color: #c084fc;">🏷️ Supply &amp; Demand (SMC)</div>
+            <div class="toggle-desc">Kotak area Supply (Ungu) &amp; Demand (Emas)</div>
+          </div>
+          <label class="switch switch-purple">
+            <input type="checkbox" id="toggle-sd" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div>
+            <div class="toggle-label" style="color: #34d399;">📊 Trade Position SL/TP Overlay</div>
+            <div class="toggle-desc">Garis posisi aktif SL (Merah) &amp; TP (Hijau)</div>
+          </div>
+          <label class="switch switch-green">
+            <input type="checkbox" id="toggle-trade" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Playback Simulator Card -->
+      <div class="panel-card">
+        <h3>▶️ Replay Playhead Simulator</h3>
+        <p style="font-size: 11px; color: #94a3b8; margin-bottom: 12px;">
+          Geser slider untuk melihat deteksi sapuan likuiditas (*Swept*) secara otomatis saat harga menembus level puncak/lembah.
+        </p>
+
+        <input type="range" id="candle-slider" min="15" max="60" value="48" style="width: 100%; margin-bottom: 14px; accent-color: #38bdf8;">
+
+        <div class="btn-grid">
+          <button class="btn btn-primary" id="btn-play">▶️ Play Replay</button>
+          <button class="btn" id="btn-step">⏭️ Step +1 Bar</button>
+        </div>
+      </div>
+
+      <!-- Legend Card -->
+      <div class="panel-card">
+        <h3>📌 Legenda Lengkap Harmoni Warna</h3>
+        <div class="legend-box">
+          <div class="legend-item">
+            <div class="color-swatch swatch-bsl"></div>
+            <div>
+              <div style="color: #38bdf8; font-weight: bold;">🎯 BSL / EQH (Cyan)</div>
+              <div style="color: #64748b; font-size: 10px;">Buy-Side Liquidity (Puncak Swing High)</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="color-swatch swatch-ssl"></div>
+            <div>
+              <div style="color: #fb923c; font-weight: bold;">🎯 SSL / EQL (Orange)</div>
+              <div style="color: #64748b; font-size: 10px;">Sell-Side Liquidity (Lembah Swing Low)</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="color-swatch swatch-supply"></div>
+            <div>
+              <div style="color: #c084fc; font-weight: bold;">🏷️ Supply Zone (Ungu)</div>
+              <div style="color: #64748b; font-size: 10px;">Zona Resistensi Institusional</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="color-swatch swatch-demand"></div>
+            <div>
+              <div style="color: #fde68a; font-weight: bold;">🏷️ Demand Zone (Emas)</div>
+              <div style="color: #64748b; font-size: 10px;">Zona Support Institusional</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="color-swatch swatch-sl"></div>
+            <div>
+              <div style="color: #fda4af; font-weight: bold;">🛑 Stop Loss (Merah)</div>
+              <div style="color: #64748b; font-size: 10px;">Batas Risiko Posisi Aktif</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="color-swatch swatch-tp"></div>
+            <div>
+              <div style="color: #6ee7b7; font-weight: bold;">🎯 Take Profit (Hijau)</div>
+              <div style="color: #64748b; font-size: 10px;">Target Profit Posisi Aktif</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // ── Generate Data ────────────────────────────────────────────────────────
+    const baseTime = Math.floor(new Date('2026-01-05T08:00:00Z').getTime() / 1000);
+    const candleData = [];
+    let currentPrice = 4425.0;
+
+    for (let i = 0; i < 65; i++) {
+      const time = baseTime + i * 900;
+      let delta = (Math.random() - 0.45) * 4.0;
+      if (i >= 5 && i <= 15) delta -= 1.8;
+      if (i >= 16 && i <= 35) delta += 2.5;
+      if (i >= 36 && i <= 45) delta -= 1.2;
+      if (i >= 46) delta += 3.2;
+
+      const open = currentPrice;
+      const close = open + delta;
+      const high = Math.max(open, close) + Math.random() * 2.5;
+      const low = Math.min(open, close) - Math.random() * 2.5;
+      currentPrice = close;
+
+      candleData.push({ time, open, high, low, close });
+    }
+
+    const liquidityPools = [
+      {
+        id: "BSL-1",
+        type: "BSL",
+        price: 4452.00,
+        startTime: baseTime + 28 * 900,
+        endTime: baseTime + 48 * 900,
+        isSwept: true,
+        label: "🎯 EQH [4452.00] (Swept)"
+      },
+      {
+        id: "BSL-2",
+        type: "BSL",
+        price: 4480.50,
+        startTime: baseTime + 2 * 900,
+        endTime: baseTime + 65 * 900,
+        isSwept: false,
+        label: "🎯 BSL [4480.50]"
+      },
+      {
+        id: "SSL-1",
+        type: "SSL",
+        price: 4421.20,
+        startTime: baseTime + 8 * 900,
+        endTime: baseTime + 65 * 900,
+        isSwept: false,
+        label: "🎯 SSL [4421.20]"
+      }
+    ];
+
+    const supplyDemandZones = [
+      {
+        id: "DEMAND-1",
+        type: "DEMAND",
+        topPrice: 4428.50,
+        bottomPrice: 4421.20,
+        startTime: baseTime + 8 * 900,
+        endTime: baseTime + 65 * 900,
+        isMitigated: false,
+        label: "DEMAND [4421.2 - 4428.5]"
+      },
+      {
+        id: "SUPPLY-2",
+        type: "SUPPLY",
+        topPrice: 4484.00,
+        bottomPrice: 4476.00,
+        startTime: baseTime + 2 * 900,
+        endTime: baseTime + 65 * 900,
+        isMitigated: false,
+        label: "MAJOR SUPPLY [4476.0 - 4484.0]"
+      }
+    ];
+
+    // Simulated Active Trade
+    const activeTrade = {
+      entryPrice: 4455.00,
+      slPrice: 4426.40,
+      tpPrice: 4474.50, // Adaptive TP front-running Supply $4476
+      startTime: baseTime + 45 * 900,
+      endTime: baseTime + 65 * 900,
+    };
+
+    // ── Setup Chart ──────────────────────────────────────────────────────────
+    const container = document.getElementById('chart-container');
+    const chart = LightweightCharts.createChart(container, {
+      layout: {
+        background: { color: '#090d16' },
+        textColor: '#94a3b8',
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: 'rgba(51, 65, 85, 0.25)' },
+        horzLines: { color: 'rgba(51, 65, 85, 0.25)' },
+      },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor: 'rgba(51, 65, 85, 0.5)', scaleMargins: { top: 0.15, bottom: 0.15 } },
+      timeScale: { borderColor: 'rgba(51, 65, 85, 0.5)', timeVisible: true, secondsVisible: false },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: '#22d3ee',
+      downColor: '#f43f5e',
+      borderUpColor: '#22d3ee',
+      borderDownColor: '#f43f5e',
+      wickUpColor: '#22d3ee',
+      wickDownColor: '#f43f5e',
+    });
+
+    let currentPlayheadIndex = 48;
+
+    function renderCandles(limit) {
+      const slice = candleData.slice(0, limit);
+      candleSeries.setData(slice);
+      if (slice.length > 0) {
+        const last = slice[slice.length - 1];
+        document.getElementById('price-hud').textContent = 
+          `Close: $${last.close.toFixed(2)} | High: $${last.high.toFixed(2)} | Low: $${last.low.toFixed(2)}`;
+      }
+    }
+
+    renderCandles(currentPlayheadIndex);
+    chart.timeScale().fitContent();
+
+    // ── Canvas Overlay for SMC + Liquidity + Trade ───────────────────────────
+    class SmcOverlay {
+      constructor(chart, series) {
+        this.chart = chart;
+        this.series = series;
+        this.showPools = true;
+        this.showSD = true;
+        this.showTrade = true;
+
+        this.canvas = document.createElement('canvas');
+        this.canvas.style.position = 'absolute';
+        this.canvas.style.top = '0';
+        this.canvas.style.left = '0';
+        this.canvas.style.width = '100%';
+        this.canvas.style.height = '100%';
+        this.canvas.style.pointerEvents = 'none';
+        this.canvas.style.zIndex = '2';
+        container.appendChild(this.canvas);
+
+        this.ctx = this.canvas.getContext('2d');
+        this.resize();
+
+        window.addEventListener('resize', () => this.resize());
+        chart.timeScale().subscribeVisibleTimeRangeChange(() => this.draw());
+      }
+
+      resize() {
+        const rect = container.getBoundingClientRect();
+        this.canvas.width = rect.width * window.devicePixelRatio;
+        this.canvas.height = rect.height * window.devicePixelRatio;
+        this.draw();
+      }
+
+      draw() {
+        const ctx = this.ctx;
+        const dpr = window.devicePixelRatio;
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        const timeScale = this.chart.timeScale();
+
+        // 1. Draw Supply & Demand Zones (Purple & Amber)
+        if (this.showSD) {
+          for (const zone of supplyDemandZones) {
+            const x1 = timeScale.timeToCoordinate(zone.startTime);
+            const x2 = timeScale.timeToCoordinate(zone.endTime);
+            const yTop = this.series.priceToCoordinate(zone.topPrice);
+            const yBottom = this.series.priceToCoordinate(zone.bottomPrice);
+            if (x1 === null || yTop === null || yBottom === null) continue;
+
+            const lx1 = x1 * dpr;
+            const lx2 = (x2 !== null ? x2 : x1 + 140) * dpr;
+            const lyTop = Math.min(yTop, yBottom) * dpr;
+            const lyBottom = Math.max(yTop, yBottom) * dpr;
+            const zoneWidth = Math.max(6 * dpr, lx2 - lx1);
+            const zoneHeight = Math.max(3 * dpr, lyBottom - lyTop);
+            const isSupply = zone.type === "SUPPLY";
+
+            ctx.fillStyle = isSupply ? "rgba(168, 85, 247, 0.14)" : "rgba(245, 158, 11, 0.14)";
+            ctx.fillRect(lx1, lyTop, zoneWidth, zoneHeight);
+
+            ctx.strokeStyle = isSupply ? "rgba(168, 85, 247, 0.85)" : "rgba(245, 158, 11, 0.85)";
+            ctx.lineWidth = 1.2 * dpr;
+            ctx.strokeRect(lx1, lyTop, zoneWidth, zoneHeight);
+          }
+        }
+
+        // 2. Draw Liquidity Pools (BSL Cyan / SSL Orange)
+        if (this.showPools) {
+          for (const pool of liquidityPools) {
+            const x1 = timeScale.timeToCoordinate(pool.startTime);
+            const x2 = timeScale.timeToCoordinate(pool.endTime);
+            const y = this.series.priceToCoordinate(pool.price);
+            if (x1 === null || y === null) continue;
+
+            const lx1 = x1 * dpr;
+            const lx2 = (x2 !== null ? x2 : x1 + 140) * dpr;
+            const ly = Math.round(y * dpr) + 0.5;
+            const isBsl = pool.type === "BSL";
+            const isSwept = pool.isSwept;
+
+            const strokeColor = isBsl
+              ? isSwept ? "rgba(56, 189, 248, 0.35)" : "rgba(56, 189, 248, 0.90)"
+              : isSwept ? "rgba(251, 146, 60, 0.35)" : "rgba(251, 146, 60, 0.90)";
+
+            ctx.save();
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = (isSwept ? 1 : 1.5) * dpr;
+            ctx.setLineDash(isSwept ? [2 * dpr, 4 * dpr] : [6 * dpr, 3 * dpr]);
+
+            ctx.beginPath();
+            ctx.moveTo(lx1, ly);
+            ctx.lineTo(lx2, ly);
+            ctx.stroke();
+
+            // Badge
+            ctx.font = `600 ${Math.round(10 * dpr)}px 'JetBrains Mono', monospace`;
+            const text = pool.label;
+            const textWidth = ctx.measureText(text).width;
+            const padX = 6 * dpr;
+            const badgeH = 15 * dpr;
+            const badgeY = ly - badgeH / 2;
+            const badgeX = Math.max(lx1, lx2 - textWidth - padX * 2);
+
+            ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+            ctx.fillRect(badgeX, badgeY, textWidth + padX * 2, badgeH);
+            ctx.strokeRect(badgeX, badgeY, textWidth + padX * 2, badgeH);
+
+            ctx.fillStyle = isBsl ? "#7dd3fc" : "#fdba74";
+            ctx.fillText(text, badgeX + padX, badgeY + badgeH - 3.5 * dpr);
+            ctx.restore();
+          }
+        }
+
+        // 3. Draw Active Trade Position Overlay (SL Red / TP Green)
+        if (this.showTrade && currentPlayheadIndex >= 45) {
+          const x1 = timeScale.timeToCoordinate(activeTrade.startTime);
+          const yEntry = this.series.priceToCoordinate(activeTrade.entryPrice);
+          const ySL = this.series.priceToCoordinate(activeTrade.slPrice);
+          const yTP = this.series.priceToCoordinate(activeTrade.tpPrice);
+
+          if (x1 !== null && yEntry !== null && ySL !== null && yTP !== null) {
+            const lx1 = x1 * dpr;
+            const lx2 = this.canvas.width; // extend to right edge
+
+            ctx.save();
+            // SL Line (Red)
+            ctx.strokeStyle = "#f43f5e";
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(lx1, ySL * dpr);
+            ctx.lineTo(lx2, ySL * dpr);
+            ctx.stroke();
+
+            // TP Line (Green)
+            ctx.strokeStyle = "#10b981";
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.beginPath();
+            ctx.moveTo(lx1, yTP * dpr);
+            ctx.lineTo(lx2, yTP * dpr);
+            ctx.stroke();
+
+            // Entry Line (Cyan / Gray)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.lineWidth = 1 * dpr;
+            ctx.setLineDash([4 * dpr, 4 * dpr]);
+            ctx.beginPath();
+            ctx.moveTo(lx1, yEntry * dpr);
+            ctx.lineTo(lx2, yEntry * dpr);
+            ctx.stroke();
+
+            // SL Badge
+            ctx.font = `bold ${Math.round(10 * dpr)}px 'JetBrains Mono', monospace`;
+            ctx.fillStyle = "#f43f5e";
+            ctx.fillText(`🛑 SL: ${activeTrade.slPrice.toFixed(2)}`, lx2 - 120 * dpr, (ySL * dpr) - 4 * dpr);
+
+            // TP Badge
+            ctx.fillStyle = "#10b981";
+            ctx.fillText(`🎯 TP: ${activeTrade.tpPrice.toFixed(2)}`, lx2 - 120 * dpr, (yTP * dpr) - 4 * dpr);
+
+            ctx.restore();
+          }
+        }
+      }
+    }
+
+    const overlay = new SmcOverlay(chart, candleSeries);
+    setTimeout(() => overlay.draw(), 150);
+
+    // ── Controls ─────────────────────────────────────────────────────────────
+    document.getElementById('toggle-pools').addEventListener('change', (e) => {
+      overlay.showPools = e.target.checked;
+      overlay.draw();
+    });
+
+    document.getElementById('toggle-sd').addEventListener('change', (e) => {
+      overlay.showSD = e.target.checked;
+      overlay.draw();
+    });
+
+    document.getElementById('toggle-trade').addEventListener('change', (e) => {
+      overlay.showTrade = e.target.checked;
+      overlay.draw();
+    });
+
+    const slider = document.getElementById('candle-slider');
+    slider.addEventListener('input', (e) => {
+      currentPlayheadIndex = Number(e.target.value);
+      renderCandles(currentPlayheadIndex);
+      overlay.draw();
+    });
+
+    document.getElementById('btn-step').addEventListener('click', () => {
+      if (currentPlayheadIndex < candleData.length) {
+        currentPlayheadIndex++;
+        slider.value = currentPlayheadIndex;
+        renderCandles(currentPlayheadIndex);
+        overlay.draw();
+      }
+    });
+
+    let isPlaying = false;
+    let playTimer = null;
+    const playBtn = document.getElementById('btn-play');
+
+    playBtn.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      if (isPlaying) {
+        playBtn.textContent = '⏸️ Pause Replay';
+        playTimer = setInterval(() => {
+          if (currentPlayheadIndex < candleData.length) {
+            currentPlayheadIndex++;
+            slider.value = currentPlayheadIndex;
+            renderCandles(currentPlayheadIndex);
+            overlay.draw();
+          } else {
+            clearInterval(playTimer);
+            isPlaying = false;
+            playBtn.textContent = '▶️ Play Replay';
+          }
+        }, 400);
+      } else {
+        clearInterval(playTimer);
+        playBtn.textContent = '▶️ Play Replay';
+      }
+    });
+  </script>
+</body>
+</html>

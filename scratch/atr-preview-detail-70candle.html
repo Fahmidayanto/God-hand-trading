@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Preview Detail — 70 Candle + Entry + Garis ATR</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #0f172a;
+    color: #f8fafc;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 980px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .title { font-size: 15px; font-weight: 700; }
+  .badge {
+    background: rgba(34,211,238,.15);
+    color: #22d3ee;
+    border: 1px solid rgba(34,211,238,.3);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .chart {
+    position: relative;
+    height: 320px;
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .candle { position: absolute; bottom: 40px; width: 8px; border-radius: 1px; }
+  .wick { position: absolute; width: 1.5px; background: #64748b; left: 50%; transform: translateX(-50%); }
+  .up { background: #22c55e; }
+  .down { background: #ef4444; }
+  .atr-line {
+    position: absolute;
+    left: 0;
+    height: 2px;
+    background: #22d3ee;
+    box-shadow: 0 0 8px rgba(34,211,238,.6);
+  }
+  .atr-zone {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: rgba(34,211,238,.06);
+    border-top: 2px solid #22d3ee;
+    border-bottom: 2px solid #22d3ee;
+  }
+  .atr-label {
+    position: absolute;
+    background: #0e7490;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: monospace;
+    padding: 3px 8px;
+    border-radius: 6px;
+    border: 1px solid #22d3ee;
+    white-space: nowrap;
+    z-index: 5;
+  }
+  .entry-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #22c55e;
+    z-index: 3;
+  }
+  .sl-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #ef4444;
+    border-top: 1px dashed #ef4444;
+    z-index: 3;
+  }
+  .tp-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #22d3ee;
+    border-top: 1px dashed #22d3ee;
+    z-index: 3;
+  }
+  .trade-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: monospace;
+    padding: 2px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 6;
+  }
+  .candle-num {
+    position: absolute;
+    bottom: 4px;
+    font-size: 8px;
+    color: #475569;
+    font-family: monospace;
+    transform: translateX(-50%);
+  }
+  .legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: #94a3b8;
+    flex-wrap: wrap;
+  }
+  .legend span b { color: #22d3ee; }
+  .legend .sl { color: #ef4444; }
+  .legend .tp { color: #22d3ee; }
+  .legend .en { color: #22c55e; }
+  .info {
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: #0b1220;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #cbd5e1;
+    line-height: 1.7;
+  }
+  .info b { color: #22d3ee; }
+  .info .sl { color: #ef4444; }
+  .info .tp { color: #22d3ee; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <div class="title">ATR Band — Preview Detail (70 Candle + Entry)</div>
+      <span class="badge">ATR ON</span>
+    </div>
+
+    <div class="chart" id="chart"></div>
+
+    <div class="legend">
+      <span>ATR: <b id="atrVal">$0</b></span>
+      <span class="en">Entry (candle 15)</span>
+      <span class="sl">SL (1.5× ATR)</span>
+      <span class="tp">TP (2.0× ATR)</span>
+    </div>
+
+    <div class="info" id="info"></div>
+  </div>
+
+<script>
+  const chart = document.getElementById('chart');
+  const W = 980, H = 320;
+  const base = 150;
+  const total = 70;      // total candle
+  const entryIdx = 14;   // entry di candle ke-15 (index 14)
+  const period = 14;     // ATR period
+
+  // Generate 70 candle dengan tren naik + noise
+  const candles = [];
+  let price = base;
+  for (let i = 0; i < total; i++) {
+    const up = Math.random() > 0.42;
+    const body = 6 + Math.random() * 18;
+    const wick = 3 + Math.random() * 8;
+    const open = up ? price : price + body;
+    const close = up ? price + body : price;
+    candles.push({ open, close, high: Math.max(open, close) + wick, low: Math.min(open, close) - wick, up });
+    price = close + (Math.random() * 2 - 0.5); // drift kecil
+  }
+
+  // Hitung ATR dari 14 candle SEBELUM entry (candle 1-14, index 0-13)
+  let trSum = 0;
+  for (let i = 1; i <= entryIdx; i++) {
+    const c = candles[i], p = candles[i-1];
+    const tr = Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+    trSum += tr;
+  }
+  const atr = trSum / period;
+
+  // Skala
+  const stepX = W / (total + 1);
+  const minP = Math.min(...candles.map(c => c.low));
+  const maxP = Math.max(...candles.map(c => c.high));
+  const range = (maxP - minP) || 1;
+  const toY = (p) => H - 50 - ((p - minP) / range) * (H - 100);
+
+  // Gambar semua candle
+  candles.forEach((c, i) => {
+    const x = stepX * (i + 1);
+    const yOpen = toY(c.open), yClose = toY(c.close);
+    const yHigh = toY(c.high), yLow = toY(c.low);
+    const yTop = Math.min(yOpen, yClose);
+    const h = Math.max(2, Math.abs(yClose - yOpen));
+
+    const wick = document.createElement('div');
+    wick.className = 'wick';
+    wick.style.left = x + 'px';
+    wick.style.top = yHigh + 'px';
+    wick.style.height = (yLow - yHigh) + 'px';
+    chart.appendChild(wick);
+
+    const body = document.createElement('div');
+    body.className = 'candle ' + (c.up ? 'up' : 'down');
+    body.style.left = (x - 4) + 'px';
+    body.style.top = yTop + 'px';
+    body.style.height = h + 'px';
+    chart.appendChild(body);
+
+    // Nomor candle (tampilkan tiap 5)
+    if ((i + 1) % 5 === 0) {
+      const num = document.createElement('div');
+      num.className = 'candle-num';
+      num.textContent = (i + 1);
+      num.style.left = x + 'px';
+      chart.appendChild(num);
+    }
+  });
+
+  // Garis ATR: dari candle 1 (index 0) sampai candle 14 (index 13)
+  const atrY = toY(maxP) - 30;
+  const atrLine = document.createElement('div');
+  atrLine.className = 'atr-line';
+  atrLine.style.top = atrY + 'px';
+  // Batasi hanya dari candle 1 sampai candle 14 (rentang ATR period)
+  const atrXStart = stepX * 1;   // candle 1
+  const atrXEnd = stepX * period; // candle 14
+  atrLine.style.left = atrXStart + 'px';
+  atrLine.style.width = (atrXEnd - atrXStart) + 'px';
+  chart.appendChild(atrLine);
+
+  // Label ATR di atas garis (di tengah rentang)
+  const atrLabel = document.createElement('div');
+  atrLabel.className = 'atr-label';
+  atrLabel.textContent = 'ATR $' + atr.toFixed(2);
+  atrLabel.style.top = (atrY - 26) + 'px';
+  atrLabel.style.left = (atrXStart + (atrXEnd - atrXStart) / 2) + 'px';
+  atrLabel.style.transform = 'translateX(-50%)';
+  chart.appendChild(atrLabel);
+
+  // Entry di candle 15 (index 14)
+  const entryP = candles[entryIdx].close;
+  const slP = entryP - atr * 1.5;
+  const tpP = entryP + atr * 2.0;
+
+  const entryY = toY(entryP);
+  const slY = toY(slP);
+  const tpY = toY(tpP);
+
+  const entryLine = document.createElement('div');
+  entryLine.className = 'entry-line';
+  entryLine.style.top = entryY + 'px';
+  chart.appendChild(entryLine);
+
+  const slLine = document.createElement('div');
+  slLine.className = 'sl-line';
+  slLine.style.top = slY + 'px';
+  chart.appendChild(slLine);
+
+  const tpLine = document.createElement('div');
+  tpLine.className = 'tp-line';
+  tpLine.style.top = tpY + 'px';
+  chart.appendChild(tpLine);
+
+  // Label trade
+  const entryLabel = document.createElement('div');
+  entryLabel.className = 'trade-label';
+  entryLabel.style.cssText = 'background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);';
+  entryLabel.textContent = 'Entry $' + entryP.toFixed(2);
+  entryLabel.style.top = (entryY - 18) + 'px';
+  entryLabel.style.left = (stepX * (entryIdx + 1)) + 'px';
+  chart.appendChild(entryLabel);
+
+  const slLabel = document.createElement('div');
+  slLabel.className = 'trade-label';
+  slLabel.style.cssText = 'background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3);';
+  slLabel.textContent = 'SL $' + slP.toFixed(2) + ' (' + (atr*1.5).toFixed(1) + ' pips)';
+  slLabel.style.top = (slY + 4) + 'px';
+  slLabel.style.left = (stepX * (entryIdx + 1)) + 'px';
+  chart.appendChild(slLabel);
+
+  const tpLabel = document.createElement('div');
+  tpLabel.className = 'trade-label';
+  tpLabel.style.cssText = 'background:rgba(34,211,238,.15);color:#22d3ee;border:1px solid rgba(34,211,238,.3);';
+  tpLabel.textContent = 'TP $' + tpP.toFixed(2) + ' (' + (atr*2.0).toFixed(1) + ' pips)';
+  tpLabel.style.top = (tpY - 18) + 'px';
+  tpLabel.style.left = (stepX * (entryIdx + 1)) + 'px';
+  chart.appendChild(tpLabel);
+
+  // Update legend + info
+  document.getElementById('atrVal').textContent = '$' + atr.toFixed(2);
+  document.getElementById('info').innerHTML =
+    '<b>ATR</b> dihitung dari 14 candle sebelum entry (candle 1–14). ' +
+    'Entry di <b>candle 15</b> ($' + entryP.toFixed(2) + '). ' +
+    'SL = ATR × 1.5 = $' + (atr*1.5).toFixed(2) + ' → <span class="sl">$' + slP.toFixed(2) + '</span> (' + (atr*1.5).toFixed(1) + ' pips). ' +
+    'TP = ATR × 2.0 = $' + (atr*2.0).toFixed(2) + ' → <span class="tp">$' + tpP.toFixed(2) + '</span> (' + (atr*2.0).toFixed(1) + ' pips).';
+</script>
+</body>
+</html>

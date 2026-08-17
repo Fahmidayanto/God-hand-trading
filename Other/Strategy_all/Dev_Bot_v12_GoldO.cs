@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| File: HH_LL_Extraction_M15.mq5                                  |
-//| Purpose: Isolate HH/LL Detection and Horizontal Zone Drawing     |
+//| Purpose: Isolate HH/LL Detection and Horizontal Zone Drawing    |
 //| Timeframe: M15 (15-minute) specific implementation              |
 //| Note: This version is specifically optimized for M15 timeframe  |
 //+------------------------------------------------------------------+
@@ -15,14 +15,15 @@ bool DeleteFileW(string lpFileName);
 CTrade trade;  // Objek untuk eksekusi trading
 
 //+------------------------------------------------------------------+
-//| BACKTEST DATA EXPORT - Struct & Global Variables                  |
+//| BACKTEST DATA EXPORT - Struct & Global Variables                 |
 //+------------------------------------------------------------------+
 struct BacktestTrade
 {
     ulong     ticket;
     string    symbol;
     string    type;
-    string    session;          // "BUY" atau "SELL"
+    string    signal_type;   // "CHoCH" atau "BoS"
+    string    session;       // "BUY" atau "SELL"
     double    entry_price;
     double    exit_price;
     double    sl;
@@ -77,12 +78,12 @@ datetime g_LastProcessedBarTime_H1 = 0;    // Last processed bar time H1 (untuk 
 string   g_StateFilePath = "";             // Path ke state file
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK LL, HH, BOS, CHoCH                             |
+//| STRUKTUR DATA UNTUK LL, HH, BOS, CHoCH                           |
 //+------------------------------------------------------------------+
 struct LLHHBOSData
 {
     string    type;
-    string    session;           // "LL", "HH", "BoS", "CHoCH"
+    string    session;        // "LL", "HH", "BoS", "CHoCH"
     string    direction;      // "Bullish" atau "Bearish"
     double    price;          // Harga level
     datetime  time;           // Waktu terdeteksi
@@ -96,18 +97,18 @@ LLHHBOSData g_LLHHBOSData[];        // Array dinamis untuk menyimpan LL, HH, BOS
 int         g_LLHHBOSCount = 0;     // Jumlah data yang tersimpan
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK HISTORY ACCEPTED LEVELS (HH & LL)             |
+//| STRUKTUR DATA UNTUK HISTORY ACCEPTED LEVELS (HH & LL)            |
 //+------------------------------------------------------------------+
 struct AcceptedLevelHistory
 {
     string    type;
-    string    session;           // "HH" atau "LL"
+    string    session;        // "HH" atau "LL"
     double    price;          // Harga level
     datetime  time;           // Waktu terdeteksi
     string    timeframe;      // "M15" atau "H1"
 };
 
-AcceptedLevelHistory g_AcceptedLevelHistory[];  // Array untuk menyimpan semua update HH & LL
+AcceptedLevelHistory g_AcceptedLevelHistory[];        // Array untuk menyimpan semua update HH & LL
 int                  g_AcceptedLevelHistoryCount = 0; // Jumlah history yang tersimpan
 
 // Forward declarations
@@ -115,13 +116,13 @@ void WarmUp_M15(int bars);
 void WarmUp_H1(int bars);
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNIFIED EVENT (untuk sorting berdasarkan waktu)      |
+//| STRUKTUR DATA UNIFIED EVENT (untuk sorting berdasarkan waktu)    |
 //+------------------------------------------------------------------+
 struct UnifiedEvent
 {
     datetime  time;           // Waktu untuk sorting
     string    type;
-    string    session;           // "CHoCH", "BoS", "HH", "LL"
+    string    session;        // "CHoCH", "BoS", "HH", "LL"
     string    direction;      // "Bullish", "Bearish", "Update"
     double    price;          // Harga
     string    timeframe;      // "M15" atau "H1"
@@ -134,7 +135,7 @@ UnifiedEvent g_UnifiedEvents[];  // Array untuk menyimpan semua events tergabung
 int          g_UnifiedEventCount = 0; // Jumlah unified events
 
 //+------------------------------------------------------------------+
-//| STRUKTUR DATA UNTUK MARKET STRUCTURE RECORD (Comprehensive)       |
+//| STRUKTUR DATA UNTUK MARKET STRUCTURE RECORD (Comprehensive)      |
 //+------------------------------------------------------------------+
 struct MarketStructureRecord
 {
@@ -171,7 +172,8 @@ int                   g_StructureRecordsCount = 0; // Jumlah records
 //+------------------------------------------------------------------+
 void SaveLLHHBOSToArray(string type, string direction, double price,
                         datetime time, string timeframe, string status,
-                        double prev_price = 0, datetime prev_time = 0)
+                        double prev_price = 0, datetime prev_time = 0
+                        )
 {
     // ✅ DUPLICATE CHECK: Cegah duplikasi event (type + time + timeframe)
     for (int i = 0; i < g_LLHHBOSCount; i++)
@@ -311,7 +313,8 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
                       double max_favorable_points = 0, double max_adverse_points = 0,
                       string close_reason = "",
                       double body_ratio = 0, double body_ratio_min = 0,
-                      bool body_ratio_passed = false, string body_ratio_mode = "N/A")
+                      bool body_ratio_passed = false, string body_ratio_mode = "N/A",
+                      string signal_type = "BoS")
 {
     for (int i = 0; i < g_TradeCount; i++)
     {
@@ -328,6 +331,7 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
     g_BacktestTrades[g_TradeCount].ticket       = ticket;
     g_BacktestTrades[g_TradeCount].symbol       = symbol;
     g_BacktestTrades[g_TradeCount].type         = type;
+    g_BacktestTrades[g_TradeCount].signal_type   = (signal_type != "" ? signal_type : "BoS");
     g_BacktestTrades[g_TradeCount].session      = type; // "BUY" atau "SELL"
     g_BacktestTrades[g_TradeCount].entry_price  = entry_price;
     g_BacktestTrades[g_TradeCount].exit_price   = exit_price;
@@ -382,7 +386,7 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
 //+------------------------------------------------------------------+
 //| Rekam entry yang ditolak filter ke array BacktestTrades          |
 //+------------------------------------------------------------------+
-void RecordRejectedToBacktestTrades(string type, double price, string reason)
+void RecordRejectedToBacktestTrades(string type, double price, string reason, string signal_type = "BoS")
 {
     int newSize = g_TradeCount + 1;
     ArrayResize(g_BacktestTrades, newSize);
@@ -390,6 +394,7 @@ void RecordRejectedToBacktestTrades(string type, double price, string reason)
     g_BacktestTrades[g_TradeCount].ticket        = 0;
     g_BacktestTrades[g_TradeCount].symbol        = _Symbol;
     g_BacktestTrades[g_TradeCount].type          = type;
+    g_BacktestTrades[g_TradeCount].signal_type   = (signal_type != "" ? signal_type : "BoS");
     g_BacktestTrades[g_TradeCount].session       = type; // "BUY" atau "SELL"
     g_BacktestTrades[g_TradeCount].entry_price   = price;
     g_BacktestTrades[g_TradeCount].exit_price    = 0;
@@ -607,7 +612,7 @@ void ExportBacktestToCSV()
     if (!fileExists || !isLiveTrading)
     {
         // Header — schema v2: kolom Session_IsDST ditambahkan setelah Session
-        FileWrite(handle, "Ticket", "Symbol", "Type", "EntryPrice", "ExitPrice",
+        FileWrite(handle, "Ticket", "Symbol", "Type", "SignalType", "EntryPrice", "ExitPrice",
                   "SL", "TP", "Profit", "Spread_Cost", "Commission", "Swap", "Net_Profit",
                   "Session", "Session_IsDST",
                   "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
@@ -661,6 +666,7 @@ void ExportBacktestToCSV()
                   IntegerToString(currentTicket),
                   g_BacktestTrades[i].symbol,
                   g_BacktestTrades[i].type,
+                  (g_BacktestTrades[i].signal_type != "" ? g_BacktestTrades[i].signal_type : "BoS"),
                   DoubleToString(g_BacktestTrades[i].entry_price, _Digits),
                   DoubleToString(g_BacktestTrades[i].exit_price, _Digits),
                   DoubleToString(g_BacktestTrades[i].sl, _Digits),
@@ -2130,6 +2136,13 @@ input int Entry3TP_Sell_M15 = 3000;  // Take Profit untuk Sell Entry 3 (dalam po
 input ulong MagicNumber_M15 = 12345; // Magic number untuk EA M15
 input int MaxEntriesPerCycle_M15 = 2; // Max entries per CHoCH cycle M15 // FIX #4: Changed from 3 to 1
 
+//+------------------------------------------------------------------+
+//| ENTRY EXECUTION TOGGLES                                         |
+//+------------------------------------------------------------------+
+input bool EnableEntry_CHoCH      = false; // Izinkan entry langsung saat CHoCH terkonfirmasi
+input bool EnableEntry_BoS        = true;  // Izinkan entry BoS pertama (Cycle 1 / Entry 1)
+input bool EnableEntry_BoS_Cycle2 = true;  // Izinkan entry BoS susulan (Cycle 2 / Entry 2+)
+
 // FIX #3: Hold time constraints
 input int MinHoldHours_M15 = 4;  // Minimum hold time before allowing TP exit (hours)
 input int MaxHoldHours_M15 = 24; // Maximum hold time, force close after this (hours)
@@ -2261,6 +2274,7 @@ struct TradeRecord_M15
     double    profit;
     string    type;
     string    session;
+    string    signal_type;   // "CHoCH" atau "BoS"
     int       trailing_step; // Langkah trailing stop aktif (0 = belum aktif, 1, 2, 3)
     double    initial_sl;
     double    initial_tp;
@@ -6904,6 +6918,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 ObjectSetInteger(0, chochLabel_M15, OBJPROP_FONTSIZE, 10);
                 ObjectSetInteger(0, chochLabel_M15, OBJPROP_ANCHOR, ANCHOR_LEFT_LOWER); // 🔥 Kunci utama
                 ObjectSetString(0, chochLabel_M15, OBJPROP_TEXT, "CHoCH_M15");
+                SaveLLHHBOSToArray("CHoCH", "Bullish", tempHH_M15, rates_M15[1].time, "M15", "Confirmed", preChochLL_M15, 0);
+                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, lastTimeLL_M15, "M15", "PreChoCH", 0, 0);
+                ResetMode2_M15(); // Reset variabel MODE 2                   
+                Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset untuk siklus baru.");
+                UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time);
                 chochBullish_M15              = true;
                 hhAfterChochConfirmedFlag_M15 = false; // Reset flag HH setelah CHoCH (Bullish)
                 isInTrendBearish_M15          = false;
@@ -6935,12 +6954,111 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 timeBoSBearish_M15            = -1;
                 postChoCH_LL_M15              = -1;
                 preChochHH_M15                = -1; // Simpan HH sebelum CHoCH Bullish
-                // SAVE CHoCH BULLISH DATA - price = HH yang di-break (tempHH_M15), previousPrice = LL referensi
-                SaveLLHHBOSToArray("CHoCH", "Bullish", tempHH_M15, rates_M15[1].time, "M15", "Confirmed", preChochLL_M15, 0);
-                SaveLLHHBOSToArray("LL", "Reference", preChochLL_M15, lastTimeLL_M15, "M15", "PreChoCH", 0, 0);
-                ResetMode2_M15(); // Reset variabel MODE 2                   
-                Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset untuk siklus baru.");
-                UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time);
+                
+                //=== ENTRY BUY SAAT CHoCH BULLISH M15 ===//
+                if (EnableEntry_CHoCH &&
+                    rates_M15[0].close > ema200_M15 &&
+                    entryCountBuy_M15 < MaxEntriesPerCycle_M15)
+                {
+                    ResetLastBodyRatioMetrics();
+                    bool isFiltered = false;
+                    string rejectReason = "N/A";
+                    
+                    if (!IsH1ConfirmedBullish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H1 EMA200 Filter";
+                    }
+                    else if (!IsH4ConfirmedBullish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H4 EMA Filter";
+                    }
+                    else if (!IsEMATrendingUp_M15())
+                    {
+                        isFiltered = true;
+                        rejectReason = "EMA Slope Filter";
+                    }
+                    else if (!IsCandleStrong(rates_M15, true))  // true = BUY context
+                    {
+                        isFiltered = true;
+                        rejectReason = "Body Ratio Filter";
+                    }
+                    else if (!IsSessionAllowedForEntry())
+                    {
+                        isFiltered = true;
+                        rejectReason = "Session Filter";
+                    }
+                    
+                    if (!isFiltered)
+                    {
+                        double entryPrice_M15 = rates_M15[1].close + 3 * _Point;
+                        double sl_M15, tp_M15;
+                        double dynamicSL_Buy     = lastAcceptedLL_M15;
+                        double maxSLDistance_Buy = DefaultSL_Buy_M15 * _Point;
+                        double minSLDistance_Buy = 1500 * _Point;
+                        
+                        double distanceToLL_Buy  = entryPrice_M15 - dynamicSL_Buy;
+                        
+                        if (distanceToLL_Buy > maxSLDistance_Buy)
+                        {
+                            sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
+                        }
+                        else
+                        {
+                            sl_M15 = dynamicSL_Buy - 1000 * _Point;
+                            if (entryPrice_M15 - sl_M15 > maxSLDistance_Buy)
+                                sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
+                        }
+
+                        double slDistance_Buy = entryPrice_M15 - sl_M15;
+                        slDistance_Buy = MathMax(minSLDistance_Buy, MathMin(maxSLDistance_Buy, slDistance_Buy));
+                        sl_M15 = NormalizeDouble(entryPrice_M15 - slDistance_Buy, _Digits);
+                        
+                        tp_M15 = entryPrice_M15 + DefaultTP_Buy_M15 * _Point;
+                        
+                        if (trade.Buy(0.05, NULL, entryPrice_M15, sl_M15, tp_M15, "CHoCH Buy M15")) 
+                        {
+                            Print("✅ ENTRY BUY CHoCH di harga M15 ", entryPrice_M15);
+                            Print("📊 Entry Count (Buy): ", ++entryCountBuy_M15, "/", MaxEntriesPerCycle_M15);
+                            lastEntryTime_M15 = TimeCurrent();
+                            buyEntryPrice_M15 = entryPrice_M15;
+                            trailingActivatedBuy_M15 = false;
+                            currentBuyTrade_M15.ticket = trade.ResultOrder();
+                            currentBuyTrade_M15.entry_price = entryPrice_M15;
+                            currentBuyTrade_M15.sl = sl_M15;
+                            currentBuyTrade_M15.tp = tp_M15;
+                            currentBuyTrade_M15.entry_time = TimeCurrent();
+                            currentBuyTrade_M15.type = "BUY";
+                            currentBuyTrade_M15.signal_type = "CHoCH";
+                            currentBuyTrade_M15.session = GetCurrentSession();
+                            currentBuyTrade_M15.trailing_step = 0;
+                            InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
+                            ApplyBodyRatioSummary_M15(currentBuyTrade_M15);
+                            
+                            int buyTradeIndex = -1;
+                            for(int k = 0; k < 10; k++) {
+                                if(activeBuyTrades_M15[k].ticket == 0) {
+                                    buyTradeIndex = k;
+                                    break;
+                                }
+                            }
+                            if(buyTradeIndex >= 0) {
+                                activeBuyTrades_M15[buyTradeIndex] = currentBuyTrade_M15;
+                                activeBuyCount_M15 = entryCountBuy_M15;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        double estimatedEntry = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+                        if (estimatedEntry <= 0) {
+                            MqlTick lastTick;
+                            if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.ask;
+                        }
+                        RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason, "CHoCH");
+                    }
+                }
         }
 
     //--------------+
@@ -7050,6 +7168,105 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     }
                 }
             }
+
+            //=== ENTRY SELL SAAT CHoCH BEARISH M15 ===//
+            if (EnableEntry_CHoCH &&
+                rates_M15[0].close < ema200_M15 &&
+                entryCountSell_M15 < MaxEntriesPerCycle_M15)
+            {
+                ResetLastBodyRatioMetrics();
+                    bool isFiltered = false;
+                    string rejectReason = "N/A";
+                    
+                    if (!IsH1ConfirmedBearish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H1 EMA200 Filter";
+                    }
+                    else if (!IsH4ConfirmedBearish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H4 EMA Filter";
+                    }
+                    else if (IsEMATrendingUp_M15())
+                    {
+                        isFiltered = true;
+                        rejectReason = "EMA Slope Filter";
+                    }
+                    else if (!IsCandleStrong(rates_M15, false)) // false = SELL context
+                    {
+                        isFiltered = true;
+                        rejectReason = "Body Ratio Filter";
+                    }
+                    else if (!IsSessionAllowedForEntry())
+                    {
+                        isFiltered = true;
+                        rejectReason = "Session Filter";
+                    }
+                    
+                    if (!isFiltered)
+                    {
+                        double entryPrice_M15 = rates_M15[1].close - 5 * _Point;
+                        double sl_M15, tp_M15;
+                        double dynamicSL_Sell     = preChochHH_M15 > 0 ? preChochHH_M15 : lastAcceptedHH_M15;
+                        double maxSLDistance_Sell = DefaultSL_Sell_M15 * _Point;
+                        double distanceToHH_Sell  = dynamicSL_Sell - entryPrice_M15;
+                        
+                        if (distanceToHH_Sell > maxSLDistance_Sell)
+                        {
+                            sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
+                        }
+                        else
+                        {
+                            sl_M15 = dynamicSL_Sell + 1000 * _Point;
+                            if (sl_M15 - entryPrice_M15 > maxSLDistance_Sell)
+                                sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
+                        }
+
+                        tp_M15 = entryPrice_M15 - DefaultTP_Sell_M15 * _Point;
+
+                        if (trade.Sell(0.05, NULL, entryPrice_M15, sl_M15, tp_M15, "CHoCH Sell M15"))
+                        {
+                            Print("✅ ENTRY SELL CHoCH di harga M15 ", entryPrice_M15);
+                            Print("📊 Entry Count (Sell): ", ++entryCountSell_M15, "/", MaxEntriesPerCycle_M15);
+                            lastSellEntryTime_M15 = TimeCurrent();
+                            sellEntryPrice_M15 = entryPrice_M15;
+                            trailingActivatedSell_M15 = false;
+                            currentSellTrade_M15.ticket = trade.ResultOrder();
+                            currentSellTrade_M15.entry_price = entryPrice_M15;
+                            currentSellTrade_M15.sl = sl_M15;
+                            currentSellTrade_M15.tp = tp_M15;
+                            currentSellTrade_M15.entry_time = TimeCurrent();
+                            currentSellTrade_M15.type = "SELL";
+                            currentSellTrade_M15.signal_type = "CHoCH";
+                            currentSellTrade_M15.session = GetCurrentSession();
+                            currentSellTrade_M15.trailing_step = 0;
+                            InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
+                            ApplyBodyRatioSummary_M15(currentSellTrade_M15);
+                            
+                            int sellTradeIndex = -1;
+                            for(int k = 0; k < 10; k++) {
+                                if(activeSellTrades_M15[k].ticket == 0) {
+                                    sellTradeIndex = k;
+                                    break;
+                                }
+                            }
+                            if(sellTradeIndex >= 0) {
+                                activeSellTrades_M15[sellTradeIndex] = currentSellTrade_M15;
+                                activeSellCount_M15 = entryCountSell_M15;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        double estimatedEntry = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+                        if (estimatedEntry <= 0) {
+                            MqlTick lastTick;
+                            if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.bid;
+                        }
+                        RecordRejectedToBacktestTrades("SELL", estimatedEntry, rejectReason, "CHoCH");
+                    }
+                }
             activeSellCount_M15           = 0;      // Reset active sell count
             // bosBearishJustLogged_M15      = false;       // 🔓 Reset log untuk trigger BoS baru (jika digunakan untuk Bearish)
             time_postChoCH_LL_M15         = -1;          // Reset waktu post-CHoCH LL (jika digunakan)
@@ -7067,13 +7284,6 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             SaveLLHHBOSToArray("HH", "Reference", preChochHH_M15, preChochHHTime_M15, "M15", "PreChoCH", 0, 0);
             ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
             Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset");
-            // Optional: Hapus visual LL lama jika diperlukan
-            // UpdateAcceptedLevelVisuals_M15(-1, "HH", rates_M15[1].time); // Contoh jika ingin menghapus garis HH
-            // UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time); // Contoh jika ingin menghapus garis LL sementara
-
-            //--- Reset flag lain yang relevan jika perlu ---
-            // Misalnya, jika ada logika MODE 1/2/3 untuk bearish, mungkin perlu reset variabel spesifik di sini
-            // llBeforeLLAfterBosSaved_M15 = false; // Contoh reset kunci MODE 3 Bearish jika ada
         }
 
 
@@ -7176,7 +7386,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         }
         
         // --- ENTRY LOGIC ENABLED WITH FILTERS ---
-        if (bosBullishConfirmedFlag_M15 &&
+        bool isBosEntryAllowed_Buy = (entryCountBuy_M15 == 0 && EnableEntry_BoS) ||
+                                     (entryCountBuy_M15 >= 1 && EnableEntry_BoS_Cycle2);
+
+        if (isBosEntryAllowed_Buy &&
+            bosBullishConfirmedFlag_M15 &&
             rates_M15[0].close > ema200_M15 &&
             entryCountBuy_M15 < MaxEntriesPerCycle_M15)
         {
@@ -7246,6 +7460,10 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                         PrintFormat("📌 [Hybrid SL Buy Entry %d] ZONA 2 (Ideal: %.0f poin). SL menggunakan LL + 1000 poin buffer: %.5f", entryCountBuy_M15 + 1, distanceToLL_Buy / _Point, sl_M15);
                     }
                 }
+
+                double slDistance_Buy = entryPrice_M15 - sl_M15;
+                slDistance_Buy = MathMax(minSLDistance_Buy, MathMin(maxSLDistance_Buy, slDistance_Buy));
+                sl_M15 = NormalizeDouble(entryPrice_M15 - slDistance_Buy, _Digits);
                 
                 tp_M15 = entryPrice_M15 + DefaultTP_Buy_M15 * _Point;
                 
@@ -7264,6 +7482,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentBuyTrade_M15.tp = tp_M15;
                     currentBuyTrade_M15.entry_time = TimeCurrent();
                     currentBuyTrade_M15.type = "BUY";
+                    currentBuyTrade_M15.signal_type = "BoS";
                     currentBuyTrade_M15.session = GetCurrentSession();
                     currentBuyTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
@@ -7314,7 +7533,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     MqlTick lastTick;
                     if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.ask;
                 }
-                RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason);
+                RecordRejectedToBacktestTrades("BUY", estimatedEntry, rejectReason, "BoS");
             }
         }
         // 💾 Retain lastAcceptedLL_M15 untuk Mode 3 Bullish (validasi Higher Low)
@@ -7392,7 +7611,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         }
         //=== ENTRY SELL SAAT BoS BEARISH M15 === //
         // --- ENTRY LOGIC WITH H1 & EMA FILTERS ---
-        if (bosBearishConfirmedFlag_M15 &&
+        bool isBosEntryAllowed_Sell = (entryCountSell_M15 == 0 && EnableEntry_BoS) ||
+                                      (entryCountSell_M15 >= 1 && EnableEntry_BoS_Cycle2);
+
+        if (isBosEntryAllowed_Sell &&
+            bosBearishConfirmedFlag_M15 &&
             rates_M15[0].close < ema200_M15 &&
             entryCountSell_M15 < MaxEntriesPerCycle_M15)
         {
@@ -7488,6 +7711,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentSellTrade_M15.tp = tp_M15;
                     currentSellTrade_M15.entry_time = TimeCurrent();
                     currentSellTrade_M15.type = "SELL";
+                    currentSellTrade_M15.signal_type = "BoS";
                     currentSellTrade_M15.session = GetCurrentSession();
                     currentSellTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
@@ -7538,7 +7762,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     MqlTick lastTick;
                     if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.bid;
                 }
-                RecordRejectedToBacktestTrades("SELL", estimatedEntry, rejectReason);
+                RecordRejectedToBacktestTrades("SELL", estimatedEntry, rejectReason, "BoS");
             }
         }
         // 💾 [FIX] Retain lastAcceptedHH_M15 untuk Mode 3 Bearish (validasi Lower High)

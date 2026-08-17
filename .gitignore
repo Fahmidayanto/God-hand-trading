@@ -18,6 +18,7 @@ env/
 venv/
 .venv
 *.egg-info/
+ValueCell_MT5/backend/data/sentiment_cache/
 
 # Node modules
 node_modules/

@@ -587,6 +587,47 @@ class OllamaProvider(ModelProvider):
         return bool(self.config.parameters.get("host"))
 
 
+class GroqProvider(ModelProvider):
+    """Groq model provider
+
+    Groq provides ultra-fast LLM inference with OpenAI-compatible API endpoints.
+    """
+
+    def create_model(self, model_id: Optional[str] = None, **kwargs):
+        """Create Groq model via agno or OpenAI-compatible client"""
+        try:
+            from agno.models.groq import Groq
+        except ImportError:
+            try:
+                from agno.models.openai import OpenAILike
+                Groq = None
+            except ImportError:
+                raise ImportError(
+                    "agno package not installed. Install with: pip install agno"
+                )
+
+        model_id = model_id or self.config.default_model
+        params = {**self.config.parameters, **kwargs}
+
+        logger.info(f"Creating Groq model: {model_id}")
+
+        if Groq is not None:
+            return Groq(
+                id=model_id,
+                api_key=self.config.api_key,
+                temperature=params.get("temperature"),
+                max_tokens=params.get("max_tokens"),
+            )
+        else:
+            return OpenAILike(
+                id=model_id,
+                api_key=self.config.api_key,
+                base_url=self.config.base_url or "https://api.groq.com/openai/v1",
+                temperature=params.get("temperature"),
+                max_tokens=params.get("max_tokens"),
+            )
+
+
 class ModelFactory:
     """
     Factory for creating model instances with provider abstraction
@@ -600,6 +641,7 @@ class ModelFactory:
 
     # Registry of provider classes
     _providers: Dict[str, type[ModelProvider]] = {
+        "groq": GroqProvider,
         "openrouter": OpenRouterProvider,
         "google": GoogleProvider,
         "azure": AzureProvider,

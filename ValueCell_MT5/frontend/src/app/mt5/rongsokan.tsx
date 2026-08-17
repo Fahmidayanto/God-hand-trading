@@ -1729,7 +1729,7 @@ export default function RongsokanPage() {
         minHeight: "100vh",
         width: "100%",
         position: "relative",
-        overflowX: "hidden",
+        overflowX: "auto",
         overflowY: "auto"
       }}
     >

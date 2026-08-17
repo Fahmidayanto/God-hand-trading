@@ -1,0 +1,10 @@
+{
+  "signal": "BUY",
+  "confidence": 0.85,
+  "risk_pct": 2.5,
+  "sl_price": 4358.5,
+  "tp_price": 4438.5,
+  "lot_size": 0.01,
+  "cycle_stage": "🟣 REVERSAL_SHIFT (CHOCH)",
+  "reasoning": "• Arah & Struktur: Struktur M15 mengonfirmasi CHoCH Bullish valid sebagai awal pembalikan tren (Siklus #0). H1 dan H4 juga menunjukkan tren bullish, mendukung arah beli.\n• Stop Loss & Invalidasi: SL dipasang di 4358.5 di bawah swing low terdekat 4360 dengan buffer 1.5 poin, jarak 22 poin dari entry untuk menghindari noise wick.\n• Target Profit: TP dipasang di 4438.5 menyasar zona supply 4440-4448, front-running resistance dengan jarak 1.5 poin sebelum supply, menghasilkan rasio Risk:Reward 1:2.64.\n• Alokasi Risiko: Mengalokasikan risiko 2.5% dari modal $1000 ($25) dengan ukuran lot 0.01 demi disiplin modal dan manajemen risiko yang ketat."
+}

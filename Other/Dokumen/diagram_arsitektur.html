@@ -1273,8 +1273,7 @@
                                 </div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Analisis berita emas terkini menggunakan LLM (GLM/Qwen/Gemini) atau keyword
-                                case-insensitive dengan decay eksponensial.
+                                Analisis berita emas via AgentRouter GLM-5.2 (Tier 1) & Groq Qwen 3.6 27B (Fallback #2), slot anchor 3 jam, akumulasi kumulatif & decay eksponensial.
                             </div>
                         </div>
 
@@ -1288,8 +1287,7 @@
                                 </div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Mendeteksi jarak waktu rilis data makro ekonomi utama (NFP, FOMC, CPI, GDP) terhadap jam
-                                perdagangan.
+                                Mendeteksi rilis data makro utama (NFP, FOMC, CPI) & mengambil sentimen anchor 3h sebelum terdekat saat structure event.
                             </div>
                         </div>
 
@@ -2493,8 +2491,16 @@
                     <ul class="meta-list">
                         <li>
                             <span class="meta-label">LLM Processing Chain</span>
-                            <span class="meta-value">Mencoba memanggil model AI tier-1 secara bertahap jika gagal:
-                                <code>GLM-5.2 &rarr; Qwen-397B &rarr; Qwen-122B &rarr; Gemini</code>.</span>
+                            <span class="meta-value">Mencoba memanggil model AI secara bertahap jika gagal:
+                                <code>AgentRouter (GLM-5.2) &rarr; Groq (Qwen-3.6-27b) &rarr; NVIDIA (Qwen-397B / Nemotron-120B) &rarr; Gemini</code>.</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Daily Anchor Slots (3 Jam Replay Engine)</span>
+                            <span class="meta-value">Pada mode simulasi/replay, berita dievaluasi per slot 3 jam (<code>00, 03, 06, 09, 12, 15, 18, 21 UTC</code>). Skor LLM dihitung sekali per slot dan di-reuse untuk semua event pada rentang tersebut.</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Kombinasi Kumulatif & Deduplikasi</span>
+                            <span class="meta-value">Berita digabungkan secara akumulatif dari slot-slot sebelumnya di hari yang sama dengan filter deduplikasi (<code>_dedup_news</code> exact + fuzzy &ge; 0.85).</span>
                         </li>
                         <li>
                             <span class="meta-label">Fungsi Keyword & Negation</span>
@@ -2511,6 +2517,8 @@
                             <span class="meta-label">Contoh Hasil Analisis Berita</span>
                             <div class="meta-value"
                                 style="margin-top: 0.5rem; padding: 0.65rem; background: rgba(0, 229, 255, 0.04); border-left: 3px solid var(--color-watcher); border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; word-break: normal; color: #fff;">
+                                • Primary LLM Provider: <span style="color: #00e676; font-weight: bold;">AgentRouter (GLM-5.2)</span> | Fallback #2: <span style="color: #ffaa00; font-weight: bold;">Groq API (qwen/qwen3.6-27b)</span><br>
+                                • Replay Anchor Slot: <span style="color: #ffaa00;">09:00 UTC</span> (Akumulasi slot 00, 03, 06, 09)<br>
                                 • Headline: "Gold rallies on high inflation fears" (2 jam lalu)<br>
                                 &rarr; Sentimen: <span style="color: #00e676; font-weight: bold;">BULLISH</span> | Bobot
                                 Waktu: <span style="color: #00e676;">0.89</span><br>
@@ -2539,6 +2547,10 @@
                             <span class="meta-label">Pengecekan Waktu (Proximity)</span>
                             <span class="meta-value">Menghitung jarak waktu (selisih jam dan menit) antara jadwal rilis
                                 event dengan waktu perdagangan saat ini.</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Penarikan Anchor saat Structure Event</span>
+                            <span class="meta-value">Saat terjadi <em>Structure Event</em> (CHoCH/BoS/HH/LL) di jam simulasi (misal 10:15 UTC), sistem mengambil data sentimen dari slot 3-harian sebelum terdekat (<code>slot_hour &le; event_hour</code>, yaitu slot 09:00 UTC).</span>
                         </li>
                     </ul>
                 </div>
@@ -2629,8 +2641,7 @@
                         <li>
                             <span class="meta-label">Pemanfaatan Data Log</span>
                             <span class="meta-value">Keputusan sentiment tetap dicatat di objek return
-                                <code>shadow_decision</code> untuk dianalisis dan dibanding-bandingkan dalam pengujian
-                                backtesting secara offline.</span>
+                                <code>shadow_decision</code> dan tersimpan di database SQLite untuk dianalisis dan dibanding-bandingkan dalam pengujian backtesting secara offline.</span>
                         </li>
                     </ul>
                 </div>

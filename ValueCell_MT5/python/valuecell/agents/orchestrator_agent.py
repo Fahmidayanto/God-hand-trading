@@ -200,38 +200,31 @@ class OrchestratorAgent:
                     agent_results["ml_prediction"] = ml_result
                     
                     if ms_signal in ["BUY", "SELL"]:
-                        logger.info("⚡ Execution Trigger: Combining warmup news with current news for updated sentiment analysis...")
-                        # Combine headlines from warmup and current execution
-                        warmup_news = self._latest_warmup_results.get("news_headlines", [])
-                        current_news = market_data.get("news_headlines", [])
-                        
-                        combined_news = []
-                        seen_headlines = set()
-                        for item in warmup_news + current_news:
-                            hl = item.get("headline", "").strip()
-                            if hl and hl not in seen_headlines:
-                                seen_headlines.add(hl)
-                                combined_news.append(item)
-                                
-                        warmup_events = self._latest_warmup_results.get("upcoming_events", [])
-                        current_events = market_data.get("upcoming_events", [])
-                        
-                        combined_events = []
-                        seen_events = set()
-                        for item in warmup_events + current_events:
-                            evt = item.get("event", "").strip()
-                            if evt and evt not in seen_events:
-                                seen_events.add(evt)
-                                combined_events.append(item)
-                                
-                        # Run fresh sentiment analysis on combined news
+                        warmup_sentiment = self._latest_warmup_results.get("sentiment") or {}
+                        precomputed = market_data.get("precomputed_sentiment")
+                        if precomputed is not None:
+                            logger.info("⚡ Execution Trigger: Reusing precomputed daily-anchor sentiment score (no fresh LLM call)...")
+                        else:
+                            # Safety net: anchor scoring failed upstream (e.g. sentiment
+                            # agent unavailable when the anchor slot was built) -- fall
+                            # back to whatever score is cached from the warm-up moment.
+                            precomputed = warmup_sentiment.get("sentiment_analysis_raw")
+                            logger.info("⚡ Execution Trigger: Daily anchor score unavailable, reusing warm-up sentiment score...")
+
+                        news_headlines = market_data.get("news_headlines") or []
+                        upcoming_events = market_data.get("upcoming_events") or self._latest_warmup_results.get("upcoming_events", [])
+
+                        # Confidence adjustment/veto is still recalculated fresh
+                        # against this BOS's real signal+confidence -- only the
+                        # underlying news score is reused.
                         sentiment_result = self.agents["sentiment"].analyze(
                             signal=ms_signal,
                             confidence=ms_result["confidence"],
                             current_time=market_data["current_bar"]["time"],
-                            news_headlines=combined_news,
-                            upcoming_events=combined_events,
-                            symbol=symbol
+                            news_headlines=news_headlines,
+                            upcoming_events=upcoming_events,
+                            symbol=symbol,
+                            precomputed_sentiment=precomputed,
                         )
                         agent_results["sentiment"] = sentiment_result
                     else:
@@ -282,7 +275,8 @@ class OrchestratorAgent:
                             current_time=market_data["current_bar"]["time"],
                             news_headlines=market_data.get("news_headlines"),
                             upcoming_events=market_data.get("upcoming_events"),
-                            symbol=symbol
+                            symbol=symbol,
+                            precomputed_sentiment=market_data.get("precomputed_sentiment"),
                         )
                         
                         # Gather results
@@ -355,7 +349,8 @@ class OrchestratorAgent:
                                 current_time=market_data["current_bar"]["time"],
                                 news_headlines=market_data.get("news_headlines"),
                                 upcoming_events=market_data.get("upcoming_events"),
-                                symbol=symbol
+                                symbol=symbol,
+                                precomputed_sentiment=market_data.get("precomputed_sentiment"),
                             )
                             agent_results["sentiment"] = sentiment_result
                             logger.debug(f"   → Adjustment: {sentiment_result['confidence_adjustment']:+.3f} | Filtered: {sentiment_result['filtered']}")

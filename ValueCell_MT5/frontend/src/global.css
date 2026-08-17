@@ -130,6 +130,12 @@
 }
 
 @layer base {
+  :root {
+    /* Sidebar width — responsive via media queries below. Pages read --sidebar-w
+       to offset their content area so it never collides with the sidebar. */
+    --sidebar-w: 240px;
+  }
+
   * {
     margin: 0;
     padding: 0;
@@ -177,9 +183,64 @@
     padding: 0 !important;
     box-sizing: border-box !important;
     font-family: 'Inter', sans-serif !important;
-    zoom: 0.67;
-    -moz-transform: scale(0.67);
+    /* Default: 100% (medium/large screens @ 1920x1080).
+       Scale down on split screen, small laptops, and very large displays. */
+    zoom: 1;
+    -moz-transform: scale(1);
     -moz-transform-origin: 0 0;
+  }
+
+  /* Laptop & Split-screen (e.g. IDE preview tabs, 2-column editor views) */
+  @media (max-width: 1536px) {
+    body {
+      zoom: 0.88;
+      -moz-transform: scale(0.88);
+    }
+  }
+
+  @media (max-width: 1200px) {
+    body {
+      zoom: 0.80;
+      -moz-transform: scale(0.80);
+    }
+  }
+
+  @media (max-width: 900px) {
+    body {
+      zoom: 0.72;
+      -moz-transform: scale(0.72);
+    }
+  }
+
+  /* 2K / QHD (2560x1440) and above: gentle scale to keep info density */
+  @media (min-width: 2560px) {
+    body {
+      zoom: 0.85;
+      -moz-transform: scale(0.85);
+    }
+  }
+
+  /* 4K (3840x2160) and ultrawide: original scaling for the design target */
+  @media (min-width: 3200px) {
+    body {
+      zoom: 0.7;
+      -moz-transform: scale(0.7);
+    }
+  }
+
+  /* Sidebar gets narrower on small screens so content area stays usable.
+     On <1024px the sidebar collapses to icon-only (64px). */
+  @media (max-width: 1023px) {
+    :root {
+      --sidebar-w: 64px;
+    }
+  }
+
+  /* Utility: page content offset by sidebar width.
+     Pages wrap their main content in <div class="mt5-page-content"> and the
+     padding-left tracks the sidebar responsively. */
+  .mt5-page-content {
+    padding-left: var(--sidebar-w);
   }
 
   input[type="password"]::-webkit-password-reveal-button {
@@ -350,6 +411,21 @@
 
   .animate-pulse-glow {
     animation: pulse-glow 2s infinite;
+  }
+
+  @keyframes sidebarFadeSlideIn {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-sidebar-fade {
+    animation: sidebarFadeSlideIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 }
 

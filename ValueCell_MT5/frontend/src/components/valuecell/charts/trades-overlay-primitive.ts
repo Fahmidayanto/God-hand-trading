@@ -17,6 +17,10 @@ export interface TradeOverlayEntry {
   profit: number;
   entry_time_ts: number;
   exit_time_ts: number | null;
+  // ATR band info (optional) — drawn as a horizontal line + value label
+  atr?: number | null;
+  atr_start_ts?: number | null;
+  atr_end_ts?: number | null;
 }
 
 const GREEN_BG = "rgba(34, 197, 94, 0.15)";
@@ -63,43 +67,59 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
       let count2026 = 0;
       let skippedCount = 0;
 
+      // Shared helpers for both the trade loop and the ATR band loop.
+      const timeframeToSeconds: { [key: string]: number } = {
+        'M15': 900,   // 15 minutes
+        'M30': 1800,  // 30 minutes
+        'H1': 3600,   // 1 hour
+        'H4': 14400,  // 4 hours
+        'D1': 86400,  // 1 day
+      };
+      const tsOptions = timeScale.options();
+
       for (const trade of visibleTrades) {
-        const exitTs = trade.exit_time_ts ?? this.source.lastCandleTime;
+        const lastCandleTs = this.source.lastCandleTime;
+        const isOpenTrade = trade.exit_time_ts === null;
+        const secondsPerBar = timeframeToSeconds[this.source.timeframe] || 900;
+        const barSpacing = tsOptions.barSpacing || 6;
+
+        // If trade is closed (exit_time_ts !== null), use exact exit timestamp.
+        // If trade is OPEN / RUNNING, project forward by 15 bars into the future so box, lines & targets are visible!
+        const exitTs = !isOpenTrade
+          ? trade.exit_time_ts!
+          : (lastCandleTs !== null ? lastCandleTs + 15 * secondsPerBar : trade.entry_time_ts + 15 * secondsPerBar);
         if (exitTs === null) continue;
 
         const is2026Trade = new Date(trade.entry_time_ts * 1000).getFullYear() === 2026;
         if (is2026Trade) {
           count2026++;
         }
-        
-        const x1 = timeScale.timeToCoordinate(trade.entry_time_ts as UTCTimestamp);
+
+        let x1 = timeScale.timeToCoordinate(trade.entry_time_ts as UTCTimestamp);
         let x2 = timeScale.timeToCoordinate(exitTs as UTCTimestamp);
-        
-        // FALLBACK: If exit coordinate is null (exit time not in chart data),
-        // extrapolate x2 coordinate based on entry coordinate and time difference
-        if (x2 === null && x1 !== null) {
-          // Get bar spacing from time scale options
-          const tsOptions = timeScale.options();
-          const barSpacing = tsOptions.barSpacing || 6; // Default 6 pixels per bar
-          
-          // Map timeframe to seconds per bar
-          const timeframeToSeconds: { [key: string]: number } = {
-            'M15': 900,   // 15 minutes
-            'M30': 1800,  // 30 minutes
-            'H1': 3600,   // 1 hour
-            'H4': 14400,  // 4 hours
-            'D1': 86400,  // 1 day
-          };
-          
-          const secondsPerBar = timeframeToSeconds[this.source.timeframe] || 900;
-          
-          // Calculate time difference in bars
-          const timeDiff = exitTs - trade.entry_time_ts;
-          const barsCount = timeDiff / secondsPerBar;
-          const pixelDiff = barsCount * barSpacing;
-          
-          // Extrapolate x2 from x1
-          x2 = (x1 + pixelDiff) as any;
+
+        const lastCandleX = lastCandleTs !== null ? timeScale.timeToCoordinate(lastCandleTs as UTCTimestamp) : null;
+
+        // If x1 is null because entry is not in visible range
+        if (x1 === null && lastCandleX !== null && lastCandleTs !== null) {
+          const barsDiff = (trade.entry_time_ts - lastCandleTs) / secondsPerBar;
+          x1 = (lastCandleX + barsDiff * barSpacing) as any;
+        }
+
+        // Extrapolate x2 if it's null (future candle / projection / off chart)
+        if (x2 === null) {
+          if (x1 !== null) {
+            const barsDiff = (exitTs - trade.entry_time_ts) / secondsPerBar;
+            x2 = (x1 + Math.max(1, barsDiff) * barSpacing) as any;
+          } else if (lastCandleX !== null && lastCandleTs !== null) {
+            const barsAhead = (exitTs - lastCandleTs) / secondsPerBar;
+            x2 = (lastCandleX + barsAhead * barSpacing) as any;
+          }
+        }
+
+        // Guard against closed past trades stretching beyond lastCandleX
+        if (!isOpenTrade && lastCandleTs !== null && exitTs <= lastCandleTs && lastCandleX !== null && x2 !== null && x2 > lastCandleX) {
+          x2 = lastCandleX;
         }
         
         if (x1 === null || x2 === null) {
@@ -110,9 +130,18 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
         }
 
         const yEntry = series.priceToCoordinate(trade.entry_price);
-        const yTP = trade.tp !== null ? series.priceToCoordinate(trade.tp) : null;
-        const ySL = trade.sl !== null ? series.priceToCoordinate(trade.sl) : null;
+        let yTP = trade.tp !== null ? series.priceToCoordinate(trade.tp) : null;
+        let ySL = trade.sl !== null ? series.priceToCoordinate(trade.sl) : null;
         if (yEntry === null) continue;
+
+        // If TP or SL is off-screen (null from priceToCoordinate), extrapolate coordinate from known scale
+        if (yTP === null && trade.tp !== null && ySL !== null && trade.sl !== null) {
+          const pxPerUnit = Math.abs(ySL - yEntry) / (Math.abs(trade.sl - trade.entry_price) || 1);
+          yTP = (trade.type === 'BUY' ? yEntry - Math.abs(trade.tp - trade.entry_price) * pxPerUnit : yEntry + Math.abs(trade.tp - trade.entry_price) * pxPerUnit) as any;
+        } else if (ySL === null && trade.sl !== null && yTP !== null && trade.tp !== null) {
+          const pxPerUnit = Math.abs(yTP - yEntry) / (Math.abs(trade.tp - trade.entry_price) || 1);
+          ySL = (trade.type === 'BUY' ? yEntry + Math.abs(trade.sl - trade.entry_price) * pxPerUnit : yEntry - Math.abs(trade.sl - trade.entry_price) * pxPerUnit) as any;
+        }
 
         let left = x1 * hpr;
         let right = x2 * hpr;
@@ -171,6 +200,127 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
           ctx.lineTo(lx2, lySL);
           ctx.stroke();
         }
+
+        // ── Visual PnL Pill Badge ──
+        // Render a sharp, readable pill badge displaying floating or realized PnL
+        const pnl = trade.profit ?? 0;
+        const isClosed = trade.exit_time_ts !== null;
+        let pnlText = "";
+        if (pnl > 0) {
+          pnlText = `+$${pnl.toFixed(2)}${isClosed ? " (TP)" : ""}`;
+        } else if (pnl < 0) {
+          pnlText = `-$${Math.abs(pnl).toFixed(2)}${isClosed ? " (SL)" : ""}`;
+        } else {
+          pnlText = `$0.00${isClosed ? "" : " (Open)"}`;
+        }
+
+        ctx.font = `bold ${Math.max(10, 11 * vpr)}px monospace`;
+        const pnlTextW = ctx.measureText(pnlText).width;
+        
+        // Position badge: For open trades, sit right near current active candle. For closed trades, at exit point.
+        let badgeX = Math.min(width - pnlTextW - 12 * hpr, Math.max(8 * hpr, right - pnlTextW - 4 * hpr));
+        if (!isClosed && lastCandleX !== null) {
+          const liveX = lastCandleX * hpr + 8 * hpr;
+          if (liveX + pnlTextW + 8 * hpr < width) {
+            badgeX = liveX;
+          }
+        }
+        const badgeY = lyEntry;
+
+        const isWin = pnl >= 0;
+        const badgeBg = isWin ? "rgba(16, 185, 129, 0.92)" : "rgba(239, 68, 68, 0.92)";
+        const badgeBorder = isWin ? "#10b981" : "#ef4444";
+
+        ctx.fillStyle = badgeBg;
+        ctx.strokeStyle = badgeBorder;
+        ctx.lineWidth = Math.max(1, 1 * vpr);
+        ctx.beginPath();
+        ctx.roundRect(badgeX - 4 * hpr, badgeY - 9 * vpr, pnlTextW + 8 * hpr, 18 * vpr, 4 * vpr);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = "#ffffff";
+        ctx.textBaseline = "middle";
+        ctx.fillText(pnlText, badgeX, badgeY);
+      }
+
+      // ── ATR band: horizontal line from atr_start_ts to atr_end_ts + value label ──
+      // Drawn after trades so it sits on top, but with a translucent fill so it
+      // never hides the candles. Position is adaptive: if the ATR price collides
+      // with an existing SL/TP/entry line, shift it to a clear area.
+      for (const trade of visibleTrades) {
+        if (trade.atr == null || trade.atr_start_ts == null || trade.atr_end_ts == null) continue;
+
+        // Anchor on the entry (atr_end_ts) and measure exactly `period` bars to
+        // the left. This keeps the band exactly 14 candles wide even when the
+        // start falls off the left edge of the visible range (during replay).
+        const ax2 = timeScale.timeToCoordinate(trade.atr_end_ts as UTCTimestamp);
+        if (ax2 === null) continue;
+        const atrSecondsPerBar = timeframeToSeconds[this.source.timeframe] || 900;
+        const atrBarSpacing = tsOptions.barSpacing || 6;
+        const bars = Math.max(1, Math.round((trade.atr_end_ts - trade.atr_start_ts) / atrSecondsPerBar));
+        const atrWidthPx = bars * atrBarSpacing;
+        const aleftRaw = ax2 - atrWidthPx;
+        const arightRaw = ax2;
+
+        // ATR line sits at the top of the visible price range, above the candles.
+        // Use the entry price + ATR as a natural anchor, then nudge away from
+        // any occupied price (SL/TP/entry) to avoid overlap.
+        const basePrice = trade.entry_price + trade.atr;
+        let atrPrice = basePrice;
+        const occupied = [trade.entry_price, trade.sl, trade.tp].filter((p): p is number => p !== null);
+        const minGap = trade.atr * 0.15; // 15% of ATR as minimum separation
+        let guard = 0;
+        while (occupied.some(p => Math.abs(p - atrPrice) < minGap) && guard < 20) {
+          atrPrice += minGap; // shift up until clear
+          guard++;
+        }
+
+        const yAtr = series.priceToCoordinate(atrPrice);
+        if (yAtr === null) continue;
+
+        let aleft = aleftRaw * hpr;
+        let aright = arightRaw * hpr;
+        if (aleft > aright) [aleft, aright] = [aright, aleft];
+        aleft = Math.max(0, Math.min(width, aleft));
+        aright = Math.max(0, Math.min(width, aright));
+        if (aright - aleft < 2) aright = aleft + 2;
+
+        const lyAtr = yAtr * vpr;
+
+        // Translucent band fill (subtle, doesn't hide candles)
+        ctx.fillStyle = 'rgba(34, 211, 238, 0.06)';
+        ctx.fillRect(aleft, lyAtr - 10 * vpr, aright - aleft, 20 * vpr);
+
+        // Solid ATR line
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = Math.max(1, 2 * vpr);
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(aleft, lyAtr);
+        ctx.lineTo(aright, lyAtr);
+        ctx.stroke();
+
+        // Value label above the line (centered on the band)
+        const labelText = `ATR $${trade.atr.toFixed(2)}`;
+        ctx.font = `${Math.max(10, 11 * vpr)}px monospace`;
+        const textW = ctx.measureText(labelText).width;
+        const labelX = aleft + (aright - aleft) / 2 - textW / 2;
+        const labelY = lyAtr - 8 * vpr;
+
+        // Label background pill
+        ctx.fillStyle = 'rgba(14, 116, 144, 0.9)';
+        ctx.strokeStyle = '#22d3ee';
+        ctx.lineWidth = Math.max(1, 1 * vpr);
+        ctx.beginPath();
+        ctx.roundRect(labelX - 4 * hpr, labelY - 12 * vpr, textW + 8 * hpr, 16 * vpr, 4 * vpr);
+        ctx.fill();
+        ctx.stroke();
+
+        // Label text
+        ctx.fillStyle = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(labelText, labelX, labelY);
       }
 
       ctx.setLineDash([]);
