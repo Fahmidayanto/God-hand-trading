@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Holographic Card & Spring Physics - Motion-UI + Three.js</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    :root {
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --bg-dark: #090a10;
+      --card-bg: rgba(18, 20, 32, 0.75);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --accent-neon: #ec4899;
+      --accent-blue: #3b82f6;
+      --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: #f8fafc;
+      font-family: var(--font-sans);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      perspective: 1200px;
+    }
+
+    #grid-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* Top Bar Header */
+    .top-header {
+      position: absolute;
+      top: 2rem;
+      left: 2.5rem;
+      right: 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .badge {
+      background: rgba(236, 72, 153, 0.15);
+      border: 1px solid rgba(236, 72, 153, 0.3);
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-neon);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .info-tag {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      font-family: var(--font-mono);
+    }
+
+    /* 3D Card Container */
+    .card-scene {
+      position: relative;
+      z-index: 20;
+      transform-style: preserve-3d;
+    }
+
+    .card-wrap {
+      width: 380px;
+      height: 520px;
+      position: relative;
+      transform-style: preserve-3d;
+      will-change: transform;
+      cursor: grab;
+    }
+
+    .card-wrap:active {
+      cursor: grabbing;
+    }
+
+    .holo-card {
+      position: absolute;
+      inset: 0;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 2.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+      box-shadow: 0 35px 70px -15px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(255, 255, 255, 0.15);
+      transform-style: preserve-3d;
+    }
+
+    /* Holographic Specular Glare */
+    .holo-glare {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle 280px at var(--glare-x, 50%) var(--glare-y, 50%),
+        rgba(255, 255, 255, 0.25),
+        rgba(236, 72, 153, 0.15) 30%,
+        rgba(59, 130, 246, 0.08) 60%,
+        transparent 80%
+      );
+      opacity: 0;
+      mix-blend-mode: overlay;
+      pointer-events: none;
+      transition: opacity 0.3s var(--ease-out);
+    }
+
+    .card-wrap:hover .holo-glare {
+      opacity: 1;
+    }
+
+    /* Card Contents */
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transform: translateZ(30px);
+    }
+
+    .chip-icon {
+      width: 44px;
+      height: 36px;
+      background: linear-gradient(135deg, #ffd700, #ffaa00);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(255, 170, 0, 0.3);
+    }
+
+    .chip-icon::after {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      border: 1px dashed rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+    }
+
+    .card-network {
+      font-size: 0.75rem;
+      font-weight: 800;
+      color: #cbd5e1;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      font-family: var(--font-mono);
+    }
+
+    .card-center {
+      transform: translateZ(45px);
+      text-align: center;
+      margin: 1.5rem 0;
+    }
+
+    .card-number {
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      color: #fff;
+      margin-bottom: 0.5rem;
+      text-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+    }
+
+    .card-holder {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card-bottom {
+      transform: translateZ(35px);
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 18px;
+      padding: 1.25rem;
+    }
+
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+
+    .meta-col-label {
+      font-size: 0.65rem;
+      color: #64748b;
+      text-transform: uppercase;
+      margin-bottom: 0.2rem;
+    }
+
+    .meta-col-val {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    /* Tactile Interactive Action Button */
+    .tactile-btn {
+      width: 100%;
+      border: none;
+      background: linear-gradient(135deg, var(--accent-neon), var(--accent-blue));
+      color: #fff;
+      padding: 0.75rem;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(236, 72, 153, 0.35);
+      transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+    }
+
+    .tactile-btn:hover {
+      transform: scale(1.02);
+      box-shadow: 0 12px 28px rgba(236, 72, 153, 0.5);
+    }
+
+    .tactile-btn:active {
+      transform: scale(0.96);
+    }
+
+    /* Floating Guide */
+    .guide-prompt {
+      position: absolute;
+      bottom: 2rem;
+      color: #64748b;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .card-wrap {
+        transform: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <canvas id="grid-canvas"></canvas>
+
+  <div class="top-header">
+    <div class="badge">SPRING DAMPING V4</div>
+    <div class="info-tag">PHYSICS ENGINE ACTIVE</div>
+  </div>
+
+  <div class="card-scene">
+    <div class="card-wrap" id="card">
+      <div class="holo-card">
+        <div class="holo-glare" id="glare"></div>
+
+        <div class="card-top">
+          <div class="chip-icon"></div>
+          <div class="card-network">QUANTUM VIP</div>
+        </div>
+
+        <div class="card-center">
+          <div class="card-number">8842 •••• •••• 9102</div>
+          <div class="card-holder">ANTIGRAVITY OPERATOR</div>
+        </div>
+
+        <div class="card-bottom">
+          <div class="meta-row">
+            <div>
+              <div class="meta-col-label">Balance</div>
+              <div class="meta-col-val">1,248.50 SOL</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="meta-col-label">Status</div>
+              <div class="meta-col-val" style="color: #10b981;">VERIFIED</div>
+            </div>
+          </div>
+          <button class="tactile-btn" id="btn-trigger">TAP FOR HAPTIC PULSE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="guide-prompt">
+    🖱️ Hover & move cursor over card to test dynamic 3D physics & specular glare
+  </div>
+
+  <script>
+    // --- 1. Three.js Cyber Wave Grid ---
+    const canvas = document.getElementById('grid-canvas');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x090a10, 0.05);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 4, 9);
+    camera.rotation.x = -0.35;
+
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    // Dynamic Grid Plane
+    const gridX = 40;
+    const gridY = 40;
+    const planeGeo = new THREE.PlaneGeometry(30, 30, gridX, gridY);
+    const planeMat = new THREE.MeshBasicMaterial({
+      color: 0x3b82f6,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.18
+    });
+    const gridMesh = new THREE.Mesh(planeGeo, planeMat);
+    gridMesh.rotation.x = -Math.PI / 2;
+    gridMesh.position.y = -2.5;
+    scene.add(gridMesh);
+
+    // Ambient floating particles
+    const particleCount = 200;
+    const partGeo = new THREE.BufferGeometry();
+    const partPos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount * 3; i += 3) {
+      partPos[i] = (Math.random() - 0.5) * 20;
+      partPos[i + 1] = Math.random() * 6 - 2;
+      partPos[i + 2] = (Math.random() - 0.5) * 15;
+    }
+    partGeo.setAttribute('position', new THREE.BufferAttribute(partPos, 3));
+    const partMat = new THREE.PointsMaterial({ size: 0.04, color: 0xec4899, transparent: true, opacity: 0.5 });
+    const particleCloud = new THREE.Points(partGeo, partMat);
+    scene.add(particleCloud);
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- 2. Spring Physics Tilt Engine for Holographic Card ---
+    const card = document.getElementById('card');
+    const glare = document.getElementById('glare');
+    const btnTrigger = document.getElementById('btn-trigger');
+
+    // Physics State
+    const springState = {
+      rotX: 0,
+      rotY: 0,
+      targetRotX: 0,
+      targetRotY: 0,
+      glareX: 50,
+      glareY: 50
+    };
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const deltaX = e.clientX - centerX;
+      const deltaY = e.clientY - centerY;
+
+      const maxTilt = 20; // degrees
+      springState.targetRotY = (deltaX / (window.innerWidth * 0.5)) * maxTilt;
+      springState.targetRotX = -(deltaY / (window.innerHeight * 0.5)) * maxTilt;
+
+      // Glare position
+      const glareX = ((e.clientX - rect.left) / rect.width) * 100;
+      const glareY = ((e.clientY - rect.top) / rect.height) * 100;
+      glare.style.setProperty('--glare-x', `${glareX}%`);
+      glare.style.setProperty('--glare-y', `${glareY}%`);
+    });
+
+    window.addEventListener('mouseleave', () => {
+      springState.targetRotX = 0;
+      springState.targetRotY = 0;
+    });
+
+    // Tactile Click Pulse
+    btnTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+
+      // GSAP Ripple Shockwave
+      gsap.fromTo(card, 
+        { scale: 0.94 }, 
+        { scale: 1, duration: 0.5, ease: "elastic.out(1.2, 0.4)" }
+      );
+
+      // Grid Wave Burst
+      gsap.fromTo(planeMat, 
+        { opacity: 0.6 }, 
+        { opacity: 0.18, duration: 0.8, ease: "power2.out" }
+      );
+    });
+
+    // --- 3. Animation Loop ---
+    const clock = new THREE.Clock();
+    const posAttribute = planeGeo.attributes.position;
+
+    function renderLoop() {
+      requestAnimationFrame(renderLoop);
+      const elapsed = clock.getElapsedTime();
+
+      // Spring Damping Interpolation (Lerp with friction)
+      springState.rotX += (springState.targetRotX - springState.rotX) * 0.08;
+      springState.rotY += (springState.targetRotY - springState.rotY) * 0.08;
+
+      card.style.transform = `rotateX(${springState.rotX}deg) rotateY(${springState.rotY}deg)`;
+
+      // Three.js Grid Sine Wave Oscillation
+      for (let i = 0; i < posAttribute.count; i++) {
+        const u = posAttribute.getX(i);
+        const v = posAttribute.getY(i);
+        const z = Math.sin(u * 0.5 + elapsed * 2) * 0.35 + Math.cos(v * 0.5 + elapsed * 1.5) * 0.35;
+        posAttribute.setZ(i, z);
+      }
+      posAttribute.needsUpdate = true;
+
+      // Particle Drift
+      particleCloud.rotation.y = elapsed * 0.04;
+
+      renderer.render(scene, camera);
+    }
+
+    renderLoop();
+  </script>
+</body>
+</html>

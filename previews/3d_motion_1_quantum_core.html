@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantum Core 3D - Interactive Energy Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    :root {
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --bg-dark: #07090e;
+      --panel-bg: rgba(15, 23, 42, 0.65);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f0ff;
+      --accent-purple: #a855f7;
+      --accent-amber: #f59e0b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* UI Overlay */
+    .ui-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 2.5rem;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: auto;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.2));
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--accent-cyan);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    }
+
+    .brand-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to right, #fff, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .status-pill {
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      padding: 0.5rem 1rem;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-cyan);
+      box-shadow: 0 0 12px var(--accent-cyan);
+      animation: pulse-dot 2s infinite var(--ease-smooth);
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.4); opacity: 0.5; }
+    }
+
+    /* Main HUD Card */
+    .hud-card {
+      pointer-events: auto;
+      align-self: center;
+      background: var(--panel-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+      transform: translateY(20px);
+      opacity: 0;
+      transition: border-color 0.3s var(--ease-smooth);
+    }
+
+    .hud-card:hover {
+      border-color: rgba(0, 240, 255, 0.3);
+    }
+
+    .hud-header {
+      margin-bottom: 1.5rem;
+    }
+
+    .hud-subtitle {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent-cyan);
+      margin-bottom: 0.25rem;
+      display: block;
+    }
+
+    .hud-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .metric-item {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 0.85rem 1rem;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* State Switcher Buttons */
+    .controls-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .mode-switch-group {
+      display: flex;
+      gap: 0.5rem;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.35rem;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .mode-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 0.65rem 0.5rem;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s var(--ease-smooth);
+      position: relative;
+    }
+
+    .mode-btn:hover {
+      color: #fff;
+    }
+
+    .mode-btn.active {
+      background: #1e293b;
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .mode-btn.active[data-state="idle"] {
+      color: var(--accent-cyan);
+      box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+    }
+
+    .mode-btn.active[data-state="boost"] {
+      color: var(--accent-purple);
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.25);
+    }
+
+    .mode-btn.active[data-state="surge"] {
+      color: var(--accent-amber);
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.25);
+    }
+
+    .bottom-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .hint-text {
+      opacity: 0.7;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+
+  <div class="ui-overlay">
+    <div class="top-bar">
+      <div class="brand">
+        <div class="brand-badge">Motion v4.2</div>
+        <div class="brand-title">QUANTUM ENGINE</div>
+      </div>
+      <div class="status-pill">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">CORE ONLINE: 60 FPS</span>
+      </div>
+    </div>
+
+    <div class="hud-card" id="hud-card">
+      <div class="hud-header">
+        <span class="hud-subtitle" id="hud-state-label">STATE MATRIX</span>
+        <h1 class="hud-title" id="hud-state-title">Harmonic Resonance</h1>
+      </div>
+
+      <div class="metrics-grid">
+        <div class="metric-item">
+          <div class="metric-label">Orbital Velocity</div>
+          <div class="metric-value" id="metric-velocity">1.00x</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-label">Core Flux Output</div>
+          <div class="metric-value" id="metric-flux">42.8 GW</div>
+        </div>
+      </div>
+
+      <div>
+        <span class="controls-label">DYNAMIC ENERGY STATE</span>
+        <div class="mode-switch-group">
+          <button class="mode-btn active" data-state="idle">IDLE</button>
+          <button class="mode-btn" data-state="boost">OVERDRIVE</button>
+          <button class="mode-btn" data-state="surge">QUANTUM SURGE</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bar">
+      <div class="hint-text">🖱️ Move cursor to inspect 3D perspective | Click mode to morph core</div>
+      <div>GSAP + THREE.JS + MOTION-UI</div>
+    </div>
+  </div>
+
+  <script>
+    // --- 1. Three.js Scene Setup ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x07090e, 0.04);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.z = 8.5;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    // Core Group
+    const coreGroup = new THREE.Group();
+    scene.add(coreGroup);
+
+    // Inner Wireframe Core
+    const innerGeo = new THREE.IcosahedronGeometry(1.6, 2);
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: 0x00f0ff,
+      wireframe: true,
+      emissive: 0x00f0ff,
+      emissiveIntensity: 0.6,
+      roughness: 0.2,
+      metalness: 0.8
+    });
+    const innerCore = new THREE.Mesh(innerGeo, innerMat);
+    coreGroup.add(innerCore);
+
+    // Outer Faceted Crystal
+    const outerGeo = new THREE.IcosahedronGeometry(2.1, 1);
+    const outerMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.45,
+      roughness: 0.1,
+      metalness: 0.1,
+      transmission: 0.9,
+      ior: 1.5,
+      reflectivity: 0.9,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1
+    });
+    const outerCore = new THREE.Mesh(outerGeo, outerMat);
+    coreGroup.add(outerCore);
+
+    // Orbital Particle Cloud
+    const particleCount = 1400;
+    const particleGeo = new THREE.BufferGeometry();
+    const particlePositions = new Float32Array(particleCount * 3);
+    const particleScales = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      const radius = 2.8 + Math.random() * 2.6;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * Math.PI;
+
+      particlePositions[i * 3] = radius * Math.cos(theta) * Math.cos(phi);
+      particlePositions[i * 3 + 1] = radius * Math.sin(phi);
+      particlePositions[i * 3 + 2] = radius * Math.sin(theta) * Math.cos(phi);
+      particleScales[i] = Math.random();
+    }
+
+    particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeo.setAttribute('scale', new THREE.BufferAttribute(particleScales, 1));
+
+    const particleMat = new THREE.PointsMaterial({
+      size: 0.045,
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending
+    });
+    const particles = new THREE.Points(particleGeo, particleMat);
+    coreGroup.add(particles);
+
+    // Dynamic Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambientLight);
+
+    const pointLightPrimary = new THREE.PointLight(0x00f0ff, 3, 20);
+    pointLightPrimary.position.set(4, 3, 5);
+    scene.add(pointLightPrimary);
+
+    const pointLightSecondary = new THREE.PointLight(0xa855f7, 2.5, 20);
+    pointLightSecondary.position.set(-4, -3, -2);
+    scene.add(pointLightSecondary);
+
+    // --- 2. Motion Tokens & Physics Engine ---
+    const motionTokens = {
+      duration: { fast: 0.18, normal: 0.35, slow: 0.6 },
+      ease: { smooth: "power3.out", sharp: "power2.inOut" }
+    };
+
+    // State Configuration
+    const stateConfigs = {
+      idle: {
+        name: "Harmonic Resonance",
+        color: 0x00f0ff,
+        colorHex: "#00f0ff",
+        rotSpeed: 0.4,
+        pulseScale: 1.0,
+        flux: "42.8 GW",
+        velocity: "1.00x",
+        lightIntensity: 3.0
+      },
+      boost: {
+        name: "Overdrive Acceleration",
+        color: 0xa855f7,
+        colorHex: "#a855f7",
+        rotSpeed: 1.2,
+        pulseScale: 1.18,
+        flux: "128.4 GW",
+        velocity: "3.20x",
+        lightIntensity: 5.5
+      },
+      surge: {
+        name: "Quantum Hyper-Surge",
+        color: 0xf59e0b,
+        colorHex: "#f59e0b",
+        rotSpeed: 2.5,
+        pulseScale: 1.35,
+        flux: "986.2 GW",
+        velocity: "7.50x",
+        lightIntensity: 8.0
+      }
+    };
+
+    let currentState = "idle";
+    let targetSpeed = stateConfigs.idle.rotSpeed;
+    let currentSpeed = targetSpeed;
+
+    // Mouse Tracking with Smooth Damping (Lerp)
+    const mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+    window.addEventListener('mousemove', (e) => {
+      mouse.targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouse.targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // --- 3. GSAP Entry Animation ---
+    gsap.to('#hud-card', {
+      opacity: 1,
+      y: 0,
+      duration: 0.8,
+      ease: motionTokens.ease.smooth,
+      delay: 0.3
+    });
+
+    // --- 4. State Switcher Logic ---
+    const buttons = document.querySelectorAll('.mode-btn');
+    const hudStateTitle = document.getElementById('hud-state-title');
+    const hudStateLabel = document.getElementById('hud-state-label');
+    const metricFlux = document.getElementById('metric-flux');
+    const metricVelocity = document.getElementById('metric-velocity');
+    const statusDot = document.getElementById('status-dot');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stateKey = btn.dataset.state;
+        if (stateKey === currentState) return;
+
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyState(stateKey);
+      });
+    });
+
+    function applyState(stateKey) {
+      currentState = stateKey;
+      const cfg = stateConfigs[stateKey];
+
+      // Update Target Speed
+      targetSpeed = cfg.rotSpeed;
+
+      // GSAP Color & Material Morph
+      gsap.to(innerMat.color, {
+        r: ((cfg.color >> 16) & 255) / 255,
+        g: ((cfg.color >> 8) & 255) / 255,
+        b: (cfg.color & 255) / 255,
+        duration: motionTokens.duration.normal,
+        ease: motionTokens.ease.smooth
+      });
+
+      gsap.to(innerMat.emissive, {
+        r: ((cfg.color >> 16) & 255) / 255,
+        g: ((cfg.color >> 8) & 255) / 255,
+        b: (cfg.color & 255) / 255,
+        duration: motionTokens.duration.normal,
+        ease: motionTokens.ease.smooth
+      });
+
+      gsap.to(particleMat.color, {
+        r: ((cfg.color >> 16) & 255) / 255,
+        g: ((cfg.color >> 8) & 255) / 255,
+        b: (cfg.color & 255) / 255,
+        duration: motionTokens.duration.normal,
+        ease: motionTokens.ease.smooth
+      });
+
+      gsap.to(pointLightPrimary, {
+        intensity: cfg.lightIntensity,
+        duration: motionTokens.duration.normal,
+        ease: motionTokens.ease.smooth
+      });
+
+      // Micro-Scale Pulse
+      gsap.fromTo(coreGroup.scale, 
+        { x: cfg.pulseScale * 0.9, y: cfg.pulseScale * 0.9, z: cfg.pulseScale * 0.9 },
+        { x: cfg.pulseScale, y: cfg.pulseScale, z: cfg.pulseScale, duration: 0.45, ease: "back.out(1.7)" }
+      );
+
+      // DOM Updates with subtle text reveal
+      gsap.to(hudStateTitle, {
+        opacity: 0,
+        y: -6,
+        duration: 0.15,
+        onComplete: () => {
+          hudStateTitle.innerText = cfg.name;
+          hudStateLabel.style.color = cfg.colorHex;
+          metricFlux.innerText = cfg.flux;
+          metricVelocity.innerText = cfg.velocity;
+          statusDot.style.background = cfg.colorHex;
+          statusDot.style.boxShadow = `0 0 12px ${cfg.colorHex}`;
+          gsap.to(hudStateTitle, { opacity: 1, y: 0, duration: 0.25, ease: motionTokens.ease.smooth });
+        }
+      });
+    }
+
+    // --- 5. Render Loop (60 FPS Procedural Motion) ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // Smooth Lerp for Speed and Mouse Tilt
+      currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+      mouse.x += (mouse.targetX - mouse.x) * 0.08;
+      mouse.y += (mouse.targetY - mouse.y) * 0.08;
+
+      // Group Rotation (Procedural + Mouse)
+      coreGroup.rotation.y += currentSpeed * delta * 0.8;
+      coreGroup.rotation.x = Math.sin(elapsed * 0.6) * 0.15 + (mouse.y * 0.35);
+      coreGroup.rotation.z = Math.cos(elapsed * 0.4) * 0.1 + (-mouse.x * 0.35);
+
+      // Inner Counter-Rotation
+      innerCore.rotation.y -= currentSpeed * delta * 1.2;
+      innerCore.rotation.z += currentSpeed * delta * 0.5;
+
+      // Floating Wave
+      coreGroup.position.y = Math.sin(elapsed * 1.5) * 0.18;
+
+      // Particles Twist
+      particles.rotation.y += currentSpeed * delta * 0.4;
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

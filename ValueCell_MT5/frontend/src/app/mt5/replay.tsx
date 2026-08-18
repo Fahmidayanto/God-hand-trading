@@ -412,11 +412,11 @@ function getProcessedReplayTrades(
   m15Candles: ReplayCandle[],
   h1Candles: ReplayCandle[],
   h4Candles: ReplayCandle[],
-  useLLMSetup?: boolean,
+  isLLMActive?: boolean,
 ): { executedTrades: ReplayTrade[]; rejectedTrades: ReplayTrade[] } {
   // When LLM mode is active, trades are governed exclusively by live LLM session decisions.
   // We completely isolate the session from static database EA backtest trades and EA candidate filters.
-  if (useLLMSetup) {
+  if (isLLMActive) {
     return { executedTrades: [], rejectedTrades: [] };
   }
 
@@ -471,17 +471,30 @@ function EntryToggle({
   description,
   checked,
   onChange,
+  disabled = false,
+  disabledReason,
 }: {
   label: string;
   description?: string;
   checked: boolean;
   onChange: () => void;
+  disabled?: boolean;
+  disabledReason?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-1 py-3">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 px-1 py-3 transition-opacity",
+        disabled && "opacity-50"
+      )}
+      title={disabled ? disabledReason : undefined}
+    >
       <div className="min-w-0">
         <div className="text-xs font-semibold text-slate-200">{label}</div>
         {description && <div className="mt-0.5 text-[10px] text-slate-500">{description}</div>}
+        {disabled && disabledReason && (
+          <div className="mt-0.5 text-[9px] text-amber-400/80">⚠️ {disabledReason}</div>
+        )}
       </div>
       <button
         type="button"
@@ -489,15 +502,18 @@ function EntryToggle({
         aria-checked={checked}
         aria-label={label}
         onClick={onChange}
+        disabled={disabled}
         className={cn(
           "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-          checked ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+          checked ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900",
+          disabled && "cursor-not-allowed"
         )}
       >
         <span
           className={cn(
             "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-            checked ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500"
+            checked ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500",
+            disabled && "bg-slate-700"
           )}
         />
       </button>
@@ -1243,6 +1259,10 @@ export default function ReplayTrades() {
   const [useLLMSetup, setUseLLMSetup] = useState(false);
   const [llmRecommendation, setLlmRecommendation] = useState<any | null>(null);
   const [llmLoading, setLlmLoading] = useState(false);
+  // Decision engine toggle: "rule" (SmartRuleEngine) or "llm" (LLMDecisionEngine)
+  const [decisionEngine, setDecisionEngine] = useState<"rule" | "llm">("rule");
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   // LLM-executed positions — kept separate so they survive replay re-renders.
   const [llmPositions, setLlmPositions] = useState<any[]>([]);
   const [isMa20Visible, setIsMa20Visible] = useState(true);
@@ -1783,9 +1803,6 @@ export default function ReplayTrades() {
   const [activePositions, setActivePositions] = useState<any[]>([]);
 
   // ── LLM Trade Setup: request recommendation from backend ──
-  // Accepts an optional structure event (CHoCH/BOS). If not provided, falls back
-  // to the most recent active position. This lets the LLM be triggered directly
-  // on a detected CHoCH/BOS even when no rule-based trade was opened.
   const llmAbortControllerRef = useRef<AbortController | null>(null);
 
   const cancelLLMSetup = useCallback(() => {
@@ -1794,10 +1811,14 @@ export default function ReplayTrades() {
       llmAbortControllerRef.current = null;
     }
     setLlmLoading(false);
+    setDecisionLoading(false);
   }, []);
 
   const requestLLMSetup = useCallback(async (structureEvent?: any) => {
-    if (!replayData) return;
+    if (!replayData || currentIndex === 0) {
+      setDecisionError("Pilih candle terlebih dahulu");
+      return;
+    }
 
     // Cancel any previous pending LLM request
     if (llmAbortControllerRef.current) {
@@ -1810,30 +1831,48 @@ export default function ReplayTrades() {
     let entryPrice: number;
     let structure: string;
 
+    const candle = currentIndex > 0 ? (replayData.candles[currentIndex - 1] || replayData.candles[0]) : replayData.candles[0];
+
     if (structureEvent) {
-      entryTs = structureEvent.time ?? 0;
-      entryPrice = structureEvent.price ?? 0;
+      entryTs = structureEvent.time ?? candle?.time ?? 0;
+      entryPrice = structureEvent.price ?? candle?.close ?? 0;
       const dir = structureEvent.direction ? ` (${structureEvent.direction})` : "";
       structure = `${structureEvent.type || "STRUCTURE"}${dir}`;
     } else {
       const active = activePositions.find(p => !p.is_closed && !p.is_rejected);
-      if (!active) return;
-      entryTs = active.entry_time ?? 0;
-      entryPrice = active.entry_price ?? 0;
-      structure = active.signal_type || "unknown";
+      if (active) {
+        entryTs = active.entry_time ?? candle?.time ?? 0;
+        entryPrice = active.entry_price ?? candle?.close ?? 0;
+        structure = active.signal_type || "ACTIVE_TRADE";
+      } else {
+        entryTs = candle?.time ?? 0;
+        entryPrice = candle?.close ?? 0;
+        const latestStruct = [...replayData.structures]
+          .reverse()
+          .find(s => s.time <= entryTs);
+        if (latestStruct) {
+          const dir = latestStruct.direction ? ` (${latestStruct.direction})` : "";
+          structure = `${latestStruct.type || "STRUCTURE"}${dir}`;
+        } else {
+          structure = "MANUAL_REPLAY_ANALYSIS";
+        }
+      }
     }
 
     setLlmLoading(true);
+    setDecisionLoading(true);
+    setDecisionError(null);
     setLlmRecommendation(null);
+
     try {
-      // Always compute ATR so the LLM has volatility context, regardless of
-      // whether the ATR SL/TP toggle is on.
+      // Compute ATR for volatility context
       const atr = calculateATR(replayData.candles, entryTs, strategyParams.atr_period);
       const priorCandles = replayData.candles.filter(c => c.time <= entryTs).slice(-30);
       const localCandles = priorCandles.slice(-10);
       const candlesSummary = priorCandles.length > 0
         ? `recent 10-bar local pullback: high=${Math.max(...localCandles.map(c => c.high)).toFixed(2)}, low=${Math.min(...localCandles.map(c => c.low)).toFixed(2)} | 30-bar range: swingHigh=${Math.max(...priorCandles.map(c => c.high)).toFixed(2)}, swingLow=${Math.min(...priorCandles.map(c => c.low)).toFixed(2)}, lastClose=${priorCandles[priorCandles.length - 1].close.toFixed(2)}`
         : "no prior candles";
+
       // Calculate live multi-timeframe indicator data & candle quality
       const loadedMap = allReplayDataRef.current || allReplayData;
       const m15Candles = loadedMap.M15?.candles ?? replayData.candles;
@@ -1938,11 +1977,11 @@ export default function ReplayTrades() {
         entry_price: entryPrice,
         atr,
         balance: strategyParams.initial_balance ?? 1000,
+        risk_pct: strategyParams.risk_pct || 2.0,
         news: "no news",
         timeframe: activeTimeframe,
         candles_summary: candlesSummary,
         market_context: marketContext,
-        // EA entry filter status — LLM should consider these as context
         ea_filters: {
           h1_ema200: entryFilterParams.h1_ema200_filter,
           h4_ema: entryFilterParams.h4_ema_filter,
@@ -1953,16 +1992,35 @@ export default function ReplayTrades() {
           bos_cycle_filter: entryFilterParams.bos_cycle_filter,
         },
       };
+
       const res = await fetch(`${BASE_URL}/trading/llm-setup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
         signal: controller.signal,
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(errBody.detail || `HTTP ${res.status}`);
+      }
+
       const data = await res.json();
       if (!controller.signal.aborted) {
-        setLlmRecommendation(data);
+        setLlmRecommendation({
+          ...data,
+          engine_used: "llm",
+          signal: data.signal,
+          entry_price: data.entry_price || entryPrice,
+          sl_price: data.sl_price ?? data.sl,
+          tp_price: data.tp_price ?? data.tp1 ?? data.tp,
+          sl: data.sl_price ?? data.sl,
+          tp1: data.tp_price ?? data.tp1 ?? data.tp,
+          lot_size: data.lot_size,
+          confidence: data.confidence,
+          reasoning: data.reasoning,
+          cycle_stage: data.cycle_stage || exhaustionStage,
+        });
       }
     } catch (e: any) {
       if (e?.name === "AbortError" || controller.signal.aborted) {
@@ -1970,36 +2028,168 @@ export default function ReplayTrades() {
         return;
       }
       console.error("LLM setup request failed:", e);
+      setDecisionError(e?.message || "Gagal memanggil LLM");
       setLlmRecommendation({
         signal: "HOLD",
         confidence: 0,
         sl_price: 0,
         tp_price: 0,
         lot_size: 0,
-        reasoning: `Gagal memanggil LLM: ${e}`,
+        reasoning: `Gagal memanggil LLM: ${e?.message || e}`,
       });
     } finally {
       if (llmAbortControllerRef.current === controller) {
         llmAbortControllerRef.current = null;
         setLlmLoading(false);
+        setDecisionLoading(false);
       }
     }
-  }, [replayData, activePositions, strategyParams, activeTimeframe, entryFilterParams, allReplayData]);
+  }, [replayData, currentIndex, activePositions, strategyParams, activeTimeframe, entryFilterParams, allReplayData, yearFrom, monthFrom, yearTo, monthTo]);
+
+  // Decision Engine (Rule | LLM) toggle dispatcher
+  // ── Decision Engine (SmartRuleEngine vs LLMDecisionEngine 7-Step Reasoning) ──
+  const requestDecisionSetup = useCallback(async () => {
+    if (!replayData || currentIndex === 0) {
+      setDecisionError("Pilih candle terlebih dahulu");
+      return;
+    }
+
+    setDecisionLoading(true);
+    setLlmLoading(true);
+    setDecisionError(null);
+    setLlmRecommendation(null);
+
+    try {
+      // Ensure H1 & H4 candles exist in memory
+      const loadedMap = allReplayDataRef.current || allReplayData;
+      let h1Candles = loadedMap.H1?.candles ?? [];
+      let h4Candles = loadedMap.H4?.candles ?? [];
+
+      if (h1Candles.length === 0) {
+        try {
+          const h1Data = await fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, "H1");
+          if (h1Data?.candles && h1Data.candles.length > 0) {
+            h1Candles = h1Data.candles;
+            setAllReplayData(prev => ({ ...prev, H1: h1Data }));
+            allReplayDataRef.current = { ...allReplayDataRef.current, H1: h1Data };
+          }
+        } catch (err) {
+          console.warn("[Decision Setup] Auto-fetch H1 candles warning:", err);
+        }
+      }
+
+      if (h4Candles.length === 0) {
+        try {
+          const h4Data = await fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, "H4");
+          if (h4Data?.candles && h4Data.candles.length > 0) {
+            h4Candles = h4Data.candles;
+            setAllReplayData(prev => ({ ...prev, H4: h4Data }));
+            allReplayDataRef.current = { ...allReplayDataRef.current, H4: h4Data };
+          }
+        } catch (err) {
+          console.warn("[Decision Setup] Auto-fetch H4 candles warning:", err);
+        }
+      }
+
+      const m15Slice = (replayData.candles || []).slice(0, currentIndex);
+      const currentCandle = m15Slice[m15Slice.length - 1] || replayData.candles[0];
+      const anchorTs = new Date(currentCandle.time * 1000).toISOString();
+
+      const m15Bars = (replayData.candles || []).slice(0, Math.max(currentIndex, 60)).map((c) => ({
+        time: new Date(c.time * 1000).toISOString(),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+
+      const h1Bars = (h1Candles.length > 0 ? h1Candles : (replayData.candles || [])).slice(0, Math.max(Math.floor(currentIndex / 4) + 1, 60)).map((c) => ({
+        time: new Date(c.time * 1000).toISOString(),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+
+      const h4Bars = (h4Candles.length > 0 ? h4Candles : (replayData.candles || [])).slice(0, Math.max(Math.floor(currentIndex / 16) + 1, 60)).map((c) => ({
+        time: new Date(c.time * 1000).toISOString(),
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
+      }));
+
+      const engineType = decisionEngine === "llm" ? "llm" : "rule";
+      const payload = {
+        symbol: "XAUUSD",
+        anchor_timestamp: anchorTs,
+        engine: engineType,
+        ohlc: { M15: m15Bars, H1: h1Bars, H4: h4Bars },
+        balance: Number(strategyParams.initial_balance) || 1000.0,
+        risk_pct: strategyParams.risk_pct || 1.0,
+      };
+
+      const res = await fetch(`${BASE_URL}/replay/decision`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(errBody.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setLlmRecommendation({
+        ...data,
+        engine_used: engineType,
+        signal: data.signal,
+        entry_price: data.entry_price || currentCandle.close,
+        sl_price: data.sl,
+        tp_price: data.tp1,
+        sl: data.sl,
+        tp1: data.tp1,
+        tp2: data.tp2,
+        lot_size: data.lot_size,
+        rr_ratio: data.rr_ratio,
+        confidence: data.confidence,
+        reasoning: data.reasoning,
+        confluences: data.confluences || [],
+        block_reason: data.block_reason,
+        regime: data.regime,
+        event_proximity: data.event_proximity,
+      });
+    } catch (err: any) {
+      console.error("Decision setup failed:", err);
+      setDecisionError(err?.message || "Gagal meminta decision setup");
+      setLlmRecommendation({
+        signal: "HOLD",
+        confidence: 0,
+        sl_price: 0,
+        tp_price: 0,
+        lot_size: 0,
+        reasoning: `Gagal memanggil LLM 7-Step Reasoning: ${err?.message || err}`,
+      });
+    } finally {
+      setDecisionLoading(false);
+      setLlmLoading(false);
+    }
+  }, [replayData, currentIndex, allReplayData, decisionEngine, strategyParams, yearFrom, monthFrom, yearTo, monthTo]);
 
   // ── LLM Trade Setup: execute the recommendation ──
-  // Opens a position in the replay with the LLM's SL/TP/lot and draws it on the chart.
   const executeLLMSetup = useCallback(() => {
-    if (!llmRecommendation || llmRecommendation.signal === "HOLD") return;
+    if (!llmRecommendation) return;
+    const isTradeable = (llmRecommendation.signal === "BUY" || llmRecommendation.signal === "SELL") && (llmRecommendation.sl_price ?? llmRecommendation.sl ?? 0) > 0;
+    if (!isTradeable) return;
     if (!replayData) return;
 
     const rec = llmRecommendation;
-    const entryTs = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.time ?? 0) : 0;
-    // Use the LLM's entry price if provided; otherwise fall back to the current
-    // candle close so SL/TP distances are anchored to a real price (not $0).
-    const candleClose = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.close ?? 0) : 0;
+    const entryTs = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.time ?? 0) : (replayData.candles[0]?.time ?? 0);
+    const candleClose = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.close ?? 0) : (replayData.candles[0]?.close ?? 0);
     const entryPrice = rec.entry_price && rec.entry_price > 0 ? rec.entry_price : candleClose;
-    const slPrice = rec.sl_price ?? 0;
-    const tpPrice = rec.tp_price ?? 0;
+    const slPrice = rec.sl_price ?? rec.sl ?? 0;
+    const tpPrice = rec.tp_price ?? rec.tp1 ?? 0;
     const lotSize = Math.max(0.01, Number((rec.lot_size || 0.01).toFixed(2)));
 
     const llmPos = {
@@ -2020,16 +2210,14 @@ export default function ReplayTrades() {
       tp_trigger_price: null,
       is_tp_maxed: false,
       is_llm: true,
+      reasoning: rec.reasoning,
     };
 
-    // Store in a dedicated state so it survives replay re-renders (the trades
-    // primitive is rebuilt from source data on every candle advance).
     setLlmPositions((prev) => {
       if (prev.some(p => p.entry_time === entryTs)) return prev;
       return [...prev, llmPos];
     });
 
-    // Also add to active positions so it shows in the table immediately.
     setActivePositions((prev) => {
       if (prev.some(p => p.entry_time === entryTs && p.is_llm)) return prev;
       return [llmPos, ...prev];
@@ -2045,8 +2233,8 @@ export default function ReplayTrades() {
       setLlmRecommendation(null);
       return;
     }
-    const entryTs = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.time ?? 0) : 0;
-    const entryPrice = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.close ?? 0) : 0;
+    const entryTs = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.time ?? 0) : (replayData.candles[0]?.time ?? 0);
+    const entryPrice = currentIndex > 0 ? (replayData.candles[currentIndex - 1]?.close ?? 0) : (replayData.candles[0]?.close ?? 0);
     const rec = llmRecommendation;
 
     const rejectedPos = {
@@ -2081,14 +2269,19 @@ export default function ReplayTrades() {
     setLlmRecommendation(null);
   }, [llmRecommendation, replayData, currentIndex]);
 
-  // ── Auto-trigger LLM on detected CHoCH/BOS when LLM mode is on ──
+  // ── Auto-trigger LLM Trade Setup on CHoCH & BOS ──
   const processedLLMEventsRef = useRef<Set<number>>(new Set());
+  const [autoDecisionEnabled, setAutoDecisionEnabled] = useState(true);
+
   useEffect(() => {
-    if (!useLLMSetup || !replayData || currentIndex === 0) return;
+    const isLLMActive = useLLMSetup || decisionEngine === "llm";
+    if (!isLLMActive || !autoDecisionEnabled || !replayData || currentIndex === 0) return;
+    if (llmLoading || decisionLoading) return;
+
     const candle = replayData.candles[currentIndex - 1];
     if (!candle) return;
 
-    // Find the latest unhandled CHoCH/BOS event formed up to the current candle
+    // Cari CHoCH atau BOS event terbaru yang belum diproses dan ≤ current candle
     const event = [...replayData.structures]
       .reverse()
       .find((s) => {
@@ -2098,12 +2291,29 @@ export default function ReplayTrades() {
       });
     if (!event) return;
 
-    // Only trigger once per event
     const key = event.time ?? 0;
     processedLLMEventsRef.current.add(key);
+    if (useLLMSetup) {
+      console.log(`🤖 Auto LLM Trade Setup (SL/TP/Lot) triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
+      requestLLMSetup(event);
+    } else if (decisionEngine === "llm") {
+      console.log(`🧠 Auto LLM 7-Step Reasoning triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
+      requestDecisionSetup();
+    }
+  }, [useLLMSetup, decisionEngine, autoDecisionEnabled, replayData, currentIndex, llmLoading, decisionLoading, requestLLMSetup, requestDecisionSetup]);
 
-    requestLLMSetup(event);
-  }, [useLLMSetup, replayData, currentIndex, requestLLMSetup]);
+  // ── Auto-sync Entry Filter toggles ──
+  const isAutoDecisionActive = autoDecisionEnabled && (decisionEngine === "llm" || useLLMSetup);
+  useEffect(() => {
+    if (isAutoDecisionActive && entryFilterParams.entry_choch) {
+      setEntryFilterParams((prev) => ({
+        ...prev,
+        entry_choch: false,
+        entry_bos: false,
+        entry_bos_cycle_2_plus: false,
+      }));
+    }
+  }, [isAutoDecisionActive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Monthly summary stats
   const [monthlyPNL, setMonthlyPNL] = useState<any[]>([]);
@@ -2494,7 +2704,7 @@ export default function ReplayTrades() {
       m15Candles,
       h1Candles,
       h4Candles,
-      useLLMSetup,
+      useLLMSetup || decisionEngine === "llm",
     );
 
     const llmEntryTimes = new Set(llmPositions.map(p => p.entry_time ?? 0));
@@ -2648,6 +2858,27 @@ export default function ReplayTrades() {
     for (const llmPos of llmPositions) {
       const entryTs = llmPos.entry_time ?? 0;
       if (entryTs <= candle.time) {
+        if (llmPos.is_rejected) {
+          activePosList.push({
+            ticket: llmPos.ticket,
+            type: llmPos.type,
+            entry_time: llmPos.entry_time,
+            lot_size: llmPos.lot_size ?? 0,
+            entry_price: llmPos.entry_price ?? 0,
+            current_price: null,
+            sl: null,
+            tp: null,
+            original_sl: null,
+            original_tp: null,
+            status: "Rejected",
+            reject_reason: llmPos.reject_reason || "Ditolak / HOLD",
+            pnl: 0,
+            is_rejected: true,
+            is_llm: true,
+          });
+          continue;
+        }
+
         total++;
         const typeUpper = (llmPos.type ?? "BUY").toUpperCase();
         const isBuy = typeUpper === "BUY";
@@ -2833,7 +3064,7 @@ export default function ReplayTrades() {
       const merged = [
         ...mapped,
         ...llmPositions
-          .filter(p => (p.entry_time ?? 0) <= candle.time)
+          .filter(p => !p.is_rejected && (p.entry_time ?? 0) <= candle.time)
           .map(p => {
             const entryTs = p.entry_time ?? 0;
             const posInList = activePosList.find(pos => pos.ticket === p.ticket);
@@ -3407,7 +3638,7 @@ export default function ReplayTrades() {
       m15Candles,
       h1Candles,
       h4Candles,
-      useLLMSetup,
+      useLLMSetup || decisionEngine === "llm",
     );
     const filteredTrades = executedTrades;
 
@@ -3567,6 +3798,27 @@ export default function ReplayTrades() {
     for (const llmPos of llmPositions) {
       const entryTs = llmPos.entry_time ?? 0;
       if (entryTs <= candle.time) {
+        if (llmPos.is_rejected) {
+          activePosList.push({
+            ticket: llmPos.ticket,
+            type: llmPos.type,
+            entry_time: llmPos.entry_time,
+            lot_size: llmPos.lot_size ?? 0,
+            entry_price: llmPos.entry_price ?? 0,
+            current_price: null,
+            sl: null,
+            tp: null,
+            original_sl: null,
+            original_tp: null,
+            status: "Rejected",
+            reject_reason: llmPos.reject_reason || "Ditolak / HOLD",
+            pnl: 0,
+            is_rejected: true,
+            is_llm: true,
+          });
+          continue;
+        }
+
         total++;
         const typeUpper = (llmPos.type ?? "BUY").toUpperCase();
         const isBuy = typeUpper === "BUY";
@@ -3744,7 +3996,7 @@ export default function ReplayTrades() {
       const mergedEntries = [
         ...entries,
         ...llmPositions
-          .filter(p => (p.entry_time ?? 0) <= candle.time)
+          .filter(p => !p.is_rejected && (p.entry_time ?? 0) <= candle.time)
           .map(p => {
             const entryTs = p.entry_time ?? 0;
             const posInList = activePosList.find(pos => pos.ticket === p.ticket);
@@ -4815,21 +5067,37 @@ export default function ReplayTrades() {
             </h2>
 
             {/* ── LLM Trade Setup Recommendation Panel ── */}
-            {useLLMSetup && (
-              <div className="mb-4 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-purple-300">
-                    <span>🤖</span> LLM Trade Setup
+            {(useLLMSetup || decisionEngine === "llm" || llmLoading || decisionLoading || llmRecommendation) && (
+              <div className="mb-4 rounded-xl border border-purple-500/40 bg-gradient-to-br from-purple-950/40 via-slate-950/80 to-purple-900/15 p-4 shadow-lg backdrop-blur-md">
+                <div className="flex items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-purple-300">
+                    <span className="text-base">🤖</span>
+                    <span>LLM Trade Setup ({decisionEngine === "llm" ? "7-Step Reasoning" : "CHoCH & BOS"})</span>
+                    {llmRecommendation?.cycle_stage && (
+                      <span className={cn(
+                        "font-bold px-2 py-0.5 rounded text-[10px]",
+                        String(llmRecommendation.cycle_stage).includes("OVEREXTENDED")
+                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                          : String(llmRecommendation.cycle_stage).includes("MID_CYCLE")
+                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                          : String(llmRecommendation.cycle_stage).includes("REVERSAL") || String(llmRecommendation.cycle_stage).includes("CHOCH")
+                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      )}>
+                        {llmRecommendation.cycle_stage}
+                      </span>
+                    )}
                   </div>
-                  {llmLoading && (
+                  {(llmLoading || decisionLoading) && (
                     <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1.5 text-xs text-purple-300">
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" /> LLM berpikir...
+                      <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 animate-pulse">
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                        <span>LLM Berpikir & Menganalisis...</span>
                       </span>
                       <button
                         type="button"
                         onClick={cancelLLMSetup}
-                        className="rounded border border-rose-500/40 bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer"
+                        className="rounded-md border border-rose-500/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer"
                         title="Batalkan permintaan rekomendasi LLM"
                       >
                         Batal
@@ -4838,130 +5106,129 @@ export default function ReplayTrades() {
                   )}
                 </div>
 
-                {!llmRecommendation && !llmLoading && (
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                {!llmRecommendation && !llmLoading && !decisionLoading && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <span className="text-xs text-slate-400">
-                      Minta LLM memutuskan signal, SL, TP, dan lot untuk trade aktif.
+                      Otomatis menganalisis saat CHoCH/BOS terdeteksi, atau minta LLM menentukan Signal, SL, TP, & Lot sekarang.
                     </span>
                     <button
                       type="button"
-                      onClick={requestLLMSetup}
-                      className="rounded-md border border-purple-500/40 bg-purple-500/15 px-3 py-1.5 text-xs font-semibold text-purple-300 hover:bg-purple-500/25 transition-colors cursor-pointer"
+                      onClick={() => (decisionEngine === "llm" ? requestDecisionSetup() : requestLLMSetup())}
+                      className="rounded-md border border-purple-500/40 bg-purple-500/20 px-3.5 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/30 transition-all cursor-pointer shadow-sm"
                     >
-                      Minta Rekomendasi LLM
+                      🧠 Analisis Sekarang (LLM)
                     </button>
                   </div>
                 )}
 
-                {llmRecommendation && (
-                  <div className="mt-3 space-y-2.5">
-                    <div className="grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4">
-                      <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Signal</div>
-                        <div className={`font-bold text-xs ${llmRecommendation.signal === "BUY" ? "text-emerald-400" : llmRecommendation.signal === "SELL" ? "text-rose-400" : "text-slate-400"}`}>
-                          {llmRecommendation.signal} ({Math.round((llmRecommendation.confidence ?? 0) * 100)}%)
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Risk %</div>
-                        <div className="font-mono font-bold text-amber-400 text-xs">
-                          {llmRecommendation.risk_pct ? `${llmRecommendation.risk_pct.toFixed(1)}%` : "2.0%"}
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">SL / TP</div>
-                        <div className="font-mono text-xs font-semibold flex items-center gap-1">
-                          <span className="text-rose-400">${llmRecommendation.sl_price?.toFixed(2)}</span>
-                          <span className="text-slate-600">/</span>
-                          <span className="text-emerald-400">${llmRecommendation.tp_price?.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                        <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Lot Size</div>
-                        <div className="font-mono font-bold text-cyan-300 text-xs">
-                          {Math.max(0.01, Number(llmRecommendation.lot_size || 0.01)).toFixed(2)} Lot
-                        </div>
-                      </div>
-                    </div>
+                {llmRecommendation && (() => {
+                  const sigUpper = (llmRecommendation.signal || "HOLD").toUpperCase();
+                  const isTradeable = (sigUpper === "BUY" || sigUpper === "SELL") && (llmRecommendation.sl_price ?? llmRecommendation.sl ?? 0) > 0;
+                  const isBlocked = sigUpper.includes("BLOCK");
 
-                    {/* Cycle Stage & Overextended Warning Badge */}
-                    {llmRecommendation.cycle_stage && (
-                      <div className="flex items-center justify-between rounded-lg bg-slate-950/80 border border-slate-800/90 px-3 py-1.5 text-[11px]">
-                        <span className="text-slate-400 font-medium">Siklus Struktur:</span>
-                        <span className={cn(
-                          "font-bold px-2 py-0.5 rounded text-[10px]",
-                          String(llmRecommendation.cycle_stage).includes("OVEREXTENDED")
-                            ? "bg-rose-500/15 text-rose-300 border border-rose-500/30"
-                            : String(llmRecommendation.cycle_stage).includes("MID_CYCLE")
-                            ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
-                            : String(llmRecommendation.cycle_stage).includes("REVERSAL") || String(llmRecommendation.cycle_stage).includes("CHOCH")
-                            ? "bg-purple-500/15 text-purple-300 border border-purple-500/30"
-                            : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                        )}>
-                          {llmRecommendation.cycle_stage}
-                        </span>
-                      </div>
-                    )}
-                    {(() => {
-                      const reasoningRaw =
-                        llmRecommendation.reasoning ||
-                        (llmRecommendation as any).reason ||
-                        (llmRecommendation as any).analysis ||
-                        (llmRecommendation as any).explanation;
-                      const reasoningStr =
-                        typeof reasoningRaw === "string"
-                          ? reasoningRaw
-                          : Array.isArray(reasoningRaw)
-                          ? reasoningRaw.join("\n")
-                          : typeof reasoningRaw === "object" && reasoningRaw !== null
-                          ? Object.entries(reasoningRaw)
-                              .map(([k, v]) => `• ${k}: ${v}`)
-                              .join("\n")
-                          : null;
-
-                      if (!reasoningStr) return null;
-
-                      return (
-                        <div className="rounded-lg border border-purple-500/30 bg-slate-950/90 p-3.5 text-xs leading-relaxed text-slate-200 shadow-sm">
-                          <div className="font-bold text-purple-300 flex items-center gap-1.5 mb-2 pb-1.5 border-b border-slate-800 text-xs">
-                            <span>💡</span> Analisis & Pertimbangan AI:
-                          </div>
-                          <div className="whitespace-pre-line text-slate-300 font-sans leading-relaxed text-[11px] space-y-1">
-                            {reasoningStr}
+                  return (
+                    <div className="mt-3 space-y-3">
+                      <div className="grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4">
+                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Signal</div>
+                          <div className={`font-bold text-sm ${sigUpper === "BUY" ? "text-emerald-400" : sigUpper === "SELL" ? "text-rose-400" : isBlocked ? "text-amber-400" : "text-slate-400"}`}>
+                            {sigUpper} ({Math.round((llmRecommendation.confidence ?? 0) * 100)}%)
                           </div>
                         </div>
-                      );
-                    })()}
-                    <div className="flex gap-2">
-                      {llmRecommendation.signal === "HOLD" ? (
-                        <button
-                          type="button"
-                          onClick={() => rejectLLMSetup(llmRecommendation.reasoning || "Ditolak oleh LLM (HOLD)")}
-                          className="rounded-md border border-slate-600 bg-slate-800/40 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700/40 transition-colors cursor-pointer"
-                        >
-                          ✓ Pahami Sinyal HOLD
-                        </button>
-                      ) : (
-                        <>
+                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Risk %</div>
+                          <div className="font-mono font-bold text-amber-400 text-sm">
+                            {isTradeable && llmRecommendation.risk_pct ? `${Number(llmRecommendation.risk_pct).toFixed(1)}%` : "-"}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">SL / TP</div>
+                          <div className="font-mono text-xs font-semibold flex items-center gap-1">
+                            {isTradeable ? (
+                              <>
+                                <span className="text-rose-400 font-bold">${llmRecommendation.sl_price?.toFixed(2)}</span>
+                                <span className="text-slate-600">/</span>
+                                <span className="text-emerald-400 font-bold">${llmRecommendation.tp_price?.toFixed(2)}</span>
+                              </>
+                            ) : (
+                              <span className="text-slate-500 font-mono">- / -</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Lot Size</div>
+                          <div className="font-mono font-bold text-cyan-300 text-sm">
+                            {isTradeable ? `${Math.max(0.01, Number(llmRecommendation.lot_size || 0.01)).toFixed(2)} Lot` : "-"}
+                          </div>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const reasoningRaw =
+                          llmRecommendation.reasoning ||
+                          (llmRecommendation as any).reason ||
+                          (llmRecommendation as any).analysis ||
+                          (llmRecommendation as any).explanation;
+                        const reasoningStr =
+                          typeof reasoningRaw === "string"
+                            ? reasoningRaw
+                            : Array.isArray(reasoningRaw)
+                            ? reasoningRaw.join("\n")
+                            : typeof reasoningRaw === "object" && reasoningRaw !== null
+                            ? Object.entries(reasoningRaw)
+                                .map(([k, v]) => `• ${k}: ${v}`)
+                                .join("\n")
+                            : null;
+
+                        if (!reasoningStr) return null;
+
+                        return (
+                          <div className="rounded-lg border border-purple-500/30 bg-slate-950/95 p-3 text-xs leading-relaxed text-slate-200 shadow-sm">
+                            <div className="font-bold text-purple-300 flex items-center gap-1.5 mb-1.5 pb-1 border-b border-slate-800/80 text-xs">
+                              <span>💡</span> Analisis & Pertimbangan AI:
+                            </div>
+                            <div className="whitespace-pre-line text-slate-300 font-sans leading-relaxed text-[11px] space-y-1">
+                              {reasoningStr}
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2.5 pt-1">
+                        {!isTradeable ? (
                           <button
                             type="button"
-                            onClick={executeLLMSetup}
-                            className="rounded-md border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/25 transition-colors cursor-pointer"
+                            onClick={() => rejectLLMSetup(llmRecommendation.reasoning || `Ditolak oleh LLM (${sigUpper})`)}
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-colors cursor-pointer active:scale-95"
                           >
-                            ✓ Eksekusi
+                            <span>✓</span>
+                            <span>Pahami Keputusan ({sigUpper} - Stand Aside)</span>
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => rejectLLMSetup("Ditolak oleh User")}
-                            className="rounded-md border border-slate-600 bg-slate-800/40 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-700/40 transition-colors cursor-pointer"
-                          >
-                            ✗ Tolak
-                          </button>
-                        </>
-                      )}
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={executeLLMSetup}
+                              className="flex items-center gap-1.5 rounded-lg border border-emerald-500/60 bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition-all cursor-pointer shadow-sm active:scale-95"
+                            >
+                              <span>✓</span>
+                              <span>Eksekusi Trade ({sigUpper})</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => rejectLLMSetup("Ditolak oleh User")}
+                              className="flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/25 transition-all cursor-pointer active:scale-95"
+                            >
+                              <span>✗</span>
+                              <span>Tolak Setup</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -5179,18 +5446,24 @@ export default function ReplayTrades() {
                         description="Change of Character patterns"
                         checked={entryFilterParams.entry_choch}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_choch: !prev.entry_choch }))}
+                        disabled={isAutoDecisionActive}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
                       />
                       <EntryToggle
                         label="BOS Cycle 1 Entries"
                         description="First BOS after CHoCH"
                         checked={entryFilterParams.entry_bos}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos: !prev.entry_bos }))}
+                        disabled={isAutoDecisionActive}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
                       />
                       <EntryToggle
                         label="BOS Cycle 2+ Entries"
                         description="Second and subsequent BOS cycles"
                         checked={entryFilterParams.entry_bos_cycle_2_plus}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos_cycle_2_plus: !prev.entry_bos_cycle_2_plus }))}
+                        disabled={isAutoDecisionActive}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
                       />
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
@@ -5399,6 +5672,125 @@ export default function ReplayTrades() {
                           </label>
                         </>
                       )}
+
+                      {/* ── Decision Engine (Rule vs LLM) ── */}
+                      {/* ── Mesin Keputusan & AI Analysis ── */}
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Mesin Keputusan & AI Analysis
+                      </div>
+
+                      {/* 1. SmartRule Engine */}
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-cyan-300">
+                            ⚙️ SmartRule Engine
+                            <StrategyTooltip
+                              fungsi="Menggunakan aturan baku Smart Money Concepts (SMC) dan filter teknikal deterministik secara instan tanpa memanggil AI."
+                              contoh="Entry otomatis dievaluasi berdasarkan break struktur CHoCH/BOS dan filter EMA200."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Eksekusi deterministik cepat berbasis aturan indikator & filter
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={decisionEngine === "rule"}
+                          aria-label="Aktifkan SmartRule Engine"
+                          onClick={() => {
+                            setDecisionEngine((prev) => (prev === "rule" ? "off" as any : "rule"));
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
+                            decisionEngine === "rule" ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              decisionEngine === "rule" ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {/* 2. LLM 7-Step Reasoning */}
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-300">
+                            🧠 LLM 7-Step Reasoning
+                            <StrategyTooltip
+                              fungsi="AI melakukan analisis kontekstual mendalam melalui 7 tahapan: Regime, Structure, Catalyst, Risk Asymmetry, Path Dependency, Decision, & Invalidation."
+                              contoh="Menganalisis multi-timeframe M15/H1/H4 dan memberikan justifikasi komprehensif sebelum merumuskan trade setup."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Analisis institusional mendalam 7 langkah berbasis AI multi-tier
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={decisionEngine === "llm"}
+                          aria-label="Aktifkan LLM 7-Step Reasoning"
+                          onClick={() => {
+                            setDecisionEngine((prev) => (prev === "llm" ? "off" as any : "llm"));
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            decisionEngine === "llm" ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              decisionEngine === "llm" ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {/* 3. Gunakan LLM untuk SL/TP/Lot */}
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-300">
+                            🤖 Gunakan LLM untuk SL/TP/Lot
+                            <StrategyTooltip
+                              fungsi="Saat terdeteksi struktur CHoCH atau BOS, AI langsung menganalisis dan memunculkan kartu rekomendasi setup posisi (Signal, SL, TP, & Lot) di Daftar Posisi dengan tombol Eksekusi dan Tolak."
+                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik '✓ Eksekusi' untuk membuka posisi atau '✗ Tolak'."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Auto-thinking saat CHoCH/BOS dengan kartu rekomendasi SL, TP, & Lot
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={useLLMSetup}
+                          aria-label="Gunakan LLM untuk SL/TP/Lot"
+                          onClick={() => {
+                            setUseLLMSetup((prev) => {
+                              const next = !prev;
+                              setAutoDecisionEnabled(next);
+                              return next;
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              useLLMSetup ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
                       <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                         Smart Money Concepts (SMC)
                       </div>
@@ -5479,56 +5871,6 @@ export default function ReplayTrades() {
                             className={cn(
                               "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
                               strategyParams.show_liquidity_pools ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        LLM Trade Setup
-                      </div>
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-slate-200">
-                            Gunakan LLM untuk SL/TP/Lot
-                            <StrategyTooltip
-                              fungsi="LLM (sentiment agent) yang memutuskan signal, SL, TP, dan lot size berdasarkan analisis konteks pasar — bukan rumus kaku. LLM menerima struktur, ATR, balance, dan berita, lalu memberi rekomendasi. Anda konfirmasi sebelum eksekusi."
-                              contoh="LLM menerima: CHoCH bullish, ATR $40, balance $1000, risiko 2%. LLM memutuskan: BUY, SL $60 di bawah swing low, TP $80 di resistance, lot 0.005. Anda klik Eksekusi untuk membuka posisi."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            LLM memberi rekomendasi, Anda konfirmasi sebelum eksekusi
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={useLLMSetup}
-                          aria-label="Gunakan LLM untuk SL/TP/Lot"
-                          onClick={() => {
-                            setUseLLMSetup((prev) => {
-                              const next = !prev;
-                              // LLM = suggest mode. Matikan rule-based CHoCH/BOS entries
-                              // dan ATR SL/TP supaya tidak ada dua sumber sinyal yang membingungkan.
-                              setEntryFilterParams((p) => ({
-                                ...p,
-                                entry_choch: next ? false : true,
-                                entry_bos: next ? false : true,
-                                entry_bos_cycle_2_plus: next ? false : true,
-                              }));
-                              setStrategyParams((p) => ({ ...p, use_atr_sltp: next ? false : true }));
-                              return next;
-                            });
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              useLLMSetup ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
                             )}
                           />
                         </button>

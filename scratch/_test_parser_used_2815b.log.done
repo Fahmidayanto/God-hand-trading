@@ -1,0 +1,70 @@
+"""Test LLM response parser dengan mock response."""
+import sys
+import os
+import numpy as np
+import pandas as pd
+from datetime import datetime, timezone
+
+sys.path.insert(0, r"B:/Project MT5")
+
+from verification_system.analyzers.replay_structure_provider import ReplayStructureProvider
+from verification_system.decision_engines.llm_decision_engine import LLMDecisionEngine
+
+np.random.seed(42)
+n = 500
+prices = 2000.0 + np.cumsum(np.random.randn(n) * 0.5 + 0.2)
+df_m15 = pd.DataFrame(
+    {
+        "time": pd.date_range("2023-04-15", periods=n, freq="15min"),
+        "open": prices + np.random.randn(n) * 0.3,
+        "high": prices + abs(np.random.randn(n)) * 0.8,
+        "low": prices - abs(np.random.randn(n)) * 0.8,
+        "close": prices,
+    }
+)
+df_h1 = df_m15.iloc[::4].reset_index(drop=True)
+df_h4 = df_m15.iloc[::16].reset_index(drop=True)
+
+ctx = ReplayStructureProvider().build(
+    ohlc_by_timeframe={"M15": df_m15, "H1": df_h1, "H4": df_h4},
+    anchor_ts=datetime(2023, 4, 18, 12, 0, tzinfo=timezone.utc),
+    anchor_idx_by_timeframe={"M15": 400, "H1": 100, "H4": 25},
+)
+
+engine = LLMDecisionEngine(balance=1000.0)
+
+mock_response = """Let me think through this carefully.
+
+{
+    "reasoning": {
+        "regime": "Strong uptrend on M15 and H1 with ADX 51/84. Confluence YES. Volatility expanding on H1. High confidence trending_up regime.",
+        "structure": "Nearest SSL at 2069.10 with 2 touches - strong support pool. No fresh OB or FVG nearby. Liquidity sweep risk if price retests SSL.",
+        "catalyst": "No high-impact event in 72h. Clean runway for technicals.",
+        "risk_asymmetry": "BUY case: target BSL above, R:R 3:1. SELL case: target SSL at 2069.10, counters trend. BUY has better EV.",
+        "path_dependency": "If price pulls back to SSL 2069.10, expect bounce (liquidity grab). SL below SSL. Path: pullback bounce continuation up.",
+        "invalidation": "Close below 2068 invalidates bullish thesis. Reassess to SELL or HOLD."
+    },
+    "decision": {
+        "signal": "BUY",
+        "entry_price": 2083.91,
+        "sl": 2068.00,
+        "tp1": 2098.00,
+        "tp2": 2110.00,
+        "lot_size": 0.06,
+        "confidence": 0.72,
+        "summary": "BUY with SL below SSL 2069.10, TP1 at 2098, TP2 at 2110. High confluence on trend + liquidity."
+    }
+}
+
+That's my analysis."""
+
+setup = engine._parse_response(mock_response, ctx)
+print("=" * 60)
+print("Parsed TradeSetup (from mock LLM response)")
+print("=" * 60)
+print(f"Signal: {setup.signal.value}")
+print(f"Entry: {setup.entry_price}")
+print(f"SL: {setup.sl}  |  TP1: {setup.tp1}  |  TP2: {setup.tp2}")
+print(f"Lot (recomputed): {setup.lot_size}  |  R:R: {setup.rr_ratio:.2f}  |  Conf: {setup.confidence:.2f}")
+print(f"Confluences: {setup.confluences}")
+print(f"\nReasoning summary:\n{setup.reasoning[:400]}")

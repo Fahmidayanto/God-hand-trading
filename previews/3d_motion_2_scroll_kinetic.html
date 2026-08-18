@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kinetic Spatial Scroll 3D - Three.js + GSAP ScrollTrigger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root {
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      --bg-color: #030712;
+      --accent-emerald: #10b981;
+      --accent-cyan: #06b6d4;
+      --accent-indigo: #6366f1;
+      --card-bg: rgba(17, 24, 39, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: #f9fafb;
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+    }
+
+    /* Fixed Three.js Viewport */
+    #webgl-viewport {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* Navigation Header */
+    header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 1.5rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(3, 7, 18, 0.4);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .brand-logo {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+
+    .scroll-progress-container {
+      width: 160px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .scroll-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-emerald), var(--accent-cyan));
+      transition: width 0.1s linear;
+    }
+
+    /* Scroll Sections */
+    .scroll-container {
+      position: relative;
+      z-index: 10;
+    }
+
+    .section {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 6rem 10vw;
+      position: relative;
+    }
+
+    .section.right {
+      justify-content: flex-end;
+    }
+
+    .section.center {
+      justify-content: center;
+      text-align: center;
+    }
+
+    .content-box {
+      max-width: 520px;
+      background: var(--card-bg);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--card-border);
+      border-radius: 28px;
+      padding: 3rem;
+      box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
+      transform: translateY(40px);
+      opacity: 0;
+    }
+
+    .step-tag {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--accent-emerald);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 0.75rem;
+      display: inline-block;
+      padding: 0.25rem 0.6rem;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      border-radius: 8px;
+    }
+
+    .section-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.04em;
+      margin-bottom: 1.25rem;
+      background: linear-gradient(135deg, #ffffff 40%, #9ca3af 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .section-desc {
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #9ca3af;
+      margin-bottom: 2rem;
+    }
+
+    .feature-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .tag-chip {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #d1d5db;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 0.4rem 0.8rem;
+      border-radius: 999px;
+    }
+
+    /* Scroll Prompt Indicator */
+    .scroll-indicator {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      color: #6b7280;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      animation: bounce 2s infinite var(--ease-smooth);
+    }
+
+    @keyframes bounce {
+      0%, 100% { transform: translate(-50%, 0); }
+      50% { transform: translate(-50%, 8px); }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .section {
+        padding: 4rem 1.5rem;
+        justify-content: center !important;
+      }
+      .content-box {
+        padding: 2rem;
+      }
+      .section-title {
+        font-size: 1.75rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="webgl-viewport"></div>
+
+  <header>
+    <div class="brand-logo">
+      <div class="brand-dot"></div>
+      <span>SPATIAL.KINETIC</span>
+    </div>
+    <div class="scroll-progress-container">
+      <div class="scroll-progress-bar" id="progress-bar"></div>
+    </div>
+  </header>
+
+  <main class="scroll-container">
+    <!-- Section 1 -->
+    <section class="section" id="sec-1">
+      <div class="content-box">
+        <span class="step-tag">Phase 01 // Genesis</span>
+        <h1 class="section-title">Harmonic Kinetic Topology</h1>
+        <p class="section-desc">
+          Geometri kurva non-Euclidean 3D yang disintesis secara parametrik dengan pencahayaan spekular dinamis dan rendering 60 FPS GPU-accelerated.
+        </p>
+        <div class="feature-tags">
+          <span class="tag-chip">Three.js R128</span>
+          <span class="tag-chip">Parametric Torus Knot</span>
+          <span class="tag-chip">Dynamic Roughness</span>
+        </div>
+      </div>
+      <div class="scroll-indicator">
+        <span>SCROLL TO EXPLORE</span>
+        <span>↓</span>
+      </div>
+    </section>
+
+    <!-- Section 2 -->
+    <section class="section right" id="sec-2">
+      <div class="content-box">
+        <span class="step-tag">Phase 02 // Precision</span>
+        <h2 class="section-title">Scroll-Linked Spatial Choreography</h2>
+        <p class="section-desc">
+          Setiap perputaran roda mouse terikat langsung (*scrubbed*) dengan interpolasi rotasi kamera, field-of-view, dan pergeseran matriks spasial.
+        </p>
+        <div class="feature-tags">
+          <span class="tag-chip">GSAP ScrollTrigger</span>
+          <span class="tag-chip">Linear Scrub</span>
+          <span class="tag-chip">Camera Lerp</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3 -->
+    <section class="section" id="sec-3">
+      <div class="content-box">
+        <span class="step-tag">Phase 03 // Energy</span>
+        <h2 class="section-title">Optical Material Dispersion</h2>
+        <p class="section-desc">
+          Kromatisasi spektrum cahaya dengan transmisi optik tinggi, menghasilkan pantulan pendar kaca (*iridescent reflections*) yang memukau.
+        </p>
+        <div class="feature-tags">
+          <span class="tag-chip">MeshPhysicalMaterial</span>
+          <span class="tag-chip">Specular Highlights</span>
+          <span class="tag-chip">Zero Layout Thrashing</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4 -->
+    <section class="section center" id="sec-4">
+      <div class="content-box">
+        <span class="step-tag">Phase 04 // Horizon</span>
+        <h2 class="section-title">Ready for Production UI</h2>
+        <p class="section-desc">
+          Dirancang sesuai standar craft Emil Kowalski: bebas jank, micro-interactions responsif, dan fallback aksesibilitas otomatis.
+        </p>
+        <div class="feature-tags" style="justify-content: center;">
+          <span class="tag-chip">Motion Tokens</span>
+          <span class="tag-chip">Accessible Motion</span>
+          <span class="tag-chip">Production Tested</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // --- 1. Three.js Spatial Setup ---
+    const container = document.getElementById('webgl-viewport');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x030712, 0.035);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 9);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.3;
+    container.appendChild(renderer.domElement);
+
+    // Kinetic Object (Torus Knot)
+    const geometry = new THREE.TorusKnotGeometry(1.9, 0.55, 180, 32, 2, 3);
+    const material = new THREE.MeshPhysicalMaterial({
+      color: 0x10b981,
+      emissive: 0x064e3b,
+      emissiveIntensity: 0.4,
+      roughness: 0.15,
+      metalness: 0.85,
+      clearcoat: 1.0,
+      clearcoatRoughness: 0.1,
+      reflectivity: 0.95
+    });
+    const kineticMesh = new THREE.Mesh(geometry, material);
+    scene.add(kineticMesh);
+
+    // Surrounding Light Dust
+    const dustCount = 600;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPos = new Float32Array(dustCount * 3);
+    for(let i=0; i<dustCount*3; i+=3) {
+      dustPos[i] = (Math.random() - 0.5) * 20;
+      dustPos[i+1] = (Math.random() - 0.5) * 20;
+      dustPos[i+2] = (Math.random() - 0.5) * 20;
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+    const dustMat = new THREE.PointsMaterial({ size: 0.03, color: 0x10b981, transparent: true, opacity: 0.6 });
+    const dust = new THREE.Points(dustGeo, dustMat);
+    scene.add(dust);
+
+    // Multi-Point Lighting
+    const light1 = new THREE.PointLight(0x10b981, 4, 25);
+    light1.position.set(5, 5, 5);
+    scene.add(light1);
+
+    const light2 = new THREE.PointLight(0x06b6d4, 3.5, 25);
+    light2.position.set(-5, -3, 3);
+    scene.add(light2);
+
+    const light3 = new THREE.PointLight(0x6366f1, 2, 20);
+    light3.position.set(0, 5, -4);
+    scene.add(light3);
+
+    // Resize Handler
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      ScrollTrigger.refresh();
+    });
+
+    // --- 2. GSAP ScrollTrigger Sequences ---
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Scroll Progress Bar
+    gsap.to('#progress-bar', {
+      width: '100%',
+      ease: 'none',
+      scrollTrigger: {
+        trigger: 'body',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 0.2
+      }
+    });
+
+    // Animate Content Boxes On Scroll
+    gsap.utils.toArray('.content-box').forEach(box => {
+      gsap.to(box, {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: box,
+          start: 'top 80%',
+          toggleActions: 'play none none reverse'
+        }
+      });
+    });
+
+    // 3D Object Timeline Linked to Global Scroll
+    const scrollTL = gsap.timeline({
+      scrollTrigger: {
+        trigger: 'body',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 1.2
+      }
+    });
+
+    scrollTL
+      // Section 1 -> 2: Shift to left, rotate and zoom
+      .to(kineticMesh.position, { x: -2.5, y: 0.2, z: 1.5, ease: 'power1.inOut' })
+      .to(kineticMesh.rotation, { x: 2.2, y: 3.5, z: 1.0, ease: 'power1.inOut' }, '<')
+      .to(material.color, { r: 0.02, g: 0.71, b: 0.83 }, '<') // Morph to Cyan
+
+      // Section 2 -> 3: Shift to right, dramatic angle
+      .to(kineticMesh.position, { x: 2.6, y: -0.3, z: 0.8, ease: 'power1.inOut' })
+      .to(kineticMesh.rotation, { x: 4.8, y: 6.0, z: 2.8, ease: 'power1.inOut' }, '<')
+      .to(material.color, { r: 0.38, g: 0.4, b: 0.94 }, '<') // Morph to Indigo
+
+      // Section 3 -> 4: Center massive finale pose
+      .to(kineticMesh.position, { x: 0, y: 0, z: 3.0, ease: 'power2.out' })
+      .to(kineticMesh.rotation, { x: 7.2, y: 9.0, z: 4.5, ease: 'power2.out' }, '<')
+      .to(material.color, { r: 0.06, g: 0.72, b: 0.5 }, '<'); // Return to Emerald
+
+    // --- 3. Continuous Render Loop ---
+    const clock = new THREE.Clock();
+
+    function render() {
+      requestAnimationFrame(render);
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // Continuous subtle idle drift
+      kineticMesh.rotation.y += delta * 0.15;
+      dust.rotation.y += delta * 0.05;
+
+      renderer.render(scene, camera);
+    }
+
+    render();
+  </script>
+</body>
+</html>

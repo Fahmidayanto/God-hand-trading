@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs, database, scenarios
+from app.api.v1 import dashboard, trading, agents, performance, websocket, valuecell, activity_logs, database, scenarios, replay_decision
 from app.config import get_settings
 from app.middleware.error_handler import ErrorHandlerMiddleware
 from app.middleware.logging import LoggingMiddleware
@@ -258,6 +258,12 @@ app.include_router(
     scenarios.router,
     prefix=f"{settings.API_V1_PREFIX}/scenarios",
     tags=["Scenarios"],
+)
+
+app.include_router(
+    replay_decision.router,
+    prefix=f"{settings.API_V1_PREFIX}/replay",
+    tags=["Replay Decision"],
 )
 
 # ValueCell legacy endpoints (for backward compatibility)
