@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   createChart,
@@ -10,7 +10,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2 } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -44,6 +44,7 @@ interface ReplayCandle {
   close: number;
   volume: number;
   ema200: number | null;
+  spread?: number | null;
 }
 
 interface StructureEvent {
@@ -71,6 +72,9 @@ interface ReplayTrade {
   entry_time: number | null;
   exit_time: number | null;
   lot_size: number | null;
+  spread_cost?: number | null;
+  commission?: number | null;
+  swap?: number | null;
 }
 
 interface ReplayData {
@@ -124,6 +128,9 @@ const SPEED_MAP: Record<string, number> = {
   "3x": 100,
   "5x": 50,
   "10x": 20,
+  "50x": 5,
+  "100x": 1,
+  "1000x": 1,
 };
 
 const MONTHS = [
@@ -148,8 +155,8 @@ const DEFAULT_ENTRY_FILTER_PARAMS: EntryFilterParams = {
   h1_ema200_filter: true,
   h4_ema_filter: true,
   ema_slope_filter: true,
-  body_ratio_filter: true,
-  session_filter: true,
+  body_ratio_filter: false,
+  session_filter: false,
   ema_stretch_filter: true,
   bos_cycle_filter: true,
 };
@@ -164,23 +171,64 @@ function getSimpleMovingAverage(candles: ReplayCandle[], endIndex: number, perio
   return total / period;
 }
 
-function getEntryStructureInfo(entryTime: number, structures: StructureEvent[]) {
+function getEntryStructureInfo(entryTime: number, structures: StructureEvent[], direction?: string) {
   let latestType = "";
-  let bosCycle = 0;
+  let latestTypeBuy = "";
+  let latestTypeSell = "";
+  let bosCycleBuy = 0;
+  let bosCycleSell = 0;
 
   for (const event of structures) {
     if (event.time > entryTime) break;
+    if (event.timeframe && event.timeframe.toUpperCase() !== "M15") continue;
+
     const type = event.type?.toUpperCase() ?? "";
+    const dir = (event.direction ?? "").toUpperCase();
+    const isBull = dir.includes("BULL") || type.includes("BULL");
+    const isBear = dir.includes("BEAR") || type.includes("BEAR");
+
     if (type.includes("CHOCH")) {
       latestType = "CHOCH";
-      bosCycle = 0;
+      if (isBull) {
+        latestTypeBuy = "CHOCH";
+        bosCycleBuy = 0;
+      }
+      if (isBear) {
+        latestTypeSell = "CHOCH";
+        bosCycleSell = 0;
+      }
+      if (!isBull && !isBear) {
+        latestTypeBuy = "CHOCH";
+        latestTypeSell = "CHOCH";
+        bosCycleBuy = 0;
+        bosCycleSell = 0;
+      }
     } else if (type.includes("BOS")) {
       latestType = "BOS";
-      bosCycle += 1;
+      if (isBull) {
+        latestTypeBuy = "BOS";
+        bosCycleBuy += 1;
+      }
+      if (isBear) {
+        latestTypeSell = "BOS";
+        bosCycleSell += 1;
+      }
+      if (!isBull && !isBear) {
+        latestTypeBuy = "BOS";
+        latestTypeSell = "BOS";
+        bosCycleBuy += 1;
+        bosCycleSell += 1;
+      }
     }
   }
 
-  return { latestType, bosCycle };
+  const dirUpper = (direction ?? "").toUpperCase();
+  const isSell = dirUpper.includes("SELL") || dirUpper.includes("BEAR");
+  const isBuy = dirUpper.includes("BUY") || dirUpper.includes("BULL");
+  const effectiveLatestType = isSell ? (latestTypeSell || latestType) : (isBuy ? (latestTypeBuy || latestType) : latestType);
+  const bosCycle = isSell ? bosCycleSell : bosCycleBuy;
+
+  return { latestType: effectiveLatestType, bosCycle, bosCycleBuy, bosCycleSell };
 }
 
 function getLastAcceptedLL(entryTime: number, structures: StructureEvent[]) {
@@ -199,6 +247,18 @@ function getLastAcceptedHH(entryTime: number, structures: StructureEvent[]) {
     if (event.type?.toUpperCase() === "HH") lastAcceptedHH = event.price;
   }
   return lastAcceptedHH;
+}
+
+function formatMT5Time(ts: number | null | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts * 1000);
+  const Y = d.getUTCFullYear();
+  const M = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const D = String(d.getUTCDate()).padStart(2, "0");
+  const h = String(d.getUTCHours()).padStart(2, "0");
+  const m = String(d.getUTCMinutes()).padStart(2, "0");
+  const s = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${Y}.${M}.${D} ${h}:${m}:${s}`;
 }
 
 function getCandleAtOrBefore(candles: ReplayCandle[], time: number) {
@@ -229,19 +289,21 @@ function passesEAEntryFilters(
   const m15Index = getCandleIndexAtOrBefore(m15Candles, entryTime);
   // The EA evaluates rates[1], the last fully closed M15 bar, rather than the bar forming at entry.
   const m15Candle = m15Index > 0 ? m15Candles[m15Index - 1] : null;
+  const currentPrice = (trade.entry_price != null && trade.entry_price > 0)
+    ? trade.entry_price
+    : (m15Index >= 0 ? (m15Candles[m15Index].open || m15Candles[m15Index].close) : (m15Candle?.close ?? 0));
   const h1Candle = getCandleAtOrBefore(h1Candles, entryTime);
   const h4Index = getCandleIndexAtOrBefore(h4Candles, entryTime);
   const h4Candle = h4Index >= 0 ? h4Candles[h4Index] : null;
 
-  if (params.h1_ema200_filter) {
-    if (h1Candle?.ema200 === null || h1Candle?.ema200 === undefined) return false;
-    if (isBuy ? h1Candle.close <= h1Candle.ema200 : h1Candle.close >= h1Candle.ema200) return false;
+  if (params.h1_ema200_filter && h1Candles.length > 0 && h1Candle?.ema200 != null && h1Candle.ema200 > 0 && currentPrice > 0) {
+    if (isBuy ? currentPrice <= h1Candle.ema200 : currentPrice >= h1Candle.ema200) return false;
   }
 
-  if (params.h4_ema_filter && h4Candle?.ema200 !== null && h4Candle?.ema200 !== undefined) {
+  if (params.h4_ema_filter && h4Candles.length > 0 && h4Candle?.ema200 != null && h4Candle.ema200 > 0 && currentPrice > 0) {
     // Matches the EA: MathMax(ema * 0.0025, 500 * _Point), where XAUUSD _Point is 0.01.
     const gapThreshold = Math.max(h4Candle.ema200 * 0.0025, 5);
-    if (isBuy ? h4Candle.close <= h4Candle.ema200 + gapThreshold : h4Candle.close >= h4Candle.ema200 - gapThreshold) return false;
+    if (isBuy ? currentPrice <= h4Candle.ema200 + gapThreshold : currentPrice >= h4Candle.ema200 - gapThreshold) return false;
   }
 
   if (params.ema_slope_filter) {
@@ -291,7 +353,7 @@ function filterTradesByEntryParams(
     const entryTime = trade.entry_time;
     if (entryTime === null) return false;
 
-    const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures);
+    const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures, trade.type);
     const matchesStructureFilter = latestType === "CHOCH"
       ? params.entry_choch
       : latestType === "BOS"
@@ -316,7 +378,7 @@ function getReplayFilterRejectReason(
   const entryTime = trade.entry_time;
   if (entryTime === null) return "Missing entry time";
 
-  const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures);
+  const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures, trade.type);
   if (latestType === "CHOCH" && !params.entry_choch) return "CHoCH Filter (Disabled)";
   if (latestType === "BOS") {
     if (bosCycle === 1 && !params.entry_bos) return "BOS 1 Filter (Disabled)";
@@ -327,22 +389,40 @@ function getReplayFilterRejectReason(
   const isBuy = trade.type.toUpperCase() === "BUY";
   const m15Index = getCandleIndexAtOrBefore(m15Candles, entryTime);
   const m15Candle = m15Index > 0 ? m15Candles[m15Index - 1] : null;
+  const currentPrice = (trade.entry_price != null && trade.entry_price > 0)
+    ? trade.entry_price
+    : (m15Index >= 0 ? (m15Candles[m15Index].open || m15Candles[m15Index].close) : (m15Candle?.close ?? 0));
   const h1Candle = getCandleAtOrBefore(h1Candles, entryTime);
   const h4Candle = getCandleAtOrBefore(h4Candles, entryTime);
 
   if (params.session_filter && new Date(entryTime * 1000).getUTCHours() === 1) return "Session Filter (01:00 UTC)";
-  if (params.h1_ema200_filter && (h1Candle?.ema200 === null || h1Candle?.ema200 === undefined || (isBuy ? h1Candle.close <= h1Candle.ema200 : h1Candle.close >= h1Candle.ema200))) return "H1 EMA200 Filter";
-  if (params.h4_ema_filter && h4Candle?.ema200 !== null && h4Candle?.ema200 !== undefined) {
+  if (params.h1_ema200_filter && h1Candles.length > 0 && h1Candle?.ema200 != null && h1Candle.ema200 > 0 && currentPrice > 0 && (isBuy ? currentPrice <= h1Candle.ema200 : currentPrice >= h1Candle.ema200)) return "H1 EMA200 Filter";
+  if (params.h4_ema_filter && h4Candles.length > 0 && h4Candle?.ema200 != null && h4Candle.ema200 > 0 && currentPrice > 0) {
     const gapThreshold = Math.max(h4Candle.ema200 * 0.0025, 5);
-    if (isBuy ? h4Candle.close <= h4Candle.ema200 + gapThreshold : h4Candle.close >= h4Candle.ema200 - gapThreshold) return "H4 EMA Filter";
+    if (isBuy ? currentPrice <= h4Candle.ema200 + gapThreshold : currentPrice >= h4Candle.ema200 - gapThreshold) return "H4 EMA Filter";
   }
   if (params.ema_slope_filter) {
     const previousCandle = m15Index > 1 ? m15Candles[m15Index - 2] : null;
     if (m15Candle?.ema200 === null || m15Candle?.ema200 === undefined || previousCandle?.ema200 === null || previousCandle?.ema200 === undefined || (isBuy ? m15Candle.ema200 <= previousCandle.ema200 : m15Candle.ema200 >= previousCandle.ema200)) return "EMA Slope Filter";
   }
   if (params.body_ratio_filter && !passesEAEntryFilters({ ...trade }, m15Candles, h1Candles, h4Candles, { ...params, h1_ema200_filter: false, h4_ema_filter: false, ema_slope_filter: false, session_filter: false })) return "Body Ratio Filter";
-  return trade.reject_reason || "Filter Rejection";
+  if (trade.reject_reason && trade.reject_reason !== "N/A") {
+    return trade.reject_reason;
+  }
+  return "Filter Rejection";
 }
+
+const getTimestampSeconds = (timeVal: any): number => {
+  if (timeVal === null || timeVal === undefined) return 0;
+  if (typeof timeVal === "number") return timeVal;
+  if (typeof timeVal === "string") {
+    const num = Number(timeVal);
+    if (!isNaN(num)) return num;
+    const parsed = Date.parse(timeVal);
+    if (!isNaN(parsed)) return Math.floor(parsed / 1000);
+  }
+  return 0;
+};
 
 function createLocalStructureCandidateTrades(
   data: ReplayData,
@@ -351,8 +431,8 @@ function createLocalStructureCandidateTrades(
   h4Candles: ReplayCandle[],
   params: EntryFilterParams,
 ): ReplayTrade[] {
-  const closeByTime = new Map(data.candles.map((candle) => [candle.time, candle.close]));
-  const existingTradeTimes = (data.trades || []).map((t) => t.entry_time ?? 0);
+  const candleByTime = new Map(data.candles.map((candle) => [candle.time, candle]));
+  const seenEventTimes = new Set<number>();
 
   return data.structures.flatMap((event) => {
     const typeUpper = event.type?.toUpperCase() ?? "";
@@ -360,19 +440,24 @@ function createLocalStructureCandidateTrades(
     const isBos = typeUpper.includes("BOS");
     if (!isChoch && !isBos) return [];
 
-    // Avoid duplicating trades that already exist in DB data.trades (within 900 seconds / 1 candle)
-    const hasExistingTrade = existingTradeTimes.some(
-      (entryTime) => Math.abs(entryTime - event.time) <= 900
-    );
-    if (hasExistingTrade) return [];
+    const eventSec = getTimestampSeconds(event.time);
+    if (eventSec === 0 || seenEventTimes.has(eventSec)) return [];
+    seenEventTimes.add(eventSec);
 
-    const entryPrice = closeByTime.get(event.time);
+    const candidateEntryTime = eventSec + 900; // Open of the next bar (exact MT5 execution time)
+
+    const candleObj = candleByTime.get(eventSec);
+    const rawPrice = candleObj?.close;
     const direction = event.direction?.toUpperCase() ?? "";
-    if (entryPrice === undefined || (!direction.includes("BULL") && !direction.includes("BEAR"))) return [];
+    if (rawPrice === undefined || (!direction.includes("BULL") && !direction.includes("BEAR"))) return [];
+
+    const isBuy = direction.includes("BULL");
+    const spreadPts = (candleObj?.spread != null && candleObj.spread > 0) ? candleObj.spread : 3;
+    const entryPrice = isBuy ? Number((rawPrice + (spreadPts * 0.01)).toFixed(2)) : rawPrice;
 
     const candidate: ReplayTrade = {
-      ticket: -event.time,
-      type: direction.includes("BULL") ? "BUY" : "SELL",
+      ticket: 0,
+      type: isBuy ? "BUY" : "SELL",
       status: "EXECUTED",
       reject_reason: null,
       entry_price: entryPrice,
@@ -381,12 +466,12 @@ function createLocalStructureCandidateTrades(
       tp: null,
       net_profit: null,
       session: isChoch ? "CHOCH" : "BOS",
-      entry_time: event.time,
+      entry_time: candidateEntryTime,
       exit_time: null,
       lot_size: 0.01,
     };
 
-    const { latestType, bosCycle } = getEntryStructureInfo(event.time, data.structures);
+    const { latestType, bosCycle } = getEntryStructureInfo(eventSec, data.structures, candidate.type);
     const matchesStructureFilter = latestType === "CHOCH"
       ? params.entry_choch
       : latestType === "BOS"
@@ -415,7 +500,6 @@ function getProcessedReplayTrades(
   isLLMActive?: boolean,
 ): { executedTrades: ReplayTrade[]; rejectedTrades: ReplayTrade[] } {
   // When LLM mode is active, trades are governed exclusively by live LLM session decisions.
-  // We completely isolate the session from static database EA backtest trades and EA candidate filters.
   if (isLLMActive) {
     return { executedTrades: [], rejectedTrades: [] };
   }
@@ -423,24 +507,35 @@ function getProcessedReplayTrades(
   const executedTrades: ReplayTrade[] = [];
   const rejectedTrades: ReplayTrade[] = [];
 
-  const allCandidates = [
-    ...data.trades,
-    ...createLocalStructureCandidateTrades(data, m15Candles, h1Candles, h4Candles, params),
-  ];
+  // Option B: 100% Pure Independent Simulator
+  // Trade positions are synthesized directly from verified market structures (CHoCH / BoS) and candle OHLC.
+  const rawCandidates = createLocalStructureCandidateTrades(data, m15Candles, h1Candles, h4Candles, params);
+
+  const seenBuckets = new Set<string>();
+  const allCandidates: ReplayTrade[] = [];
+  for (const t of rawCandidates) {
+    if (t.entry_time === null || t.entry_time === undefined) continue;
+    const ts = getTimestampSeconds(t.entry_time);
+    const candleBucket = Math.round(ts / 900) * 900;
+    const key = `${t.type}_${candleBucket}`;
+    if (seenBuckets.has(key)) continue;
+    seenBuckets.add(key);
+    allCandidates.push({
+      ...t,
+      entry_time: ts,
+    });
+  }
+
+  // Sort chronologically (ASC) and assign sequential ticket numbers 1, 2, 3, 4 ... across CHoCH & BoS
+  allCandidates.sort((a, b) => (a.entry_time ?? 0) - (b.entry_time ?? 0));
+  allCandidates.forEach((trade, idx) => {
+    trade.ticket = idx + 1;
+  });
 
   for (const trade of allCandidates) {
     if (trade.entry_time === null) continue;
 
-    if (trade.status?.toUpperCase() === "REJECTED") {
-      rejectedTrades.push({
-        ...trade,
-        status: "REJECTED",
-        reject_reason: trade.reject_reason || getReplayFilterRejectReason(trade, structures, m15Candles, h1Candles, h4Candles, params),
-      });
-      continue;
-    }
-
-    const { latestType, bosCycle } = getEntryStructureInfo(trade.entry_time, structures);
+    const { latestType, bosCycle } = getEntryStructureInfo(trade.entry_time, structures, trade.type);
     const matchesStructureFilter = latestType === "CHOCH"
       ? params.entry_choch
       : latestType === "BOS"
@@ -453,7 +548,11 @@ function getProcessedReplayTrades(
     const passesFilters = matchesStructureFilter && passesEAEntryFilters(trade, m15Candles, h1Candles, h4Candles, params);
 
     if (passesFilters) {
-      executedTrades.push(trade);
+      executedTrades.push({
+        ...trade,
+        status: "EXECUTED",
+        reject_reason: null,
+      });
     } else {
       rejectedTrades.push({
         ...trade,
@@ -590,8 +689,12 @@ function StrategyTooltip({ fungsi, contoh }: StrategyTooltipProps) {
 // ── Custom Dropdown Component ────────────────────────────────────────────────
 
 const SELECT_ACCENTS = {
-  blue: { border: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)", text: "#93c5fd", shadow: "rgba(59,130,246,0.25)" },
-  purple: { border: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)", text: "#c4b5fd", shadow: "rgba(139,92,246,0.25)" },
+  blue: { border: "var(--neon-blue, #38bdf8)", bg: "rgba(59,130,246,0.2)", text: "#93c5fd", shadow: "rgba(59,130,246,0.25)" },
+  purple: { border: "var(--neon-purple, #a855f7)", bg: "rgba(139,92,246,0.2)", text: "#c4b5fd", shadow: "rgba(139,92,246,0.25)" },
+  cyan: { border: "#06b6d4", bg: "rgba(6,182,212,0.2)", text: "#67e8f9", shadow: "rgba(6,182,212,0.25)" },
+  emerald: { border: "#10b981", bg: "rgba(16,185,129,0.2)", text: "#6ee7b7", shadow: "rgba(16,185,129,0.25)" },
+  amber: { border: "#f59e0b", bg: "rgba(245,158,11,0.2)", text: "#fcd34d", shadow: "rgba(245,158,11,0.25)" },
+  rose: { border: "#f43f5e", bg: "rgba(244,63,94,0.2)", text: "#fda4af", shadow: "rgba(244,63,94,0.25)" },
 };
 
 interface CustomSelectProps<T> {
@@ -599,7 +702,7 @@ interface CustomSelectProps<T> {
   onChange: (val: T) => void;
   options: T[];
   getLabel: (val: T) => string;
-  accent: "blue" | "purple";
+  accent?: keyof typeof SELECT_ACCENTS;
   className?: string;
 }
 
@@ -608,7 +711,7 @@ function CustomSelect<T extends string | number>({
   onChange,
   options,
   getLabel,
-  accent,
+  accent = "blue",
   className,
 }: CustomSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
@@ -624,7 +727,7 @@ function CustomSelect<T extends string | number>({
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
 
-  const c = SELECT_ACCENTS[accent];
+  const c = (accent && SELECT_ACCENTS[accent]) || SELECT_ACCENTS.blue;
 
   return (
     <div ref={containerRef} className={cn("relative select-none z-[100] group", className)}>
@@ -709,7 +812,11 @@ interface StrategyParams {
   lot_override: number;        // 0.00 = Auto
   initial_tp_dist: number;     // USD, default 30.00 (3000 poin)
   sl_safety_buffer: number;    // USD, default 10.00 (1000 poin)
+  min_sl_dist: number;         // USD, default 15.00 (1500 poin)
+  max_sl_dist: number;         // USD, default 30.00 (3000 poin)
   force_24h_close: boolean;
+  enable_profit_target_exit: boolean; // Toggle Target Profit Exit (USD)
+  profit_target_exit_usd: number;     // USD target profit, default 300.00
   initial_balance: number;     // USD, default 1000.00
   // ATR-based adaptive SL/TP
   use_atr_sltp: boolean;       // toggle ATR mode
@@ -718,6 +825,10 @@ interface StrategyParams {
   atr_tp_multiplier: number;   // TP = ATR * multiplier, default 2.0
   show_supply_demand: boolean; // Visual Supply & Demand (Resistance & Support) Zones
   show_liquidity_pools: boolean; // Visual Buy-Side (BSL) & Sell-Side (SSL) Liquidity Pools
+  // Price-Ratio Dynamic Scaling (Opsi 1: Adaptif Multi-Price Level)
+  use_price_ratio_scaling: boolean; // Toggle Price-Ratio Dynamic Scaling
+  base_reference_price: number;     // Baseline Reference Price (Default: 2000.0 USD)
+  risk_pct?: number;
 }
 
 export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
@@ -731,14 +842,20 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   lot_override: 0.05,
   initial_tp_dist: 30.00,
   sl_safety_buffer: 10.00,
-  force_24h_close: false,
+  min_sl_dist: 15.00,
+  max_sl_dist: 30.00,
+  force_24h_close: true,
+  enable_profit_target_exit: false,
+  profit_target_exit_usd: 300.00,
   initial_balance: 1000.00,
   use_atr_sltp: false,
   atr_period: 14,
   atr_sl_multiplier: 1.5,
   atr_tp_multiplier: 2.0,
-  show_supply_demand: true,
-  show_liquidity_pools: true,
+  show_supply_demand: false,
+  show_liquidity_pools: false,
+  use_price_ratio_scaling: true,
+  base_reference_price: 2000.00,
 };
 
 const INITIAL_BALANCE = 1000.00;
@@ -751,27 +868,35 @@ const calculateATR = (
   upToTime: number,
   period: number = 14,
 ): number | null => {
-  const prior = candles.filter(c => c.time <= upToTime);
-  if (prior.length < period + 1) return null;
+  if (!candles || candles.length <= period) return null;
 
-  const trueRanges: number[] = [];
-  for (let i = 1; i < prior.length; i++) {
-    const c = prior[i];
-    const prevClose = prior[i - 1].close;
+  // Binary search to find index of candle at or immediately before upToTime
+  let lo = 0, hi = candles.length - 1, targetIdx = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time <= upToTime) {
+      targetIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
+  if (targetIdx < period) return null;
+
+  let sumTR = 0;
+  for (let i = targetIdx; i > targetIdx - period; i--) {
+    const c = candles[i];
+    const prevClose = candles[i - 1].close;
     const tr = Math.max(
       c.high - c.low,
       Math.abs(c.high - prevClose),
       Math.abs(c.low - prevClose),
     );
-    trueRanges.push(tr);
+    sumTR += tr;
   }
-  if (trueRanges.length < period) return null;
 
-  // Simple average of the last `period` true ranges (Wilder smoothing is
-  // overkill for a replay tool — ponytail: plain average is fine).
-  const slice = trueRanges.slice(-period);
-  const sum = slice.reduce((acc, v) => acc + v, 0);
-  return sum / period;
+  return sumTR / period;
 };
 
 /**
@@ -810,22 +935,19 @@ export function calculateSupplyDemandZones(
     const isDemand = isHlLl || (isChochBos && dirUpper.includes("BULL"));
     if (!isSupply && !isDemand) continue;
 
-    // Find closest origin candle by timestamp
-    let originCandle: ReplayCandle | null = null;
-    let candleIdx = -1;
-
-    for (let i = 0; i < candles.length; i++) {
-      if (Math.abs(candles[i].time - s.time) <= 1800) {
-        originCandle = candles[i];
-        candleIdx = i;
-        break;
-      }
-      if (candles[i].time > s.time) {
-        candleIdx = Math.max(0, i - 1);
-        originCandle = candles[candleIdx];
-        break;
+    // Find closest origin candle by timestamp using binary search
+    let lo = 0, hi = candles.length - 1, candleIdx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (candles[mid].time <= s.time) {
+        candleIdx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
       }
     }
+    if (candleIdx < 0 && candles.length > 0) candleIdx = 0;
+    const originCandle = candleIdx >= 0 ? candles[candleIdx] : null;
 
     if (!originCandle) continue;
 
@@ -947,8 +1069,17 @@ export function calculateLiquidityPools(
         Math.abs(other.time - startTime) > 1800
     );
 
-    // Find candle index where this structure formed
-    const candleIdx = candles.findIndex((c) => Math.abs(c.time - startTime) <= 1800 || c.time >= startTime);
+    // Find candle index where this structure formed using binary search
+    let lo = 0, hi = candles.length - 1, candleIdx = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (candles[mid].time <= startTime) {
+        candleIdx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
     const startScanIdx = candleIdx >= 0 ? candleIdx + 1 : 0;
 
     // Check if price has swept this liquidity level
@@ -1004,30 +1135,358 @@ export function calculateLiquidityPools(
   return uniquePools.reverse();
 }
 
-const simulateTrailingSLTP = (
-  t: any,
-  candles: any[],
+/**
+ * Compute active market structure lines (HH/LL/BOS/CHOCH) at the current playhead candle.
+ * Strictly enforces single highest HH and lowest LL per active swing leg (discards lower internal highs or higher internal lows).
+ */
+export function computeStructureLinesForPlayhead(
+  data: ReplayData,
+  currentCandleTime: number,
+  candleTimeArray?: number[]
+): StructureLineItem[] {
+  if (!data || !data.candles || data.candles.length === 0 || !data.structures) return [];
+
+  const lowerBound = (target: number): number => {
+    if (candleTimeArray && candleTimeArray.length > 0) {
+      let lo = 0, hi = candleTimeArray.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (candleTimeArray[mid] < target) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    }
+    const arr = data.candles;
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (arr[mid].time < target) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+
+  const isLevelBrokenAtPlayhead = (h: StructureEvent, playheadTime: number): boolean => {
+    const hType = h.type?.toUpperCase();
+    if (hType !== "HH" && hType !== "LL" && hType !== "LH" && hType !== "HL") {
+      return false;
+    }
+
+    const breakEvent = data.structures.find((b) => {
+      const bType = b.type?.toUpperCase();
+      if (bType !== "BOS" && bType !== "CHOCH") return false;
+      if (b.time <= h.time || b.time > playheadTime) return false;
+      const bDir = b.direction?.toUpperCase();
+      const isHigh = hType === "HH" || hType === "LH";
+      if (isHigh && bDir === "BULLISH") {
+        return Math.abs(b.price - h.price) <= 0.08 || b.previous_price === h.price;
+      } else if (!isHigh && bDir === "BEARISH") {
+        return Math.abs(b.price - h.price) <= 0.08 || b.previous_price === h.price;
+      }
+      return false;
+    });
+
+    return breakEvent ? playheadTime >= breakEvent.time : false;
+  };
+
+  // Find true candle peak/valley formation time for HH/LL lines
+  const findPeakValleyFormationTime = (
+    price: number,
+    stype: string,
+    eventTime: number
+  ): number => {
+    const isHigh = stype === "HH" || stype === "LH";
+    const startIdx = lowerBound(eventTime);
+    if (startIdx < data.candles.length && data.candles[startIdx].time === eventTime) {
+      const val = isHigh ? data.candles[startIdx].high : data.candles[startIdx].low;
+      if (Math.abs(val - price) <= 0.08) {
+        return eventTime;
+      }
+    }
+    for (let i = startIdx; i >= Math.max(0, startIdx - 400); i--) {
+      if (i < data.candles.length) {
+        const c = data.candles[i];
+        const val = isHigh ? c.high : c.low;
+        if (Math.abs(val - price) <= 0.08) {
+          return c.time;
+        }
+      }
+    }
+    return eventTime;
+  };
+
+  const findLevelFormationTime = (
+    levelPrice: number,
+    direction: string,
+    eventTime: number,
+    timeframe: string
+  ): number | undefined => {
+    const isBullish = direction?.toUpperCase() === 'BULLISH';
+    const targetTypes = isBullish ? ["HH", "LH"] : ["LL", "HL"];
+    let bestTime: number | undefined;
+    let hasCandleMatch = false;
+
+    for (const item of data.structures) {
+      const itemType = item.type?.toUpperCase();
+      if (targetTypes.includes(itemType) && item.time < eventTime && item.timeframe === timeframe) {
+        if (Math.abs(item.price - levelPrice) <= 0.08) {
+          const cIdx = lowerBound(item.time);
+          const candle = data.candles[cIdx];
+          const isExactPeak = candle && candle.time === item.time &&
+            (isBullish ? Math.abs(candle.high - levelPrice) <= 0.08 : Math.abs(candle.low - levelPrice) <= 0.08);
+
+          if (isExactPeak) {
+            if (!hasCandleMatch || (bestTime !== undefined && item.time > bestTime)) {
+              bestTime = item.time;
+              hasCandleMatch = true;
+            }
+          } else if (!hasCandleMatch) {
+            if (bestTime === undefined || item.time > bestTime) {
+              bestTime = item.time;
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasCandleMatch) {
+      const startSearchIdx = lowerBound(eventTime);
+      for (let i = startSearchIdx - 1; i >= 0; i--) {
+        const c = data.candles[i];
+        if (startSearchIdx - i > 400) break;
+        const match = isBullish ? Math.abs(c.high - levelPrice) <= 0.08 : Math.abs(c.low - levelPrice) <= 0.08;
+        if (match) {
+          return c.time;
+        }
+      }
+    }
+
+    return bestTime;
+  };
+
+  const linesToDraw: StructureLineItem[] = [];
+
+  for (const s of data.structures) {
+    const typeUpper = s.type?.toUpperCase() ?? "";
+    const dirUpper = s.direction?.toUpperCase() ?? "";
+    const isBullish = dirUpper === "BULLISH";
+
+    if (typeUpper === "BOS" || typeUpper === "CHOCH") {
+      if (currentCandleTime < s.time) {
+        continue;
+      }
+
+      const levelFormationTime = findLevelFormationTime(s.price, s.direction, s.time, s.timeframe);
+      const startTime = levelFormationTime ?? s.previous_time ?? (s.time - 900);
+      let endTime = s.time;
+
+      const dirUp = isBullish;
+      const startIdx = lowerBound(startTime + 1);
+      const endIdx = lowerBound(endTime);
+      for (let i = startIdx; i < endIdx; i++) {
+        const c = data.candles[i];
+        const crossed = dirUp ? c.close > s.price : c.close < s.price;
+        if (crossed) {
+          endTime = c.time;
+          break;
+        }
+      }
+
+      if (startTime < endTime) {
+        linesToDraw.push({
+          price: s.price,
+          startTime,
+          endTime,
+          color: isBullish ? '#10b981' : '#ef4444',
+          lineWidth: 2,
+          lineStyle: typeUpper === "BOS" ? LineStyle.Solid : LineStyle.Dashed,
+          label: `${typeUpper} ${s.price.toFixed(2)}`,
+          isResistance: isBullish,
+        });
+      }
+    } else if (typeUpper === "HH" || typeUpper === "LL" || typeUpper === "LH" || typeUpper === "HL") {
+      if (isLevelBrokenAtPlayhead(s, currentCandleTime)) {
+        continue;
+      }
+
+      // 1. Verified peak/valley formation time (attaches line strictly to the actual candle peak/valley)
+      const startTime = findPeakValleyFormationTime(s.price, typeUpper, s.time);
+      if (startTime > currentCandleTime) continue;
+
+      // 2. Check if a subsequent CHOCH or BOS event completed or broke this structural level
+      const breakEvent = data.structures.find((b) => {
+        const bType = b.type?.toUpperCase();
+        if (bType !== "BOS" && bType !== "CHOCH") return false;
+        if (b.time <= startTime || b.time > currentCandleTime) return false;
+        const prevMatch = b.previous_price !== undefined && Math.abs(b.previous_price - s.price) <= 0.08;
+        const priceMatch = Math.abs(b.price - s.price) <= 0.08;
+        return prevMatch || priceMatch;
+      });
+
+      const startIdx = lowerBound(startTime + 1);
+      const maxIdx = Math.min(startIdx + 20, data.candles.length);
+
+      let endTime = currentCandleTime;
+      let broke = false;
+
+      if (breakEvent) {
+        endTime = Math.min(breakEvent.time, currentCandleTime);
+        broke = true;
+      } else {
+        for (let i = startIdx; i < maxIdx; i++) {
+          const c = data.candles[i];
+          if (c.time > currentCandleTime) break;
+          const crossed = (typeUpper === "HH" || typeUpper === "LH") ? c.close > s.price : c.close < s.price;
+          if (crossed) {
+            endTime = c.time;
+            broke = true;
+            break;
+          }
+        }
+
+        if (!broke && maxIdx > startIdx) {
+          const maxCandleTime = data.candles[maxIdx - 1].time;
+          endTime = Math.min(maxCandleTime, currentCandleTime);
+        }
+      }
+
+      if (startTime < endTime) {
+        const isHigh = typeUpper === "HH" || typeUpper === "LH";
+        const color = isHigh ? '#60a5fa' : '#fb923c';
+        linesToDraw.push({
+          price: s.price,
+          startTime,
+          endTime,
+          color,
+          lineWidth: 1.5,
+          lineStyle: LineStyle.Dotted,
+          label: `${typeUpper} [M15] ${s.price.toFixed(2)}`,
+          isResistance: isHigh,
+        });
+      }
+    }
+  }
+
+  // Filter linesToDraw:
+  // Strictly enforce single highest HH and lowest LL per active overlapping swing leg
+  const filteredLinesToDraw: StructureLineItem[] = [];
+  const sortedLines = [...linesToDraw].sort((a, b) => a.startTime - b.startTime);
+  for (const line of sortedLines) {
+    const isHh = line.label.startsWith("HH") || line.label.startsWith("LH");
+    const isLl = line.label.startsWith("LL") || line.label.startsWith("HL");
+
+    if (isHh) {
+      // 1. De-duplicate identical level with same price & same formation time
+      const dup = filteredLinesToDraw.find(existing => {
+        const isExHh = existing.label.startsWith("HH") || existing.label.startsWith("LH");
+        return isExHh && Math.abs(existing.price - line.price) <= 0.08 && existing.startTime === line.startTime;
+      });
+      if (dup) continue;
+
+      // 2. Overlapping active cycle check
+      const overlappingHh = filteredLinesToDraw.find(existing => {
+        const isExHh = existing.label.startsWith("HH") || existing.label.startsWith("LH");
+        return isExHh && (line.startTime <= existing.endTime && line.endTime >= existing.startTime);
+      });
+
+      if (overlappingHh) {
+        if (line.price <= overlappingHh.price) {
+          // Lower internal high in same active leg -> discard line
+          continue;
+        } else {
+          // Higher peak in same active leg -> replace with highest peak
+          const idx = filteredLinesToDraw.indexOf(overlappingHh);
+          filteredLinesToDraw[idx] = line;
+          continue;
+        }
+      }
+    } else if (isLl) {
+      // 1. De-duplicate identical level with same price & same formation time
+      const dup = filteredLinesToDraw.find(existing => {
+        const isExLl = existing.label.startsWith("LL") || existing.label.startsWith("HL");
+        return isExLl && Math.abs(existing.price - line.price) <= 0.08 && existing.startTime === line.startTime;
+      });
+      if (dup) continue;
+
+      // 2. Overlapping active cycle check
+      const overlappingLl = filteredLinesToDraw.find(existing => {
+        const isExLl = existing.label.startsWith("LL") || existing.label.startsWith("HL");
+        return isExLl && (line.startTime <= existing.endTime && line.endTime >= existing.startTime);
+      });
+
+      if (overlappingLl) {
+        if (line.price >= overlappingLl.price) {
+          // Higher internal low in same active leg -> discard line
+          continue;
+        } else {
+          // Lower valley in same active leg -> replace with lowest valley
+          const idx = filteredLinesToDraw.indexOf(overlappingLl);
+          filteredLinesToDraw[idx] = line;
+          continue;
+        }
+      }
+    }
+
+    filteredLinesToDraw.push(line);
+  }
+
+  return filteredLinesToDraw;
+}
+
+function calculateTradeSwap(entryTs: number, exitTs: number, lotSize: number, isBuy: boolean): number {
+  if (!entryTs || !exitTs || exitTs <= entryTs) return 0.0;
+  const dailyRate = isBuy ? -12.50 : -4.50;
+  const startDay = Math.floor(entryTs / 86400) * 86400;
+  const endDay = Math.floor(exitTs / 86400) * 86400;
+
+  let totalDays = 0;
+  for (let t = startDay + 86400; t <= endDay; t += 86400) {
+    const dt = new Date(t * 1000);
+    const dow = dt.getUTCDay(); // 0: Sun, 1: Mon, 2: Tue, 3: Wed, 4: Thu, 5: Fri, 6: Sat
+    if (dow === 4) { // Crossing Wednesday midnight to Thursday -> 3x swap
+      totalDays += 3;
+    } else if (dow === 1 || dow === 2 || dow === 3 || dow === 5) {
+      totalDays += 1;
+    }
+  }
+  return Number((totalDays * dailyRate * lotSize).toFixed(2));
+}
+
+function simulateTrailingSLTP(
+  t: ReplayTrade,
+  candles: ReplayCandle[],
   currentCandleTime: number,
   structures: StructureEvent[],
   params: StrategyParams = DEFAULT_STRATEGY_PARAMS
-): {
-  initialSL: number;
-  initialTP: number;
-  sl: number | null;
-  tp: number | null;
-  beTriggered: boolean;
-  isClosedSimulated: boolean;
-  exitPriceSimulated: number | null;
-  exitTimeSimulated: number | null;
-  expansionCount: number;
-} => {
-  const typeLower = (t.type ?? "").toLowerCase();
+) {
   const entryPrice = t.entry_price ?? 0;
+  const typeLower = (t.type ?? "").toLowerCase();
 
-  // ATR-based adaptive SL/TP: distance scales with volatility so it stays
-  // proportional whether price is at 1000 or 5000.
+  // Price-Ratio Dynamic Scaling (Opsi 1)
+  const ratio = (params.use_price_ratio_scaling && params.base_reference_price > 0 && entryPrice > 0)
+    ? entryPrice / params.base_reference_price
+    : 1.0;
+
+  const actualLot = getActualLotSize(t);
+  const baseLot = params.lot_override > 0 ? params.lot_override : actualLot;
+  const tradeLotSize = params.use_price_ratio_scaling
+    ? Math.max(0.01, Number((baseLot / ratio).toFixed(2)))
+    : baseLot;
+
+  const effectiveTrailingDistance = params.trailing_distance * ratio;
+  const effectiveTpTrigger = params.tp_trigger * ratio;
+  const effectiveTpEkspansi = params.tp_ekspansi * ratio;
+  const effectiveBreakevenTrigger = params.breakeven_trigger * ratio;
+  const effectiveBuffer = params.breakeven_buffer * ratio;
+  const effectiveInitialTpDist = params.initial_tp_dist * ratio;
+  const effectiveSlSafetyBuffer = params.sl_safety_buffer * ratio;
+  const effectiveMinSlDist = (params.min_sl_dist ?? 15.00) * ratio;
+  const effectiveMaxSlDist = (params.max_sl_dist ?? 30.00) * ratio;
+
+  // Compute Initial SL and Initial TP
   let initialSL: number;
-  let initialTP: number;
+  let initialTP: number | null;
+
   if (params.use_atr_sltp) {
     const atr = calculateATR(candles, t.entry_time ?? 0, params.atr_period);
     if (atr !== null && atr > 0) {
@@ -1036,161 +1495,620 @@ const simulateTrailingSLTP = (
       initialSL = typeLower === "buy" ? entryPrice - slDist : entryPrice + slDist;
       initialTP = typeLower === "buy" ? entryPrice + tpDist : entryPrice - tpDist;
     } else {
-      // Fallback if not enough candles for ATR
-      const slDistance = Math.max(15.00, Math.min(30.00, Math.abs(entryPrice - (typeLower === "buy" ? entryPrice - params.trailing_distance : entryPrice + params.trailing_distance))));
+      const slDistance = Math.max(effectiveMinSlDist, Math.min(effectiveMaxSlDist, Math.abs(entryPrice - (typeLower === "buy" ? entryPrice - effectiveTrailingDistance : entryPrice + effectiveTrailingDistance))));
       initialSL = typeLower === "buy" ? entryPrice - slDistance : entryPrice + slDistance;
-      initialTP = params.initial_tp_dist > 0
-        ? (typeLower === "buy" ? entryPrice + params.initial_tp_dist : entryPrice - params.initial_tp_dist)
-        : (typeLower === "buy" ? entryPrice + 30.00 : entryPrice - 30.00);
+      initialTP = effectiveInitialTpDist > 0
+        ? (typeLower === "buy" ? entryPrice + effectiveInitialTpDist : entryPrice - effectiveInitialTpDist)
+        : (typeLower === "buy" ? entryPrice + 30.00 * ratio : entryPrice - 30.00 * ratio);
     }
   } else {
     const structuralSL = (typeLower === "buy"
       ? getLastAcceptedLL(t.entry_time ?? 0, structures)
-      : t.sl) ?? (typeLower === "buy"
-      ? entryPrice - params.trailing_distance
-      : entryPrice + params.trailing_distance);
+      : getLastAcceptedHH(t.entry_time ?? 0, structures)) ?? (typeLower === "buy"
+      ? (t.sl ?? entryPrice - effectiveTrailingDistance)
+      : (t.sl ?? entryPrice + effectiveTrailingDistance));
     const bufferedSL = typeLower === "buy"
-      ? structuralSL - params.sl_safety_buffer
-      : structuralSL + params.sl_safety_buffer;
-    const slDistance = Math.max(15.00, Math.min(30.00, Math.abs(entryPrice - bufferedSL)));
+      ? structuralSL - effectiveSlSafetyBuffer
+      : structuralSL + effectiveSlSafetyBuffer;
+    const slDistance = Math.max(effectiveMinSlDist, Math.min(effectiveMaxSlDist, Math.abs(entryPrice - bufferedSL)));
     initialSL = typeLower === "buy" ? entryPrice - slDistance : entryPrice + slDistance;
 
-    initialTP = params.initial_tp_dist > 0
-      ? (typeLower === "buy" ? entryPrice + params.initial_tp_dist : entryPrice - params.initial_tp_dist)
-      : (t.tp ?? (typeLower === "buy" ? entryPrice + 30.00 : entryPrice - 30.00));
+    initialTP = effectiveInitialTpDist > 0
+      ? (typeLower === "buy" ? entryPrice + effectiveInitialTpDist : entryPrice - effectiveInitialTpDist)
+      : (t.tp ?? (typeLower === "buy" ? entryPrice + 30.00 * ratio : entryPrice - 30.00 * ratio));
   }
 
   let currentSL = initialSL;
   let currentTP = initialTP;
+  const slHistory: number[] = [initialSL];
+  const tpHistory: number[] = initialTP !== null ? [initialTP] : [];
 
-  // Compute effective Break-Even buffer
-  let effectiveBuffer = params.breakeven_buffer;
+  let startIdx = 0;
+  let lo = 0;
+  let hi = candles.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time >= (t.entry_time ?? 0)) {
+      startIdx = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
 
-  const activeCandles = candles.filter(c => c.time >= (t.entry_time ?? 0) && c.time <= currentCandleTime);
+  let endIdx = candles.length - 1;
+  lo = startIdx;
+  hi = candles.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time <= currentCandleTime) {
+      endIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
   let expansionCount = 0;
   let beTriggered = false;
   let isClosedSimulated = false;
   let exitPriceSimulated: number | null = null;
   let exitTimeSimulated: number | null = null;
+  let closeReason: "TP" | "SL" | "24H_FORCE" | "PROFIT_TARGET" | null = null;
+  let maxFavorablePoints = 0;
+  let maxAdversePoints = 0;
 
-  for (const c of activeCandles) {
+  for (let i = startIdx; i <= endIdx; i++) {
+    const c = candles[i];
     const price = c.close;
 
-    // Force 24h Close
+    // Track MFE & MAE
+    if (typeLower === "buy") {
+      const fav = Math.max(0, (c.high - entryPrice) * 100);
+      const adv = Math.max(0, (entryPrice - c.low) * 100);
+      if (fav > maxFavorablePoints) maxFavorablePoints = Math.round(fav);
+      if (adv > maxAdversePoints) maxAdversePoints = Math.round(adv);
+    } else {
+      const fav = Math.max(0, (entryPrice - c.low) * 100);
+      const adv = Math.max(0, (c.high - entryPrice) * 100);
+      if (fav > maxFavorablePoints) maxFavorablePoints = Math.round(fav);
+      if (adv > maxAdversePoints) maxAdversePoints = Math.round(adv);
+    }
+
+    // 1. Force 24h Close (Hold limit 24 jam / weekend gap)
     if (params.force_24h_close && (c.time - (t.entry_time ?? 0)) >= 86400) {
       isClosedSimulated = true;
-      exitPriceSimulated = price;
+      exitPriceSimulated = c.open;
       exitTimeSimulated = c.time;
+      closeReason = "24H_FORCE";
       break;
     }
 
+    // 2. Dynamic TP Expansion pada Bar Open
     if (typeLower === "buy") {
-      // 1. Check if stopped out by SL first
+      const canExpand = params.max_ekspansi === 0 || expansionCount < params.max_ekspansi;
+      if (canExpand && currentTP !== null && (currentTP - c.open) <= effectiveTpTrigger) {
+        const expandedTP = c.open + effectiveTpEkspansi;
+        if (expandedTP > currentTP) {
+          currentTP = expandedTP;
+          expansionCount++;
+          tpHistory.push(expandedTP);
+        }
+      }
+    } else if (typeLower === "sell") {
+      const canExpand = params.max_ekspansi === 0 || expansionCount < params.max_ekspansi;
+      if (canExpand && currentTP !== null && (c.open - currentTP) <= effectiveTpTrigger) {
+        const expandedTP = c.open - effectiveTpEkspansi;
+        if (expandedTP < currentTP) {
+          currentTP = expandedTP;
+          expansionCount++;
+          tpHistory.push(expandedTP);
+        }
+      }
+    }
+
+    // 3. Profit Target USD Exit
+    if (params.enable_profit_target_exit && params.profit_target_exit_usd > 0) {
+      const currentHighFloating = typeLower === "buy"
+        ? (c.high - entryPrice) * tradeLotSize * 100
+        : (entryPrice - c.low) * tradeLotSize * 100;
+      if (currentHighFloating >= params.profit_target_exit_usd) {
+        isClosedSimulated = true;
+        const exitTargetPrice = typeLower === "buy"
+          ? entryPrice + (params.profit_target_exit_usd / (tradeLotSize * 100))
+          : entryPrice - (params.profit_target_exit_usd / (tradeLotSize * 100));
+        exitPriceSimulated = Number(exitTargetPrice.toFixed(2));
+        exitTimeSimulated = c.time;
+        closeReason = "PROFIT_TARGET";
+        break;
+      }
+    }
+
+    // 4. Intra-Bar SL & TP Check
+    if (typeLower === "buy") {
       if (c.low <= currentSL) {
         isClosedSimulated = true;
         exitPriceSimulated = currentSL;
         exitTimeSimulated = c.time;
+        closeReason = "SL";
         break;
       }
-
-      // 2. Check if hits TP
       if (currentTP !== null && c.high >= currentTP) {
         isClosedSimulated = true;
         exitPriceSimulated = currentTP;
         exitTimeSimulated = c.time;
+        closeReason = "TP";
         break;
       }
-
-      // Check if BE is triggered using candle High price
-      if (params.enable_breakeven && c.high - entryPrice >= params.breakeven_trigger) {
+      if (params.enable_breakeven && c.high - entryPrice >= effectiveBreakevenTrigger) {
         beTriggered = true;
       }
-
-      // Trailing SL
-      const targetSL = price - params.trailing_distance;
-      const minSL = entryPrice - params.trailing_distance;
+      const targetSL = price - effectiveTrailingDistance;
+      const minSL = entryPrice - effectiveTrailingDistance;
       const maxSL = price - 1.50;
       let newSL = Math.max(minSL, Math.min(maxSL, targetSL));
-
-      // Break-even floor: once triggered, SL cannot go below entry + effectiveBuffer
-      if (beTriggered) {
-        newSL = Math.max(newSL, entryPrice + effectiveBuffer);
-      }
-
+      if (beTriggered) newSL = Math.max(newSL, entryPrice + effectiveBuffer);
       newSL = Math.max(currentSL, newSL);
-
-      if (Math.abs(newSL - currentSL) >= 0.10) currentSL = newSL;
-
-      // TP expansion (respect max_ekspansi limit)
-      const canExpand = params.max_ekspansi === 0 || expansionCount < params.max_ekspansi;
-      if (canExpand && currentTP - price <= params.tp_trigger) {
-        const expandedTP = price + params.tp_ekspansi;
-        if (expandedTP > currentTP) {
-          currentTP = expandedTP;
-          expansionCount++;
-        }
+      if (Math.abs(newSL - currentSL) >= 0.10) {
+        currentSL = newSL;
+        const lastSL = slHistory[slHistory.length - 1];
+        if (Math.abs(newSL - lastSL) >= 2.00) slHistory.push(newSL);
       }
     } else if (typeLower === "sell") {
-      // 1. Check if stopped out by SL first
-      if (c.high >= currentSL) {
+      const candleSpreadVal = (c.spread != null && c.spread > 0) ? (c.spread * 0.01) : 0.04;
+      // Multi-Point Ask Model: Open tick uses open + bar spread; for high/low evaluation use normal baseline spread (max 0.60 USD) to prevent rollover phantom spikes
+      const normalSpreadVal = Math.min(candleSpreadVal, 0.60);
+      const askHigh = Math.max(c.open + candleSpreadVal, c.high + normalSpreadVal);
+      const askLow = c.low + normalSpreadVal;
+      if (askHigh >= currentSL) {
         isClosedSimulated = true;
         exitPriceSimulated = currentSL;
         exitTimeSimulated = c.time;
+        closeReason = "SL";
         break;
       }
-
-      // 2. Check if hits TP
-      if (currentTP !== null && c.low <= currentTP) {
+      if (currentTP !== null && askLow <= currentTP) {
         isClosedSimulated = true;
         exitPriceSimulated = currentTP;
         exitTimeSimulated = c.time;
+        closeReason = "TP";
         break;
       }
-
-      // Check if BE is triggered using candle Low price
-      if (params.enable_breakeven && entryPrice - c.low >= params.breakeven_trigger) {
+      if (params.enable_breakeven && entryPrice - c.low >= effectiveBreakevenTrigger) {
         beTriggered = true;
       }
-
-      // Trailing SL
-      const targetSL = price + params.trailing_distance;
-      const minSL = entryPrice + params.trailing_distance;
-      const maxSL = price + 1.50;
-      let newSL = Math.min(minSL, Math.max(maxSL, targetSL));
-
-      // Break-even floor: once triggered, SL cannot go above entry - effectiveBuffer
-      if (beTriggered) {
-        newSL = Math.min(newSL, entryPrice - effectiveBuffer);
-      }
-
+      const targetSL = price + effectiveTrailingDistance;
+      const maxSL = entryPrice + effectiveTrailingDistance;
+      const minSL = price + 1.50;
+      let newSL = Math.max(minSL, Math.min(maxSL, targetSL));
+      if (beTriggered) newSL = Math.min(newSL, entryPrice - effectiveBuffer);
       newSL = Math.min(currentSL, newSL);
-
-      if (Math.abs(newSL - currentSL) >= 0.10) currentSL = newSL;
-
-      // TP expansion (respect max_ekspansi limit)
-      const canExpand = params.max_ekspansi === 0 || expansionCount < params.max_ekspansi;
-      if (canExpand && price - currentTP <= params.tp_trigger) {
-        const expandedTP = price - params.tp_ekspansi;
-        if (expandedTP < currentTP) {
-          currentTP = expandedTP;
-          expansionCount++;
-        }
+      if (Math.abs(newSL - currentSL) >= 0.10) {
+        currentSL = newSL;
+        const lastSL = slHistory[slHistory.length - 1];
+        if (Math.abs(newSL - lastSL) >= 2.00) slHistory.push(newSL);
       }
     }
   }
+
+  if (slHistory.length > 0 && Math.abs(currentSL - slHistory[slHistory.length - 1]) > 0.01) slHistory.push(currentSL);
+  if (currentTP !== null && tpHistory.length > 0 && Math.abs(currentTP - tpHistory[tpHistory.length - 1]) > 0.01) tpHistory.push(currentTP);
 
   return {
     initialSL,
     initialTP,
     sl: currentSL,
     tp: currentTP,
+    slHistory,
+    tpHistory,
+    closeReason,
     beTriggered,
     isClosedSimulated,
     exitPriceSimulated,
     exitTimeSimulated,
     expansionCount,
+    maxFavorablePoints,
+    maxAdversePoints,
   };
-};
+}
+
+function processTradesForPlayhead(
+  executedTrades: ReplayTrade[],
+  rejectedTrades: ReplayTrade[],
+  llmPositions: any[],
+  candle: ReplayCandle,
+  candles: ReplayCandle[],
+  structures: StructureEvent[],
+  strategyParams: StrategyParams,
+  useLLMSetup: boolean,
+  activePlanner: any
+): {
+  runningProfit: number;
+  tradeStats: { total: number; wins: number; losses: number };
+  activePositions: any[];
+  overlayEntries: TradeOverlayEntry[];
+} {
+  let profit = 0;
+  let total = 0;
+  let wins = 0;
+  let losses = 0;
+  const activePosList: any[] = [];
+  const overlayEntries: TradeOverlayEntry[] = [];
+  const isAtrEnabled = strategyParams.use_atr_sltp || useLLMSetup;
+
+  const llmEntryTimes = new Set(llmPositions.map(p => p.entry_time ?? 0));
+  for (const trade of rejectedTrades) {
+    if ((trade.entry_time ?? 0) > candle.time) continue;
+    if (llmEntryTimes.has(trade.entry_time ?? 0)) continue;
+    activePosList.push({
+      ticket: trade.ticket,
+      type: trade.type,
+      entry_time: trade.entry_time,
+      lot_size: trade.lot_size ?? 0,
+      entry_price: trade.entry_price ?? 0,
+      current_price: null,
+      sl: null,
+      tp: null,
+      original_sl: null,
+      original_tp: null,
+      status: "Rejected",
+      reject_reason: trade.reject_reason,
+      pnl: 0,
+      is_rejected: true,
+    });
+  }
+
+  for (const t of executedTrades) {
+    const entryTs = t.entry_time ?? 0;
+    if (entryTs <= candle.time) {
+      total++;
+      const actualLot = getActualLotSize(t);
+      const baseLot = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
+      const entryPriceVal = t.entry_price ?? 0;
+      const ratio = (strategyParams.use_price_ratio_scaling && strategyParams.base_reference_price > 0 && entryPriceVal > 0)
+        ? entryPriceVal / strategyParams.base_reference_price
+        : 1.0;
+      const lotSize = strategyParams.use_price_ratio_scaling
+        ? Math.max(0.01, Number((baseLot / ratio).toFixed(2)))
+        : baseLot;
+
+      const simTime = candle.time;
+      const dynamicLevels = simulateTrailingSLTP(t, candles, simTime, structures, strategyParams);
+      const isClosed = dynamicLevels.isClosedSimulated;
+
+      const entryPrice = t.entry_price ?? 0;
+      const typeLower = (t.type ?? "").toLowerCase();
+      const initialSL = dynamicLevels.initialSL;
+      const initialTP = dynamicLevels.initialTP;
+
+      const isBEActive = dynamicLevels.beTriggered;
+      const isTPMaxed = strategyParams.max_ekspansi > 0 && dynamicLevels.expansionCount >= strategyParams.max_ekspansi;
+      const beTriggerPrice = strategyParams.enable_breakeven
+        ? (typeLower === "buy" ? entryPrice + strategyParams.breakeven_trigger : entryPrice - strategyParams.breakeven_trigger)
+        : null;
+      const tpTriggerPrice = isTPMaxed
+        ? null
+        : (dynamicLevels.tp !== null
+            ? (typeLower === "buy" ? dynamicLevels.tp - strategyParams.tp_trigger : dynamicLevels.tp + strategyParams.tp_trigger)
+            : null
+          );
+
+      let finalExitPrice = entryPrice;
+      let finalExitTs: number | null = null;
+      let tradeProfit = 0;
+
+      if (isClosed) {
+        finalExitPrice = dynamicLevels.exitPriceSimulated ?? entryPrice;
+        finalExitTs = dynamicLevels.exitTimeSimulated ?? null;
+
+        const entryCandle = candles.find(c => c.time === entryTs) || candles.find(c => c.time === (entryTs - 900));
+        const entrySpreadPts = (entryCandle?.spread != null && entryCandle.spread > 0) ? entryCandle.spread : 4;
+        const spreadCost = (t.spread_cost != null && t.spread_cost > 0)
+          ? t.spread_cost
+          : (entrySpreadPts * 0.01) * lotSize * 100;
+        const commissionCost = t.commission ?? 0;
+        const swapCost = t.swap != null && t.swap !== 0
+          ? t.swap
+          : calculateTradeSwap(entryTs, finalExitTs ?? candle.time, lotSize, typeLower === "buy");
+
+        if (typeLower === "buy") {
+          tradeProfit = (finalExitPrice - entryPrice) * lotSize * 100 - spreadCost - commissionCost + swapCost;
+        } else {
+          tradeProfit = (entryPrice - finalExitPrice) * lotSize * 100 - spreadCost - commissionCost + swapCost;
+        }
+        tradeProfit = Number(tradeProfit.toFixed(2));
+
+        profit += tradeProfit;
+        if (tradeProfit > 0) wins++;
+        else if (tradeProfit < 0) losses++;
+
+        activePosList.push({
+          ticket: t.ticket,
+          type: t.type,
+          entry_time: t.entry_time,
+          lot_size: lotSize,
+          entry_price: entryPrice,
+          current_price: finalExitPrice,
+          sl: dynamicLevels.sl,
+          tp: dynamicLevels.tp,
+          original_sl: initialSL,
+          original_tp: initialTP,
+          sl_history: dynamicLevels.slHistory,
+          tp_history: dynamicLevels.tpHistory,
+          close_reason: dynamicLevels.closeReason,
+          expansion_count: dynamicLevels.expansionCount,
+          status: dynamicLevels.closeReason === "24H_FORCE" ? "Closed (24h)" : dynamicLevels.closeReason === "PROFIT_TARGET" ? "Closed (Target USD)" : "Closed",
+          pnl: tradeProfit,
+          be_trigger_price: beTriggerPrice,
+          is_be_active: isBEActive,
+          tp_trigger_price: tpTriggerPrice,
+          is_tp_maxed: isTPMaxed,
+          is_closed: true,
+        });
+      } else {
+        const entryCandle = candles.find(c => c.time === entryTs) || candles.find(c => c.time === (entryTs - 900));
+        const entrySpreadPts = (entryCandle?.spread != null && entryCandle.spread > 0) ? entryCandle.spread : 4;
+        const spreadCost = t.spread_cost != null && t.spread_cost > 0
+          ? t.spread_cost
+          : ((entrySpreadPts * 0.01) * lotSize * 100);
+        const openSwapCost = t.swap != null && t.swap !== 0
+          ? t.swap
+          : calculateTradeSwap(entryTs, candle.time, lotSize, typeLower === "buy");
+
+        if (typeLower === "buy") {
+          tradeProfit = (candle.close - entryPrice) * lotSize * 100 - spreadCost + openSwapCost;
+        } else {
+          tradeProfit = (entryPrice - candle.close) * lotSize * 100 - spreadCost + openSwapCost;
+        }
+        tradeProfit = Number(tradeProfit.toFixed(2));
+        profit += tradeProfit;
+
+        const isTPExpanded = dynamicLevels.tp !== null && Math.abs(dynamicLevels.tp - initialTP) > 0.01;
+        const isSLTrailing = dynamicLevels.sl !== null && Math.abs(dynamicLevels.sl - initialSL) > 0.01;
+
+        let statusText = "Normal";
+        if (isBEActive && isTPExpanded) {
+          statusText = "BE + TP Expanded";
+        } else if (isBEActive) {
+          statusText = "Break-Even";
+        } else if (isTPExpanded) {
+          statusText = "TP Expanded";
+        } else if (isSLTrailing) {
+          statusText = "Trailing";
+        }
+
+        activePosList.push({
+          ticket: t.ticket,
+          type: t.type,
+          entry_time: t.entry_time,
+          lot_size: lotSize,
+          entry_price: entryPrice,
+          current_price: candle.close,
+          sl: dynamicLevels.sl,
+          tp: dynamicLevels.tp,
+          original_sl: initialSL,
+          original_tp: initialTP,
+          sl_history: dynamicLevels.slHistory,
+          tp_history: dynamicLevels.tpHistory,
+          close_reason: dynamicLevels.closeReason,
+          expansion_count: dynamicLevels.expansionCount,
+          status: statusText,
+          pnl: tradeProfit,
+          be_trigger_price: beTriggerPrice,
+          is_be_active: isBEActive,
+          tp_trigger_price: tpTriggerPrice,
+          is_tp_maxed: isTPMaxed,
+        });
+      }
+
+      overlayEntries.push({
+        type: t.type,
+        entry_price: entryPrice,
+        sl: dynamicLevels.sl,
+        tp: dynamicLevels.tp,
+        profit: tradeProfit,
+        entry_time_ts: entryTs,
+        exit_time_ts: isClosed ? finalExitTs : null,
+        atr: isAtrEnabled ? calculateATR(candles, entryTs, strategyParams.atr_period) : null,
+        atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
+        atr_end_ts: isAtrEnabled ? entryTs : null,
+      });
+    }
+  }
+
+  // Active Planner
+  if (activePlanner) {
+    const exitTs = activePlanner.exitTime ?? (activePlanner.entryTime + (activePlanner.durationBars || 15) * 900);
+    overlayEntries.push({
+      type: activePlanner.type === "long" ? "BUY" : "SELL",
+      entry_price: activePlanner.entryPrice,
+      sl: activePlanner.slPrice,
+      tp: activePlanner.tpPrice,
+      profit: 0,
+      entry_time_ts: activePlanner.entryTime,
+      exit_time_ts: exitTs,
+      atr: null,
+      atr_start_ts: null,
+      atr_end_ts: null,
+    });
+  }
+
+  // LLM Positions
+  for (const llmPos of llmPositions) {
+    const entryTs = llmPos.entry_time ?? 0;
+    if (entryTs <= candle.time) {
+      if (llmPos.is_rejected) {
+        activePosList.push({
+          ticket: llmPos.ticket,
+          type: llmPos.type,
+          entry_time: llmPos.entry_time,
+          lot_size: llmPos.lot_size ?? 0,
+          entry_price: llmPos.entry_price ?? 0,
+          current_price: null,
+          sl: null,
+          tp: null,
+          original_sl: null,
+          original_tp: null,
+          status: "Rejected",
+          reject_reason: llmPos.reject_reason || "Ditolak / HOLD",
+          pnl: 0,
+          is_rejected: true,
+          is_llm: true,
+        });
+        continue;
+      }
+
+      total++;
+      const typeUpper = (llmPos.type ?? "BUY").toUpperCase();
+      const isBuy = typeUpper === "BUY";
+      const lotSize = llmPos.lot_size ?? 0.01;
+      const entryPrice = llmPos.entry_price ?? 0;
+      const slPrice = llmPos.sl ?? 0;
+      const tpPrice = llmPos.tp ?? 0;
+
+      let isClosed = false;
+      let exitPrice = candle.close;
+      let exitTime: number | null = null;
+      let statusText = "Running";
+
+      // Binary search start index
+      let startIdx = 0, lo = 0, hi = candles.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (candles[mid].time >= entryTs) {
+          startIdx = mid;
+          hi = mid - 1;
+        } else {
+          lo = mid + 1;
+        }
+      }
+
+      let endIdx = candles.length - 1;
+      lo = startIdx;
+      hi = candles.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (candles[mid].time <= candle.time) {
+          endIdx = mid;
+          lo = mid + 1;
+        } else {
+          hi = mid - 1;
+        }
+      }
+
+      for (let i = startIdx; i <= endIdx; i++) {
+        const c = candles[i];
+        if (!c) continue;
+
+        if (strategyParams.force_24h_close && (c.time - entryTs) >= 86400) {
+          isClosed = true;
+          exitPrice = c.close;
+          exitTime = c.time;
+          statusText = "Closed (24h)";
+          break;
+        }
+
+        if (isBuy) {
+          if (slPrice > 0 && c.low <= slPrice) {
+            isClosed = true;
+            exitPrice = slPrice;
+            exitTime = c.time;
+            statusText = "Closed (SL)";
+            break;
+          } else if (tpPrice > 0 && c.high >= tpPrice) {
+            isClosed = true;
+            exitPrice = tpPrice;
+            exitTime = c.time;
+            statusText = "Closed (TP)";
+            break;
+          }
+        } else {
+          const candleSpreadVal = (c.spread != null && c.spread > 0) ? (c.spread * 0.01) : 0.04;
+          const normalSpreadVal = Math.min(candleSpreadVal, 0.60);
+          const askHigh = Math.max(c.open + candleSpreadVal, c.high + normalSpreadVal);
+          const askLow = c.low + normalSpreadVal;
+
+          if (slPrice > 0 && askHigh >= slPrice) {
+            isClosed = true;
+            exitPrice = slPrice;
+            exitTime = c.time;
+            statusText = "Closed (SL)";
+            break;
+          } else if (tpPrice > 0 && askLow <= tpPrice) {
+            isClosed = true;
+            exitPrice = tpPrice;
+            exitTime = c.time;
+            statusText = "Closed (TP)";
+            break;
+          }
+        }
+      }
+
+      let pnl = 0;
+      if (isClosed) {
+        if (isBuy) {
+          pnl = (exitPrice - entryPrice) * lotSize * 100;
+        } else {
+          pnl = (entryPrice - exitPrice) * lotSize * 100;
+        }
+        if (pnl > 0) wins++;
+        else if (pnl < 0) losses++;
+      } else {
+        if (isBuy) {
+          pnl = (candle.close - entryPrice) * lotSize * 100;
+        } else {
+          pnl = (entryPrice - candle.close) * lotSize * 100;
+        }
+      }
+      profit += pnl;
+
+      activePosList.push({
+        ticket: llmPos.ticket,
+        type: typeUpper,
+        entry_time: entryTs,
+        lot_size: lotSize,
+        entry_price: entryPrice,
+        current_price: isClosed ? exitPrice : candle.close,
+        sl: slPrice,
+        tp: tpPrice,
+        original_sl: llmPos.original_sl ?? slPrice,
+        original_tp: llmPos.original_tp ?? tpPrice,
+        sl_history: [llmPos.original_sl ?? slPrice, ...(slPrice !== (llmPos.original_sl ?? slPrice) ? [slPrice] : [])],
+        tp_history: [llmPos.original_tp ?? tpPrice, ...(tpPrice !== (llmPos.original_tp ?? tpPrice) ? [tpPrice] : [])],
+        close_reason: isClosed ? (statusText.includes("TP") ? "TP" : statusText.includes("SL") ? "SL" : null) : null,
+        status: statusText,
+        pnl: pnl,
+        be_trigger_price: null,
+        is_be_active: false,
+        tp_trigger_price: null,
+        is_tp_maxed: false,
+        is_closed: isClosed,
+        is_llm: true,
+        exit_time: exitTime,
+      });
+
+      overlayEntries.push({
+        type: llmPos.type,
+        entry_price: llmPos.entry_price,
+        sl: llmPos.sl,
+        tp: llmPos.tp,
+        profit: pnl,
+        entry_time_ts: entryTs,
+        exit_time_ts: isClosed ? exitTime : null,
+        atr: isAtrEnabled ? calculateATR(candles, entryTs, strategyParams.atr_period) : null,
+        atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
+        atr_end_ts: isAtrEnabled ? entryTs : null,
+      });
+    }
+  }
+
+  return {
+    runningProfit: profit,
+    tradeStats: { total, wins, losses },
+    activePositions: activePosList.sort((a, b) => getTimestampSeconds(b.entry_time) - getTimestampSeconds(a.entry_time)),
+    overlayEntries,
+  };
+}
 
 export default function ReplayTrades() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -1252,15 +2170,27 @@ export default function ReplayTrades() {
   const [initialBalanceInput, setInitialBalanceInput] = useState(String(DEFAULT_STRATEGY_PARAMS.initial_balance));
   const [maxBosCycleInput, setMaxBosCycleInput] = useState(String(DEFAULT_ENTRY_FILTER_PARAMS.max_bos_cycle));
   const [lotSizeInput, setLotSizeInput] = useState(String(DEFAULT_STRATEGY_PARAMS.lot_override));
+  const [initialTpDistInput, setInitialTpDistInput] = useState(String(DEFAULT_STRATEGY_PARAMS.initial_tp_dist));
+  const [slSafetyBufferInput, setSlSafetyBufferInput] = useState(String(DEFAULT_STRATEGY_PARAMS.sl_safety_buffer));
+  const [minSlDistInput, setMinSlDistInput] = useState(String(DEFAULT_STRATEGY_PARAMS.min_sl_dist));
+  const [maxSlDistInput, setMaxSlDistInput] = useState(String(DEFAULT_STRATEGY_PARAMS.max_sl_dist));
+  const [trailingDistanceInput, setTrailingDistanceInput] = useState(String(DEFAULT_STRATEGY_PARAMS.trailing_distance));
+  const [tpTriggerInput, setTpTriggerInput] = useState(String(DEFAULT_STRATEGY_PARAMS.tp_trigger));
+  const [tpEkspansiInput, setTpEkspansiInput] = useState(String(DEFAULT_STRATEGY_PARAMS.tp_ekspansi));
+  const [maxEkspansiInput, setMaxEkspansiInput] = useState(String(DEFAULT_STRATEGY_PARAMS.max_ekspansi));
+  const [beTriggerInput, setBeTriggerInput] = useState(String(DEFAULT_STRATEGY_PARAMS.breakeven_trigger));
+  const [beBufferInput, setBeBufferInput] = useState(String(DEFAULT_STRATEGY_PARAMS.breakeven_buffer));
   const [atrPeriodInput, setAtrPeriodInput] = useState(String(DEFAULT_STRATEGY_PARAMS.atr_period));
   const [atrSlMultInput, setAtrSlMultInput] = useState(String(DEFAULT_STRATEGY_PARAMS.atr_sl_multiplier));
   const [atrTpMultInput, setAtrTpMultInput] = useState(String(DEFAULT_STRATEGY_PARAMS.atr_tp_multiplier));
+  const [baseRefPriceInput, setBaseRefPriceInput] = useState(String(DEFAULT_STRATEGY_PARAMS.base_reference_price));
+  const [profitTargetExitInput, setProfitTargetExitInput] = useState(String(DEFAULT_STRATEGY_PARAMS.profit_target_exit_usd));
   // LLM trade setup (replay)
   const [useLLMSetup, setUseLLMSetup] = useState(false);
   const [llmRecommendation, setLlmRecommendation] = useState<any | null>(null);
   const [llmLoading, setLlmLoading] = useState(false);
-  // Decision engine toggle: "rule" (SmartRuleEngine) or "llm" (LLMDecisionEngine)
-  const [decisionEngine, setDecisionEngine] = useState<"rule" | "llm">("rule");
+  // Decision engine toggle: "rule" (SmartRuleEngine) or "llm" (LLMDecisionEngine) or "off"
+  const [decisionEngine, setDecisionEngine] = useState<"rule" | "llm" | "off">("off");
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   // LLM-executed positions — kept separate so they survive replay re-renders.
@@ -1272,6 +2202,20 @@ export default function ReplayTrades() {
   const [plannerTool, setPlannerTool] = useState<"none" | "long" | "short">("none");
   const [selectedRrRatio, setSelectedRrRatio] = useState<number>(2.0);
   const [activePlanner, setActivePlanner] = useState<PositionPlanner | null>(null);
+
+  // ── Cut / Jump to Bar Replay (TradingView Bar Replay ✂️)
+  const [isCutMode, setIsCutMode] = useState<boolean>(false);
+  const [cutHoverInfo, setCutHoverInfo] = useState<{
+    x: number;
+    time: number;
+    index: number;
+    formattedTime: string;
+  } | null>(null);
+  const isCutModeRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isCutModeRef.current = isCutMode;
+  }, [isCutMode]);
 
   const plannerToolRef = useRef<"none" | "long" | "short">("none");
   const selectedRrRatioRef = useRef<number>(2.0);
@@ -1574,8 +2518,20 @@ export default function ReplayTrades() {
     tpPrice: number;
     entryTime: number;
     exitTime: number;
-    durationBars: number;
+      durationBars: number;
   } | null>(null);
+
+  // Keyboard shortcut: Escape to cancel Cut Mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isCutMode) {
+        setIsCutMode(false);
+        setCutHoverInfo(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isCutMode]);
 
   const getTimeToCanvasX = (time: number): number | null => {
     if (!chartRef.current) return null;
@@ -1601,10 +2557,44 @@ export default function ReplayTrades() {
   };
 
   const handleChartMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!activePlannerRef.current || !candleSeriesRef.current || !chartContainerRef.current) return;
+    if (!chartContainerRef.current) return;
     const rect = chartContainerRef.current.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
     const mouseX = e.clientX - rect.left;
+
+    // ── Handle Cut / Jump to Bar Click (TradingView Bar Replay) ──
+    if ((isCutModeRef.current || e.altKey) && replayDataRef.current && chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const time = timeScale.coordinateToTime(mouseX);
+      const data = replayDataRef.current;
+      let targetIdx = -1;
+      if (time !== null && time !== undefined) {
+        const targetTs = Number(time);
+        let minDiff = Infinity;
+        for (let i = 0; i < data.candles.length; i++) {
+          const diff = Math.abs(data.candles[i].time - targetTs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            targetIdx = i;
+          }
+        }
+      } else if (cutHoverInfo) {
+        targetIdx = cutHoverInfo.index;
+      }
+
+      if (targetIdx !== -1) {
+        if (isPlaying) stopPlayback();
+        const newIdx = targetIdx + 1; // Include the selected candle
+        setChartDataToIndex(newIdx, data);
+        setCurrentIndex(newIdx);
+        setIsCutMode(false);
+        setCutHoverInfo(null);
+        e.stopPropagation();
+        return;
+      }
+    }
+
+    if (!activePlannerRef.current || !candleSeriesRef.current || !chartContainerRef.current) return;
 
     const entryY = candleSeriesRef.current.priceToCoordinate(activePlannerRef.current.entryPrice);
     const tpY = candleSeriesRef.current.priceToCoordinate(activePlannerRef.current.tpPrice);
@@ -1653,10 +2643,49 @@ export default function ReplayTrades() {
   };
 
   const handleChartMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!activePlannerRef.current || !candleSeriesRef.current || !chartContainerRef.current) return;
+    if (!chartContainerRef.current) return;
     const rect = chartContainerRef.current.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
     const mouseX = e.clientX - rect.left;
+
+    // ── Handle Cut / Jump to Bar hover (TradingView Cut Line) ──
+    if ((isCutModeRef.current || e.altKey) && replayDataRef.current && chartRef.current) {
+      const timeScale = chartRef.current.timeScale();
+      const time = timeScale.coordinateToTime(mouseX);
+      const data = replayDataRef.current;
+      if (time !== null && data.candles.length > 0) {
+        const targetTs = Number(time);
+        let closestIdx = -1;
+        let minDiff = Infinity;
+        for (let i = 0; i < data.candles.length; i++) {
+          const diff = Math.abs(data.candles[i].time - targetTs);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closestIdx = i;
+          }
+        }
+        if (closestIdx !== -1) {
+          const c = data.candles[closestIdx];
+          const d = new Date(c.time * 1000);
+          const y = d.getUTCFullYear();
+          const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+          const day = String(d.getUTCDate()).padStart(2, "0");
+          const h = String(d.getUTCHours()).padStart(2, "0");
+          const min = String(d.getUTCMinutes()).padStart(2, "0");
+          setCutHoverInfo({
+            x: mouseX,
+            time: c.time,
+            index: closestIdx,
+            formattedTime: `${y}-${m}-${day} ${h}:${min} UTC`,
+          });
+        }
+      }
+      return;
+    } else {
+      if (cutHoverInfo !== null) setCutHoverInfo(null);
+    }
+
+    if (!activePlannerRef.current || !candleSeriesRef.current || !chartContainerRef.current) return;
 
     if (dragModeRef.current !== "none") {
       setDragMousePos({ x: mouseX, y: mouseY });
@@ -1764,6 +2793,7 @@ export default function ReplayTrades() {
   };
 
   const handleChartMouseLeave = () => {
+    if (cutHoverInfo !== null) setCutHoverInfo(null);
     if (dragModeRef.current !== "none") {
       dragModeRef.current = "none";
       setDragMode("none");
@@ -1775,26 +2805,31 @@ export default function ReplayTrades() {
   };
 
 
+  const processedTradesMemo = useMemo(() => {
+    if (!replayData) return { executedTrades: [], rejectedTrades: [] };
+    const m15Data = allReplayData.M15 ?? (replayData.meta?.timeframe === "M15" ? replayData : null);
+    const h1Data = allReplayData.H1 ?? (replayData.meta?.timeframe === "H1" ? replayData : null);
+    const h4Data = allReplayData.H4 ?? (replayData.meta?.timeframe === "H4" ? replayData : null);
+    const m15Candles = m15Data?.candles ?? replayData.candles ?? [];
+    const h1Candles = h1Data?.candles ?? [];
+    const h4Candles = h4Data?.candles ?? [];
+
+    return getProcessedReplayTrades(
+      replayData,
+      replayData.structures,
+      entryFilterParams,
+      m15Candles,
+      h1Candles,
+      h4Candles,
+      useLLMSetup || decisionEngine === "llm",
+    );
+  }, [replayData, allReplayData, entryFilterParams, useLLMSetup, decisionEngine]);
+
   const getFilteredTrades = useCallback(
     (data: ReplayData) => {
-      const m15Data = allReplayData.M15 ?? (data.meta.timeframe === "M15" ? data : null);
-      const h1Data = allReplayData.H1 ?? (data.meta.timeframe === "H1" ? data : null);
-      const h4Data = allReplayData.H4 ?? (data.meta.timeframe === "H4" ? data : null);
-      const m15Candles = m15Data?.candles ?? [];
-      const h1Candles = h1Data?.candles ?? [];
-      const h4Candles = h4Data?.candles ?? [];
-
-      const { executedTrades } = getProcessedReplayTrades(
-        data,
-        data.structures,
-        entryFilterParams,
-        m15Candles,
-        h1Candles,
-        h4Candles,
-      );
-      return executedTrades;
+      return processedTradesMemo.executedTrades;
     },
-    [allReplayData, entryFilterParams]
+    [processedTradesMemo]
   );
 
   // Running stats
@@ -1937,7 +2972,8 @@ export default function ReplayTrades() {
       const activeSsl = pools.filter(p => p.type === "SSL" && !p.isSwept && p.price < entryPrice).sort((a, b) => b.price - a.price)[0];
 
       // Calculate Structure Cycle and EMA Stretch Ratio for Exhaustion Analysis
-      const { latestType, bosCycle } = getEntryStructureInfo(entryTs, replayData.structures);
+      const structType = structure.toUpperCase().includes("SELL") || structure.toUpperCase().includes("BEARISH") ? "SELL" : "BUY";
+      const { latestType, bosCycle } = getEntryStructureInfo(entryTs, replayData.structures, structType);
       const isChoch = structure.toUpperCase().includes("CHOCH") || latestType === "CHOCH";
       const currentBos = Math.max(1, bosCycle);
       const emaStretchRatio = m15Ema && atr && atr > 0 ? Number((Math.abs(entryPrice - m15Ema) / atr).toFixed(2)) : null;
@@ -2679,410 +3715,31 @@ export default function ReplayTrades() {
 
   // Re-simulate active positions and chart markers whenever strategy parameters change
   useEffect(() => {
-    if (!replayData || currentIndex === 0) return;
-    const activeIdx = Math.max(0, currentIndex - 1);
+    if (!replayData || replayData.candles.length === 0) return;
+    const activeIdx = currentIndex === 0 ? replayData.candles.length - 1 : Math.max(0, currentIndex - 1);
     const candle = replayData.candles[activeIdx];
     if (!candle) return;
 
-    let profit = 0;
-    let total = 0;
-    let wins = 0;
-    let losses = 0;
-    const activePosList: any[] = [];
-
-    const m15Data = allReplayData.M15 ?? (replayData.meta.timeframe === "M15" ? replayData : null);
-    const h1Data = allReplayData.H1 ?? (replayData.meta.timeframe === "H1" ? replayData : null);
-    const h4Data = allReplayData.H4 ?? (replayData.meta.timeframe === "H4" ? replayData : null);
-    const m15Candles = m15Data?.candles ?? [];
-    const h1Candles = h1Data?.candles ?? [];
-    const h4Candles = h4Data?.candles ?? [];
-
-    const { executedTrades, rejectedTrades } = getProcessedReplayTrades(
-      replayData,
+    const processed = processTradesForPlayhead(
+      processedTradesMemo.executedTrades,
+      processedTradesMemo.rejectedTrades,
+      llmPositions,
+      candle,
+      replayData.candles,
       replayData.structures,
-      entryFilterParams,
-      m15Candles,
-      h1Candles,
-      h4Candles,
-      useLLMSetup || decisionEngine === "llm",
+      strategyParams,
+      useLLMSetup,
+      activePlanner
     );
 
-    const llmEntryTimes = new Set(llmPositions.map(p => p.entry_time ?? 0));
-    for (const trade of rejectedTrades) {
-      if ((trade.entry_time ?? 0) > candle.time) continue;
-      if (llmEntryTimes.has(trade.entry_time ?? 0)) continue;
-      activePosList.push({
-        ticket: trade.ticket,
-        type: trade.type,
-        entry_time: trade.entry_time,
-        lot_size: trade.lot_size ?? 0,
-        entry_price: trade.entry_price ?? 0,
-        current_price: null,
-        sl: null,
-        tp: null,
-        original_sl: null,
-        original_tp: null,
-        status: "Rejected",
-        reject_reason: trade.reject_reason,
-        pnl: 0,
-        is_rejected: true,
-      });
-    }
+    setRunningProfit(processed.runningProfit);
+    setTradeStats(processed.tradeStats);
+    setActivePositions(processed.activePositions);
 
-    const filteredTrades = executedTrades;
-    for (const t of filteredTrades) {
-      const entryTs = t.entry_time ?? 0;
-      if (entryTs <= candle.time) {
-        total++;
-        const exitTs = t.exit_time;
-
-        const actualLot = getActualLotSize(t);
-        const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-
-        const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-        const dynamicLevels = simulateTrailingSLTP(t, replayData.candles, simTime, replayData.structures, strategyParams);
-        const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-
-        if (dynamicLevels.isClosedSimulated || isClosedOriginal) {
-          // Closed trade: use net profit (scaled or simulated)
-          let tradeProfit = 0;
-          const exitPrice = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? (t.entry_price ?? 0))
-            : (t.exit_price ?? (t.entry_price ?? 0));
-          if (dynamicLevels.isClosedSimulated) {
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              tradeProfit = (exitPrice - entryPrice) * lotSize * 100;
-            } else {
-              tradeProfit = (entryPrice - exitPrice) * lotSize * 100;
-            }
-          } else {
-            tradeProfit = t.net_profit ?? 0;
-            if (strategyParams.lot_override > 0 && actualLot > 0) {
-              tradeProfit = (tradeProfit * strategyParams.lot_override) / actualLot;
-            }
-          }
-          profit += tradeProfit;
-          if (tradeProfit > 0) wins++;
-          else if (tradeProfit < 0) losses++;
-          // Tetap tampilkan di tabel dengan flag is_closed
-          activePosList.push({
-            ticket: t.ticket,
-            type: t.type,
-            entry_time: t.entry_time,
-            lot_size: lotSize,
-            entry_price: t.entry_price ?? 0,
-            current_price: exitPrice,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: dynamicLevels.initialSL,
-            original_tp: dynamicLevels.initialTP,
-            status: "Closed",
-            pnl: tradeProfit,
-            be_trigger_price: null,
-            is_be_active: false,
-            tp_trigger_price: null,
-            is_tp_maxed: false,
-            is_closed: true,
-          });
-        } else {
-          // Open trade: calculate running floating PnL
-          const entryPrice = t.entry_price ?? 0;
-          const typeLower = t.type.toLowerCase();
-
-          let floatingPnL = 0;
-          if (typeLower === "buy") {
-            floatingPnL = (candle.close - entryPrice) * lotSize * 100;
-          } else if (typeLower === "sell") {
-            floatingPnL = (entryPrice - candle.close) * lotSize * 100;
-          }
-          profit += floatingPnL;
-
-          // Calculate initial levels
-          const initialSL = dynamicLevels.initialSL;
-          const initialTP = dynamicLevels.initialTP;
-
-          // Determine status flags
-          const isBEActive = dynamicLevels.beTriggered;
-          const isTPExpanded = dynamicLevels.tp !== null && Math.abs(dynamicLevels.tp - initialTP) > 0.01;
-          const isSLTrailing = dynamicLevels.sl !== null && Math.abs(dynamicLevels.sl - initialSL) > 0.01;
-
-          let statusText = "Normal";
-          if (isBEActive && isTPExpanded) {
-            statusText = "BE + TP Expanded";
-          } else if (isBEActive) {
-            statusText = "Break-Even";
-          } else if (isTPExpanded) {
-            statusText = "TP Expanded";
-          } else if (isSLTrailing) {
-            statusText = "Trailing";
-          }
-
-          // Compute trigger prices
-          const beTriggerPrice = strategyParams.enable_breakeven
-            ? (typeLower === "buy" ? entryPrice + strategyParams.breakeven_trigger : entryPrice - strategyParams.breakeven_trigger)
-            : null;
-
-          const isTPMaxed = strategyParams.max_ekspansi > 0 && dynamicLevels.expansionCount >= strategyParams.max_ekspansi;
-          const tpTriggerPrice = isTPMaxed
-            ? null
-            : (dynamicLevels.tp !== null
-                ? (typeLower === "buy" ? dynamicLevels.tp - strategyParams.tp_trigger : dynamicLevels.tp + strategyParams.tp_trigger)
-                : null
-              );
-
-          activePosList.push({
-            ticket: t.ticket,
-            type: t.type,
-            entry_time: t.entry_time,
-            lot_size: lotSize,
-            entry_price: entryPrice,
-            current_price: candle.close,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: initialSL,
-            original_tp: initialTP,
-            status: statusText,
-            pnl: floatingPnL,
-            be_trigger_price: beTriggerPrice,
-            is_be_active: isBEActive,
-            tp_trigger_price: tpTriggerPrice,
-            is_tp_maxed: isTPMaxed,
-          });
-        }
-      }
-    }
-
-    // Process LLM positions in the active positions table & metrics
-    for (const llmPos of llmPositions) {
-      const entryTs = llmPos.entry_time ?? 0;
-      if (entryTs <= candle.time) {
-        if (llmPos.is_rejected) {
-          activePosList.push({
-            ticket: llmPos.ticket,
-            type: llmPos.type,
-            entry_time: llmPos.entry_time,
-            lot_size: llmPos.lot_size ?? 0,
-            entry_price: llmPos.entry_price ?? 0,
-            current_price: null,
-            sl: null,
-            tp: null,
-            original_sl: null,
-            original_tp: null,
-            status: "Rejected",
-            reject_reason: llmPos.reject_reason || "Ditolak / HOLD",
-            pnl: 0,
-            is_rejected: true,
-            is_llm: true,
-          });
-          continue;
-        }
-
-        total++;
-        const typeUpper = (llmPos.type ?? "BUY").toUpperCase();
-        const isBuy = typeUpper === "BUY";
-        const lotSize = llmPos.lot_size ?? 0.01;
-        const entryPrice = llmPos.entry_price ?? 0;
-        const slPrice = llmPos.sl ?? 0;
-        const tpPrice = llmPos.tp ?? 0;
-
-        // Check historical candles between entry and current candle to see if SL/TP was hit
-        let isClosed = false;
-        let exitPrice = candle.close;
-        let exitTime: number | null = null;
-        let statusText = "Running";
-
-        const entryCandleIdx = replayData.candles.findIndex(c => c.time >= entryTs);
-        const startIdx = entryCandleIdx >= 0 ? entryCandleIdx : 0;
-        const endIdx = activeIdx;
-
-        for (let i = startIdx; i <= endIdx; i++) {
-          const c = replayData.candles[i];
-          if (!c) continue;
-
-          // Force 24h close check: 86400 seconds = 24 hours
-          if (strategyParams.force_24h_close && (c.time - entryTs) >= 86400) {
-            isClosed = true;
-            exitPrice = c.close;
-            exitTime = c.time;
-            statusText = "Closed (24h)";
-            break;
-          }
-
-          if (isBuy) {
-            if (slPrice > 0 && c.low <= slPrice) {
-              isClosed = true;
-              exitPrice = slPrice;
-              exitTime = c.time;
-              statusText = "Closed (SL)";
-              break;
-            } else if (tpPrice > 0 && c.high >= tpPrice) {
-              isClosed = true;
-              exitPrice = tpPrice;
-              exitTime = c.time;
-              statusText = "Closed (TP)";
-              break;
-            }
-          } else {
-            if (slPrice > 0 && c.high >= slPrice) {
-              isClosed = true;
-              exitPrice = slPrice;
-              exitTime = c.time;
-              statusText = "Closed (SL)";
-              break;
-            } else if (tpPrice > 0 && c.low <= tpPrice) {
-              isClosed = true;
-              exitPrice = tpPrice;
-              exitTime = c.time;
-              statusText = "Closed (TP)";
-              break;
-            }
-          }
-        }
-
-        let pnl = 0;
-        if (isClosed) {
-          if (isBuy) {
-            pnl = (exitPrice - entryPrice) * lotSize * 100;
-          } else {
-            pnl = (entryPrice - exitPrice) * lotSize * 100;
-          }
-          if (pnl > 0) wins++;
-          else if (pnl < 0) losses++;
-        } else {
-          if (isBuy) {
-            pnl = (candle.close - entryPrice) * lotSize * 100;
-          } else {
-            pnl = (entryPrice - candle.close) * lotSize * 100;
-          }
-        }
-        profit += pnl;
-
-        activePosList.push({
-          ticket: llmPos.ticket,
-          type: typeUpper,
-          entry_time: entryTs,
-          lot_size: lotSize,
-          entry_price: entryPrice,
-          current_price: isClosed ? exitPrice : candle.close,
-          sl: slPrice,
-          tp: tpPrice,
-          original_sl: llmPos.original_sl ?? slPrice,
-          original_tp: llmPos.original_tp ?? tpPrice,
-          status: statusText,
-          pnl: pnl,
-          be_trigger_price: null,
-          is_be_active: false,
-          tp_trigger_price: null,
-          is_tp_maxed: false,
-          is_closed: isClosed,
-          is_llm: true,
-          exit_time: exitTime,
-        });
-      }
-    }
-
-    setRunningProfit(profit);
-    setTradeStats({ total, wins, losses });
-    setActivePositions(activePosList.sort((a, b) => (b.entry_time ?? Number.MIN_SAFE_INTEGER) - (a.entry_time ?? Number.MIN_SAFE_INTEGER)));
-
-    // Also update chart markers
-    if (tradesPrimitiveRef.current) {
-      const mapped = filteredTrades
-        .filter(t => (t.entry_time ?? 0) <= candle.time)
-        .map(t => {
-          const entryTs = t.entry_time ?? 0;
-          const exitTs = t.exit_time;
-          const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-          const dynamicLevels = simulateTrailingSLTP(t, replayData.candles, simTime, replayData.structures, strategyParams);
-
-          const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-          const isClosed = dynamicLevels.isClosedSimulated || isClosedOriginal;
-          const finalExitPrice = (dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? t.entry_price)
-            : (isClosedOriginal ? t.exit_price : t.entry_price)) ?? 0;
-          const finalExitTs = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitTimeSimulated ?? null)
-            : (isClosedOriginal ? exitTs : null);
-
-          // Calculate profit
-          let finalProfit = t.net_profit ?? 0;
-          const actualLot = getActualLotSize(t);
-          if (strategyParams.lot_override > 0 && actualLot > 0) {
-            finalProfit = (finalProfit * strategyParams.lot_override) / actualLot;
-          }
-          if (dynamicLevels.isClosedSimulated) {
-            const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              finalProfit = (finalExitPrice - entryPrice) * lotSize * 100;
-            } else {
-              finalProfit = (entryPrice - finalExitPrice) * lotSize * 100;
-            }
-          }
-
-          return {
-            type: t.type,
-            entry_price: t.entry_price ?? 0,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            profit: finalProfit,
-            entry_time_ts: entryTs,
-            exit_time_ts: isClosed ? finalExitTs : null,
-            // ATR band: value + candle range (start = entry - period bars, end = entry)
-            atr: (strategyParams.use_atr_sltp || useLLMSetup) ? calculateATR(replayData.candles, entryTs, strategyParams.atr_period) : null,
-            atr_start_ts: (strategyParams.use_atr_sltp || useLLMSetup) ? entryTs - strategyParams.atr_period * 900 : null,
-            atr_end_ts: (strategyParams.use_atr_sltp || useLLMSetup) ? entryTs : null,
-          };
-        });
-
-      if (activePlanner) {
-        const exitTs = activePlanner.exitTime ?? (activePlanner.entryTime + (activePlanner.durationBars || 15) * 900);
-        mapped.push({
-          type: activePlanner.type === "long" ? "BUY" : "SELL",
-          entry_price: activePlanner.entryPrice,
-          sl: activePlanner.slPrice,
-          tp: activePlanner.tpPrice,
-          profit: 0,
-          entry_time_ts: activePlanner.entryTime,
-          exit_time_ts: exitTs,
-          atr: null,
-          atr_start_ts: null,
-          atr_end_ts: null,
-        });
-      }
-
-      const lastTime = candle?.time ?? null;
-      if (lastTime !== null) {
-        tradesPrimitiveRef.current.setLastCandleTime(lastTime);
-      }
+    if (tradesPrimitiveRef.current && candle) {
+      tradesPrimitiveRef.current.setLastCandleTime(candle.time);
       tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
-      // Merge LLM-executed positions so they persist across replay re-renders.
-      const isAtrEnabled = strategyParams.use_atr_sltp || useLLMSetup;
-      const merged = [
-        ...mapped,
-        ...llmPositions
-          .filter(p => !p.is_rejected && (p.entry_time ?? 0) <= candle.time)
-          .map(p => {
-            const entryTs = p.entry_time ?? 0;
-            const posInList = activePosList.find(pos => pos.ticket === p.ticket);
-            return {
-              type: p.type,
-              entry_price: p.entry_price,
-              sl: p.sl,
-              tp: p.tp,
-              profit: posInList?.pnl ?? 0,
-              entry_time_ts: entryTs,
-              exit_time_ts: posInList?.is_closed ? posInList.exit_time : null,
-              atr: isAtrEnabled ? calculateATR(replayData.candles, entryTs, strategyParams.atr_period) : null,
-              atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
-              atr_end_ts: isAtrEnabled ? entryTs : null,
-            };
-          }),
-      ];
-      tradesPrimitiveRef.current.setTrades(merged);
+      tradesPrimitiveRef.current.setTrades(processed.overlayEntries);
     }
 
     if (supplyDemandPrimitiveRef.current && candle) {
@@ -3147,35 +3804,15 @@ export default function ReplayTrades() {
       .filter((point): point is { time: any; value: number } => point !== null);
     ma50SeriesRef.current?.setData(chartMA50 as any);
 
-    // 3. Update structure markers
+    // 3. Clear redundant candle markers (visual structure lines handle this cleanly)
+    markersPluginRef.current?.setMarkers([]);
+
     if (limit > 0) {
       const lastCandle = data.candles[limit - 1];
-      const markers: any[] = [];
-      for (const s of data.structures) {
-        if (s.time <= lastCandle.time) {
-          const color = STRUCTURE_COLORS[s.type?.toUpperCase()] ?? "#94a3b8";
-          const typeUpper = s.type?.toUpperCase() ?? "";
-          const dirLower = s.direction?.toLowerCase() ?? "";
 
-          let position: "aboveBar" | "belowBar";
-          if (typeUpper === "HH" || typeUpper === "LH") {
-            position = "aboveBar";
-          } else if (typeUpper === "HL" || typeUpper === "LL") {
-            position = "belowBar";
-          } else {
-            position = dirLower.includes("bear") ? "aboveBar" : "belowBar";
-          }
-
-          markers.push({
-            time: s.time as any,
-            position,
-            color,
-            shape: "arrowDown",
-            text: typeUpper,
-          });
-        }
-      }
-      markersPluginRef.current?.setMarkers(markers);
+      // Update structure lines at this index
+      const structLines = computeStructureLinesForPlayhead(data, lastCandle.time);
+      structurePrimitiveRef.current?.setLines(structLines);
 
       if (supplyDemandPrimitiveRef.current && limit > 0) {
         const lastCandle = data.candles[limit - 1];
@@ -3291,12 +3928,15 @@ export default function ReplayTrades() {
 
       // Default load activeTimeframe data into active display
       const currentData = loadedDataMap[activeTimeframe];
-      if (currentData) {
+      if (currentData && currentData.candles.length > 0) {
         setReplayData(currentData);
         candleTimeArrayRef.current = currentData.candles.map(c => c.time);
         const map = new Map<number, ReplayCandle>();
         currentData.candles.forEach(c => map.set(c.time, c));
         candleTimeMapRef.current = map;
+        const initialIdx = currentData.candles.length;
+        setChartDataToIndex(initialIdx, currentData);
+        setCurrentIndex(initialIdx);
       }
     } catch (err: unknown) {
       clearInterval(interval);
@@ -3362,7 +4002,7 @@ export default function ReplayTrades() {
 
   // ── Advance one candle ────────────────────────────────────────────────────
 
-  const advanceCandle = useCallback((idx: number, data: ReplayData) => {
+  const advanceCandle = useCallback((idx: number, data: ReplayData, isBatchIntermediate: boolean = false) => {
     if (idx >= data.candles.length) return idx;
 
     const candle = data.candles[idx];
@@ -3389,214 +4029,13 @@ export default function ReplayTrades() {
       ma50SeriesRef.current?.update({ time: candle.time as any, value: ma50 });
     }
 
-    // Update structure markers — all events up to this candle
-    const markers: any[] = [];
-    for (const s of data.structures) {
-      if (s.time <= candle.time) {
-        const color = STRUCTURE_COLORS[s.type?.toUpperCase()] ?? "#94a3b8";
-        const typeUpper = s.type?.toUpperCase() ?? "";
-        const dirLower = s.direction?.toLowerCase() ?? "";
-
-        // HH/LH → at the high (aboveBar), HL/LL → at the low (belowBar)
-        // CHoCH/BOS → bearish = aboveBar, bullish = belowBar
-        let position: "aboveBar" | "belowBar";
-        if (typeUpper === "HH" || typeUpper === "LH") {
-          position = "aboveBar";
-        } else if (typeUpper === "HL" || typeUpper === "LL") {
-          position = "belowBar";
-        } else {
-          // CHoCH, BOS — use direction field
-          position = dirLower.includes("bear") ? "aboveBar" : "belowBar";
-        }
-
-        markers.push({
-          time: s.time as any,
-          position,
-          color,
-          shape: "circle",
-          text: "", // Remove text label completely to avoid layout clutter
-          size: 0.6,
-        });
-      }
+    // Skip heavy overlay recalculation & state update for intermediate ticks during high speed batches
+    if (isBatchIntermediate) {
+      return idx + 1;
     }
 
-    markersPluginRef.current?.setMarkers(markers);
-
-    // Update structure lines
-    const lowerBound = (target: number): number => {
-      const arr = candleTimeArrayRef.current;
-      let lo = 0, hi = arr.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (arr[mid] < target) lo = mid + 1;
-        else hi = mid;
-      }
-      return lo;
-    };
-
-    // Pre-build a list of BOS/CHOCH events in the dataset to find breaks
-    const bosChochEvents = data.structures.filter(evt => {
-      const t = evt.type?.toUpperCase();
-      return t === "BOS" || t === "CHOCH";
-    });
-
-    const isLevelBrokenAtPlayhead = (h: StructureEvent, currentCandleTime: number): boolean => {
-      const hType = h.type?.toUpperCase();
-      if (hType !== "HH" && hType !== "LL" && hType !== "LH" && hType !== "HL") {
-        return false;
-      }
-
-      const hBucket = Math.round(h.price / 0.05);
-
-      // Find if there is a BOS/CHOCH event that breaks this HH/LL level
-      const breakEvent = bosChochEvents.find(b => {
-        const bBucket = Math.round(b.price / 0.05);
-        const priceMatch = Math.abs(bBucket - hBucket) <= 1;
-        const timeMatch = b.previous_time ? Math.abs(b.previous_time - h.time) <= 7200 : true;
-        return priceMatch && timeMatch && b.time > h.time && b.timeframe === h.timeframe;
-      });
-
-      // It is broken if the playhead has reached the break time
-      return breakEvent ? currentCandleTime >= breakEvent.time : false;
-    };
-
-    // Helper: find when a price level was first formed in HH/LL data.
-    const findLevelFormationTime = (
-      levelPrice: number,
-      direction: string, // 'BULLISH' or 'BEARISH'
-      eventTime: number,
-      timeframe: string
-    ): number | undefined => {
-      const isBullish = direction?.toUpperCase() === 'BULLISH';
-      const targetTypes = isBullish ? ["HH", "LH"] : ["LL", "HL"];
-
-      let matchTime: number | undefined;
-      for (const item of data.structures) {
-        const itemType = item.type?.toUpperCase();
-        if (targetTypes.includes(itemType) && item.time < eventTime && item.timeframe === timeframe) {
-          // Check price with 0.08 tolerance
-          if (Math.abs(item.price - levelPrice) <= 0.08) {
-            if (matchTime === undefined || item.time < matchTime) {
-              matchTime = item.time;
-            }
-          }
-        }
-      }
-      return matchTime;
-    };
-
-    const linesToDraw: StructureLineItem[] = [];
-    const currentCandleTime = candle.time;
-
-    for (const s of data.structures) {
-      const typeUpper = s.type?.toUpperCase() ?? "";
-      const dirUpper = s.direction?.toUpperCase() ?? "";
-      const isBullish = dirUpper === "BULLISH";
-
-      if (typeUpper === "BOS" || typeUpper === "CHOCH") {
-        // Only draw BOS/CHOCH line after the breakout has actually occurred at this playhead
-        if (currentCandleTime < s.time) {
-          continue;
-        }
-
-        const levelFormationTime = findLevelFormationTime(s.price, s.direction, s.time, s.timeframe);
-        const startTime = levelFormationTime ?? s.previous_time ?? (s.time - 900);
-        let endTime = s.time;
-
-        // Cap or stop line if crossed/broken by any candle close before endTime
-        const dirUp = isBullish;
-        const startIdx = lowerBound(startTime + 1);
-        const endIdx = lowerBound(endTime);
-        for (let i = startIdx; i < endIdx; i++) {
-          const c = data.candles[i];
-          const crossed = dirUp ? c.close > s.price : c.close < s.price;
-          if (crossed) {
-            endTime = c.time;
-            break;
-          }
-        }
-
-        if (startTime < endTime) {
-          linesToDraw.push({
-            price: s.price,
-            startTime,
-            endTime,
-            color: isBullish ? '#10b981' : '#ef4444',
-            lineWidth: 2,
-            lineStyle: typeUpper === "BOS" ? LineStyle.Solid : LineStyle.Dashed,
-            label: `${typeUpper} ${s.price.toFixed(2)}`,
-            isResistance: isBullish,
-          });
-        }
-      } else if (typeUpper === "HH" || typeUpper === "LL" || typeUpper === "LH" || typeUpper === "HL") {
-        // Skip HH/LL line drawing if it has already been broken by a BOS/CHOCH event at this playhead
-        if (isLevelBrokenAtPlayhead(s, currentCandleTime)) {
-          continue;
-        }
-
-        const startTime = s.time;
-        if (startTime > currentCandleTime) continue; // Point not yet formed
-
-        // Cap at 20 candles after formation
-        const startIdx = lowerBound(startTime + 1);
-        const maxIdx = Math.min(startIdx + 20, data.candles.length);
-
-        let endTime = currentCandleTime;
-        let broke = false;
-        for (let i = startIdx; i < maxIdx; i++) {
-          const c = data.candles[i];
-          if (c.time > currentCandleTime) break;
-          const crossed = (typeUpper === "HH" || typeUpper === "LH") ? c.close > s.price : c.close < s.price;
-          if (crossed) {
-            endTime = c.time;
-            broke = true;
-            break;
-          }
-        }
-
-        if (!broke && maxIdx > startIdx) {
-          const maxCandleTime = data.candles[maxIdx - 1].time;
-          endTime = Math.min(maxCandleTime, currentCandleTime);
-        }
-
-        if (startTime < endTime) {
-          const isHigh = typeUpper === "HH" || typeUpper === "LH";
-          const color = isHigh ? '#60a5fa' : '#fb923c';
-          linesToDraw.push({
-            price: s.price,
-            startTime,
-            endTime,
-            color,
-            lineWidth: 1.5,
-            lineStyle: LineStyle.Dotted,
-            label: `${typeUpper} [M15] ${s.price.toFixed(2)}`,
-            isResistance: isHigh,
-          });
-        }
-      }
-    }
-
-    // Filter linesToDraw to only keep the oldest HH/LL line when multiple exist in the same price range
-    const filteredLinesToDraw: StructureLineItem[] = [];
-    const sortedLines = [...linesToDraw].sort((a, b) => a.startTime - b.startTime);
-    for (const line of sortedLines) {
-      const isHhOrLl = line.label.startsWith("HH") || line.label.startsWith("LL") ||
-        line.label.startsWith("LH") || line.label.startsWith("HL");
-      if (isHhOrLl) {
-        const lineTypePrefix = line.label.slice(0, 2);
-        const hasOlderSameLevel = filteredLinesToDraw.some(existing => {
-          const existingTypePrefix = existing.label.slice(0, 2);
-          const sameType = existingTypePrefix === lineTypePrefix;
-          const samePrice = Math.abs(existing.price - line.price) <= 0.08;
-          return sameType && samePrice;
-        });
-        if (hasOlderSameLevel) {
-          continue;
-        }
-      }
-      filteredLinesToDraw.push(line);
-    }
-
+    // Update structure lines (strictly single highest HH and lowest LL per active leg)
+    const filteredLinesToDraw = computeStructureLinesForPlayhead(data, candle.time, candleTimeArrayRef.current);
     structurePrimitiveRef.current?.setLines(filteredLinesToDraw);
 
     // Update Supply & Demand zones primitive
@@ -3623,400 +4062,27 @@ export default function ReplayTrades() {
       }
     }
 
-    // Update trades overlay
-    const m15Data = allReplayData.M15 ?? (data.meta.timeframe === "M15" ? data : null);
-    const h1Data = allReplayData.H1 ?? (data.meta.timeframe === "H1" ? data : null);
-    const h4Data = allReplayData.H4 ?? (data.meta.timeframe === "H4" ? data : null);
-    const m15Candles = m15Data?.candles ?? [];
-    const h1Candles = h1Data?.candles ?? [];
-    const h4Candles = h4Data?.candles ?? [];
-
-    const { executedTrades, rejectedTrades } = getProcessedReplayTrades(
-      data,
+    // Update trades overlay & active positions & running stats in single fast pass
+    const processed = processTradesForPlayhead(
+      processedTradesMemo.executedTrades,
+      processedTradesMemo.rejectedTrades,
+      llmPositions,
+      candle,
+      data.candles,
       data.structures,
-      entryFilterParams,
-      m15Candles,
-      h1Candles,
-      h4Candles,
-      useLLMSetup || decisionEngine === "llm",
+      strategyParams,
+      useLLMSetup,
+      activePlanner
     );
-    const filteredTrades = executedTrades;
 
-    // Track running trade stats
-    let profit = 0;
-    let total = 0;
-    let wins = 0;
-    let losses = 0;
-    const activePosList: any[] = [];
+    setRunningProfit(processed.runningProfit);
+    setTradeStats(processed.tradeStats);
+    setActivePositions(processed.activePositions);
 
-    const llmEntryTimes = new Set(llmPositions.map(p => p.entry_time ?? 0));
-    for (const trade of rejectedTrades) {
-      if ((trade.entry_time ?? 0) > candle.time) continue;
-      if (llmEntryTimes.has(trade.entry_time ?? 0)) continue;
-      activePosList.push({
-        ticket: trade.ticket,
-        type: trade.type,
-        entry_time: trade.entry_time,
-        lot_size: trade.lot_size ?? 0,
-        entry_price: trade.entry_price ?? 0,
-        current_price: null,
-        sl: null,
-        tp: null,
-        original_sl: null,
-        original_tp: null,
-        status: "Rejected",
-        reject_reason: trade.reject_reason,
-        pnl: 0,
-        is_rejected: true,
-      });
-    }
-
-    for (const t of filteredTrades) {
-      const entryTs = t.entry_time ?? 0;
-      if (entryTs <= candle.time) {
-        total++;
-        const exitTs = t.exit_time;
-
-        const actualLot = getActualLotSize(t);
-        const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-
-        const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-        const dynamicLevels = simulateTrailingSLTP(t, data.candles, simTime, data.structures, strategyParams);
-        const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-
-        if (dynamicLevels.isClosedSimulated || isClosedOriginal) {
-          // Closed trade: use net profit (scaled or simulated)
-          let tradeProfit = 0;
-          const exitPrice = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? (t.entry_price ?? 0))
-            : (t.exit_price ?? (t.entry_price ?? 0));
-          if (dynamicLevels.isClosedSimulated) {
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              tradeProfit = (exitPrice - entryPrice) * lotSize * 100;
-            } else {
-              tradeProfit = (entryPrice - exitPrice) * lotSize * 100;
-            }
-          } else {
-            tradeProfit = t.net_profit ?? 0;
-            if (strategyParams.lot_override > 0 && actualLot > 0) {
-              tradeProfit = (tradeProfit * strategyParams.lot_override) / actualLot;
-            }
-          }
-          profit += tradeProfit;
-          if (tradeProfit > 0) wins++;
-          else if (tradeProfit < 0) losses++;
-          activePosList.push({
-            ticket: t.ticket,
-            type: t.type,
-            entry_time: t.entry_time,
-            lot_size: lotSize,
-            entry_price: t.entry_price ?? 0,
-            current_price: exitPrice,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: dynamicLevels.initialSL,
-            original_tp: dynamicLevels.initialTP,
-            status: "Closed",
-            pnl: tradeProfit,
-            be_trigger_price: null,
-            is_be_active: false,
-            tp_trigger_price: null,
-            is_tp_maxed: false,
-            is_closed: true,
-          });
-        } else {
-          // Open trade: calculate running floating PnL
-          const entryPrice = t.entry_price ?? 0;
-          const typeLower = t.type.toLowerCase();
-
-          let floatingPnL = 0;
-          if (typeLower === "buy") {
-            floatingPnL = (candle.close - entryPrice) * lotSize * 100;
-          } else if (typeLower === "sell") {
-            floatingPnL = (entryPrice - candle.close) * lotSize * 100;
-          }
-          profit += floatingPnL;
-
-          // Calculate initial levels
-          const initialSL = dynamicLevels.initialSL;
-          const initialTP = dynamicLevels.initialTP;
-
-          // Determine status flags
-          const isBEActive = dynamicLevels.beTriggered;
-          const isTPExpanded = dynamicLevels.tp !== null && Math.abs(dynamicLevels.tp - initialTP) > 0.01;
-          const isSLTrailing = dynamicLevels.sl !== null && Math.abs(dynamicLevels.sl - initialSL) > 0.01;
-
-          let statusText = "Normal";
-          if (isBEActive && isTPExpanded) {
-            statusText = "BE + TP Expanded";
-          } else if (isBEActive) {
-            statusText = "Break-Even";
-          } else if (isTPExpanded) {
-            statusText = "TP Expanded";
-          } else if (isSLTrailing) {
-            statusText = "Trailing";
-          }
-
-          // Compute trigger prices
-          const beTriggerPrice = strategyParams.enable_breakeven
-            ? (typeLower === "buy" ? entryPrice + strategyParams.breakeven_trigger : entryPrice - strategyParams.breakeven_trigger)
-            : null;
-
-          const isTPMaxed = strategyParams.max_ekspansi > 0 && dynamicLevels.expansionCount >= strategyParams.max_ekspansi;
-          const tpTriggerPrice = isTPMaxed
-            ? null
-            : (dynamicLevels.tp !== null
-                ? (typeLower === "buy" ? dynamicLevels.tp - strategyParams.tp_trigger : dynamicLevels.tp + strategyParams.tp_trigger)
-                : null
-              );
-
-          activePosList.push({
-            ticket: t.ticket,
-            type: t.type,
-            entry_time: t.entry_time,
-            lot_size: lotSize,
-            entry_price: entryPrice,
-            current_price: candle.close,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            original_sl: initialSL,
-            original_tp: initialTP,
-            status: statusText,
-            pnl: floatingPnL,
-            be_trigger_price: beTriggerPrice,
-            is_be_active: isBEActive,
-            tp_trigger_price: tpTriggerPrice,
-            is_tp_maxed: isTPMaxed,
-          });
-        }
-      }
-    }
-
-    // Process LLM positions in advanceCandle
-    for (const llmPos of llmPositions) {
-      const entryTs = llmPos.entry_time ?? 0;
-      if (entryTs <= candle.time) {
-        if (llmPos.is_rejected) {
-          activePosList.push({
-            ticket: llmPos.ticket,
-            type: llmPos.type,
-            entry_time: llmPos.entry_time,
-            lot_size: llmPos.lot_size ?? 0,
-            entry_price: llmPos.entry_price ?? 0,
-            current_price: null,
-            sl: null,
-            tp: null,
-            original_sl: null,
-            original_tp: null,
-            status: "Rejected",
-            reject_reason: llmPos.reject_reason || "Ditolak / HOLD",
-            pnl: 0,
-            is_rejected: true,
-            is_llm: true,
-          });
-          continue;
-        }
-
-        total++;
-        const typeUpper = (llmPos.type ?? "BUY").toUpperCase();
-        const isBuy = typeUpper === "BUY";
-        const lotSize = llmPos.lot_size ?? 0.01;
-        const entryPrice = llmPos.entry_price ?? 0;
-        const slPrice = llmPos.sl ?? 0;
-        const tpPrice = llmPos.tp ?? 0;
-
-        let isClosed = false;
-        let exitPrice = candle.close;
-        let exitTime: number | null = null;
-        let statusText = "Running";
-
-        const entryCandleIdx = data.candles.findIndex(c => c.time >= entryTs);
-        const startIdx = entryCandleIdx >= 0 ? entryCandleIdx : 0;
-        const endIdx = idx;
-
-        for (let i = startIdx; i <= endIdx; i++) {
-          const c = data.candles[i];
-          if (!c) continue;
-
-          // Force 24h close check: 86400 seconds = 24 hours
-          if (strategyParams.force_24h_close && (c.time - entryTs) >= 86400) {
-            isClosed = true;
-            exitPrice = c.close;
-            exitTime = c.time;
-            statusText = "Closed (24h)";
-            break;
-          }
-
-          if (isBuy) {
-            if (slPrice > 0 && c.low <= slPrice) {
-              isClosed = true;
-              exitPrice = slPrice;
-              exitTime = c.time;
-              statusText = "Closed (SL)";
-              break;
-            } else if (tpPrice > 0 && c.high >= tpPrice) {
-              isClosed = true;
-              exitPrice = tpPrice;
-              exitTime = c.time;
-              statusText = "Closed (TP)";
-              break;
-            }
-          } else {
-            if (slPrice > 0 && c.high >= slPrice) {
-              isClosed = true;
-              exitPrice = slPrice;
-              exitTime = c.time;
-              statusText = "Closed (SL)";
-              break;
-            } else if (tpPrice > 0 && c.low <= tpPrice) {
-              isClosed = true;
-              exitPrice = tpPrice;
-              exitTime = c.time;
-              statusText = "Closed (TP)";
-              break;
-            }
-          }
-        }
-
-        let pnl = 0;
-        if (isClosed) {
-          if (isBuy) {
-            pnl = (exitPrice - entryPrice) * lotSize * 100;
-          } else {
-            pnl = (entryPrice - exitPrice) * lotSize * 100;
-          }
-          if (pnl > 0) wins++;
-          else if (pnl < 0) losses++;
-        } else {
-          if (isBuy) {
-            pnl = (candle.close - entryPrice) * lotSize * 100;
-          } else {
-            pnl = (entryPrice - candle.close) * lotSize * 100;
-          }
-        }
-        profit += pnl;
-
-        activePosList.push({
-          ticket: llmPos.ticket,
-          type: typeUpper,
-          entry_time: entryTs,
-          lot_size: lotSize,
-          entry_price: entryPrice,
-          current_price: isClosed ? exitPrice : candle.close,
-          sl: slPrice,
-          tp: tpPrice,
-          original_sl: llmPos.original_sl ?? slPrice,
-          original_tp: llmPos.original_tp ?? tpPrice,
-          status: statusText,
-          pnl: pnl,
-          be_trigger_price: null,
-          is_be_active: false,
-          tp_trigger_price: null,
-          is_tp_maxed: false,
-          is_closed: isClosed,
-          is_llm: true,
-          exit_time: exitTime,
-        });
-      }
-    }
-
-    setRunningProfit(profit);
-    setTradeStats({ total, wins, losses });
-    setActivePositions(activePosList.sort((a, b) => (b.entry_time ?? Number.MIN_SAFE_INTEGER) - (a.entry_time ?? Number.MIN_SAFE_INTEGER)));
-
-    // Update chart trades overlay
     if (tradesPrimitiveRef.current) {
-      const isAtrEnabled = strategyParams.use_atr_sltp || useLLMSetup;
-      const entries: TradeOverlayEntry[] = filteredTrades
-        .filter(t => (t.entry_time ?? 0) <= candle.time)
-        .map(t => {
-          const entryTs = t.entry_time ?? 0;
-          const exitTs = t.exit_time;
-          const simTime = exitTs !== null ? Math.min(candle.time, exitTs) : candle.time;
-          const dynamicLevels = simulateTrailingSLTP(t, data.candles, simTime, data.structures, strategyParams);
-
-          const isClosedOriginal = exitTs !== null && exitTs <= candle.time;
-          const isClosed = dynamicLevels.isClosedSimulated || isClosedOriginal;
-          const finalExitPrice = (dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitPriceSimulated ?? t.entry_price)
-            : (isClosedOriginal ? t.exit_price : t.entry_price)) ?? 0;
-          const finalExitTs = dynamicLevels.isClosedSimulated
-            ? (dynamicLevels.exitTimeSimulated ?? null)
-            : (isClosedOriginal ? exitTs : null);
-
-          // Calculate profit
-          let finalProfit = t.net_profit ?? 0;
-          const actualLot = getActualLotSize(t);
-          if (strategyParams.lot_override > 0 && actualLot > 0) {
-            finalProfit = (finalProfit * strategyParams.lot_override) / actualLot;
-          }
-          if (dynamicLevels.isClosedSimulated) {
-            const lotSize = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
-            const entryPrice = t.entry_price ?? 0;
-            const typeLower = t.type.toLowerCase();
-            if (typeLower === "buy") {
-              finalProfit = (finalExitPrice - entryPrice) * lotSize * 100;
-            } else {
-              finalProfit = (entryPrice - finalExitPrice) * lotSize * 100;
-            }
-          }
-
-          return {
-            type: t.type,
-            entry_price: t.entry_price ?? 0,
-            sl: dynamicLevels.sl,
-            tp: dynamicLevels.tp,
-            profit: finalProfit,
-            entry_time_ts: entryTs,
-            exit_time_ts: isClosed ? finalExitTs : null,
-            atr: isAtrEnabled ? calculateATR(data.candles, entryTs, strategyParams.atr_period) : null,
-            atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
-            atr_end_ts: isAtrEnabled ? entryTs : null,
-          };
-        });
-
-      if (activePlanner) {
-        const exitTs = activePlanner.exitTime ?? (activePlanner.entryTime + (activePlanner.durationBars || 15) * 900);
-        entries.push({
-          type: activePlanner.type === "long" ? "BUY" : "SELL",
-          entry_price: activePlanner.entryPrice,
-          sl: activePlanner.slPrice,
-          tp: activePlanner.tpPrice,
-          profit: 0,
-          entry_time_ts: activePlanner.entryTime,
-          exit_time_ts: exitTs,
-          atr: null,
-          atr_start_ts: null,
-          atr_end_ts: null,
-        });
-      }
-
-      const mergedEntries = [
-        ...entries,
-        ...llmPositions
-          .filter(p => !p.is_rejected && (p.entry_time ?? 0) <= candle.time)
-          .map(p => {
-            const entryTs = p.entry_time ?? 0;
-            const posInList = activePosList.find(pos => pos.ticket === p.ticket);
-            return {
-              type: p.type,
-              entry_price: p.entry_price,
-              sl: p.sl,
-              tp: p.tp,
-              profit: posInList?.pnl ?? 0,
-              entry_time_ts: entryTs,
-              exit_time_ts: posInList?.is_closed ? posInList.exit_time : null,
-              atr: isAtrEnabled ? calculateATR(data.candles, entryTs, strategyParams.atr_period) : null,
-              atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
-              atr_end_ts: isAtrEnabled ? entryTs : null,
-            };
-          }),
-      ];
-      tradesPrimitiveRef.current.setTrades(mergedEntries);
       tradesPrimitiveRef.current.setLastCandleTime(candle.time);
       tradesPrimitiveRef.current.setTimeframe(activeTimeframe);
+      tradesPrimitiveRef.current.setTrades(processed.overlayEntries);
     }
 
     if (chartRef.current) {
@@ -4024,7 +4090,7 @@ export default function ReplayTrades() {
     }
 
     return idx + 1;
-  }, [strategyParams, getFilteredTrades, llmPositions, useLLMSetup, activePlanner, activeTimeframe]);
+  }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe]);
 
   // ── Playback controls (continued) ──
 
@@ -4033,6 +4099,9 @@ export default function ReplayTrades() {
     setIsPlaying(true);
 
     let idx = currentIndex;
+    const batchSize = speed === "1000x" ? 50 : speed === "100x" ? 10 : speed === "50x" ? 5 : 1;
+    const intervalMs = speed === "1000x" ? 20 : speed === "100x" ? 20 : speed === "50x" ? 25 : (SPEED_MAP[speed] || 50);
+
     timerRef.current = setInterval(() => {
       if (idx >= replayData.candles.length) {
         clearInterval(timerRef.current!);
@@ -4040,9 +4109,12 @@ export default function ReplayTrades() {
         setIsPlaying(false);
         return;
       }
-      idx = advanceCandle(idx, replayData);
+      for (let b = 0; b < batchSize && idx < replayData.candles.length; b++) {
+        const isIntermediate = b < batchSize - 1 && (idx + 1) < replayData.candles.length;
+        idx = advanceCandle(idx, replayData, isIntermediate);
+      }
       setCurrentIndex(idx);
-    }, SPEED_MAP[speed]);
+    }, intervalMs);
   }, [replayData, currentIndex, speed, advanceCandle]);
 
   const handleNext = useCallback(() => {
@@ -4075,11 +4147,255 @@ export default function ReplayTrades() {
 
   const totalCandles = replayData?.candles.length ?? 0;
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
+  const isReplayFinished = totalCandles > 0 && currentIndex >= totalCandles;
   const currentCandle = replayData?.candles[Math.max(0, currentIndex - 1)];
   const completedTrades = tradeStats.wins + tradeStats.losses;
   const winRate = completedTrades > 0 ? Math.round((tradeStats.wins / completedTrades) * 100) : 0;
   const initialBalance = strategyParams.initial_balance ?? INITIAL_BALANCE;
   const currentEquity = initialBalance + runningProfit;
+
+  const handleExportCSV = useCallback(() => {
+    if (!replayData || !replayData.candles.length) return;
+
+    const headers = [
+      "Ticket", "Symbol", "Type", "EntryStructure", "CloseType", "EntryPrice", "ExitPrice",
+      "SL", "TP", "Profit", "Spread_Cost", "Commission", "Swap", "Net_Profit",
+      "Session", "Session_IsDST",
+      "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
+      "Status", "Reject_Reason",
+      "BodyRatio", "BodyRatioMin", "BodyRatioPassed", "BodyRatioMode",
+      "InitialSL", "InitialTP", "FinalSL", "FinalTP",
+      "InitialRiskPoints", "InitialRewardPoints",
+      "FinalRiskPoints", "FinalRewardPoints",
+      "TrailingModified", "TrailingCount",
+      "TPExpanded", "TPExpandCount",
+      "MaxFavorablePoints", "MaxAdversePoints",
+      "CloseReason"
+    ];
+
+    const rows: string[] = [headers.join(",")];
+
+    const m15Data = allReplayData.M15 ?? (replayData.meta.timeframe === "M15" ? replayData : null);
+    const h1Data = allReplayData.H1 ?? (replayData.meta.timeframe === "H1" ? replayData : null);
+    const h4Data = allReplayData.H4 ?? (replayData.meta.timeframe === "H4" ? replayData : null);
+    const m15Candles = m15Data?.candles ?? [];
+    const h1Candles = h1Data?.candles ?? [];
+    const h4Candles = h4Data?.candles ?? [];
+
+    const { executedTrades, rejectedTrades } = getProcessedReplayTrades(
+      replayData,
+      replayData.structures,
+      entryFilterParams,
+      m15Candles,
+      h1Candles,
+      h4Candles,
+      useLLMSetup || decisionEngine === "llm",
+    );
+
+    const endCandle = replayData.candles[replayData.candles.length - 1];
+    const simTime = endCandle.time;
+
+    // 1. Process Executed Trades
+    for (const t of executedTrades) {
+      const entryTs = t.entry_time ?? 0;
+      const actualLot = getActualLotSize(t);
+      const baseLot = strategyParams.lot_override > 0 ? strategyParams.lot_override : actualLot;
+      const entryPriceVal = t.entry_price ?? 0;
+      const ratio = (strategyParams.use_price_ratio_scaling && strategyParams.base_reference_price > 0 && entryPriceVal > 0)
+        ? entryPriceVal / strategyParams.base_reference_price
+        : 1.0;
+      const lotSize = strategyParams.use_price_ratio_scaling
+        ? Math.max(0.01, Number((baseLot / ratio).toFixed(2)))
+        : baseLot;
+
+      const dynamicLevels = simulateTrailingSLTP(t, replayData.candles, simTime, replayData.structures, strategyParams);
+      const activePos = activePositions?.find(p => String(p.ticket) === String(t.ticket));
+      const isClosed = activePos ? activePos.is_closed : dynamicLevels.isClosedSimulated;
+      const exitPrice = activePos ? activePos.current_price : (isClosed ? (dynamicLevels.exitPriceSimulated ?? entryPriceVal) : (replayData.candles[replayData.candles.length - 1]?.close ?? entryPriceVal));
+      const exitTs = isClosed ? dynamicLevels.exitTimeSimulated : (replayData.candles[replayData.candles.length - 1]?.time ?? entryTs);
+
+      const typeLower = t.type.toLowerCase();
+      const entryCandle = replayData.candles.find(c => c.time === entryTs) || replayData.candles.find(c => c.time === (entryTs - 900));
+      const entrySpreadPts = (entryCandle?.spread != null && entryCandle.spread > 0) ? entryCandle.spread : 4;
+      const spreadCost = (t.spread_cost != null && t.spread_cost > 0)
+        ? t.spread_cost
+        : Number(((entrySpreadPts * 0.01) * lotSize * 100).toFixed(2));
+      const commission = 0.0;
+      const swap = t.swap != null && t.swap !== 0
+        ? t.swap
+        : calculateTradeSwap(entryTs, exitTs ?? entryTs, lotSize, typeLower === "buy");
+
+      let grossProfit = 0;
+      let netProfit = 0;
+      if (typeLower === "buy") {
+        grossProfit = Number(((exitPrice - entryPriceVal) * lotSize * 100).toFixed(2));
+      } else {
+        grossProfit = Number(((entryPriceVal - exitPrice) * lotSize * 100).toFixed(2));
+      }
+      netProfit = Number((grossProfit - spreadCost - commission + swap).toFixed(2));
+
+      // Structure info
+      const { latestType, bosCycle } = getEntryStructureInfo(entryTs, replayData.structures, t.type);
+      const entryStructure = latestType === "CHOCH" ? "CHoCH" : (bosCycle > 0 ? `BoS_${bosCycle}` : "BoS");
+
+      // Close type
+      let closeType = "UNKNOWN";
+      const cReason = (dynamicLevels.closeReason as string) ?? "";
+      if (cReason === "24H_FORCE") closeType = "24H_FORCE";
+      else if (cReason === "PROFIT_TARGET") closeType = "PROFIT_TARGET";
+      else if (cReason === "3_BOS_EXIT") closeType = "3_BOS_EXIT";
+      else if (isClosed) {
+        if (netProfit > 0) {
+          closeType = dynamicLevels.expansionCount > 0 ? `HIT_TP${dynamicLevels.expansionCount + 1}` : "HIT_TP1";
+        } else {
+          closeType = "HIT_SL";
+        }
+      } else {
+        closeType = "OPEN";
+      }
+
+      const initialSL = dynamicLevels.initialSL ?? 0;
+      const initialTP = dynamicLevels.initialTP ?? 0;
+      const finalSL = dynamicLevels.sl ?? initialSL;
+      const finalTP = dynamicLevels.tp ?? initialTP;
+
+      const initialRiskPts = Math.round(Math.abs(entryPriceVal - initialSL) * 100);
+      const initialRewardPts = Math.round(Math.abs(initialTP - entryPriceVal) * 100);
+      const finalRiskPts = Math.round(Math.abs(entryPriceVal - finalSL) * 100);
+      const finalRewardPts = Math.round(Math.abs(finalTP - entryPriceVal) * 100);
+
+      const trailingModified = (dynamicLevels.slHistory?.length || 0) > 1 ? "YES" : "NO";
+      const trailingCount = Math.max(0, (dynamicLevels.slHistory?.length || 1) - 1);
+      const tpExpanded = (dynamicLevels.expansionCount || 0) > 0 ? "YES" : "NO";
+      const tpExpandCount = dynamicLevels.expansionCount || 0;
+
+      const row = [
+        t.ticket,
+        "XAUUSD",
+        t.type.toUpperCase(),
+        entryStructure,
+        closeType,
+        entryPriceVal.toFixed(2),
+        exitPrice.toFixed(2),
+        finalSL.toFixed(2),
+        finalTP.toFixed(2),
+        grossProfit.toFixed(2),
+        spreadCost.toFixed(2),
+        commission.toFixed(2),
+        swap.toFixed(2),
+        netProfit.toFixed(2),
+        t.session || "LONDON",
+        "NO",
+        formatMT5Time(entryTs),
+        formatMT5Time(exitTs),
+        lotSize.toFixed(2),
+        111,
+        replayData.meta.timeframe || "M15",
+        isClosed ? "CLOSED" : "OPEN",
+        "",
+        "0.00",
+        "0.50",
+        "YES",
+        "",
+        initialSL.toFixed(2),
+        initialTP.toFixed(2),
+        finalSL.toFixed(2),
+        finalTP.toFixed(2),
+        initialRiskPts,
+        initialRewardPts,
+        finalRiskPts,
+        finalRewardPts,
+        trailingModified,
+        trailingCount,
+        tpExpanded,
+        tpExpandCount,
+        dynamicLevels.maxFavorablePoints || 0,
+        dynamicLevels.maxAdversePoints || 0,
+        dynamicLevels.closeReason || (isClosed ? closeType : "")
+      ];
+      rows.push(row.join(","));
+    }
+
+    // 2. Process Rejected Trades
+    for (const r of rejectedTrades) {
+      const entryTs = r.entry_time ?? 0;
+      const entryPriceVal = r.entry_price ?? 0;
+      const { latestType, bosCycle } = getEntryStructureInfo(entryTs, replayData.structures, r.type);
+      const entryStructure = latestType === "CHOCH" ? "CHoCH" : (bosCycle > 0 ? `BoS_${bosCycle}` : "BoS");
+
+      const row = [
+        r.ticket,
+        "XAUUSD",
+        r.type.toUpperCase(),
+        entryStructure,
+        "REJECTED",
+        entryPriceVal.toFixed(2),
+        "0.00",
+        (r.sl ?? 0).toFixed(2),
+        (r.tp ?? 0).toFixed(2),
+        "0.00",
+        "0.00",
+        "0.00",
+        "0.00",
+        "0.00",
+        r.session || "LONDON",
+        "NO",
+        formatMT5Time(entryTs),
+        "",
+        (r.lot_size ?? 0.05).toFixed(2),
+        111,
+        replayData.meta.timeframe || "M15",
+        "REJECTED",
+        `"${(r.reject_reason || "FILTER_REJECTED").replace(/"/g, '""')}"`,
+        "0.00",
+        "0.50",
+        "NO",
+        "",
+        (r.sl ?? 0).toFixed(2),
+        (r.tp ?? 0).toFixed(2),
+        (r.sl ?? 0).toFixed(2),
+        (r.tp ?? 0).toFixed(2),
+        0,
+        0,
+        0,
+        0,
+        "NO",
+        0,
+        "NO",
+        0,
+        0,
+        0,
+        `"${(r.reject_reason || "FILTER_REJECTED").replace(/"/g, '""')}"`
+      ];
+      rows.push(row.join(","));
+    }
+
+    // Trigger browser download
+    const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(rows.join("\n"));
+    const downloadAnchor = document.createElement("a");
+
+    // Penamaan file dinamis sesuai rentang tanggal data yang difilter (bukan tanggal hari ini)
+    let exportDateStr = "";
+    if (replayData.candles && replayData.candles.length > 0) {
+      const lastCandle = replayData.candles[replayData.candles.length - 1];
+      const lastDate = new Date(lastCandle.time * 1000);
+      const yyyy = lastDate.getUTCFullYear();
+      const mm = String(lastDate.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(lastDate.getUTCDate()).padStart(2, "0");
+      exportDateStr = `${yyyy}-${mm}-${dd}`;
+    } else if (yearFrom === yearTo) {
+      const mm = String(monthTo).padStart(2, "0");
+      exportDateStr = `${yearTo}-${mm}`;
+    } else {
+      exportDateStr = `${yearFrom}_${yearTo}`;
+    }
+
+    downloadAnchor.setAttribute("href", csvContent);
+    downloadAnchor.setAttribute("download", `Backtest_Results_XAUUSD_${exportDateStr}-replay.csv`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  }, [replayData, allReplayData, entryFilterParams, strategyParams, useLLMSetup, decisionEngine, activePositions, yearFrom, monthFrom, yearTo, monthTo]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -4090,38 +4406,56 @@ export default function ReplayTrades() {
     >
       {/* ── Header ── */}
       <div
-        className="relative z-30 flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 sm:py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
+        className="relative z-30 flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)] overflow-visible flex-nowrap"
         style={{ borderColor: "rgba(var(--neon-blue-rgb), 0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
-        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-          <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-xl sm:text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none">
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-lg sm:text-xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none">
             🎬
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] leading-none mb-1">
+            <h1 className="text-lg sm:text-xl font-bold text-[var(--text-primary)] leading-none mb-0.5 whitespace-nowrap">
               Replay Trades
             </h1>
-            <p className="text-[var(--text-tertiary)] text-[11px] sm:text-xs">
-              Replay historical trades and evaluate strategy performance
+            <p className="text-[var(--text-tertiary)] text-[10px] sm:text-[11px] whitespace-nowrap">
+              Replay historical trades & evaluate strategy
             </p>
           </div>
         </div>
 
         {/* Filter controls + Playback Controls */}
-        <div className="flex items-center gap-2 flex-wrap justify-start sm:justify-end min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap justify-end min-w-0 shrink-0">
           {/* If replayData is loaded, render playback controls FIRST! */}
           {replayData && (
             <>
               {/* Playback Control Deck */}
-              <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+                {/* Jump / Cut to Bar (TradingView Bar Replay ✂️) */}
+                <button
+                  onClick={() => {
+                    setIsCutMode((prev) => !prev);
+                    if (plannerTool !== "none") setPlannerTool("none");
+                  }}
+                  title="Jump to Bar (TradingView ✂️) - Klik candle di chart untuk memotong replay ke titik tersebut"
+                  className={cn(
+                    "flex items-center gap-1 px-2 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 cursor-pointer border select-none",
+                    isCutMode
+                      ? "bg-rose-500/20 text-rose-300 border-rose-500/60 shadow-[0_0_12px_rgba(244,63,94,0.35)] animate-pulse"
+                      : "text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border-transparent hover:border-rose-500/30"
+                  )}
+                >
+                  <Scissors size={12} />
+                  <span>{isCutMode ? "Cut..." : "Jump"}</span>
+                </button>
+
                 {/* Rewind */}
                 <button
                   onClick={handlePrev}
                   disabled={isPlaying || currentIndex <= 0}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
                 >
                   <Rewind size={12} />
-                  <span>Rewind</span>
+                  <span>Prev</span>
                 </button>
 
                 {/* Play / Pause */}
@@ -4129,7 +4463,7 @@ export default function ReplayTrades() {
                   onClick={isPlaying ? stopPlayback : startPlayback}
                   disabled={currentIndex >= totalCandles}
                   className={cn(
-                    "flex items-center gap-1 px-3 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer shadow-sm border",
+                    "flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer shadow-sm border",
                     isPlaying
                       ? "bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                       : "bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
@@ -4143,7 +4477,7 @@ export default function ReplayTrades() {
                 <button
                   onClick={handleNext}
                   disabled={isPlaying || currentIndex >= totalCandles}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 disabled:opacity-30 cursor-pointer text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 disabled:hover:bg-transparent"
                 >
                   <SkipForward size={12} />
                   <span>Next</span>
@@ -4152,64 +4486,70 @@ export default function ReplayTrades() {
                 {/* Stop */}
                 <button
                   onClick={handleStop}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-red-400 hover:text-red-300 hover:bg-red-500/10"
                 >
                   <Square size={12} />
                   <span>Stop</span>
                 </button>
               </div>
 
-              {/* Speed */}
-              <div className="flex items-center gap-1.5 ml-1">
-                <span className="text-xs text-[var(--text-secondary,#94a3b8)]">Speed:</span>
-                <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
-                  {(["1x", "2x", "3x", "5x", "10x"] as const).map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setSpeed(s)}
-                      className={cn(
-                        "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer",
-                        speed === s
-                          ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                          : "text-slate-400 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+              {/* Speed Selector (Compact) */}
+              <div className="flex items-center gap-1 ml-0.5">
+                <CustomSelect
+                  value={speed}
+                  onChange={(val) => setSpeed(val as any)}
+                  options={["1x", "2x", "3x", "5x", "10x", "50x", "100x", "1000x"]}
+                  getLabel={(s) => `⚡ ${s}`}
+                  accent="cyan"
+                  className="w-20 text-xs"
+                />
               </div>
 
-              {/* Progress Bar */}
-              <div className="flex items-center gap-2 w-32 ml-1">
+              {/* Progress Bar (Compact) */}
+              <div className="flex items-center gap-1.5 w-20 sm:w-24 ml-0.5">
                 <div className="flex-1 h-1.5 rounded-full bg-[rgba(100,116,139,0.15)] overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-purple-500 transition-all"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
-                <span className="text-xs font-mono tabular-nums text-[var(--text-secondary,#94a3b8)] min-w-[28px] text-right">
+                <span className="text-[11px] font-mono tabular-nums text-[var(--text-secondary,#94a3b8)] min-w-[24px] text-right">
                   {progress}%
                 </span>
               </div>
 
+              {/* Export CSV Button (Active when replay finished 100%, Disabled otherwise) */}
+              <button
+                onClick={handleExportCSV}
+                disabled={!isReplayFinished}
+                title={isReplayFinished ? "Download Backtest Results (.csv)" : "Download aktif otomatis setelah replay selesai (100%)"}
+                className={cn(
+                  "flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all duration-200 active:scale-95 shadow-sm border select-none whitespace-nowrap",
+                  isReplayFinished
+                    ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer animate-pulse"
+                    : "bg-slate-800/30 text-slate-500 border-slate-700/30 opacity-40 cursor-not-allowed"
+                )}
+              >
+                <Download size={12} />
+                <span>Export</span>
+              </button>
+
               {/* Vertical separator */}
-              <div className="w-[1px] h-6 bg-slate-800/60 self-center" />
+              <div className="w-[1px] h-5 bg-slate-800/60 self-center mx-0.5" />
             </>
           )}
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
             {/* Timeframe selector (tiru 100% dari page trades) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2">
-              <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary,#94a3b8)]">Timeframe</span>
-              <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+            <div className="flex items-center gap-1 sm:gap-1.5">
+              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
                 {["M15", "H1", "H4"].map((tf) => (
                   <button
                     key={tf}
                     disabled={isLoading}
                     onClick={() => handleTimeframeChange(tf)}
                     className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-40",
+                      "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-40",
                       tf === activeTimeframe
                         ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
                         : "text-slate-400 hover:text-white hover:bg-white/5"
@@ -4221,7 +4561,7 @@ export default function ReplayTrades() {
               </div>
             </div>
 
-            <Calendar size={16} className="text-[var(--neon-blue,#38bdf8)] animate-pulse hidden sm:inline-block" />
+            <Calendar size={14} className="text-[var(--neon-blue,#38bdf8)] animate-pulse hidden xl:inline-block" />
 
             {/* From */}
             <CustomSelect
@@ -4237,10 +4577,10 @@ export default function ReplayTrades() {
               options={availableMonthsFrom}
               getLabel={(val) => MONTHS[val - 1]}
               accent="purple"
-              className="w-28 sm:w-32"
+              className="w-24 sm:w-28"
             />
 
-            <span className="text-[var(--text-secondary,#94a3b8)] text-sm font-semibold">→</span>
+            <span className="text-[var(--text-secondary,#94a3b8)] text-xs font-semibold">→</span>
 
             {/* To */}
             <CustomSelect
@@ -4256,13 +4596,13 @@ export default function ReplayTrades() {
               options={availableMonthsTo}
               getLabel={(val) => MONTHS[val - 1]}
               accent="purple"
-              className="w-28 sm:w-32"
+              className="w-24 sm:w-28"
             />
 
             <button
               onClick={handleLoad}
               disabled={isLoading}
-              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
+              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white shrink-0"
               style={
                 replayData
                   ? {
@@ -4452,6 +4792,7 @@ export default function ReplayTrades() {
               id="btn-long-tool"
               onClick={() => {
                 setPlannerTool((prev) => (prev === "long" ? "none" : "long"));
+                if (isCutMode) setIsCutMode(false);
               }}
               title="Long Position Tool (Klik pada chart untuk meletakkan posisi Buy)"
               className={cn(
@@ -4471,6 +4812,7 @@ export default function ReplayTrades() {
               id="btn-short-tool"
               onClick={() => {
                 setPlannerTool((prev) => (prev === "short" ? "none" : "short"));
+                if (isCutMode) setIsCutMode(false);
               }}
               title="Short Position Tool (Klik pada chart untuk meletakkan posisi Sell)"
               className={cn(
@@ -4482,6 +4824,26 @@ export default function ReplayTrades() {
             >
               <TrendingDown size={14} className={plannerTool === "short" ? "text-slate-950 stroke-[2.5]" : "text-rose-400"} />
               <span>Short</span>
+            </button>
+
+            {/* Jump to Bar (TradingView Bar Replay ✂️) */}
+            <button
+              type="button"
+              id="btn-cut-tool"
+              onClick={() => {
+                setIsCutMode((prev) => !prev);
+                if (plannerTool !== "none") setPlannerTool("none");
+              }}
+              title="Jump to Bar (TradingView ✂️) - Klik candle di chart untuk memotong & melompat ke waktu tersebut"
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
+                isCutMode
+                  ? "bg-amber-500 text-slate-950 shadow-[0_0_16px_rgba(245,158,11,0.6)] border border-amber-400 animate-pulse"
+                  : "text-amber-400 hover:bg-amber-500/15 border border-amber-500/25 bg-amber-500/5 hover:border-amber-500/40"
+              )}
+            >
+              <Scissors size={14} className={isCutMode ? "text-slate-950 stroke-[2.5]" : "text-amber-400"} />
+              <span>Jump Bar</span>
             </button>
 
             {/* Divider */}
@@ -5025,6 +5387,31 @@ export default function ReplayTrades() {
             </div>
           )}
 
+          {/* ── TradingView-Style Jump / Cut Line Overlay (✂️ Bar Replay) ── */}
+          {isCutMode && cutHoverInfo && (
+            <div className="pointer-events-none absolute inset-x-4 top-3 bottom-0 z-30 overflow-hidden select-none">
+              {/* Vertical Cut Dotted Line */}
+              <div
+                className="absolute top-0 bottom-0 w-0 border-l-2 border-dashed border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.7)]"
+                style={{ left: `${cutHoverInfo.x}px` }}
+              >
+                {/* Top Floating Badge with Scissors Icon & Timestamp */}
+                <div className="absolute top-4 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/95 border border-amber-400 text-amber-300 text-xs font-mono font-bold shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md whitespace-nowrap animate-bounce">
+                  <Scissors size={13} className="text-amber-400" />
+                  <span>Potong Replay ke: {cutHoverInfo.formattedTime}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    (Bar #{cutHoverInfo.index + 1})
+                  </span>
+                </div>
+
+                {/* Bottom Instruction Pill */}
+                <div className="absolute bottom-6 -translate-x-1/2 px-3 py-1 rounded-md bg-amber-950/90 border border-amber-500/80 text-[11px] text-amber-200 font-sans font-semibold shadow-lg whitespace-nowrap">
+                  ✂️ Klik untuk memotong replay ke titik ini (Esc untuk batal)
+                </div>
+              </div>
+            </div>
+          )}
+
           <div
             ref={chartContainerRef}
             onMouseDown={handleChartMouseDown}
@@ -5033,7 +5420,9 @@ export default function ReplayTrades() {
             onMouseLeave={handleChartMouseLeave}
             className={cn(
               "w-full h-full rounded-lg overflow-hidden transition-all",
-              dragMode === "move" || hoveredDragTarget === "move"
+              isCutMode
+                ? "cursor-crosshair"
+                : dragMode === "move" || hoveredDragTarget === "move"
                 ? "cursor-move select-none"
                 : dragMode === "width" || hoveredDragTarget === "width"
                 ? "cursor-ew-resize select-none"
@@ -5257,7 +5646,8 @@ export default function ReplayTrades() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-200 text-xs font-medium">
-                    {activePositions
+                    {[...activePositions]
+                      .sort((a, b) => getTimestampSeconds(b.entry_time) - getTimestampSeconds(a.entry_time))
                       .map((pos) => {
                       const isWin = pos.pnl >= 0;
                       const isBuy = pos.type === "BUY";
@@ -5265,10 +5655,10 @@ export default function ReplayTrades() {
                       const isRejected = pos.is_rejected === true;
                       const signalType = pos.entry_time == null
                         ? ""
-                        : getEntryStructureInfo(pos.entry_time, replayData.structures).latestType;
+                        : getEntryStructureInfo(pos.entry_time, replayData.structures, pos.type).latestType;
 
-                      const hasSLChanged = !isClosed && pos.sl && pos.original_sl && Math.abs(pos.sl - pos.original_sl) > 0.01;
-                      const hasTPChanged = !isClosed && pos.tp && pos.original_tp && Math.abs(pos.tp - pos.original_tp) > 0.01;
+                      const hasSLChanged = Boolean(pos.sl && pos.original_sl && Math.abs(pos.sl - pos.original_sl) > 0.01);
+                      const hasTPChanged = Boolean(pos.tp && pos.original_tp && Math.abs(pos.tp - pos.original_tp) > 0.01);
 
                       // Status Badge Classes
                       let badgeClass = "bg-slate-800/40 text-slate-400 border border-slate-700/30";
@@ -5336,33 +5726,106 @@ export default function ReplayTrades() {
                               : `${new Date(pos.entry_time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`}
                           </td>
                           <td className={`py-3.5 px-4 text-right font-mono ${isClosed ? "text-slate-500" : ""}`}>
-                            {isRejected ? <span className="text-slate-600">-</span> : <>{isClosed ? <span className="text-[10px] text-slate-500">Exit: </span> : null}${pos.current_price.toFixed(2)}</>}
+                            {isRejected ? (
+                              <span className="text-slate-600">-</span>
+                            ) : (
+                              <>
+                                {isClosed ? (
+                                  pos.close_reason === "24H_FORCE" ? (
+                                    <span className="text-[10px] text-amber-400 font-bold">24h: </span>
+                                  ) : pos.close_reason === "PROFIT_TARGET" ? (
+                                    <span className="text-[10px] text-blue-400 font-bold">Target: </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-500">Exit: </span>
+                                  )
+                                ) : null}
+                                ${pos.current_price.toFixed(2)}
+                              </>
+                            )}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono">
                             {hasSLChanged ? (
                               <span className="flex items-center justify-end gap-1.5">
-                                <span className="text-slate-500 line-through">${pos.original_sl.toFixed(2)}</span>
-                                <span className="text-slate-400">→</span>
+                                <span className="text-slate-400">${pos.original_sl.toFixed(2)}</span>
+                                <span className="text-slate-500">→</span>
                                 <span className="text-rose-400 font-bold">${pos.sl.toFixed(2)}</span>
+                                {isClosed && pos.close_reason === "SL" && (
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-bold rounded border border-rose-500/30">
+                                    Hit SL
+                                  </span>
+                                )}
                               </span>
                             ) : (
-                              <span className="text-slate-400">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
+                              <span className="flex items-center justify-end gap-1.5">
+                                <span className="text-slate-400">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
+                                {isClosed && pos.close_reason === "SL" && (
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-bold rounded border border-rose-500/30">
+                                    Hit SL
+                                  </span>
+                                )}
+                              </span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono">
-                            {hasTPChanged ? (
-                              <span className="flex items-center justify-end gap-1.5">
-                                <span className="text-slate-500 line-through">${pos.original_tp.toFixed(2)}</span>
-                                <span className="text-slate-400">→</span>
-                                <span className="text-emerald-400 font-bold">${pos.tp.toFixed(2)}</span>
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
-                            )}
+                            {(() => {
+                              const tpNumber = pos.tp_history?.length || (pos.expansion_count ? pos.expansion_count + 1 : 1);
+                              const tpBadge = isClosed ? (
+                                pos.close_reason === "TP" ? (
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold rounded border border-emerald-500/30">
+                                    Hit TP {tpNumber}
+                                  </span>
+                                ) : pos.close_reason === "24H_FORCE" ? (
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-bold rounded border border-amber-500/30">
+                                    Hit 24h
+                                  </span>
+                                ) : pos.close_reason === "PROFIT_TARGET" ? (
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold rounded border border-blue-500/30">
+                                    Hit Target USD
+                                  </span>
+                                ) : null
+                              ) : null;
+
+                              if (pos.tp_history && pos.tp_history.length > 1) {
+                                return (
+                                  <div className="flex flex-wrap items-center justify-end gap-1">
+                                    {pos.tp_history.map((val: number, idx: number) => {
+                                      const isLast = idx === pos.tp_history.length - 1;
+                                      return (
+                                        <span key={idx} className="inline-flex items-center gap-1">
+                                          {idx > 0 && <span className="text-slate-500 text-[10px]">→</span>}
+                                          <span className={isLast ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                                            ${val.toFixed(2)}
+                                          </span>
+                                        </span>
+                                      );
+                                    })}
+                                    {tpBadge}
+                                  </div>
+                                );
+                              }
+
+                              if (hasTPChanged) {
+                                return (
+                                  <span className="flex items-center justify-end gap-1.5">
+                                    <span className="text-slate-400">${pos.original_tp.toFixed(2)}</span>
+                                    <span className="text-slate-500">→</span>
+                                    <span className="text-emerald-400 font-bold">${pos.tp.toFixed(2)}</span>
+                                    {tpBadge}
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <span className="flex items-center justify-end gap-1.5">
+                                  <span className="text-slate-400">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
+                                  {tpBadge}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="py-3.5 px-4 text-left font-mono text-[10px] space-y-0.5">
-                            {isClosed ? (
-                              <span className="text-slate-600">—</span>
+                            {isRejected ? (
+                              <span className="text-slate-600">-</span>
                             ) : (
                               <>
                                 <div className="flex items-center gap-1.5">
@@ -5402,9 +5865,145 @@ export default function ReplayTrades() {
                       );
                     })}
                   </tbody>
+                  {(() => {
+                    const executedPositions = activePositions.filter(p => !p.is_rejected);
+                    const closedPositions = executedPositions.filter(p => p.is_closed);
+                    const openPositions = executedPositions.filter(p => !p.is_closed);
+                    const rejectedPositions = activePositions.filter(p => p.is_rejected);
+
+                    const totalLots = executedPositions.reduce((sum, p) => sum + (p.lot_size || 0), 0);
+                    const totalPnL = executedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
+                    const realizedPnL = closedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
+
+                    const wins = closedPositions.filter(p => p.pnl > 0).length;
+                    const losses = closedPositions.filter(p => p.pnl < 0).length;
+                    const winRate = (wins + losses) > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : "0.0";
+                    const isNetWin = totalPnL >= 0;
+
+                    return (
+                      <tfoot className="border-t-2 border-slate-700/80 bg-slate-950/80 font-semibold text-xs text-slate-200">
+                        <tr>
+                          <td colSpan={4} className="py-3 px-4 text-left font-bold text-slate-300">
+                            <div className="flex items-center gap-2">
+                              <span className="text-cyan-400">📊 TOTAL REKAPITULASI:</span>
+                              <span className="text-[11px] font-normal text-slate-400">
+                                ({executedPositions.length} Dieksekusi · {rejectedPositions.length} Ditolak)
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-cyan-300">
+                            {totalLots.toFixed(2)}
+                          </td>
+                          <td colSpan={7} className="py-3 px-4 text-right font-mono text-[11px] text-slate-400">
+                            <span>Win Rate: </span>
+                            <span className="text-emerald-400 font-bold">{winRate}%</span>
+                            <span className="mx-2">·</span>
+                            <span>Realized: </span>
+                            <span className={realizedPnL >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                              {realizedPnL >= 0 ? "+" : ""}${realizedPnL.toFixed(2)}
+                            </span>
+                          </td>
+                          <td className={`py-3 px-4 text-right font-mono font-bold text-base ${isNetWin ? "text-emerald-400" : "text-rose-400"}`}>
+                            {isNetWin ? "+" : ""}${totalPnL.toFixed(2)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
                 </table>
               </div>
             )}
+
+            {/* ── Summary Performance Cards Deck ── */}
+            {activePositions.length > 0 && (() => {
+              const executedPositions = activePositions.filter(p => !p.is_rejected);
+              const closedPositions = executedPositions.filter(p => p.is_closed);
+              const openPositions = executedPositions.filter(p => !p.is_closed);
+              const rejectedPositions = activePositions.filter(p => p.is_rejected);
+
+              const totalLots = executedPositions.reduce((sum, p) => sum + (p.lot_size || 0), 0);
+              const totalPnL = executedPositions.reduce((sum, p) => sum + (p.pnl || 0), 0);
+
+              const wins = closedPositions.filter(p => p.pnl > 0).length;
+              const losses = closedPositions.filter(p => p.pnl < 0).length;
+              const winRate = (wins + losses) > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : "0.0";
+              const isNetWin = totalPnL >= 0;
+              const initialBal = strategyParams.initial_balance ?? 1000;
+              const finalEquity = initialBal + totalPnL;
+
+              return (
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                      🎯 Total Posisi
+                    </div>
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-white font-mono">
+                      <span>{activePositions.length}</span>
+                      <span className="text-xs font-normal text-slate-400">Trade</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-1.5">
+                      <span className="text-emerald-400 font-semibold">{wins}W</span>
+                      <span>·</span>
+                      <span className="text-rose-400 font-semibold">{losses}L</span>
+                      <span>·</span>
+                      <span className="text-slate-400">{openPositions.length} Open</span>
+                      {rejectedPositions.length > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="text-rose-300 font-semibold">{rejectedPositions.length} Rej</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                      📊 Win Rate
+                    </div>
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-emerald-400 font-mono">
+                      <span>{winRate}%</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      {wins} Menang dari {wins + losses} Posisi Closed
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                      📦 Volume Lot
+                    </div>
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-cyan-300 font-mono">
+                      <span>{totalLots.toFixed(2)}</span>
+                      <span className="text-xs font-normal text-slate-400">Lot</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-400">
+                      Rata-rata: {executedPositions.length > 0 ? (totalLots / executedPositions.length).toFixed(2) : "0.00"} Lot/Trade
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    "rounded-xl border p-3.5 shadow-sm",
+                    isNetWin
+                      ? "border-emerald-500/30 bg-emerald-950/20"
+                      : "border-rose-500/30 bg-rose-950/20"
+                  )}>
+                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                      💰 Total Net Profit
+                    </div>
+                    <div className={cn(
+                      "flex items-baseline gap-1.5 font-bold text-lg font-mono",
+                      isNetWin ? "text-emerald-400" : "text-rose-400"
+                    )}>
+                      <span>{isNetWin ? "+" : ""}${totalPnL.toFixed(2)}</span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-slate-300 flex items-center justify-between">
+                      <span>Saldo Akhir:</span>
+                      <span className="font-mono font-bold text-white">${finalEquity.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -5437,9 +6036,13 @@ export default function ReplayTrades() {
                   </div>
                   <StructureSchemaMap params={entryFilterParams} />
                   <div className="grid border-t border-slate-800/50 lg:grid-cols-2">
+                    {/* ══════════════════════════════════════════════ */}
+                    {/* ── KOLOM KIRI: ENTRY, FILTER & AI ANALYSIS ── */}
+                    {/* ══════════════════════════════════════════════ */}
                     <div className="divide-y divide-slate-800/50 py-2 lg:pr-5">
+                      {/* 1. Entry Settings & Structure */}
                       <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Entry Settings
+                        Entry Settings &amp; Structure
                       </div>
                       <EntryToggle
                         label="CHoCH Entries"
@@ -5492,8 +6095,274 @@ export default function ReplayTrades() {
                           className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
+
+                      {/* 2. EA Trend & Entry Filters */}
                       <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Position &amp; Exit
+                        EA Trend &amp; Entry Filters
+                      </div>
+                      <EntryToggle
+                        label="H1 EMA200 Filter"
+                        description="H1 close must be above/below EMA200 by trade direction"
+                        checked={entryFilterParams.h1_ema200_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, h1_ema200_filter: !prev.h1_ema200_filter }))}
+                      />
+                      <EntryToggle
+                        label="H4 EMA Filter"
+                        description="H4 EMA trend with EA gap threshold"
+                        checked={entryFilterParams.h4_ema_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, h4_ema_filter: !prev.h4_ema_filter }))}
+                      />
+                      <EntryToggle
+                        label="EMA Slope Filter"
+                        description="M15 EMA200 must move in the trade direction"
+                        checked={entryFilterParams.ema_slope_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_slope_filter: !prev.ema_slope_filter }))}
+                      />
+                      <EntryToggle
+                        label="Body Ratio Filter"
+                        description="M15 candle body must be at least 40% of its range"
+                        checked={entryFilterParams.body_ratio_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, body_ratio_filter: !prev.body_ratio_filter }))}
+                      />
+                      <EntryToggle
+                        label="Session Filter"
+                        description="Block entries recorded at 01:00 UTC"
+                        checked={entryFilterParams.session_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, session_filter: !prev.session_filter }))}
+                      />
+                      <EntryToggle
+                        label="🛡️ EMA Stretch Filter"
+                        description="Peringatkan/HOLD jika jarak harga >3.5x ATR dari M15 EMA200"
+                        checked={entryFilterParams.ema_stretch_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_stretch_filter: !prev.ema_stretch_filter }))}
+                      />
+                      <EntryToggle
+                        label="🛡️ BOS Cycle Stage Filter"
+                        description="Peringatkan/HOLD jika sudah mencapai BOS ke-4+ berturut-turut tanpa pullback"
+                        checked={entryFilterParams.bos_cycle_filter}
+                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, bos_cycle_filter: !prev.bos_cycle_filter }))}
+                      />
+
+                      {/* 3. Mesin Keputusan & AI Analysis */}
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Mesin Keputusan &amp; AI Analysis
+                      </div>
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-cyan-300">
+                            ⚙️ SmartRule Engine
+                            <StrategyTooltip
+                              fungsi="Menggunakan aturan baku Smart Money Concepts (SMC) dan filter teknikal deterministik secara instan tanpa memanggil AI."
+                              contoh="Entry otomatis dievaluasi berdasarkan break struktur CHoCH/BOS dan filter EMA200."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Eksekusi deterministik cepat berbasis aturan indikator &amp; filter
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={decisionEngine === "rule"}
+                          aria-label="Aktifkan SmartRule Engine"
+                          onClick={() => {
+                            setDecisionEngine((prev) => (prev === "rule" ? "off" as any : "rule"));
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
+                            decisionEngine === "rule" ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              decisionEngine === "rule" ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-300">
+                            🧠 LLM 7-Step Reasoning
+                            <StrategyTooltip
+                              fungsi="AI melakukan analisis kontekstual mendalam melalui 7 tahapan: Regime, Structure, Catalyst, Risk Asymmetry, Path Dependency, Decision, & Invalidation."
+                              contoh="Menganalisis multi-timeframe M15/H1/H4 dan memberikan justifikasi komprehensif sebelum merumuskan trade setup."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Analisis institusional mendalam 7 langkah berbasis AI multi-tier
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={decisionEngine === "llm"}
+                          aria-label="Aktifkan LLM 7-Step Reasoning"
+                          onClick={() => {
+                            setDecisionEngine((prev) => (prev === "llm" ? "off" as any : "llm"));
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            decisionEngine === "llm" ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              decisionEngine === "llm" ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-300">
+                            🤖 Gunakan LLM untuk SL/TP/Lot
+                            <StrategyTooltip
+                              fungsi="Saat terdeteksi struktur CHoCH atau BOS, AI langsung menganalisis dan memunculkan kartu rekomendasi setup posisi (Signal, SL, TP, & Lot) di Daftar Posisi dengan tombol Eksekusi dan Tolak."
+                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik '✓ Eksekusi' untuk membuka posisi atau '✗ Tolak'."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Auto-thinking saat CHoCH/BOS dengan kartu rekomendasi SL, TP, &amp; Lot
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={useLLMSetup}
+                          aria-label="Gunakan LLM untuk SL/TP/Lot"
+                          onClick={() => {
+                            setUseLLMSetup((prev) => {
+                              const next = !prev;
+                              setAutoDecisionEnabled(next);
+                              return next;
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              useLLMSetup ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {/* 4. Chart Visuals & SMC Elements */}
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Chart Visuals &amp; SMC Elements
+                      </div>
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-300">
+                            🏷️ Visual Supply &amp; Demand
+                            <StrategyTooltip
+                              fungsi="Menampilkan zona Order Block / Resistance (Ungu) dan Support (Emas) berdasarkan struktur pasar secara visual di grafik tanpa bertubrukan dengan warna SL (Merah) dan TP (Hijau)."
+                              contoh="Puncak swing high membentuk kotak Ungu Supply Zone. Lembah swing low membentuk kotak Emas Demand Zone."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Kotak Supply / Resistance (Ungu) &amp; Demand / Support (Emas)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.show_supply_demand}
+                          aria-label="Tampilkan Visual Supply & Demand"
+                          onClick={() => {
+                            setStrategyParams((prev) => {
+                              const next = !prev.show_supply_demand;
+                              if (supplyDemandPrimitiveRef.current) {
+                                supplyDemandPrimitiveRef.current.setVisible(next);
+                              }
+                              return { ...prev, show_supply_demand: next };
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            strategyParams.show_supply_demand ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.show_supply_demand ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-sky-300">
+                            🎯 Visual Liquidity Pools (BSL / SSL)
+                            <StrategyTooltip
+                              fungsi="Menampilkan garis level likuiditas Buy-Side (Cyan / Equal Highs) dan Sell-Side (Orange / Equal Lows) tempat target perburuan likuiditas dan Stop Loss pasar terkumpul."
+                              contoh="Garis Cyan 🎯 BSL di atas puncak swing high. Garis Orange 🎯 SSL di bawah lembah swing low. Garis otomatis berubah menjadi (Swept) jika telah tertembus harga."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Garis target likuiditas BSL (Cyan) &amp; SSL (Orange)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.show_liquidity_pools}
+                          aria-label="Tampilkan Visual Liquidity Pools"
+                          onClick={() => {
+                            setStrategyParams((prev) => {
+                              const next = !prev.show_liquidity_pools;
+                              if (liquidityPoolsPrimitiveRef.current) {
+                                liquidityPoolsPrimitiveRef.current.setVisible(next);
+                              }
+                              return { ...prev, show_liquidity_pools: next };
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70",
+                            strategyParams.show_liquidity_pools ? "border-sky-400/50 bg-sky-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.show_liquidity_pools ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <EntryToggle
+                        label="MA 20"
+                        description="20-period simple moving average"
+                        checked={isMa20Visible}
+                        onChange={() => setIsMa20Visible((visible) => !visible)}
+                      />
+                      <EntryToggle
+                        label="MA 50"
+                        description="50-period simple moving average"
+                        checked={isMa50Visible}
+                        onChange={() => setIsMa50Visible((visible) => !visible)}
+                      />
+                    </div>
+
+                    {/* ══════════════════════════════════════════════════════════ */}
+                    {/* ── KOLOM KANAN: POSITION, SL/TP, TRAILING, BE & SCALING ── */}
+                    {/* ══════════════════════════════════════════════════════════ */}
+                    <div className="divide-y divide-slate-800/50 border-t border-slate-800/50 py-2 lg:border-l lg:border-t-0 lg:pl-5">
+                      {/* 1. Position & Account Sizing */}
+                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Position &amp; Account Sizing
                       </div>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
@@ -5555,8 +6424,544 @@ export default function ReplayTrades() {
                         checked={strategyParams.force_24h_close}
                         onChange={() => setStrategyParams((prev) => ({ ...prev, force_24h_close: !prev.force_24h_close }))}
                       />
+                      <EntryToggle
+                        label="Profit Target Exit (USD)"
+                        description="Tutup posisi otomatis saat floating profit mencapai target nominal USD"
+                        checked={strategyParams.enable_profit_target_exit}
+                        onChange={() => setStrategyParams((prev) => ({ ...prev, enable_profit_target_exit: !prev.enable_profit_target_exit }))}
+                      />
+                      {strategyParams.enable_profit_target_exit && (
+                        <label className="flex items-center justify-between gap-4 px-1 py-3 bg-slate-900/50 rounded-md border border-slate-800 my-1">
+                          <span>
+                            <span className="block text-xs font-semibold text-emerald-300">Target Profit Amount ($)</span>
+                            <span className="mt-0.5 block text-[10px] text-slate-500">Nominal profit untuk auto-close (USD)</span>
+                          </span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            aria-label="Profit Target Exit Amount"
+                            value={profitTargetExitInput}
+                            onChange={(event) => {
+                              const nextValue = event.target.value.replace(",", ".");
+                              if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                              setProfitTargetExitInput(nextValue);
+                              if (nextValue === "" || nextValue === ".") return;
+                              const val = Math.max(1, Number(nextValue));
+                              setStrategyParams((prev) => ({ ...prev, profit_target_exit_usd: val }));
+                            }}
+                            onBlur={() => {
+                              const val = Math.max(1, Number(profitTargetExitInput) || 300);
+                              setProfitTargetExitInput(String(val));
+                              setStrategyParams((prev) => ({ ...prev, profit_target_exit_usd: val }));
+                            }}
+                            className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          />
+                        </label>
+                      )}
+
+                      {/* 2. Custom SL, TP & Trailing Stop */}
                       <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        ATR Adaptive SL/TP
+                        Custom SL, TP &amp; Trailing Stop
+                      </div>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">Initial TP Distance ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Target Profit awal (30 USD = 3000 poin)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Initial TP Distance"
+                          value={initialTpDistInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setInitialTpDistInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, initial_tp_dist: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(initialTpDistInput) || 30);
+                            setInitialTpDistInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, initial_tp_dist: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">SL Safety Buffer ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Jarak aman di luar LL/HH (10 USD = 1000 poin)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="SL Safety Buffer"
+                          value={slSafetyBufferInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setSlSafetyBufferInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(0, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, sl_safety_buffer: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(0, Number(slSafetyBufferInput) || 10);
+                            setSlSafetyBufferInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, sl_safety_buffer: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-rose-300 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">Min SL Distance ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Batas minimum jarak SL (15 USD = 1500 poin)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Min SL Distance"
+                          value={minSlDistInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setMinSlDistInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, min_sl_dist: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(minSlDistInput) || 15);
+                            setMinSlDistInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, min_sl_dist: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">Max SL Distance ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Batas maksimum jarak SL (30 USD = 3000 poin)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Max SL Distance"
+                          value={maxSlDistInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setMaxSlDistInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, max_sl_dist: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(maxSlDistInput) || 30);
+                            setMaxSlDistInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, max_sl_dist: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-rose-400 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">Trailing SL Distance ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Jarak Dynamic Trailing Stop (30 USD = 3000 poin)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="Trailing Distance"
+                          value={trailingDistanceInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setTrailingDistanceInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, trailing_distance: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(trailingDistanceInput) || 30);
+                            setTrailingDistanceInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, trailing_distance: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">TP Expansion Trigger ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Sisa jarak ke TP untuk melebarkan target ($10)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="TP Trigger"
+                          value={tpTriggerInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setTpTriggerInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, tp_trigger: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(tpTriggerInput) || 10);
+                            setTpTriggerInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, tp_trigger: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">TP Expansion Amount ($)</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">Tambahan jarak saat TP diperlebar ($20)</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          aria-label="TP Ekspansi"
+                          value={tpEkspansiInput}
+                          onChange={(event) => {
+                            const nextValue = event.target.value.replace(",", ".");
+                            if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                            setTpEkspansiInput(nextValue);
+                            if (nextValue === "" || nextValue === ".") return;
+                            const val = Math.max(1, Number(nextValue));
+                            setStrategyParams((prev) => ({ ...prev, tp_ekspansi: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Math.max(1, Number(tpEkspansiInput) || 20);
+                            setTpEkspansiInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, tp_ekspansi: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+                      <label className="flex items-center justify-between gap-4 px-1 py-3">
+                        <span>
+                          <span className="block text-xs font-semibold text-slate-200">Max TP Expansion Count</span>
+                          <span className="mt-0.5 block text-[10px] text-slate-500">0 = Unlimited expansion</span>
+                        </span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          aria-label="Max Ekspansi"
+                          value={maxEkspansiInput}
+                          onChange={(event) => {
+                            const digits = event.target.value.replace(/\D/g, "");
+                            setMaxEkspansiInput(digits);
+                            if (digits === "") return;
+                            const val = Number(digits);
+                            setStrategyParams((prev) => ({ ...prev, max_ekspansi: val }));
+                          }}
+                          onBlur={() => {
+                            const val = Number(maxEkspansiInput) || 0;
+                            setMaxEkspansiInput(String(val));
+                            setStrategyParams((prev) => ({ ...prev, max_ekspansi: val }));
+                          }}
+                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-slate-300 outline-none focus:border-slate-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        />
+                      </label>
+
+                      {/* 3. Break-Even Protection */}
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-slate-200">
+                            Break-Even (BE) Lock
+                            <StrategyTooltip
+                              fungsi="Mengunci SL ke atas harga entry saat running profit telah mencapai target trigger, melindungi posisi dari pembalikan arah."
+                              contoh="Profit sudah mencapai $15.00 → SL otomatis digeser ke Entry + $1.00."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Kunci SL ke harga entry saat profit tertentu tercapai
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.enable_breakeven}
+                          aria-label="Aktifkan Break-Even Lock"
+                          onClick={() => setStrategyParams((prev) => ({ ...prev, enable_breakeven: !prev.enable_breakeven }))}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
+                            strategyParams.enable_breakeven ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.enable_breakeven ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      {strategyParams.enable_breakeven && (
+                        <>
+                          <label className="flex items-center justify-between gap-4 px-1 py-3">
+                            <span>
+                              <span className="block text-xs font-semibold text-slate-200">BE Trigger Profit ($)</span>
+                              <span className="mt-0.5 block text-[10px] text-slate-500">Jarak profit running untuk memicu BE ($15)</span>
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              aria-label="BE Trigger"
+                              value={beTriggerInput}
+                              onChange={(event) => {
+                                const nextValue = event.target.value.replace(",", ".");
+                                if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                setBeTriggerInput(nextValue);
+                                if (nextValue === "" || nextValue === ".") return;
+                                const val = Math.max(1, Number(nextValue));
+                                setStrategyParams((prev) => ({ ...prev, breakeven_trigger: val }));
+                              }}
+                              onBlur={() => {
+                                const val = Math.max(1, Number(beTriggerInput) || 15);
+                                setBeTriggerInput(String(val));
+                                setStrategyParams((prev) => ({ ...prev, breakeven_trigger: val }));
+                              }}
+                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </label>
+                          <label className="flex items-center justify-between gap-4 px-1 py-3">
+                            <span>
+                              <span className="block text-xs font-semibold text-slate-200">BE Buffer Profit ($)</span>
+                              <span className="mt-0.5 block text-[10px] text-slate-500">Jarak aman SL di atas entry ($1.00)</span>
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              aria-label="BE Buffer"
+                              value={beBufferInput}
+                              onChange={(event) => {
+                                const nextValue = event.target.value.replace(",", ".");
+                                if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                setBeBufferInput(nextValue);
+                                if (nextValue === "" || nextValue === ".") return;
+                                const val = Math.max(0, Number(nextValue));
+                                setStrategyParams((prev) => ({ ...prev, breakeven_buffer: val }));
+                              }}
+                              onBlur={() => {
+                                const val = Math.max(0, Number(beBufferInput) || 1);
+                                setBeBufferInput(String(val));
+                                setStrategyParams((prev) => ({ ...prev, breakeven_buffer: val }));
+                              }}
+                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </label>
+                        </>
+                      )}
+
+                      {/* 4. Price-Ratio Scaling */}
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Price-Ratio Scaling (Multi-Price Level)
+                      </div>
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-emerald-300">
+                            ⚖️ Price-Ratio Dynamic Scaling (Opsi 1)
+                            <StrategyTooltip
+                              fungsi="Menyesuaikan jarak SL, TP, buffer ayunan struktur, dan ukuran lot secara proporsional dari harga patokan dasar (mis. 2000 USD). Menjaga risiko dolar ($) tetap konstan di semua era harga Gold (1000 vs 2000 vs 5000 USD) tanpa lagging indikator."
+                              contoh="Harga Emas $5000 (2.5x dari $2000) → SL & TP otomatis melebar 2.5x ($75), lot mengecil dari 0.05 ke 0.02 → Total risiko kerugian tetap konstan $150 USD."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Skalakan SL, TP &amp; Lot proporsional terhadap harga pasar (Risiko $ konstan)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.use_price_ratio_scaling}
+                          aria-label="Gunakan Price-Ratio Dynamic Scaling"
+                          onClick={() => setStrategyParams((prev) => ({ ...prev, use_price_ratio_scaling: !prev.use_price_ratio_scaling }))}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70",
+                            strategyParams.use_price_ratio_scaling ? "border-emerald-400/50 bg-emerald-500/25" : "border-slate-700 bg-slate-900"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.use_price_ratio_scaling ? "translate-x-4 bg-emerald-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+                      {strategyParams.use_price_ratio_scaling && (
+                        <>
+                          <label className="flex items-center justify-between gap-4 px-1 py-3">
+                            <span>
+                              <span className="block text-xs font-semibold text-slate-200">Base Reference Price ($)</span>
+                              <span className="mt-0.5 block text-[10px] text-slate-500">Harga patokan dasar (1.0x skala, default 2000)</span>
+                            </span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              aria-label="Base Reference Price"
+                              value={baseRefPriceInput}
+                              onChange={(event) => {
+                                const nextValue = event.target.value.replace(",", ".");
+                                if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                setBaseRefPriceInput(nextValue);
+                                if (nextValue === "" || nextValue === ".") return;
+                                const val = Math.max(100, Number(nextValue));
+                                setStrategyParams((prev) => ({ ...prev, base_reference_price: val }));
+                              }}
+                              onBlur={() => {
+                                const val = Math.max(100, Number(baseRefPriceInput) || 2000);
+                                setBaseRefPriceInput(String(val));
+                                setStrategyParams((prev) => ({ ...prev, base_reference_price: val }));
+                              }}
+                              className="h-8 w-24 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                          </label>
+
+                          {/* ⚡ Quick Presets Range Harga XAUUSD */}
+                          <div className="mt-1 mb-3 rounded-xl border border-cyan-500/25 bg-cyan-950/20 p-2.5">
+                            <div className="mb-2 flex items-center justify-between">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                                <span>⚡</span> Quick Presets Range Emas (Data Teruji)
+                              </span>
+                              <span className="text-[9px] text-slate-400">Auto-fill SL, TP &amp; Lot</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                              {[
+                                {
+                                  key: "1500-2000",
+                                  label: "1.500 - 2.000",
+                                  sub: "Era 2020-21",
+                                  base: 1650,
+                                  lot: 0.05,
+                                  tp: 25,
+                                  slMin: 12,
+                                  slMax: 25,
+                                  trail: 25,
+                                  buf: 8,
+                                  trig: 8,
+                                  exp: 15,
+                                  badge: "+1.3k$",
+                                },
+                                {
+                                  key: "2000",
+                                  label: "2.000 (Standard)",
+                                  sub: "Universal",
+                                  base: 2000,
+                                  lot: 0.05,
+                                  tp: 40,
+                                  slMin: 15,
+                                  slMax: 30,
+                                  trail: 30,
+                                  buf: 10,
+                                  trig: 10,
+                                  exp: 20,
+                                  badge: "+5.9k$",
+                                },
+                                {
+                                  key: "3500",
+                                  label: "3.500 (Mid)",
+                                  sub: "Era 2024-25",
+                                  base: 3500,
+                                  lot: 0.05,
+                                  tp: 45,
+                                  slMin: 22,
+                                  slMax: 45,
+                                  trail: 45,
+                                  buf: 15,
+                                  trig: 15,
+                                  exp: 30,
+                                  badge: "+12k$",
+                                },
+                                {
+                                  key: "4500",
+                                  label: "4.500 (Juara 1)",
+                                  sub: "Era 2026",
+                                  base: 4500,
+                                  lot: 0.05,
+                                  tp: 60,
+                                  slMin: 30,
+                                  slMax: 60,
+                                  trail: 60,
+                                  buf: 20,
+                                  trig: 20,
+                                  exp: 40,
+                                  badge: "⭐ +15.3k$",
+                                },
+                              ].map((preset) => {
+                                const isCurrent = strategyParams.base_reference_price === preset.base &&
+                                  strategyParams.initial_tp_dist === preset.tp &&
+                                  strategyParams.min_sl_dist === preset.slMin;
+                                return (
+                                  <button
+                                    key={preset.key}
+                                    type="button"
+                                    onClick={() => {
+                                      setBaseRefPriceInput(String(preset.base));
+                                      setLotSizeInput(String(preset.lot));
+                                      setInitialTpDistInput(String(preset.tp));
+                                      setSlSafetyBufferInput(String(preset.buf));
+                                      setMinSlDistInput(String(preset.slMin));
+                                      setMaxSlDistInput(String(preset.slMax));
+                                      setTrailingDistanceInput(String(preset.trail));
+                                      setTpTriggerInput(String(preset.trig));
+                                      setTpEkspansiInput(String(preset.exp));
+
+                                      setStrategyParams((prev) => ({
+                                        ...prev,
+                                        base_reference_price: preset.base,
+                                        lot_override: preset.lot,
+                                        initial_tp_dist: preset.tp,
+                                        sl_safety_buffer: preset.buf,
+                                        min_sl_dist: preset.slMin,
+                                        max_sl_dist: preset.slMax,
+                                        trailing_distance: preset.trail,
+                                        tp_trigger: preset.trig,
+                                        tp_ekspansi: preset.exp,
+                                      }));
+                                    }}
+                                    className={cn(
+                                      "group relative flex flex-col items-start rounded-lg border p-2 text-left transition-all cursor-pointer",
+                                      isCurrent
+                                        ? "border-cyan-400/80 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
+                                        : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80"
+                                    )}
+                                  >
+                                    <div className="flex w-full items-center justify-between gap-1">
+                                      <span className="font-mono text-xs font-bold">{preset.label}</span>
+                                      {preset.badge && (
+                                        <span className={cn(
+                                          "rounded px-1 py-0.5 text-[9px] font-bold font-mono",
+                                          preset.key === "4500"
+                                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                            : "bg-emerald-500/15 text-emerald-300"
+                                        )}>
+                                          {preset.badge}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="mt-0.5 text-[9px] text-slate-400">{preset.sub}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* 5. ATR Adaptive SL/TP (Alternatif) */}
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        ATR Adaptive SL/TP (Alternatif)
                       </div>
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
@@ -5672,272 +7077,6 @@ export default function ReplayTrades() {
                           </label>
                         </>
                       )}
-
-                      {/* ── Decision Engine (Rule vs LLM) ── */}
-                      {/* ── Mesin Keputusan & AI Analysis ── */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Mesin Keputusan & AI Analysis
-                      </div>
-
-                      {/* 1. SmartRule Engine */}
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-cyan-300">
-                            ⚙️ SmartRule Engine
-                            <StrategyTooltip
-                              fungsi="Menggunakan aturan baku Smart Money Concepts (SMC) dan filter teknikal deterministik secara instan tanpa memanggil AI."
-                              contoh="Entry otomatis dievaluasi berdasarkan break struktur CHoCH/BOS dan filter EMA200."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Eksekusi deterministik cepat berbasis aturan indikator & filter
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={decisionEngine === "rule"}
-                          aria-label="Aktifkan SmartRule Engine"
-                          onClick={() => {
-                            setDecisionEngine((prev) => (prev === "rule" ? "off" as any : "rule"));
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-                            decisionEngine === "rule" ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              decisionEngine === "rule" ? "translate-x-4 bg-cyan-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-
-                      {/* 2. LLM 7-Step Reasoning */}
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🧠 LLM 7-Step Reasoning
-                            <StrategyTooltip
-                              fungsi="AI melakukan analisis kontekstual mendalam melalui 7 tahapan: Regime, Structure, Catalyst, Risk Asymmetry, Path Dependency, Decision, & Invalidation."
-                              contoh="Menganalisis multi-timeframe M15/H1/H4 dan memberikan justifikasi komprehensif sebelum merumuskan trade setup."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Analisis institusional mendalam 7 langkah berbasis AI multi-tier
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={decisionEngine === "llm"}
-                          aria-label="Aktifkan LLM 7-Step Reasoning"
-                          onClick={() => {
-                            setDecisionEngine((prev) => (prev === "llm" ? "off" as any : "llm"));
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            decisionEngine === "llm" ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              decisionEngine === "llm" ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-
-                      {/* 3. Gunakan LLM untuk SL/TP/Lot */}
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🤖 Gunakan LLM untuk SL/TP/Lot
-                            <StrategyTooltip
-                              fungsi="Saat terdeteksi struktur CHoCH atau BOS, AI langsung menganalisis dan memunculkan kartu rekomendasi setup posisi (Signal, SL, TP, & Lot) di Daftar Posisi dengan tombol Eksekusi dan Tolak."
-                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik '✓ Eksekusi' untuk membuka posisi atau '✗ Tolak'."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Auto-thinking saat CHoCH/BOS dengan kartu rekomendasi SL, TP, & Lot
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={useLLMSetup}
-                          aria-label="Gunakan LLM untuk SL/TP/Lot"
-                          onClick={() => {
-                            setUseLLMSetup((prev) => {
-                              const next = !prev;
-                              setAutoDecisionEnabled(next);
-                              return next;
-                            });
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              useLLMSetup ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Smart Money Concepts (SMC)
-                      </div>
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🏷️ Visual Supply & Demand
-                            <StrategyTooltip
-                              fungsi="Menampilkan zona Order Block / Resistance (Ungu) dan Support (Emas) berdasarkan struktur pasar secara visual di grafik tanpa bertubrukan dengan warna SL (Merah) dan TP (Hijau)."
-                              contoh="Puncak swing high membentuk kotak Ungu Supply Zone. Lembah swing low membentuk kotak Emas Demand Zone."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Kotak Supply / Resistance (Ungu) & Demand / Support (Emas)
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={strategyParams.show_supply_demand}
-                          aria-label="Tampilkan Visual Supply & Demand"
-                          onClick={() => {
-                            setStrategyParams((prev) => {
-                              const next = !prev.show_supply_demand;
-                              if (supplyDemandPrimitiveRef.current) {
-                                supplyDemandPrimitiveRef.current.setVisible(next);
-                              }
-                              return { ...prev, show_supply_demand: next };
-                            });
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            strategyParams.show_supply_demand ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              strategyParams.show_supply_demand ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-sky-300">
-                            🎯 Visual Liquidity Pools (BSL / SSL)
-                            <StrategyTooltip
-                              fungsi="Menampilkan garis level likuiditas Buy-Side (Cyan / Equal Highs) dan Sell-Side (Orange / Equal Lows) tempat target perburuan likuiditas dan Stop Loss pasar terkumpul."
-                              contoh="Garis Cyan 🎯 BSL di atas puncak swing high. Garis Orange 🎯 SSL di bawah lembah swing low. Garis otomatis berubah menjadi (Swept) jika telah tertembus harga."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Garis target likuiditas BSL (Cyan) & SSL (Orange)
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={strategyParams.show_liquidity_pools}
-                          aria-label="Tampilkan Visual Liquidity Pools"
-                          onClick={() => {
-                            setStrategyParams((prev) => {
-                              const next = !prev.show_liquidity_pools;
-                              if (liquidityPoolsPrimitiveRef.current) {
-                                liquidityPoolsPrimitiveRef.current.setVisible(next);
-                              }
-                              return { ...prev, show_liquidity_pools: next };
-                            });
-                          }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70",
-                            strategyParams.show_liquidity_pools ? "border-sky-400/50 bg-sky-500/25" : "border-slate-700 bg-slate-900"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              strategyParams.show_liquidity_pools ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="divide-y divide-slate-800/50 border-t border-slate-800/50 py-2 lg:border-l lg:border-t-0 lg:pl-5">
-                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        EA Entry Filters
-                      </div>
-                      <EntryToggle
-                        label="H1 EMA200 Filter"
-                        description="H1 close must be above/below EMA200 by trade direction"
-                        checked={entryFilterParams.h1_ema200_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, h1_ema200_filter: !prev.h1_ema200_filter }))}
-                      />
-                      <EntryToggle
-                        label="H4 EMA Filter"
-                        description="H4 EMA trend with EA gap threshold"
-                        checked={entryFilterParams.h4_ema_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, h4_ema_filter: !prev.h4_ema_filter }))}
-                      />
-                      <EntryToggle
-                        label="EMA Slope Filter"
-                        description="M15 EMA200 must move in the trade direction"
-                        checked={entryFilterParams.ema_slope_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_slope_filter: !prev.ema_slope_filter }))}
-                      />
-                      <EntryToggle
-                        label="Body Ratio Filter"
-                        description="M15 candle body must be at least 40% of its range"
-                        checked={entryFilterParams.body_ratio_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, body_ratio_filter: !prev.body_ratio_filter }))}
-                      />
-                      <EntryToggle
-                        label="Session Filter"
-                        description="Block entries recorded at 01:00 UTC"
-                        checked={entryFilterParams.session_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, session_filter: !prev.session_filter }))}
-                      />
-                      <EntryToggle
-                        label="🛡️ EMA Stretch Filter"
-                        description="Peringatkan/HOLD jika jarak harga >3.5x ATR dari M15 EMA200"
-                        checked={entryFilterParams.ema_stretch_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_stretch_filter: !prev.ema_stretch_filter }))}
-                      />
-                      <EntryToggle
-                        label="🛡️ BOS Cycle Stage Filter"
-                        description="Peringatkan/HOLD jika sudah mencapai BOS ke-4+ berturut-turut tanpa pullback"
-                        checked={entryFilterParams.bos_cycle_filter}
-                        onChange={() => setEntryFilterParams((prev) => ({ ...prev, bos_cycle_filter: !prev.bos_cycle_filter }))}
-                      />
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                        Chart Indicators
-                      </div>
-                      <EntryToggle
-                        label="MA 20"
-                        description="20-period simple moving average"
-                        checked={isMa20Visible}
-                        onChange={() => setIsMa20Visible((visible) => !visible)}
-                      />
-                      <EntryToggle
-                        label="MA 50"
-                        description="50-period simple moving average"
-                        checked={isMa50Visible}
-                        onChange={() => setIsMa50Visible((visible) => !visible)}
-                      />
                     </div>
                   </div>
                 </div>
@@ -6080,10 +7219,55 @@ export default function ReplayTrades() {
                   ));
                 })()}
               </tbody>
+              {/* ── TOTAL ROW ── */}
+              {(() => {
+                const filtered = monthlyPNL.filter((month) => {
+                  if (monthlySummaryYearFilter !== "all" && String(month.year) !== monthlySummaryYearFilter) return false;
+                  const net = month.net_profit ?? 0;
+                  if (monthlySummaryPerformanceFilter === "profit" && net <= 0) return false;
+                  if (monthlySummaryPerformanceFilter === "loss" && net >= 0) return false;
+                  return true;
+                });
+                if (filtered.length === 0) return null;
+                const totalTrades = filtered.reduce((s, m) => s + (m.executed_trades ?? m.trades ?? 0), 0);
+                const totalProfit = filtered.reduce((s, m) => s + (m.profit ?? 0), 0);
+                const totalLoss   = filtered.reduce((s, m) => s + (m.loss ?? 0), 0);
+                const totalNet    = filtered.reduce((s, m) => s + (m.net_profit ?? 0), 0);
+                const totalWins   = filtered.reduce((s, m) => s + Math.round(((m.win_rate ?? 0) / 100) * (m.executed_trades ?? m.trades ?? 0)), 0);
+                const avgWinRate  = totalTrades > 0 ? (totalWins / totalTrades) * 100 : 0;
+                const initialBal  = strategyParams.initial_balance ?? 1000;
+                const totalReturn = (totalNet / initialBal) * 100;
+                return (
+                  <tfoot className="border-t-2 border-cyan-500/40 bg-slate-900/60">
+                    <tr>
+                      <td className="px-4 py-3.5 text-xs font-bold text-cyan-300 uppercase tracking-wider whitespace-nowrap">
+                        Total ({filtered.length} bulan)
+                      </td>
+                      <td className="px-4 py-3.5 font-mono font-bold text-slate-200 whitespace-nowrap">{totalTrades}</td>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${avgWinRate > 50 ? "text-green-400" : avgWinRate === 50 ? "text-white" : "text-red-400"}`}>
+                        {avgWinRate.toFixed(1)}%
+                      </td>
+                      <td className="px-4 py-3.5 font-mono font-bold text-green-400 whitespace-nowrap">
+                        +{totalProfit.toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3.5 font-mono font-bold text-red-400 whitespace-nowrap">
+                        {totalLoss.toFixed(2)}
+                      </td>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalNet >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {totalNet >= 0 ? "+" : ""}{totalNet.toFixed(2)}
+                      </td>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
+                        {totalReturn >= 0 ? "+" : ""}{totalReturn.toFixed(2)}%
+                      </td>
+                    </tr>
+                  </tfoot>
+                );
+              })()}
             </table>
           </div>
         </div>
       </div>
+
 
 
       {/* Progress popup for Loading Replay Data */}

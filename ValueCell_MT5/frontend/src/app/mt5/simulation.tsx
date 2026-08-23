@@ -333,14 +333,51 @@ const simulateTrailingSLTP = (
   // Compute effective Break-Even buffer
   let effectiveBuffer = params.breakeven_buffer;
 
-  const activeCandles = candles.filter(c => c.time >= (t.entry_time ?? 0) && c.time <= currentCandleTime);
+  const entryTs = t.entry_time ?? 0;
+  if (!candles || candles.length === 0 || entryTs > currentCandleTime) {
+    return {
+      sl: initialSL,
+      tp: initialTP,
+      beTriggered: false,
+      isClosedSimulated: false,
+      exitPriceSimulated: null,
+      exitTimeSimulated: null,
+      expansionCount: 0,
+    };
+  }
+
+  let startIdx = 0, lo = 0, hi = candles.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time >= entryTs) {
+      startIdx = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+
+  let endIdx = candles.length - 1;
+  lo = startIdx;
+  hi = candles.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time <= currentCandleTime) {
+      endIdx = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+
   let expansionCount = 0;
   let beTriggered = false;
   let isClosedSimulated = false;
   let exitPriceSimulated: number | null = null;
   let exitTimeSimulated: number | null = null;
 
-  for (const c of activeCandles) {
+  for (let i = startIdx; i <= endIdx; i++) {
+    const c = candles[i];
     const price = c.close;
 
     // Force 24h Close

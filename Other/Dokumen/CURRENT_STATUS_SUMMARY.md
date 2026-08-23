@@ -65,10 +65,10 @@
 #### 5. ⏳ Neon PostgreSQL Setup (20%)
 **Credentials**: ✅ Configured in `.env`
 ```
-PGHOST=ep-green-mud-aijudrlh-pooler.c-4.us-east-1.aws.neon.tech
+PGHOST=your_neon_host.neon.tech
 PGDATABASE=neondb
-PGUSER=neondb_owner
-PGPASSWORD=npg_gel7WiRj8NCM
+PGUSER=your_db_user
+PGPASSWORD=your_db_password
 PGSSLMODE=require
 ```
 
@@ -332,10 +332,10 @@ Dev_Bot_v11.cs → CSV Export → Daily Batch Load → Audit Tables
 
 ### Neon PostgreSQL Credentials:
 ```
-Host: ep-green-mud-aijudrlh-pooler.c-4.us-east-1.aws.neon.tech
+Host: your_neon_host.neon.tech
 Database: neondb
-User: neondb_owner
-Password: npg_gel7WiRj8NCM
+User: your_db_user
+Password: your_db_password
 SSL Mode: require
 ```
 

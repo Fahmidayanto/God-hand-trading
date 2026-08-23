@@ -35,7 +35,7 @@ export default function MT5Sidebar() {
     { path: "/mt5/settings", label: "Settings", icon: "⚙️" },
     { path: "/mt5/database", label: "DB Inspector", icon: "💾" },
     { path: "/mt5/replay", label: "Replay Trades", icon: "🎬" },
-    { path: "/mt5/replay-original", label: "Replay Original", icon: "📜" },
+    { path: "/mt5/replay-original", label: "Replay Original", icon: "🎞️" },
     { path: "/mt5/simulation", label: "Ghost Engine", icon: "👻" },
   ];
 

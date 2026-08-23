@@ -20,6 +20,12 @@ venv/
 *.egg-info/
 ValueCell_MT5/backend/data/sentiment_cache/
 
+# Machine Learning Model Binaries
+*.pkl
+*.joblib
+*.onnx
+**/models/saved/filter_latest_backup_*/
+
 # Node modules
 node_modules/
 

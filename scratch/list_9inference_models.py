@@ -3,8 +3,9 @@ Get full list of models on 9inference /v1/package/models
 """
 import urllib.request
 import json
+import os
 
-api_key = "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f"
+api_key = os.getenv("NINEINFERENCE_API_KEY", "")
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",

@@ -1,6 +1,7 @@
 """Trading API endpoints."""
 
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -391,6 +392,11 @@ async def get_backtest_chart_data(
                             "low": float(row["Low"]),
                             "close": float(row["Close"]),
                         }
+                        if "Spread" in row and row["Spread"].strip():
+                            try:
+                                candle["spread"] = int(row["Spread"].strip())
+                            except ValueError:
+                                pass
                         ema = row.get("EMA200", "").strip()
                         if ema:
                             candle["ema200"] = round(float(ema), 2)
@@ -1147,6 +1153,11 @@ async def get_replay_original_data(
     if date_from > date_to:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
 
+    # Sargable range: time >= start 00:00 AND time < day_after_end (index-friendly)
+    from datetime import timedelta as _timedelta
+    ts_from = datetime.combine(date_from, datetime.min.time())
+    ts_to_excl = datetime.combine(date_to, datetime.min.time()) + _timedelta(days=1)
+
     table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
     candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
 
@@ -1156,12 +1167,12 @@ async def get_replay_original_data(
                 # Fetch candles
                 cur.execute(
                     f"""
-                    SELECT time, open, high, low, close, volume, ema200
+                    SELECT time, open, high, low, close, volume, ema200, spread
                     FROM {candle_table}
-                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    WHERE time >= %s AND time < %s
                     ORDER BY time ASC
                     """,
-                    (date_from, date_to),
+                    (ts_from, ts_to_excl),
                 )
                 candle_rows = cur.fetchall()
 
@@ -1170,11 +1181,11 @@ async def get_replay_original_data(
                     """
                     SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time
                     FROM llhhbosdata_xauusd
-                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    WHERE time >= %s AND time < %s
                     AND timeframe = %s
                     ORDER BY time ASC
                     """,
-                    (date_from, date_to, timeframe.upper()),
+                    (ts_from, ts_to_excl, timeframe.upper()),
                 )
                 structure_rows = cur.fetchall()
 
@@ -1182,12 +1193,13 @@ async def get_replay_original_data(
                 cur.execute(
                     """
                           SELECT ticket, type, status, reject_reason, entry_price, exit_price, sl, tp,
-                              net_profit, session, entry_time, exit_time, lot_size
+                              net_profit, session, entry_time, exit_time, lot_size,
+                              spread_cost, commission, swap
                     FROM backtest_results_xauusd
-                    WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s
+                    WHERE entry_time >= %s AND entry_time < %s
                     ORDER BY entry_time ASC
                     """,
-                    (date_from, date_to),
+                    (ts_from, ts_to_excl),
                 )
                 trade_rows = cur.fetchall()
 
@@ -1211,6 +1223,7 @@ async def get_replay_original_data(
                 "close": float(r[4]),
                 "volume": int(r[5]) if r[5] is not None else 0,
                 "ema200": float(r[6]) if r[6] is not None else None,
+                "spread": int(r[7]) if len(r) > 7 and r[7] is not None else 4,
             }
             for r in candle_rows
         ]
@@ -1305,6 +1318,11 @@ async def get_replay_data(
     if date_from > date_to:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
 
+    # Sargable range: time >= start 00:00 AND time < day_after_end (index-friendly)
+    from datetime import timedelta as _timedelta
+    ts_from = datetime.combine(date_from, datetime.min.time())
+    ts_to_excl = datetime.combine(date_to, datetime.min.time()) + _timedelta(days=1)
+
     table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
     candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
 
@@ -1314,12 +1332,12 @@ async def get_replay_data(
                 # Fetch candles
                 cur.execute(
                     f"""
-                    SELECT time, open, high, low, close, volume, ema200
+                    SELECT time, open, high, low, close, volume, ema200, spread
                     FROM {candle_table}
-                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    WHERE time >= %s AND time < %s
                     ORDER BY time ASC
                     """,
-                    (date_from, date_to),
+                    (ts_from, ts_to_excl),
                 )
                 candle_rows = cur.fetchall()
 
@@ -1328,11 +1346,11 @@ async def get_replay_data(
                     """
                     SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time
                     FROM llhhbosdata_xauusd
-                    WHERE DATE(time) >= %s AND DATE(time) <= %s
+                    WHERE time >= %s AND time < %s
                     AND timeframe = %s
                     ORDER BY time ASC
                     """,
-                    (date_from, date_to, timeframe.upper()),
+                    (ts_from, ts_to_excl, timeframe.upper()),
                 )
                 structure_rows = cur.fetchall()
 
@@ -1340,9 +1358,10 @@ async def get_replay_data(
                 cur.execute(
                     """
                           SELECT ticket, type, status, reject_reason, entry_price, exit_price, sl, tp,
-                              net_profit, session, entry_time, exit_time, lot_size
+                              net_profit, session, entry_time, exit_time, lot_size,
+                              spread_cost, commission, swap
                     FROM backtest_results_xauusd
-                    WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s
+                    WHERE entry_time >= %s AND entry_time < %s
                     ORDER BY entry_time ASC
                     """,
                     (date_from, date_to),
@@ -1369,6 +1388,7 @@ async def get_replay_data(
                 "close": float(r[4]),
                 "volume": int(r[5]),
                 "ema200": float(r[6]) if r[6] is not None else None,
+                "spread": int(r[7]) if len(r) > 7 and r[7] is not None else 4,
             }
             for r in candle_rows
         ]
@@ -1402,6 +1422,9 @@ async def get_replay_data(
                 "entry_time": _ts(r[10]),
                 "exit_time": _ts(r[11]),
                 "lot_size": float(r[12]) if r[12] else None,
+                "spread_cost": float(r[13]) if len(r) > 13 and r[13] is not None else 0.0,
+                "commission": float(r[14]) if len(r) > 14 and r[14] is not None else 0.0,
+                "swap": float(r[15]) if len(r) > 15 and r[15] is not None else 0.0,
             }
             for r in trade_rows
         ]
@@ -1604,6 +1627,11 @@ async def get_simulation_data(
     if date_from > date_to:
         raise HTTPException(status_code=400, detail="Start date must be before end date")
 
+    # Sargable range: time >= start 00:00 AND time < day_after_end (index-friendly)
+    from datetime import timedelta as _timedelta
+    ts_from = datetime.combine(date_from, datetime.min.time())
+    ts_to_excl = datetime.combine(date_to, datetime.min.time()) + _timedelta(days=1)
+
     table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
     candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
 
@@ -1633,32 +1661,32 @@ async def get_simulation_data(
 
                 cur.execute(
                     f"SELECT time, open, high, low, close, volume, ema200 "
-                    f"FROM {candle_table} WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                    (date_from, date_to),
+                    f"FROM {candle_table} WHERE time >= %s AND time < %s ORDER BY time ASC",
+                    (ts_from, ts_to_excl),
                 )
                 candle_rows = cur.fetchall()
                 cur.execute(
                     "SELECT id, type, direction_action, price, time, timeframe, status, previous_price, previous_time "
-                    "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC, id ASC",
-                    (date_from, date_to, timeframe.upper()),
+                    "FROM llhhbosdata_xauusd WHERE time >= %s AND time < %s AND timeframe = %s ORDER BY time ASC, id ASC",
+                    (ts_from, ts_to_excl, timeframe.upper()),
                 )
                 structure_rows = cur.fetchall()
                 cur.execute(
                     "SELECT ticket, type, entry_price, exit_price, sl, tp, net_profit, session, entry_time, exit_time, lot_size "
-                    "FROM backtest_results_xauusd WHERE DATE(entry_time) >= %s AND DATE(entry_time) <= %s ORDER BY entry_time ASC",
-                    (date_from, date_to),
+                    "FROM backtest_results_xauusd WHERE entry_time >= %s AND entry_time < %s ORDER BY entry_time ASC",
+                    (ts_from, ts_to_excl),
                 )
                 trade_rows = cur.fetchall()
                 cur.execute(
                     "SELECT time, open, high, low, close, volume, ema200 "
-                    "FROM marketdata_xauusd_h1 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                    (date_from, date_to),
+                    "FROM marketdata_xauusd_h1 WHERE time >= %s AND time < %s ORDER BY time ASC",
+                    (ts_from, ts_to_excl),
                 )
                 h1_rows = cur.fetchall()
                 cur.execute(
                     "SELECT time, open, high, low, close, volume, ema200 "
-                    "FROM marketdata_xauusd_h4 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                    (date_from, date_to),
+                    "FROM marketdata_xauusd_h4 WHERE time >= %s AND time < %s ORDER BY time ASC",
+                    (ts_from, ts_to_excl),
                 )
                 h4_rows = cur.fetchall()
     except Exception as e:
@@ -1838,6 +1866,10 @@ async def get_single_event_simulation(
     date_from = (dt_event - timedelta(days=30)).date()
     date_to = dt_event.date()
 
+    # Sargable range: time >= start 00:00 AND time < day_after (index-friendly)
+    ts_from = datetime.combine(date_from, datetime.min.time())
+    ts_to_excl = datetime.combine(date_to + timedelta(days=1), datetime.min.time())
+
     table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
     candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
 
@@ -1855,33 +1887,33 @@ async def get_single_event_simulation(
                 with conn.cursor() as cur:
                     # Fetch candles up to event day
                     cur.execute(
-                        f"SELECT time, open, high, low, close, volume, ema200 "
-                        f"FROM {candle_table} WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                        (date_from, date_to),
+                        f"SELECT time, open, high, low, close, volume, ema200, spread "
+                        f"FROM {candle_table} WHERE time >= %s AND time < %s ORDER BY time ASC",
+                        (ts_from, ts_to_excl),
                     )
                     candle_rows = cur.fetchall()
 
                     # Fetch structures up to the event day
                     cur.execute(
                         "SELECT id, type, direction_action, price, time, timeframe, status, previous_price, previous_time "
-                        "FROM llhhbosdata_xauusd WHERE DATE(time) >= %s AND DATE(time) <= %s AND timeframe = %s ORDER BY time ASC, id ASC",
-                        (date_from, date_to, timeframe.upper()),
+                        "FROM llhhbosdata_xauusd WHERE time >= %s AND time < %s AND timeframe = %s ORDER BY time ASC, id ASC",
+                        (ts_from, ts_to_excl, timeframe.upper()),
                     )
                     structure_rows = cur.fetchall()
 
                     # Fetch H1 candles
                     cur.execute(
                         "SELECT time, open, high, low, close, volume, ema200 "
-                        "FROM marketdata_xauusd_h1 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                        (date_from, date_to),
+                        "FROM marketdata_xauusd_h1 WHERE time >= %s AND time < %s ORDER BY time ASC",
+                        (ts_from, ts_to_excl),
                     )
                     h1_rows = cur.fetchall()
 
                     # Fetch H4 candles
                     cur.execute(
                         "SELECT time, open, high, low, close, volume, ema200 "
-                        "FROM marketdata_xauusd_h4 WHERE DATE(time) >= %s AND DATE(time) <= %s ORDER BY time ASC",
-                        (date_from, date_to),
+                        "FROM marketdata_xauusd_h4 WHERE time >= %s AND time < %s ORDER BY time ASC",
+                        (ts_from, ts_to_excl),
                     )
                     h4_rows = cur.fetchall()
 
@@ -1910,7 +1942,8 @@ async def get_single_event_simulation(
 
     candles = [
         {"time": _ts(r[0]), "open": float(r[1]), "high": float(r[2]), "low": float(r[3]),
-         "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None}
+         "close": float(r[4]), "volume": int(r[5]), "ema200": float(r[6]) if r[6] is not None else None,
+         "spread": int(r[7]) if len(r) > 7 and r[7] is not None else 3}
         for r in candle_rows
     ]
     structure_events = []
@@ -2180,11 +2213,14 @@ async def clear_replay_cache(
             try:
                 date_from = date(year_from, 1, 1)
                 date_to = date(year_to, 12, 31)
+                from datetime import timedelta as _td
+                ts_from = datetime.combine(date_from, datetime.min.time())
+                ts_to_excl = datetime.combine(date_to, datetime.min.time()) + _td(days=1)
                 with get_db_conn() as conn:
                     with conn.cursor() as cur:
                         cur.execute(
-                            "DELETE FROM simulation_decisions WHERE DATE(event_time) >= %s AND DATE(event_time) <= %s",
-                            (date_from, date_to),
+                            "DELETE FROM simulation_decisions WHERE event_time >= %s AND event_time < %s",
+                            (ts_from, ts_to_excl),
                         )
                         if hasattr(conn, "commit"):
                             conn.commit()

@@ -91,6 +91,7 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
 
         # Load backtest results for real trade profit mapping
         real_trades = {}
+        entry_structures = {}
         if paths["results"].exists():
             try:
                 results_df = pd.read_csv(paths["results"])
@@ -100,6 +101,8 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                     t_type = str(r.get("Type", "")).strip().upper()
                     if not pd.isna(t_time) and t_type in ("BUY", "SELL"):
                         real_trades[(t_time, t_type)] = safe_float(r.get("Net_Profit"))
+                        # EntryStructure (CHoCH/BoS_1/BoS_2): fitur kategorikal sinyal
+                        entry_structures[(t_time, t_type)] = str(r.get("EntryStructure", "")).strip()
             except Exception as e:
                 logger.warning(f"Failed to load backtest results for mapping: {e}")
 
@@ -266,6 +269,9 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
             session_name = sess_feats.get("session_zone_name", "UNKNOWN")
             session_is_dst = sess_feats.get("session_zone_is_dst", "UNKNOWN")
 
+            # EntryStructure dari CSV real trade (kosong = sinyal tanpa eksekusi)
+            entry_structure = entry_structures.get((entry_time, signal), "")
+
             sample = {
                 "source_year": suffix,
                 "year": int(suffix[:4]),
@@ -279,6 +285,7 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                 "actual_net_profit": actual_net_profit,
                 "session_name": session_name,
                 "session_is_dst": session_is_dst,
+                "entry_structure": entry_structure if entry_structure else "NONE",
                 **all_raw,
                 **momentum_features(m15_history, entry_price),
                 **sess_feats,
@@ -300,6 +307,7 @@ def build_feature_matrix_v5(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, List[s
         "session_is_dst",
         "session_zone_name",
         "session_zone_is_dst",
+        "entry_structure",
     ]
     excluded = {
         "source_year", "entry_time", "year", "timeframe", "entry_price", "source", "reject_reason",

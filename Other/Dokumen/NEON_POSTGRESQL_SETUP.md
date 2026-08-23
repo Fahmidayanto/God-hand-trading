@@ -32,18 +32,18 @@
 ### Environment Variables (`.env`)
 ```env
 # Neon PostgreSQL Credentials
-PGHOST=ep-green-mud-aijudrlh-pooler.c-4.us-east-1.aws.neon.tech
+PGHOST=your_neon_host.neon.tech
 PGDATABASE=neondb
-PGUSER=neondb_owner
-PGPASSWORD=npg_gel7WiRj8NCM
+PGUSER=your_db_user
+PGPASSWORD=your_db_password
 PGSSLMODE=require
 ```
 
 ### Database Info
 ```
-Host: ep-green-mud-aijudrlh-pooler.c-4.us-east-1.aws.neon.tech
+Host: your_neon_host.neon.tech
 Database: neondb
-User: neondb_owner
+User: your_db_user
 Version: PostgreSQL 17.10
 SSL Mode: require (mandatory)
 ```

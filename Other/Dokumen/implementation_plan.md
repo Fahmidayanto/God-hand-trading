@@ -1591,10 +1591,10 @@ agents:
 ANTHROPIC_API_KEY=your_anthropic_key_here
 
 # Neon PostgreSQL (Production Database)
-PGHOST=ep-green-mud-aijudrlh-pooler.c-4.us-east-1.aws.neon.tech
+PGHOST=your_neon_host.neon.tech
 PGDATABASE=neondb
-PGUSER=neondb_owner
-PGPASSWORD=npg_gel7WiRj8NCM
+PGUSER=your_db_user
+PGPASSWORD=your_db_password
 PGSSLMODE=require
 
 # News API (Sentiment Agent)

@@ -15,7 +15,7 @@ if os.path.exists(env_path):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
 
-api_key = os.getenv("GROQ_API_KEY", "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")
+api_key = os.getenv("GROQ_API_KEY", "")
 model_id = os.getenv("GROQ_MODEL", "qwen/qwen3.6-27b")
 
 print(f"Testing Groq API...")

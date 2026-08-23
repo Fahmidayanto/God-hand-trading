@@ -27,46 +27,46 @@ class LLMTradeSetup:
     def __init__(
         self,
         # 9inference DeepSeek (primary)
-        nineinference_api_key: str = "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f",
+        nineinference_api_key: Optional[str] = None,
         nineinference_base_url: str = "https://9inference.cloud/v1/package",
         nineinference_model_id: str = "deepseek-v4-flash-0731",
         # AgentRouter GLM
-        agentrouter_api_key: str = "sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
+        agentrouter_api_key: Optional[str] = None,
         agentrouter_base_url: str = "https://agentrouter.org/v1",
         agentrouter_model_id: str = "glm-5.2",
         # Groq
-        groq_api_key: str = "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",
+        groq_api_key: Optional[str] = None,
         groq_base_url: str = "https://api.groq.com/openai/v1",
         groq_model_id: str = "qwen/qwen3.6-27b",
         # NVIDIA models
-        nvidia_120b_api_key: str = "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",
-        nvidia_550b_api_key: str = "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",
-        nvidia_minimax_api_key: str = "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",
-        nvidia_inkling_api_key: str = "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",
-        nvidia_laguna_api_key: str = "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",
-        nvidia_glm_api_key: str = "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",
+        nvidia_120b_api_key: Optional[str] = None,
+        nvidia_550b_api_key: Optional[str] = None,
+        nvidia_minimax_api_key: Optional[str] = None,
+        nvidia_inkling_api_key: Optional[str] = None,
+        nvidia_laguna_api_key: Optional[str] = None,
+        nvidia_glm_api_key: Optional[str] = None,
         nvidia_base_url: str = "https://integrate.api.nvidia.com/v1",
     ):
-        self.nineinference_api_key = nineinference_api_key
+        self.nineinference_api_key = nineinference_api_key or os.getenv("NINEINFERENCE_API_KEY", "")
         self.nineinference_base_url = nineinference_base_url
         self.nineinference_model_id = nineinference_model_id
 
-        self.agentrouter_api_key = agentrouter_api_key
+        self.agentrouter_api_key = agentrouter_api_key or os.getenv("AGENTROUTER_API_KEY", "")
         self.agentrouter_base_url = agentrouter_base_url
         self.agentrouter_model_id = agentrouter_model_id
 
-        self.groq_api_key = os.getenv("GROQ_API_KEY", groq_api_key)
+        self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY", "")
         self.groq_base_url = groq_base_url
         self.groq_model_id = os.getenv("GROQ_MODEL", groq_model_id)
 
         self.nvidia_base_url = nvidia_base_url
         self.nvidia_models = [
-            ("NVIDIA MiniMax M3", nvidia_minimax_api_key, "minimaxai/minimax-m3"),
-            ("NVIDIA GLM 5.2", nvidia_glm_api_key, "z-ai/glm-5.2"),
-            ("NVIDIA Laguna XS", nvidia_laguna_api_key, "poolside/laguna-xs-2.1"),
-            ("NVIDIA Inkling", nvidia_inkling_api_key, "thinkingmachines/inkling"),
-            ("NVIDIA Nemotron 120B", nvidia_120b_api_key, "nvidia/nemotron-3-super-120b-a12b"),
-            ("NVIDIA Nemotron 550B", nvidia_550b_api_key, "nvidia/nemotron-3-ultra-550b-a55b"),
+            ("NVIDIA MiniMax M3", nvidia_minimax_api_key or os.getenv("NVIDIA_MINIMAX_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "minimaxai/minimax-m3"),
+            ("NVIDIA GLM 5.2", nvidia_glm_api_key or os.getenv("NVIDIA_GLM_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "z-ai/glm-5.2"),
+            ("NVIDIA Laguna XS", nvidia_laguna_api_key or os.getenv("NVIDIA_LAGUNA_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "poolside/laguna-xs-2.1"),
+            ("NVIDIA Inkling", nvidia_inkling_api_key or os.getenv("NVIDIA_INKLING_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "thinkingmachines/inkling"),
+            ("NVIDIA Nemotron 120B", nvidia_120b_api_key or os.getenv("NVIDIA_120B_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "nvidia/nemotron-3-super-120b-a12b"),
+            ("NVIDIA Nemotron 550B", nvidia_550b_api_key or os.getenv("NVIDIA_550B_API_KEY", os.getenv("NVIDIA_API_KEY", "")), "nvidia/nemotron-3-ultra-550b-a55b"),
         ]
 
         logger.info(f"✅ LLMTradeSetup initialized | primary: Groq Qwen ({self.groq_model_id})")

@@ -129,7 +129,6 @@
             height: 100%;
             pointer-events: none;
             z-index: 20;
-            /* Elevate above card rows (z-index 10) to prevent click blockages */
         }
 
         .edge-group {
@@ -139,7 +138,7 @@
         .flow-path-hover-bridge {
             fill: none;
             stroke: transparent;
-            stroke-width: 18;
+            stroke-width: 22;
             cursor: pointer;
             pointer-events: stroke;
             /* Capture mouse pointers */
@@ -147,26 +146,34 @@
 
         .flow-path {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.1);
+            stroke: rgba(255, 255, 255, 0.18);
             stroke-width: 3;
             stroke-dasharray: 8 6;
             animation: flowDash 30s linear infinite;
             pointer-events: none;
-            /* Mouse ignores this, caught by bridge */
-            transition: stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+            transition: stroke 0.25s ease, stroke-width 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+        }
+
+        .flow-path.dimmed {
+            opacity: 0.12 !important;
+            stroke-dasharray: 4 8 !important;
+            filter: none !important;
         }
 
         .edge-group:hover .flow-path {
             stroke: #ff1744 !important;
             stroke-width: 4.5 !important;
-            filter: drop-shadow(0 0 8px #ff1744);
+            filter: drop-shadow(0 0 8px #ff1744) !important;
+            opacity: 1 !important;
         }
 
         .flow-path.active {
-            stroke: var(--active-color, var(--color-watcher));
-            stroke-width: 4;
-            filter: drop-shadow(0 0 8px var(--active-color));
-            animation: flowDash 15s linear infinite;
+            stroke: var(--active-color, #00e5ff) !important;
+            stroke-width: 4.5px !important;
+            stroke-dasharray: 10 6 !important;
+            filter: drop-shadow(0 0 10px var(--active-color, #00e5ff)) drop-shadow(0 0 3px #ffffff) !important;
+            animation: flowDash 8s linear infinite !important;
+            opacity: 1 !important;
         }
 
         .edge-delete-btn {
@@ -249,6 +256,13 @@
             border-color: var(--theme-color);
             box-shadow: 0 0 35px var(--glow-color);
             background: rgba(17, 25, 40, 0.9);
+        }
+
+        .node-card.pipeline-active,
+        .agent-card.pipeline-active {
+            border-color: rgba(0, 229, 255, 0.45) !important;
+            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2) !important;
+            transition: all 0.3s ease;
         }
 
         .card-header {
@@ -599,7 +613,7 @@
             box-shadow: 0 0 25px rgba(255, 235, 59, 0.4) !important;
         }
 
-        /* Detail Side Panel */
+        /* Detail Side Panel (On-Demand Drawer) */
         .detail-panel {
             position: fixed;
             right: 2rem;
@@ -610,13 +624,50 @@
             border: 1px solid var(--border-color);
             border-radius: 24px;
             padding: 2rem;
-            backdrop-filter: blur(16px);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
             display: flex;
             flex-direction: column;
             gap: 1.5rem;
             z-index: 200;
             overflow-y: auto;
+            transform: translateX(calc(100% + 4rem));
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+        }
+
+        .detail-panel.open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .panel-close-btn {
+            position: absolute;
+            top: 1.25rem;
+            right: 1.25rem;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 220;
+            line-height: 1;
+        }
+
+        .panel-close-btn:hover {
+            background: rgba(255, 23, 68, 0.2);
+            border-color: rgba(255, 23, 68, 0.5);
+            color: #ff1744;
+            transform: scale(1.1);
         }
 
         /* Custom Scrollbar for detail panel */
@@ -768,6 +819,65 @@
             transform: translateY(1px);
         }
 
+        /* Floating Zoom Controls */
+        .zoom-controls {
+            position: fixed;
+            bottom: 2rem;
+            left: 3rem;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(17, 25, 40, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 0.35rem 0.55rem;
+            border-radius: 12px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.15);
+            user-select: none;
+        }
+
+        .zoom-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .zoom-btn:hover {
+            background: rgba(0, 229, 255, 0.15);
+            border-color: rgba(0, 229, 255, 0.4);
+            color: #00e5ff;
+            transform: translateY(-1px);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+        }
+
+        .zoom-btn:active {
+            transform: translateY(1px);
+        }
+
+        .zoom-badge {
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--color-watcher);
+            padding: 0 0.45rem;
+            min-width: 46px;
+            text-align: center;
+            cursor: pointer;
+        }
+
         .port-handle {
             position: absolute;
             width: 14px;
@@ -858,19 +968,17 @@
         .floating-popup {
             display: none;
             position: absolute;
-            z-index: 1000;
-            background: rgba(22, 22, 30, 0.95);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 23, 68, 0.4);
+            z-index: 99999 !important;
+            background: #0b0f19 !important;
+            border: 1.5px solid #ff1744 !important;
             border-radius: 8px;
-            padding: 0.6rem 0.8rem;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 23, 68, 0.15);
+            padding: 0.65rem 0.85rem;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.95), 0 0 25px rgba(255, 23, 68, 0.4) !important;
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.75rem;
             width: max-content;
-            max-width: 250px;
+            max-width: 260px;
             pointer-events: auto;
             transform: translate(-50%, -100%);
             animation: popupFadeIn 0.15s ease-out;
@@ -948,6 +1056,15 @@
     </header>
 
     <div class="main-container">
+        <!-- Floating Zoom Controls -->
+        <div class="zoom-controls" id="zoom-controls">
+            <button class="zoom-btn" id="zoom-in-btn" onclick="zoomIn()" title="Zoom In (Scroll Up)">➕</button>
+            <div class="zoom-badge" id="zoom-level-badge" onclick="zoomReset()" title="Skala Zoom Aktif (Klik untuk Reset 100%)">100%</div>
+            <button class="zoom-btn" id="zoom-out-btn" onclick="zoomOut()" title="Zoom Out (Scroll Down)">➖</button>
+            <button class="zoom-btn" id="zoom-reset-btn" onclick="zoomReset()" title="Reset Zoom (1:1)">1:1</button>
+            <button class="zoom-btn" id="zoom-fit-btn" onclick="fitView()" title="Fit to Screen (Pusatkan Diagram)">⛶</button>
+        </div>
+
         <div class="diagram-area" id="diagram-viewport">
             <!-- Dynamic Connecting Lines -->
             <svg class="flow-line-svg" id="svg-canvas"></svg>
@@ -1548,7 +1665,8 @@
         <!-- Detail Side Panel -->
             <div class="detail-panel" id="side-panel">
                 <div class="resize-handle" id="panel-resize-handle"></div>
-                <div class="panel-placeholder" id="panel-placeholder">
+                <button class="panel-close-btn" onclick="closeSidePanel()" title="Tutup Panel Detail">×</button>
+                <div class="panel-placeholder" id="panel-placeholder" style="display: none;">
                     <svg viewBox="0 0 24 24">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="12" y1="16" x2="12" y2="12" />
@@ -2741,12 +2859,15 @@
         <script>
             // Default System Connections with Specific Port Assignments
             const defaultConnections = [
+                // Stage 1 Ingestion & Storage Chain
                 { from: "node-mt5", fromPort: "right", to: "node-watcher-trigger", toPort: "left" },
                 { from: "node-watcher-trigger", fromPort: "bottom", to: "node-neondb-mapping", toPort: "top" },
-                { from: "node-neondb-mapping", fromPort: "right", to: "node-lancedb", toPort: "left" },
-                { from: "node-neondb-mapping", fromPort: "bottom", to: "node-orchestrator", toPort: "top" },
-                { from: "node-lancedb", fromPort: "bottom", to: "node-orchestrator", toPort: "left" },
-                { from: "node-watcher-trigger", fromPort: "right", to: "node-orchestrator", toPort: "top" }, // direct trigger
+                { from: "node-neondb-mapping", fromPort: "bottom", to: "node-lancedb", toPort: "top" },
+
+                // Stage 1 -> Stage 2 (Orchestrator Coordination)
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+                { from: "node-neondb-mapping", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+                { from: "node-lancedb", fromPort: "right", to: "node-orchestrator", toPort: "left" },
 
                 // Orchestrator -> Sub-Agents
                 { from: "node-orchestrator", fromPort: "right", to: "node-ms-agent", toPort: "left" },
@@ -2786,8 +2907,8 @@
                 { from: "node-con-step4", fromPort: "bottom", to: "node-con-step5", toPort: "top" },
 
                 // Consensus Steps -> Risk Management -> Execution
-                { from: "node-con-step5", fromPort: "right", to: "node-risk-agent", toPort: "bottom" },
-                { from: "node-consensus", fromPort: "top", to: "node-risk-agent", toPort: "bottom" },
+                { from: "node-con-step5", fromPort: "right", to: "node-risk-agent", toPort: "left" },
+                { from: "node-consensus", fromPort: "right", to: "node-risk-agent", toPort: "left" },
 
                 // Risk Management Internal Workflow
                 { from: "node-risk-agent", fromPort: "bottom", to: "node-risk-sub1", toPort: "top" },
@@ -2799,7 +2920,11 @@
             ];
 
             let connections = [...defaultConnections];
-            const LAYOUT_VERSION = 7; // ponytail: bump when defaultConnections change
+            const LAYOUT_VERSION = 8; // ponytail: bump when defaultConnections change
+
+            // Selection & Hover Flow State
+            let hoveredCardId = null;
+            let selectedNodeCardId = null;
 
             // Drag-and-drop state
             let activeDragCard = null;
@@ -2808,12 +2933,130 @@
             let cardOffsetX = 0;
             let cardOffsetY = 0;
 
-            // Viewport Pan state
+            // Viewport Pan & Zoom state
             let isPanning = false;
             let panX = 0;
             let panY = 0;
             let panStartX = 0;
             let panStartY = 0;
+
+            let zoomScale = 1.0;
+            const MIN_ZOOM = 0.2;
+            const MAX_ZOOM = 2.5;
+
+            function updateTransform() {
+                const panContainer = document.getElementById('pan-container');
+                if (panContainer) {
+                    panContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
+                }
+                const badge = document.getElementById('zoom-level-badge');
+                if (badge) {
+                    badge.textContent = `${Math.round(zoomScale * 100)}%`;
+                }
+                drawLines();
+            }
+
+            // Mouse Wheel Focal Zoom Handler (Zoom towards cursor position)
+            function handleWheelZoom(e) {
+                e.preventDefault();
+                const viewport = document.getElementById('diagram-viewport');
+                const rect = viewport.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                const zoomDelta = -e.deltaY * 0.0012;
+                const factor = Math.exp(zoomDelta);
+                const targetScale = Math.min(Math.max(zoomScale * factor, MIN_ZOOM), MAX_ZOOM);
+
+                if (Math.abs(targetScale - zoomScale) < 0.001) return;
+
+                // Focal point zoom math
+                panX = mouseX - (mouseX - panX) * (targetScale / zoomScale);
+                panY = mouseY - (mouseY - panY) * (targetScale / zoomScale);
+                zoomScale = targetScale;
+
+                updateTransform();
+                saveLayoutState();
+            }
+
+            // Zoom Toolbar Handlers
+            function zoomIn() {
+                const viewport = document.getElementById('diagram-viewport');
+                const rect = viewport ? viewport.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight, left: 0, top: 0 };
+                const mouseX = rect.width / 2;
+                const mouseY = rect.height / 2;
+                const targetScale = Math.min(zoomScale * 1.2, MAX_ZOOM);
+                if (targetScale === zoomScale) return;
+
+                panX = mouseX - (mouseX - panX) * (targetScale / zoomScale);
+                panY = mouseY - (mouseY - panY) * (targetScale / zoomScale);
+                zoomScale = targetScale;
+
+                updateTransform();
+                saveLayoutState();
+            }
+
+            function zoomOut() {
+                const viewport = document.getElementById('diagram-viewport');
+                const rect = viewport ? viewport.getBoundingClientRect() : { width: window.innerWidth, height: window.innerHeight, left: 0, top: 0 };
+                const mouseX = rect.width / 2;
+                const mouseY = rect.height / 2;
+                const targetScale = Math.max(zoomScale / 1.2, MIN_ZOOM);
+                if (targetScale === zoomScale) return;
+
+                panX = mouseX - (mouseX - panX) * (targetScale / zoomScale);
+                panY = mouseY - (mouseY - panY) * (targetScale / zoomScale);
+                zoomScale = targetScale;
+
+                updateTransform();
+                saveLayoutState();
+            }
+
+            function zoomReset() {
+                zoomScale = 1.0;
+                panX = 0;
+                panY = 0;
+                updateTransform();
+                saveLayoutState();
+            }
+
+            function fitView() {
+                const cards = document.querySelectorAll('.node-card, .agent-card');
+                if (!cards.length) return;
+                const viewport = document.getElementById('diagram-viewport');
+                const vRect = viewport.getBoundingClientRect();
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                cards.forEach(card => {
+                    const dx = parseFloat(card.getAttribute('data-dx') || '0');
+                    const dy = parseFloat(card.getAttribute('data-dy') || '0');
+                    const left = card.offsetLeft + dx;
+                    const top = card.offsetTop + dy;
+                    const right = left + card.offsetWidth;
+                    const bottom = top + card.offsetHeight;
+
+                    if (left < minX) minX = left;
+                    if (top < minY) minY = top;
+                    if (right > maxX) maxX = right;
+                    if (bottom > maxY) maxY = bottom;
+                });
+
+                const pad = 100;
+                const contentW = (maxX - minX) + pad * 2;
+                const contentH = (maxY - minY) + pad * 2;
+                const sidePanel = document.getElementById('side-panel');
+                const sidePanelW = sidePanel ? sidePanel.offsetWidth : 350;
+                const availableW = Math.max(300, vRect.width - sidePanelW - 40);
+                const availableH = Math.max(300, vRect.height);
+
+                const scaleFit = Math.min(availableW / contentW, availableH / contentH);
+                zoomScale = Math.min(Math.max(scaleFit, MIN_ZOOM), 1.2);
+                panX = pad - minX * zoomScale;
+                panY = pad - minY * zoomScale;
+
+                updateTransform();
+                saveLayoutState();
+            }
 
             // Connection selection state
             let sourceNodeId = null;
@@ -2855,12 +3098,27 @@
 
                     card.addEventListener('mousedown', dragStart);
                     card.addEventListener('touchstart', dragStart, { passive: false });
+
+                    // Real-time hover flow lighting on card
+                    card.addEventListener('mouseenter', () => {
+                        if (!activeDragCard && !isPanning) {
+                            hoveredCardId = card.id;
+                            drawLines();
+                        }
+                    });
+                    card.addEventListener('mouseleave', () => {
+                        if (!activeDragCard && !isPanning) {
+                            hoveredCardId = null;
+                            drawLines();
+                        }
+                    });
                 });
 
-                // 2. Initialize viewport panning
+                // 2. Initialize viewport panning and wheel zoom
                 const viewport = document.getElementById('diagram-viewport');
                 viewport.addEventListener('mousedown', viewportPanStart);
                 viewport.addEventListener('touchstart', viewportPanStart, { passive: false });
+                viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
             }
 
             // Connection Editor Click Actions
@@ -2962,13 +3220,14 @@
 
             // Viewport Pan handlers
             function viewportPanStart(e) {
-                if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('a') || e.target.closest('ul') || e.target.closest('button') || e.target.closest('.floating-popup')) return;
+                if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('a') || e.target.closest('ul') || e.target.closest('button') || e.target.closest('.floating-popup') || e.target.closest('.zoom-controls') || e.target.closest('.detail-panel')) return;
                 if (e.type === 'mousedown' && e.button !== 0) return;
 
-                // Clear selection and hide popup when clicking empty space
+                // Clear selection, close side panel, and hide popup when clicking empty space
                 if (sourceNodeId) {
                     clearConnectionSelection();
                 }
+                closeSidePanel();
                 hideDeletePopup();
 
                 isPanning = true;
@@ -2999,11 +3258,7 @@
                 panX = clientX - panStartX;
                 panY = clientY - panStartY;
 
-                const panContainer = document.getElementById('pan-container');
-                panContainer.style.transform = `translate(${panX}px, ${panY}px)`;
-
-                // Update arrows dynamically in real-time as the diagram is panned
-                drawLines();
+                updateTransform();
 
                 if (e.type === 'touchmove') {
                     e.preventDefault();
@@ -3126,8 +3381,8 @@
                 const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-                const dx = clientX - dragStartX;
-                const dy = clientY - dragStartY;
+                const dx = (clientX - dragStartX) / zoomScale;
+                const dy = (clientY - dragStartY) / zoomScale;
 
                 // Move all selected nodes in the group
                 dragOffsets.forEach((origOffset, card) => {
@@ -3170,6 +3425,7 @@
                 const state = {
                     version: LAYOUT_VERSION,
                     pan: { x: panX, y: panY },
+                    zoom: zoomScale,
                     nodes: {},
                     connections: connections
                 };
@@ -3186,16 +3442,21 @@
                 const savedStateStr = localStorage.getItem('mt5_diagram_layout');
                 if (!savedStateStr) {
                     connections = [...defaultConnections];
+                    updateTransform();
                     return;
                 }
                 try {
                     const state = JSON.parse(savedStateStr);
-                    // Always restore pan and node positions (user's careful arrangement)
+                    // Always restore pan, zoom, and node positions
                     if (state.pan) {
                         panX = state.pan.x;
                         panY = state.pan.y;
-                        document.getElementById('pan-container').style.transform = `translate(${panX}px, ${panY}px)`;
                     }
+                    if (typeof state.zoom === 'number' && !isNaN(state.zoom)) {
+                        zoomScale = Math.min(Math.max(state.zoom, MIN_ZOOM), MAX_ZOOM);
+                    }
+                    updateTransform();
+
                     if (state.nodes) {
                         for (let id in state.nodes) {
                             const card = document.getElementById(id);
@@ -3227,7 +3488,8 @@
                 localStorage.removeItem('mt5_diagram_layout');
                 panX = 0;
                 panY = 0;
-                document.getElementById('pan-container').style.transform = 'translate(0px, 0px)';
+                zoomScale = 1.0;
+                updateTransform();
                 document.querySelectorAll('.node-card, .agent-card').forEach(card => {
                     card.setAttribute('data-dx', '0');
                     card.setAttribute('data-dy', '0');
@@ -3235,6 +3497,7 @@
                 });
                 connections = [...defaultConnections];
                 clearConnectionSelection();
+                closeSidePanel();
                 hideDeletePopup();
                 drawLines();
             }
@@ -3278,17 +3541,20 @@
                 return { start: bestA, end: bestB };
             }
 
-            function getPortCoordinates(rect, portName, rectCanvas) {
+            function getPortCoordinates(rect, portName, rectCanvas, offsetIndex = 0, totalOnPort = 1) {
                 if (!portName) return null;
+                const spread = 20; // clean multi-lane lane spacing (px)
+                const shift = totalOnPort > 1 ? (offsetIndex - (totalOnPort - 1) / 2) * spread : 0;
+
                 switch (portName) {
                     case 'top':
-                        return { x: rect.left + rect.width / 2 - rectCanvas.left, y: rect.top - rectCanvas.top, dir: 'up' };
+                        return { x: rect.left + rect.width / 2 + shift - rectCanvas.left, y: rect.top - rectCanvas.top, dir: 'up' };
                     case 'bottom':
-                        return { x: rect.left + rect.width / 2 - rectCanvas.left, y: rect.bottom - rectCanvas.top, dir: 'down' };
+                        return { x: rect.left + rect.width / 2 + shift - rectCanvas.left, y: rect.bottom - rectCanvas.top, dir: 'down' };
                     case 'left':
-                        return { x: rect.left - rectCanvas.left, y: rect.top + rect.height / 2 - rectCanvas.top, dir: 'left' };
+                        return { x: rect.left - rectCanvas.left, y: rect.top + rect.height / 2 + shift - rectCanvas.top, dir: 'left' };
                     case 'right':
-                        return { x: rect.right - rectCanvas.left, y: rect.top + rect.height / 2 - rectCanvas.top, dir: 'right' };
+                        return { x: rect.right - rectCanvas.left, y: rect.top + rect.height / 2 + shift - rectCanvas.top, dir: 'right' };
                     default:
                         return null;
                 }
@@ -3299,31 +3565,187 @@
                 if (!path) return null;
                 const start = ptA;
                 const end = ptB;
+                const sx = start.x, sy = start.y, sDir = start.dir;
+                const ex = end.x, ey = end.y, eDir = end.dir;
 
-                let cp1x = start.x;
-                let cp1y = start.y;
-                let cp2x = end.x;
-                let cp2y = end.y;
+                let d = "";
+                let midX = (sx + ex) / 2;
+                let midY = (sy + ey) / 2;
 
-                const offset = Math.min(100, Math.hypot(start.x - end.x, start.y - end.y) * 0.4);
+                // 1. Horizontal Corridor: Right -> Left (Normal forward flow)
+                if (sDir === 'right' && eDir === 'left') {
+                    if (ex >= sx + 10) {
+                        midX = (sx + ex) / 2;
+                        d = `M ${sx} ${sy} C ${midX} ${sy}, ${midX} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                    } else {
+                        // Backward wrap: route around cleanly
+                        const lateralX = Math.max(sx + 50, ex + 50);
+                        d = `M ${sx} ${sy} C ${lateralX} ${sy}, ${lateralX} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                    }
+                }
+                // 2. Horizontal Corridor: Left -> Right
+                else if (sDir === 'left' && eDir === 'right') {
+                    if (ex <= sx - 10) {
+                        midX = (sx + ex) / 2;
+                        d = `M ${sx} ${sy} C ${midX} ${sy}, ${midX} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
+                    } else {
+                        const lateralX = Math.min(sx - 50, ex - 50);
+                        d = `M ${sx} ${sy} C ${lateralX} ${sy}, ${lateralX} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
+                    }
+                }
+                // 3. Vertical Straight/S-Curve: Down -> Up (Normal downward cascade)
+                else if (sDir === 'down' && eDir === 'up') {
+                    if (ey >= sy) {
+                        if (Math.abs(sx - ex) < 4) {
+                            d = `M ${sx} ${sy} L ${ex} ${ey}`;
+                        } else {
+                            midY = (sy + ey) / 2;
+                            d = `M ${sx} ${sy} C ${sx} ${midY}, ${ex} ${midY}, ${ex} ${ey - 6} L ${ex} ${ey}`;
+                        }
+                    } else {
+                        // Target is above: route around side
+                        const gutterX = Math.min(sx, ex) - 50;
+                        d = `M ${sx} ${sy} C ${gutterX} ${sy + 40}, ${gutterX} ${ey - 40}, ${ex} ${ey - 6} L ${ex} ${ey}`;
+                    }
+                }
+                // 4. Vertical Straight/S-Curve: Up -> Down
+                else if (sDir === 'up' && eDir === 'down') {
+                    if (ey <= sy) {
+                        if (Math.abs(sx - ex) < 4) {
+                            d = `M ${sx} ${sy} L ${ex} ${ey}`;
+                        } else {
+                            midY = (sy + ey) / 2;
+                            d = `M ${sx} ${sy} C ${sx} ${midY}, ${ex} ${midY}, ${ex} ${ey + 6} L ${ex} ${ey}`;
+                        }
+                    } else {
+                        const gutterX = Math.max(sx, ex) + 50;
+                        d = `M ${sx} ${sy} C ${gutterX} ${sy - 40}, ${gutterX} ${ey + 40}, ${ex} ${ey + 6} L ${ex} ${ey}`;
+                    }
+                }
+                // 5. Right -> Up (Elbow smoothly entering target top)
+                else if (sDir === 'right' && eDir === 'up') {
+                    if (ex >= sx && ey >= sy) {
+                        d = `M ${sx} ${sy} C ${ex} ${sy}, ${ex} ${sy + (ey - sy) * 0.3}, ${ex} ${ey - 6} L ${ex} ${ey}`;
+                    } else {
+                        const leadX = Math.max(sx + 35, (sx + ex) / 2);
+                        d = `M ${sx} ${sy} C ${leadX} ${sy}, ${ex} ${Math.min(sy, ey) - 30}, ${ex} ${ey - 6} L ${ex} ${ey}`;
+                    }
+                }
+                // 6. Right -> Down (Elbow entering target bottom)
+                else if (sDir === 'right' && eDir === 'down') {
+                    const leadX = Math.max(sx + 35, (sx + ex) / 2);
+                    d = `M ${sx} ${sy} C ${leadX} ${sy}, ${ex} ${Math.max(sy, ey) + 30}, ${ex} ${ey + 6} L ${ex} ${ey}`;
+                }
+                // 7. Down -> Left (Elbow leaving bottom and entering target left)
+                else if (sDir === 'down' && eDir === 'left') {
+                    if (ex >= sx && ey >= sy) {
+                        d = `M ${sx} ${sy} C ${sx} ${ey}, ${sx + (ex - sx) * 0.3} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                    } else {
+                        const leadY = Math.max(sy + 35, (sy + ey) / 2);
+                        d = `M ${sx} ${sy} C ${sx} ${leadY}, ${Math.min(sx, ex) - 30} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                    }
+                }
+                // 8. Down -> Right (Elbow leaving bottom and entering target right)
+                else if (sDir === 'down' && eDir === 'right') {
+                    const leadY = Math.max(sy + 35, (sy + ey) / 2);
+                    d = `M ${sx} ${sy} C ${sx} ${leadY}, ${Math.max(sx, ex) + 30} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
+                }
+                // 9. Up -> Left
+                else if (sDir === 'up' && eDir === 'left') {
+                    const leadY = Math.min(sy - 35, (sy + ey) / 2);
+                    d = `M ${sx} ${sy} C ${sx} ${leadY}, ${Math.min(sx, ex) - 30} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                }
+                // 10. Up -> Right
+                else if (sDir === 'up' && eDir === 'right') {
+                    const leadY = Math.min(sy - 35, (sy + ey) / 2);
+                    d = `M ${sx} ${sy} C ${sx} ${leadY}, ${Math.max(sx, ex) + 30} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
+                }
+                // 11. Controlled Safe Default
+                else {
+                    const dist = Math.hypot(ex - sx, ey - sy);
+                    const leadDist = Math.min(50, Math.max(15, dist * 0.25));
 
-                if (start.dir === 'up') cp1y -= offset;
-                else if (start.dir === 'down') cp1y += offset;
-                else if (start.dir === 'left') cp1x -= offset;
-                else if (start.dir === 'right') cp1x += offset;
+                    let cp1x = sx, cp1y = sy;
+                    if (sDir === 'up') cp1y -= leadDist;
+                    else if (sDir === 'down') cp1y += leadDist;
+                    else if (sDir === 'left') cp1x -= leadDist;
+                    else if (sDir === 'right') cp1x += leadDist;
 
-                if (end.dir === 'up') cp2y -= offset;
-                else if (end.dir === 'down') cp2y += offset;
-                else if (end.dir === 'left') cp2x -= offset;
-                else if (end.dir === 'right') cp2x += offset;
+                    let cp2x = ex, cp2y = ey;
+                    if (eDir === 'up') cp2y -= leadDist;
+                    else if (eDir === 'down') cp2y += leadDist;
+                    else if (eDir === 'left') cp2x -= leadDist;
+                    else if (eDir === 'right') cp2x += leadDist;
 
-                const d = `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
+                    d = `M ${sx} ${sy} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${ex} ${ey}`;
+                }
+
                 path.setAttribute('d', d);
 
-                // Compute midpoint at t = 0.5
-                const midX = 0.125 * start.x + 0.375 * cp1x + 0.375 * cp2x + 0.125 * end.x;
-                const midY = 0.125 * start.y + 0.375 * cp1y + 0.375 * cp2y + 0.125 * end.y;
-                return { x: midX, y: midY };
+                // Exact midpoint for delete button
+                const midPoint = { x: (sx + ex) / 2, y: (sy + ey) / 2 };
+                return midPoint;
+            }
+
+            function getNodeThemeColor(cardId) {
+                if (!cardId) return '#00e5ff';
+                if (cardId.includes('mt5')) return '#00f2fe';
+                if (cardId.includes('watcher')) return '#00e676';
+                if (cardId.includes('neon')) return '#00e5ff';
+                if (cardId.includes('lancedb')) return '#e040fb';
+                if (cardId.includes('orchestrator')) return '#ff9100';
+                if (cardId.includes('ms-agent') || cardId.includes('ms-sub')) return '#00e676';
+                if (cardId.includes('msa-to-ml') || cardId.includes('msa-to-sent')) return '#ffaa00';
+                if (cardId.includes('ml-agent') || cardId.includes('ml-sub')) return '#b388ff';
+                if (cardId.includes('sentiment') || cardId.includes('sent-sub')) return '#ff4081';
+                if (cardId.includes('consensus') || cardId.includes('con-sub') || cardId.includes('con-step')) return '#00e5ff';
+                if (cardId.includes('risk') || cardId.includes('risk-sub')) return '#ffd600';
+                if (cardId.includes('execution')) return '#ff1744';
+                return '#00e5ff';
+            }
+
+            function getConnectedFlowGraph(startNodeId) {
+                if (!startNodeId) return { activeNodes: new Set(), activeEdgeIndices: new Set() };
+
+                const activeNodes = new Set();
+                const activeEdgeIndices = new Set();
+
+                // Seed with start node and cluster internal siblings
+                const seedNodes = new Set([startNodeId]);
+                const stagePrefixes = ['node-ms', 'node-ml', 'node-sent', 'node-con', 'node-risk'];
+                for (const prefix of stagePrefixes) {
+                    if (startNodeId.startsWith(prefix)) {
+                        connections.forEach(conn => {
+                            if (conn.from.startsWith(prefix) && conn.to.startsWith(prefix)) {
+                                seedNodes.add(conn.from);
+                                seedNodes.add(conn.to);
+                            }
+                        });
+                        break;
+                    }
+                }
+
+                seedNodes.forEach(n => activeNodes.add(n));
+
+                // Pure Forward Downstream Traversal (Eksklusif menelusuri ke depan saja)
+                const forwardQueue = Array.from(seedNodes);
+                const visitedForward = new Set(seedNodes);
+
+                while (forwardQueue.length > 0) {
+                    const curr = forwardQueue.shift();
+                    connections.forEach((conn, idx) => {
+                        if (conn.from === curr) {
+                            activeEdgeIndices.add(idx);
+                            activeNodes.add(conn.to);
+                            if (!visitedForward.has(conn.to)) {
+                                visitedForward.add(conn.to);
+                                forwardQueue.push(conn.to);
+                            }
+                        }
+                    });
+                }
+
+                return { activeNodes, activeEdgeIndices };
             }
 
             function drawLines() {
@@ -3331,7 +3753,25 @@
                 const rectCanvas = canvas.getBoundingClientRect();
 
                 canvas.innerHTML = '';
-                const selectedType = getSelectedNodeType();
+                
+                // Active focus card from either mouse hover or click selection
+                const activeTargetId = hoveredCardId || selectedNodeCardId;
+                const isFocusActive = !!activeTargetId;
+
+                const { activeNodes, activeEdgeIndices } = getConnectedFlowGraph(activeTargetId);
+
+                // Pre-count number of connections per port for multi-lane spacing
+                const outPortCounts = {};
+                const inPortCounts = {};
+                connections.forEach(conn => {
+                    const outKey = `${conn.from}-${conn.fromPort}`;
+                    const inKey = `${conn.to}-${conn.toPort}`;
+                    outPortCounts[outKey] = (outPortCounts[outKey] || 0) + 1;
+                    inPortCounts[inKey] = (inPortCounts[inKey] || 0) + 1;
+                });
+
+                const outPortIndices = {};
+                const inPortIndices = {};
 
                 connections.forEach((conn, index) => {
                     const cardA = document.getElementById(conn.from);
@@ -3341,8 +3781,17 @@
                     const rectA = cardA.getBoundingClientRect();
                     const rectB = cardB.getBoundingClientRect();
 
-                    let startPt = getPortCoordinates(rectA, conn.fromPort, rectCanvas);
-                    let endPt = getPortCoordinates(rectB, conn.toPort, rectCanvas);
+                    const outKey = `${conn.from}-${conn.fromPort}`;
+                    const inKey = `${conn.to}-${conn.toPort}`;
+
+                    const outIdx = outPortIndices[outKey] || 0;
+                    outPortIndices[outKey] = outIdx + 1;
+
+                    const inIdx = inPortIndices[inKey] || 0;
+                    inPortIndices[inKey] = inIdx + 1;
+
+                    let startPt = getPortCoordinates(rectA, conn.fromPort, rectCanvas, outIdx, outPortCounts[outKey]);
+                    let endPt = getPortCoordinates(rectB, conn.toPort, rectCanvas, inIdx, inPortCounts[inKey]);
 
                     // Fallback to dynamic closest points if no ports defined (migration compatibility)
                     if (!startPt || !endPt) {
@@ -3367,11 +3816,15 @@
                     visiblePath.setAttribute('id', visibleId);
                     visiblePath.setAttribute('class', 'flow-path');
 
-                    // Determine active path highlights
-                    if (selectedType && (conn.from.includes(selectedType) || conn.to.includes(selectedType))) {
+                    // Check if this connection belongs to the full end-to-end active graph pathway
+                    const isPathActive = isFocusActive && activeEdgeIndices.has(index);
+
+                    if (isPathActive) {
                         visiblePath.classList.add('active');
-                        const color = getActiveThemeColorForType(selectedType);
+                        const color = getNodeThemeColor(conn.from);
                         visiblePath.style.setProperty('--active-color', color);
+                    } else if (isFocusActive) {
+                        visiblePath.classList.add('dimmed');
                     }
 
                     // 3. Create delete button group (×)
@@ -3408,13 +3861,22 @@
                     const handleClick = (e) => {
                         e.stopPropagation();
                         const rect = document.getElementById('pan-container').getBoundingClientRect();
-                        const x = e.clientX - rect.left;
-                        const y = e.clientY - rect.top;
+                        const x = (e.clientX - rect.left) / zoomScale;
+                        const y = (e.clientY - rect.top) / zoomScale;
                         showDeletePopup(x, y, conn.from, conn.to);
                     };
 
                     bridgePath.addEventListener('click', handleClick);
                     delBtnGroup.addEventListener('click', handleClick);
+                });
+
+                // Highlight active connected cards along the pipeline
+                document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                    if (isFocusActive && activeNodes.has(card.id) && card.id !== selectedNodeCardId) {
+                        card.classList.add('pipeline-active');
+                    } else {
+                        card.classList.remove('pipeline-active');
+                    }
                 });
             }
 
@@ -3429,17 +3891,9 @@
                 return panel.style.getPropertyValue('--active-theme-color') || 'var(--text-primary)';
             }
 
-            // Selection logic
-            let selectedNodeId = null;
-
+            // Selection logic with Toggle support
             function selectNode(type) {
-                document.querySelectorAll('.node-card, .agent-card').forEach(card => card.classList.remove('selected'));
-                document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
-
-                document.getElementById('panel-placeholder').style.display = 'none';
                 const panel = document.getElementById('side-panel');
-
-                let color = 'var(--text-primary)';
                 const cardMap = {
                     'mt5': { cardId: 'node-mt5', panelId: 'panel-mt5', color: 'var(--color-mt5)' },
                     'watcher': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: 'var(--color-watcher)' },
@@ -3484,16 +3938,44 @@
                 };
 
                 const config = cardMap[type];
-                if (config) {
-                    const card = document.getElementById(config.cardId);
-                    const pnl = document.getElementById(config.panelId);
-                    if (card) card.classList.add('selected');
-                    if (pnl) pnl.classList.add('active');
-                    color = config.color;
+                if (!config) {
+                    closeSidePanel();
+                    return;
                 }
 
-                panel.style.setProperty('--active-theme-color', color);
-                drawLines(); // Automatically updates path highlighting!
+                // Toggle logic: If this exact card is already selected and panel is open -> Close it!
+                if (selectedNodeCardId === config.cardId && panel && panel.classList.contains('open')) {
+                    closeSidePanel();
+                    return;
+                }
+
+                // Otherwise, select and open this node
+                document.querySelectorAll('.node-card, .agent-card').forEach(card => card.classList.remove('selected'));
+                document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+
+                const placeholder = document.getElementById('panel-placeholder');
+                if (placeholder) placeholder.style.display = 'none';
+
+                const card = document.getElementById(config.cardId);
+                const pnl = document.getElementById(config.panelId);
+                if (card) card.classList.add('selected');
+                if (pnl) pnl.classList.add('active');
+                
+                selectedNodeCardId = config.cardId;
+                if (panel) {
+                    panel.classList.add('open');
+                    panel.style.setProperty('--active-theme-color', config.color);
+                }
+
+                drawLines(); // Automatically updates forward path highlighting!
+            }
+
+            function closeSidePanel() {
+                const panel = document.getElementById('side-panel');
+                if (panel) panel.classList.remove('open');
+                selectedNodeCardId = null;
+                document.querySelectorAll('.node-card, .agent-card').forEach(card => card.classList.remove('selected'));
+                drawLines();
             }
 
             // Side Panel Resizer Logic

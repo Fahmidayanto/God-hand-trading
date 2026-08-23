@@ -24,9 +24,11 @@ if google_key:
     from agno.models.google import Gemini
     providers.append(("Tier 3: Gemini 2.5 Flash", Gemini(id="gemini-2.5-flash", api_key=google_key)))
 
-providers.append(
-    ("Tier 4: NVIDIA MiniMax M3", OpenAILike(id="minimaxai/minimax-m3", api_key="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", base_url=service.nvidia_base_url, timeout=12.0, max_retries=0))
-)
+nv_key = os.getenv("NVIDIA_MINIMAX_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
+if nv_key:
+    providers.append(
+        ("Tier 4: NVIDIA MiniMax M3", OpenAILike(id="minimaxai/minimax-m3", api_key=nv_key, base_url=service.nvidia_base_url, timeout=12.0, max_retries=0))
+    )
 
 prompt = "Return raw JSON ONLY: {\"status\": \"ok\"}"
 

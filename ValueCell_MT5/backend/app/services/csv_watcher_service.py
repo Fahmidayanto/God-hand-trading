@@ -366,6 +366,8 @@ class CSVWatcherService:
                     "ticket": parse_int(row.get("Ticket")),
                     "symbol": row.get("Symbol", "XAUUSD").strip(),
                     "type": row.get("Type", "").strip(),
+                    "entry_structure": row.get("EntryStructure", "").strip(),
+                    "close_type": row.get("CloseType", "").strip(),
                     "entry_price": parse_float(row.get("EntryPrice")),
                     "exit_price": parse_float(row.get("ExitPrice")),
                     "sl": parse_float(row.get("SL")),
@@ -480,236 +482,159 @@ class CSVWatcherService:
             raise e
 
     def _sync_to_lancedb_from_neondb(self, parsed_rows: List[Dict[str, Any]], table_name: str):
-        """Option B: Fetch recently inserted NeonDB records and push them to LanceDB."""
+        """Option B: Push recently parsed records directly to LanceDB in high-speed memory batch."""
         if not self.lancedb or not parsed_rows:
             return
             
         try:
             if table_name == "llhhbosdata_xauusd":
-                logger.info(f"🔄 Syncing {len(parsed_rows)} structures from NeonDB to LanceDB...")
+                logger.info(f"🔄 Fast sync {len(parsed_rows)} structures to LanceDB...")
                 patterns_to_add = []
-                with get_db_conn() as conn:
-                    with conn.cursor() as cur:
-                        for row in parsed_rows:
-                            is_bullish = 'BULL' in str(row.get('direction_action', '')).upper() or 'HH' in str(row.get('type', '')).upper()
-                            expected_type = "BUY" if is_bullish else "SELL"
-                            
-                            query = """
-                                SELECT 
-                                    s.type, s.direction_action, s.price, s.time, s.timeframe, s.status,
-                                    COALESCE(m15.ema200, h1.ema200, h4.ema200, s.price) as ema200,
-                                    r.net_profit, r.session, r.entry_price, r.exit_price, r.entry_time, r.exit_time, r.status,
-                                    (
-                                        SELECT type FROM llhhbosdata_xauusd 
-                                        WHERE timeframe = s.timeframe AND time < s.time AND UPPER(type) IN ('CHOCH', 'BOS')
-                                        ORDER BY time DESC 
-                                        LIMIT 1
-                                    ) as prior_baseline
-                                FROM llhhbosdata_xauusd s
-                                LEFT JOIN marketdata_xauusd_m15 m15 ON s.time = m15.time AND s.timeframe = 'M15'
-                                LEFT JOIN marketdata_xauusd_h1 h1 ON s.time = h1.time AND s.timeframe = 'H1'
-                                LEFT JOIN marketdata_xauusd_h4 h4 ON s.time = h4.time AND s.timeframe = 'H4'
-                                LEFT JOIN backtest_results_xauusd r ON r.symbol = 'XAUUSD' AND r.timeframe = s.timeframe AND r.type = %s 
-                                    AND r.entry_time >= s.time AND r.entry_time <= s.time + interval '5 days'
-                                WHERE s.time = %s AND s.timeframe = %s AND s.type = %s AND s.price = %s
-                                LIMIT 1
-                            """
-                            cur.execute(query, (expected_type, row['time'], row['timeframe'], row['type'], row['price']))
-                            db_row = cur.fetchone()
-                            
-                            if db_row:
-                                s_type, s_dir, s_price, s_time, s_tf, s_status, ema200, net_profit, session, entry_pr, exit_pr, t_entry, t_exit, r_status, prior_baseline = db_row
-                                
-                                event_type = "BoS"
-                                if "choch" in s_type.lower():
-                                    event_type = "CHoCH"
-                                elif "hh" in s_type.lower():
-                                    event_type = "HH"
-                                elif "ll" in s_type.lower():
-                                    event_type = "LL"
-                                    
-                                direction = "Bullish" if is_bullish else "Bearish"
-                                prior_choch = prior_baseline is not None and prior_baseline.upper() == "CHOCH"
-                                
-                                outcome = "PENDING"
-                                profit_pips = 0.0
-                                duration_minutes = 0
-                                norm_session = "London"
-                                
-                                if net_profit is not None and str(r_status).upper() != "REJECTED":
-                                    outcome = "WIN" if float(net_profit) > 0 else "LOSS"
-                                    entry_pr = float(entry_pr or 0)
-                                    exit_pr = float(exit_pr or 0)
-                                    if expected_type == "BUY":
-                                        pips = (exit_pr - entry_pr) * 10.0
-                                    else:
-                                        pips = (entry_pr - exit_pr) * 10.0
-                                    profit_pips = round(pips, 2)
-                                    
-                                    try:
-                                        duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
-                                    except:
-                                        duration_minutes = 0
-                                    norm_session = self._normalize_session(session)
-                                else:
-                                    hour = s_time.hour
-                                    if 8 <= hour < 13:
-                                        norm_session = "London"
-                                    elif 13 <= hour < 22:
-                                        norm_session = "NewYork"
-                                    elif 22 <= hour or hour < 8:
-                                        norm_session = "Asia"
-                                        
-                                pattern_dict = {
-                                    "timestamp": s_time.isoformat(),
-                                    "symbol": "XAUUSD",
-                                    "timeframe": s_tf,
-                                    "event_type": event_type,
-                                    "direction": direction,
-                                    "price": float(s_price),
-                                    "ema200": float(ema200),
-                                    "session": norm_session,
-                                    "prior_choch": prior_choch,
-                                    "outcome": outcome,
-                                    "profit_pips": profit_pips,
-                                    "duration_minutes": duration_minutes
-                                }
-                                
-                                patterns_to_add.append(pattern_dict)
+                for row in parsed_rows:
+                    s_type = str(row.get("type", "")).strip()
+                    s_dir = str(row.get("direction_action", "")).strip()
+                    s_time = row.get("time")
+                    s_price = row.get("price") or 0.0
+                    s_tf = str(row.get("timeframe", "M15")).strip()
+                    if not s_time:
+                        continue
+                        
+                    is_bullish = 'BULL' in s_dir.upper() or 'HH' in s_type.upper()
+                    event_type = "BoS"
+                    if "choch" in s_type.lower():
+                        event_type = "CHoCH"
+                    elif "hh" in s_type.lower():
+                        event_type = "HH"
+                    elif "ll" in s_type.lower():
+                        event_type = "LL"
+                        
+                    direction = "Bullish" if is_bullish else "Bearish"
+                    hour = s_time.hour
+                    if 8 <= hour < 13:
+                        norm_session = "London"
+                    elif 13 <= hour < 22:
+                        norm_session = "NewYork"
+                    else:
+                        norm_session = "Asia"
+                        
+                    pattern_dict = {
+                        "timestamp": s_time.isoformat(),
+                        "symbol": "XAUUSD",
+                        "timeframe": s_tf,
+                        "event_type": event_type,
+                        "direction": direction,
+                        "price": float(s_price),
+                        "ema200": float(s_price),
+                        "session": norm_session,
+                        "prior_choch": False,
+                        "outcome": "PENDING",
+                        "profit_pips": 0.0,
+                        "duration_minutes": 0
+                    }
+                    patterns_to_add.append(pattern_dict)
                 
-                # Perform high-performance batch write
                 if patterns_to_add:
                     self.lancedb.add_structure_patterns_batch(patterns_to_add)
+                    logger.info(f"✅ Fast synced {len(patterns_to_add)} structures to LanceDB")
                                 
             elif table_name == "backtest_results_xauusd":
-                logger.info(f"🔄 Syncing {len(parsed_rows)} trade outcomes from NeonDB to LanceDB...")
+                logger.info(f"🔄 Fast sync {len(parsed_rows)} trade outcomes to LanceDB...")
                 trades_to_add = []
+                for row in parsed_rows:
+                    t_entry = row.get("entry_time")
+                    if not t_entry:
+                        continue
+                    t_exit = row.get("exit_time")
+                    ticket = row.get("ticket") or 0
+                    t_type = str(row.get("type", "")).strip()
+                    entry_pr = float(row.get("entry_price") or 0)
+                    exit_pr = float(row.get("exit_price") or 0)
+                    net_profit = float(row.get("net_profit") or 0)
+                    status = str(row.get("status", "")).strip()
+                    session = str(row.get("session", "")).strip()
+                    
+                    pips = 0.0
+                    if status.upper() != "REJECTED":
+                        if t_type == "BUY":
+                            pips = (exit_pr - entry_pr) * 10.0
+                        else:
+                            pips = (entry_pr - exit_pr) * 10.0
+                        outcome = "WIN" if net_profit > 0 else "LOSS"
+                    else:
+                        outcome = "PENDING"
+                        
+                    duration_minutes = 0
+                    if t_exit and t_entry:
+                        try:
+                            duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
+                        except Exception:
+                            duration_minutes = 0
+                            
+                    structure_event = str(row.get("entry_structure", "")).strip() or "BoS"
+                    
+                    trade_dict = {
+                        "ticket": int(ticket),
+                        "timestamp": t_entry.isoformat(),
+                        "symbol": "XAUUSD",
+                        "type": t_type,
+                        "entry_price": entry_pr,
+                        "exit_price": exit_pr,
+                        "profit_pips": round(pips, 2),
+                        "duration_minutes": duration_minutes,
+                        "outcome": outcome,
+                        "structure_event": structure_event,
+                        "session": self._normalize_session(session),
+                        "consensus_score": 0.80,
+                        "body_ratio": float(row["body_ratio"]) if row.get("body_ratio") is not None else None,
+                        "body_ratio_min": float(row["body_ratio_min"]) if row.get("body_ratio_min") is not None else None,
+                        "body_ratio_passed": row.get("body_ratio_passed", "NO"),
+                        "body_ratio_mode": row.get("body_ratio_mode", ""),
+                        "initial_sl": float(row["initial_sl"]) if row.get("initial_sl") is not None else None,
+                        "initial_tp": float(row["initial_tp"]) if row.get("initial_tp") is not None else None,
+                        "final_sl": float(row["final_sl"]) if row.get("final_sl") is not None else None,
+                        "final_tp": float(row["final_tp"]) if row.get("final_tp") is not None else None,
+                        "initial_risk_points": row.get("initial_risk_points"),
+                        "initial_reward_points": row.get("initial_reward_points"),
+                        "final_risk_points": row.get("final_risk_points"),
+                        "final_reward_points": row.get("final_reward_points"),
+                        "trailing_modified": row.get("trailing_modified", "NO"),
+                        "trailing_count": row.get("trailing_count", 0),
+                        "tp_expanded": row.get("tp_expanded", "NO"),
+                        "tp_expand_count": row.get("tp_expand_count", 0),
+                        "max_favorable_points": row.get("max_favorable_points", 0),
+                        "max_adverse_points": row.get("max_adverse_points", 0),
+                        "close_reason": row.get("close_reason", "")
+                    }
+                    trades_to_add.append(trade_dict)
+                    
+                if trades_to_add:
+                    self.lancedb.add_trade_outcomes_batch(trades_to_add)
+                    logger.info(f"✅ Fast synced {len(trades_to_add)} trades to LanceDB")
+                    
                 with get_db_conn() as conn:
                     with conn.cursor() as cur:
-                        for row in parsed_rows:
-                            query = """
-                                SELECT ticket, symbol, type, entry_price, exit_price, net_profit, session, entry_time, exit_time, timeframe, status,
-                                       body_ratio, body_ratio_min, body_ratio_passed, body_ratio_mode,
-                                       initial_sl, initial_tp, final_sl, final_tp,
-                                       initial_risk_points, initial_reward_points, final_risk_points, final_reward_points,
-                                       trailing_modified, trailing_count, tp_expanded, tp_expand_count,
-                                       max_favorable_points, max_adverse_points, close_reason
-                                FROM backtest_results_xauusd
-                                WHERE entry_time = %s AND ticket = %s AND type = %s
-                                LIMIT 1
-                            """
-                            cur.execute(query, (row['entry_time'], row['ticket'], row['type']))
-                            db_row = cur.fetchone()
-                            
-                            if db_row:
-                                (ticket, symbol, t_type, entry_pr, exit_pr, net_profit, session, t_entry, t_exit, tf, status,
-                                 body_ratio, body_ratio_min, body_ratio_passed, body_ratio_mode,
-                                 initial_sl, initial_tp, final_sl, final_tp,
-                                 initial_risk_points, initial_reward_points, final_risk_points, final_reward_points,
-                                 trailing_modified, trailing_count, tp_expanded, tp_expand_count,
-                                 max_favorable_points, max_adverse_points, close_reason) = db_row
-                                
-                                entry_pr = float(entry_pr or 0)
-                                exit_pr = float(exit_pr or 0)
-                                net_profit = float(net_profit or 0)
-                                
-                                pips = 0.0
-                                if str(status).upper() != "REJECTED":
-                                    if str(t_type) == "BUY":
-                                        pips = (exit_pr - entry_pr) * 10.0
-                                    else:
-                                        pips = (entry_pr - exit_pr) * 10.0
-                                    outcome = "WIN" if net_profit > 0 else "LOSS"
-                                else:
-                                    outcome = "PENDING"
-                                
-                                try:
-                                    duration_minutes = int((t_exit - t_entry).total_seconds() / 60)
-                                except:
-                                    duration_minutes = 0
-                                    
-                                structure_event = "BoS"
-                                expected_dir = "Bullish" if str(t_type) == "BUY" else "Bearish"
-                                
-                                struct_query = """
-                                    SELECT type 
-                                    FROM llhhbosdata_xauusd
-                                    WHERE timeframe = %s AND time <= %s AND time >= %s - interval '1 hour'
-                                    ORDER BY time DESC
-                                    LIMIT 1
-                                """
-                                cur.execute(struct_query, (tf, t_entry, t_entry))
-                                s_row = cur.fetchone()
-                                if s_row:
-                                    raw_type = str(s_row[0]).strip()
-                                    if "choch" in raw_type.lower():
-                                        structure_event = "CHoCH"
-                                    elif "hh" in raw_type.lower():
-                                        structure_event = "HH"
-                                    elif "ll" in raw_type.lower():
-                                        structure_event = "LL"
-                                        
-                                trade_dict = {
-                                    "ticket": int(ticket) if ticket is not None else 0,
-                                    "timestamp": t_entry.isoformat(),
-                                    "symbol": "XAUUSD",
-                                    "type": str(t_type),
-                                    "entry_price": entry_pr,
-                                    "exit_price": exit_pr,
-                                    "profit_pips": round(pips, 2),
-                                    "duration_minutes": duration_minutes,
-                                    "outcome": outcome,
-                                    "structure_event": structure_event,
-                                    "session": self._normalize_session(session),
-                                    "consensus_score": 0.80,
-                                    "body_ratio": float(body_ratio) if body_ratio is not None else None,
-                                    "body_ratio_min": float(body_ratio_min) if body_ratio_min is not None else None,
-                                    "body_ratio_passed": body_ratio_passed,
-                                    "body_ratio_mode": body_ratio_mode,
-                                    "initial_sl": float(initial_sl) if initial_sl is not None else None,
-                                    "initial_tp": float(initial_tp) if initial_tp is not None else None,
-                                    "final_sl": float(final_sl) if final_sl is not None else None,
-                                    "final_tp": float(final_tp) if final_tp is not None else None,
-                                    "initial_risk_points": initial_risk_points,
-                                    "initial_reward_points": initial_reward_points,
-                                    "final_risk_points": final_risk_points,
-                                    "final_reward_points": final_reward_points,
-                                    "trailing_modified": trailing_modified,
-                                    "trailing_count": trailing_count,
-                                    "tp_expanded": tp_expanded,
-                                    "tp_expand_count": tp_expand_count,
-                                    "max_favorable_points": max_favorable_points,
-                                    "max_adverse_points": max_adverse_points,
-                                    "close_reason": close_reason
-                                }
-                                
-                                trades_to_add.append(trade_dict)
-                                
-                        if trades_to_add:
-                            self.lancedb.add_trade_outcomes_batch(trades_to_add)
-                            
                         self._recalculate_session_patterns(cur)
 
-            # Trigger hybrid orchestrator run only on specific structure patterns (CHoCH, HH, LL, BoS) or trade outcomes
-            should_trigger = False
-            if table_name == "llhhbosdata_xauusd":
-                # Check if any new structure row contains CHoCH, HH, LL, or BoS
-                trigger_types = ["CHOCH", "HH", "LL", "BOS"]
-                for row in parsed_rows:
-                    row_type = str(row.get("type", "")).upper()
-                    if any(t in row_type for t in trigger_types):
-                        should_trigger = True
-                        break
-            elif table_name == "backtest_results_xauusd":
-                should_trigger = True
+            # Trigger hybrid orchestrator run only during live incremental watch (not bulk sync)
+            if not getattr(self, "is_syncing", False):
+                should_trigger = False
+                if table_name == "llhhbosdata_xauusd":
+                    trigger_types = ["CHOCH", "HH", "LL", "BOS"]
+                    for row in parsed_rows:
+                        row_type = str(row.get("type", "")).upper()
+                        if any(t in row_type for t in trigger_types):
+                            should_trigger = True
+                            break
+                elif table_name == "backtest_results_xauusd":
+                    should_trigger = True
 
-            if should_trigger:
-                try:
-                    logger.info(f"⚡ Hybrid trigger: new event in {table_name}. Executing orchestrator decision...")
-                    from app.services.orchestrator_service import run_orchestrator_from_db
-                    run_orchestrator_from_db("XAUUSD")
-                except Exception as trigger_err:
-                    logger.warning(f"⚠️ Failed to trigger hybrid orchestrator: {trigger_err}")
+                if should_trigger:
+                    try:
+                        logger.info(f"⚡ Live event in {table_name}. Executing orchestrator decision...")
+                        from app.services.orchestrator_service import run_orchestrator_from_db
+                        run_orchestrator_from_db("XAUUSD")
+                    except Exception as trigger_err:
+                        logger.warning(f"⚠️ Failed to trigger orchestrator: {trigger_err}")
                         
         except Exception as e:
             logger.error(f"❌ Failed to sync to LanceDB: {e}", exc_info=True)

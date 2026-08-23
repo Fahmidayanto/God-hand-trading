@@ -5,9 +5,9 @@ Tests network reachability, API key validity, latency, and models list.
 import urllib.request
 import urllib.error
 import json
-import time
+import os
 
-api_key = "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f"
+api_key = os.getenv("NINEINFERENCE_API_KEY", "")
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Content-Type": "application/json",

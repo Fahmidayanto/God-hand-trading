@@ -118,13 +118,13 @@ Return raw JSON ONLY. No markdown code blocks.
     model_chain = [
         ("Groq Qwen 3.6 27B", lambda: OpenAILike(
             id=os.getenv("GROQ_MODEL", "qwen/qwen3.6-27b"),
-            api_key=os.getenv("GROQ_API_KEY", "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"),
+            api_key=os.getenv("GROQ_API_KEY", ""),
             base_url="https://api.groq.com/openai/v1",
             temperature=0.6, top_p=0.95, max_tokens=2048, timeout=15.0, max_retries=0,
         )),
         ("AgentRouter GLM-5.2", lambda: OpenAILike(
             id="glm-5.2",
-            api_key="sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
+            api_key=os.getenv("AGENTROUTER_API_KEY", ""),
             base_url=AGENTROUTER_BASE,
             temperature=0.6, top_p=0.95, max_tokens=4096, timeout=15.0, max_retries=0,
             default_headers={
@@ -136,32 +136,32 @@ Return raw JSON ONLY. No markdown code blocks.
         )),
         ("NVIDIA Nemotron 120B", lambda: OpenAILike(
             id="nvidia/nemotron-3-super-120b-a12b",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_120B_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("NVIDIA Nemotron 550B", lambda: OpenAILike(
             id="nvidia/nemotron-3-ultra-550b-a55b",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_550B_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("NVIDIA MiniMax M3", lambda: OpenAILike(
             id="minimaxai/minimax-m3",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_MINIMAX_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("NVIDIA Inkling", lambda: OpenAILike(
             id="thinkingmachines/inkling",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_INKLING_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("NVIDIA Laguna XS 2.1", lambda: OpenAILike(
             id="poolside/laguna-xs-2.1",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_LAGUNA_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("NVIDIA GLM 5.2", lambda: OpenAILike(
             id="z-ai/glm-5.2",
-            api_key="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",
+            api_key=os.getenv("NVIDIA_GLM_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
             base_url=NV_BASE, temperature=0.6, top_p=0.95, max_tokens=1024, timeout=15.0, max_retries=0,
         )),
         ("Gemini Fallback", lambda: Gemini(

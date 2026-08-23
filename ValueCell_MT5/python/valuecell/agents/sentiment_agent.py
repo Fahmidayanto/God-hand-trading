@@ -139,37 +139,37 @@ class SentimentAgent:
         recency_decay_hours: float = 12.0,
         shadow_mode: bool = False,
         use_llm: bool = True,
-        iamhc_api_key: str = "sk-Ruln6P7FIrqb3INnYwcfQy6btxMkFPkHKgAFfr2mEfGbmFqP",
+        iamhc_api_key: Optional[str] = None,
         iamhc_base_url: str = "https://api.iamhc.cn/v1",
         iamhc_model_id: str = "DeepSeek-V4-Pro",
-        nvidia_397b_api_key: str = "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",
+        nvidia_397b_api_key: Optional[str] = None,
         nvidia_397b_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_397b_model_id: str = "qwen/qwen3.5-397b-a17b",
-        nvidia_120b_api_key: str = "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",
+        nvidia_120b_api_key: Optional[str] = None,
         nvidia_120b_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_120b_model_id: str = "nvidia/nemotron-3-super-120b-a12b",
-        nvidia_550b_api_key: str = "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",
+        nvidia_550b_api_key: Optional[str] = None,
         nvidia_550b_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_550b_model_id: str = "nvidia/nemotron-3-ultra-550b-a55b",
-        nvidia_minimax_api_key: str = "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",
+        nvidia_minimax_api_key: Optional[str] = None,
         nvidia_minimax_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_minimax_model_id: str = "minimaxai/minimax-m3",
-        nvidia_inkling_api_key: str = "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",
+        nvidia_inkling_api_key: Optional[str] = None,
         nvidia_inkling_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_inkling_model_id: str = "thinkingmachines/inkling",
-        nvidia_laguna_api_key: str = "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",
+        nvidia_laguna_api_key: Optional[str] = None,
         nvidia_laguna_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_laguna_model_id: str = "poolside/laguna-xs-2.1",
-        nvidia_glm_api_key: str = "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",
+        nvidia_glm_api_key: Optional[str] = None,
         nvidia_glm_base_url: str = "https://integrate.api.nvidia.com/v1",
         nvidia_glm_model_id: str = "z-ai/glm-5.2",
-        agentrouter_api_key: str = "sk-lHCp3TY8vQ8OvM422AtXGqr8gC5iGDsuQ9MYL6BDzACfmWzR",
+        agentrouter_api_key: Optional[str] = None,
         agentrouter_base_url: str = "https://agentrouter.org/v1",
         agentrouter_model_id: str = "glm-5.2",
-        groq_api_key: str = "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",
+        groq_api_key: Optional[str] = None,
         groq_base_url: str = "https://api.groq.com/openai/v1",
         groq_model_id: str = "qwen/qwen3.6-27b",
-        nineinference_api_key: str = "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f",
+        nineinference_api_key: Optional[str] = None,
         nineinference_base_url: str = "https://9inference.cloud/v1/package",
         nineinference_model_id: str = "deepseek-v4-flash-0731",
     ):
@@ -194,48 +194,48 @@ class SentimentAgent:
         self.shadow_mode = shadow_mode
         self.use_llm = use_llm
         
-        self.iamhc_api_key = iamhc_api_key
+        import os
+        self.iamhc_api_key = iamhc_api_key or os.getenv("IAMHC_API_KEY", "")
         self.iamhc_base_url = iamhc_base_url
         self.iamhc_model_id = iamhc_model_id
         
-        self.nvidia_397b_api_key = nvidia_397b_api_key
+        self.nvidia_397b_api_key = nvidia_397b_api_key or os.getenv("NVIDIA_397B_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_397b_base_url = nvidia_397b_base_url
         self.nvidia_397b_model_id = nvidia_397b_model_id
 
-        self.nvidia_120b_api_key = nvidia_120b_api_key
+        self.nvidia_120b_api_key = nvidia_120b_api_key or os.getenv("NVIDIA_120B_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_120b_base_url = nvidia_120b_base_url
         self.nvidia_120b_model_id = nvidia_120b_model_id
 
-        self.nvidia_550b_api_key = nvidia_550b_api_key
+        self.nvidia_550b_api_key = nvidia_550b_api_key or os.getenv("NVIDIA_550B_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_550b_base_url = nvidia_550b_base_url
         self.nvidia_550b_model_id = nvidia_550b_model_id
 
-        self.nvidia_minimax_api_key = nvidia_minimax_api_key
+        self.nvidia_minimax_api_key = nvidia_minimax_api_key or os.getenv("NVIDIA_MINIMAX_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_minimax_base_url = nvidia_minimax_base_url
         self.nvidia_minimax_model_id = nvidia_minimax_model_id
 
-        self.nvidia_inkling_api_key = nvidia_inkling_api_key
+        self.nvidia_inkling_api_key = nvidia_inkling_api_key or os.getenv("NVIDIA_INKLING_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_inkling_base_url = nvidia_inkling_base_url
         self.nvidia_inkling_model_id = nvidia_inkling_model_id
 
-        self.nvidia_laguna_api_key = nvidia_laguna_api_key
+        self.nvidia_laguna_api_key = nvidia_laguna_api_key or os.getenv("NVIDIA_LAGUNA_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_laguna_base_url = nvidia_laguna_base_url
         self.nvidia_laguna_model_id = nvidia_laguna_model_id
 
-        self.nvidia_glm_api_key = nvidia_glm_api_key
+        self.nvidia_glm_api_key = nvidia_glm_api_key or os.getenv("NVIDIA_GLM_API_KEY", os.getenv("NVIDIA_API_KEY", ""))
         self.nvidia_glm_base_url = nvidia_glm_base_url
         self.nvidia_glm_model_id = nvidia_glm_model_id
 
-        self.agentrouter_api_key = agentrouter_api_key
+        self.agentrouter_api_key = agentrouter_api_key or os.getenv("AGENTROUTER_API_KEY", "")
         self.agentrouter_base_url = agentrouter_base_url
         self.agentrouter_model_id = agentrouter_model_id
 
-        import os
-        self.groq_api_key = os.getenv("GROQ_API_KEY", groq_api_key)
+        self.groq_api_key = groq_api_key or os.getenv("GROQ_API_KEY", "")
         self.groq_base_url = groq_base_url
         self.groq_model_id = os.getenv("GROQ_MODEL", groq_model_id)
 
-        self.nineinference_api_key = nineinference_api_key
+        self.nineinference_api_key = nineinference_api_key or os.getenv("NINEINFERENCE_API_KEY", "")
         self.nineinference_base_url = nineinference_base_url
         self.nineinference_model_id = nineinference_model_id
 

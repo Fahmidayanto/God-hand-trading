@@ -70,6 +70,18 @@ def main() -> int:
     joblib.dump(mae_model, output_dir / "model_v8_final_mae.pkl")
     joblib.dump(mae_scaler, output_dir / "scaler_v8_final_mae.pkl")
 
+    # ponytail: inference agent memuat foldfinal (production_fold="final"), bukan
+    # model_v8_final_* — tanpa copy ini agent diam-diam memakai model stale.
+    import shutil
+    for src, dst in [
+        ("model_v8_final_mfe.pkl", "model_v8_foldfinal_mfe.pkl"),
+        ("scaler_v8_final_mfe.pkl", "scaler_v8_foldfinal_mfe.pkl"),
+        ("model_v8_final_mae.pkl", "model_v8_foldfinal_mae.pkl"),
+        ("scaler_v8_final_mae.pkl", "scaler_v8_foldfinal_mae.pkl"),
+    ]:
+        shutil.copyfile(output_dir / src, output_dir / dst)
+    logger.info("Synced model_v8_final_* -> model_v8_foldfinal_* (inference path)")
+
     summary = {
         "model_type": "regression_v8_final_atr_normalized",
         "training_script": "train_ml_prediction_v8_final.py",

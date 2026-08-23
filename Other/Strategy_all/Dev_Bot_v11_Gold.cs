@@ -23,6 +23,8 @@ struct BacktestTrade
     string    symbol;
     string    type;
     string    session;       // "BUY" atau "SELL"
+    string    entry_structure; // "CHoCH", "BoS_1", "BoS_2", etc.
+    string    close_type;      // "HIT_SL", "HIT_TP1", "HIT_TP2", "24H_FORCE", "PROFIT_TARGET", etc.
     double    entry_price;
     double    exit_price;
     double    sl;
@@ -312,72 +314,84 @@ void SaveTradeToArray(ulong ticket, string symbol, string type,
                       double max_favorable_points = 0, double max_adverse_points = 0,
                       string close_reason = "",
                       double body_ratio = 0, double body_ratio_min = 0,
-                      bool body_ratio_passed = false, string body_ratio_mode = "N/A")
+                      bool body_ratio_passed = false, string body_ratio_mode = "N/A",
+                      string entry_structure = "N/A", string close_type = "N/A")
 {
+    int targetIdx = -1;
     for (int i = 0; i < g_TradeCount; i++)
     {
         if (g_BacktestTrades[i].ticket == ticket)
         {
-            Print("[SKIP] Trade ticket sudah tersimpan, tidak disimpan ulang: ", ticket);
-            return;
+            targetIdx = i;
+            break;
         }
     }
 
-    int newSize = g_TradeCount + 1;
-    ArrayResize(g_BacktestTrades, newSize);
+    if (targetIdx == -1)
+    {
+        targetIdx = g_TradeCount;
+        int newSize = g_TradeCount + 1;
+        ArrayResize(g_BacktestTrades, newSize);
+        g_TradeCount = newSize;
+    }
+    else
+    {
+        PrintFormat("🔄 [UPDATE] Trade ticket %I64u diperbarui dengan data penutupan final", ticket);
+    }
     
-    g_BacktestTrades[g_TradeCount].ticket       = ticket;
-    g_BacktestTrades[g_TradeCount].symbol       = symbol;
-    g_BacktestTrades[g_TradeCount].type         = type;
-    g_BacktestTrades[g_TradeCount].session      = type; // "BUY" atau "SELL"
-    g_BacktestTrades[g_TradeCount].entry_price  = entry_price;
-    g_BacktestTrades[g_TradeCount].exit_price   = exit_price;
-    g_BacktestTrades[g_TradeCount].sl           = sl;
-    g_BacktestTrades[g_TradeCount].tp           = tp;
-    g_BacktestTrades[g_TradeCount].profit       = profit;
-    g_BacktestTrades[g_TradeCount].entry_time   = entry_time;
-    g_BacktestTrades[g_TradeCount].exit_time    = exit_time;
-    g_BacktestTrades[g_TradeCount].lot_size     = lot_size;
-    g_BacktestTrades[g_TradeCount].magic_number = magic;
-    g_BacktestTrades[g_TradeCount].timeframe    = tf;
-    g_BacktestTrades[g_TradeCount].spread_cost  = spread_cost;
-    g_BacktestTrades[g_TradeCount].commission   = commission;
-    g_BacktestTrades[g_TradeCount].swap         = swap;
-    g_BacktestTrades[g_TradeCount].session_name = session;
-    g_BacktestTrades[g_TradeCount].is_dst       = IsServerInDST(entry_time);
-    g_BacktestTrades[g_TradeCount].status       = "EXECUTED";
-    g_BacktestTrades[g_TradeCount].reject_reason = "N/A";
-    g_BacktestTrades[g_TradeCount].body_ratio        = body_ratio;
-    g_BacktestTrades[g_TradeCount].body_ratio_min    = body_ratio_min;
-    g_BacktestTrades[g_TradeCount].body_ratio_passed = body_ratio_passed;
-    g_BacktestTrades[g_TradeCount].body_ratio_mode   = body_ratio_mode;
+    g_BacktestTrades[targetIdx].ticket          = ticket;
+    g_BacktestTrades[targetIdx].symbol          = symbol;
+    g_BacktestTrades[targetIdx].type            = type;
+    g_BacktestTrades[targetIdx].session         = type; // "BUY" atau "SELL"
+    g_BacktestTrades[targetIdx].entry_structure = entry_structure;
+    g_BacktestTrades[targetIdx].close_type      = close_type;
+    g_BacktestTrades[targetIdx].entry_price     = entry_price;
+    g_BacktestTrades[targetIdx].exit_price      = exit_price;
+    g_BacktestTrades[targetIdx].sl              = sl;
+    g_BacktestTrades[targetIdx].tp              = tp;
+    g_BacktestTrades[targetIdx].profit          = profit;
+    g_BacktestTrades[targetIdx].entry_time      = entry_time;
+    g_BacktestTrades[targetIdx].exit_time       = exit_time;
+    g_BacktestTrades[targetIdx].lot_size        = lot_size;
+    g_BacktestTrades[targetIdx].magic_number    = magic;
+    g_BacktestTrades[targetIdx].timeframe       = tf;
+    g_BacktestTrades[targetIdx].spread_cost     = spread_cost;
+    g_BacktestTrades[targetIdx].commission      = commission;
+    g_BacktestTrades[targetIdx].swap            = swap;
+    g_BacktestTrades[targetIdx].session_name    = session;
+    g_BacktestTrades[targetIdx].is_dst          = IsServerInDST(entry_time);
+    g_BacktestTrades[targetIdx].status          = "EXECUTED";
+    g_BacktestTrades[targetIdx].reject_reason   = "N/A";
+    g_BacktestTrades[targetIdx].body_ratio      = body_ratio;
+    g_BacktestTrades[targetIdx].body_ratio_min  = body_ratio_min;
+    g_BacktestTrades[targetIdx].body_ratio_passed = body_ratio_passed;
+    g_BacktestTrades[targetIdx].body_ratio_mode = body_ratio_mode;
 
     if(initial_sl == 0) initial_sl = sl;
     if(initial_tp == 0) initial_tp = tp;
     if(final_sl == 0) final_sl = sl;
     if(final_tp == 0) final_tp = tp;
 
-    g_BacktestTrades[g_TradeCount].initial_sl            = initial_sl;
-    g_BacktestTrades[g_TradeCount].initial_tp            = initial_tp;
-    g_BacktestTrades[g_TradeCount].final_sl              = final_sl;
-    g_BacktestTrades[g_TradeCount].final_tp              = final_tp;
-    g_BacktestTrades[g_TradeCount].initial_risk_points   = CalculateRiskPoints(type, entry_price, initial_sl);
-    g_BacktestTrades[g_TradeCount].initial_reward_points = CalculateRewardPoints(type, entry_price, initial_tp);
-    g_BacktestTrades[g_TradeCount].final_risk_points     = CalculateRiskPoints(type, entry_price, final_sl);
-    g_BacktestTrades[g_TradeCount].final_reward_points   = CalculateRewardPoints(type, entry_price, final_tp);
-    g_BacktestTrades[g_TradeCount].trailing_modified     = trailing_modified;
-    g_BacktestTrades[g_TradeCount].trailing_count        = trailing_count;
-    g_BacktestTrades[g_TradeCount].tp_expanded           = tp_expanded;
-    g_BacktestTrades[g_TradeCount].tp_expand_count       = tp_expand_count;
-    g_BacktestTrades[g_TradeCount].max_favorable_points  = max_favorable_points;
-    g_BacktestTrades[g_TradeCount].max_adverse_points    = max_adverse_points;
-    g_BacktestTrades[g_TradeCount].close_reason          = close_reason;
+    g_BacktestTrades[targetIdx].initial_sl            = initial_sl;
+    g_BacktestTrades[targetIdx].initial_tp            = initial_tp;
+    g_BacktestTrades[targetIdx].final_sl              = final_sl;
+    g_BacktestTrades[targetIdx].final_tp              = final_tp;
+    g_BacktestTrades[targetIdx].initial_risk_points   = CalculateRiskPoints(type, entry_price, initial_sl);
+    g_BacktestTrades[targetIdx].initial_reward_points = CalculateRewardPoints(type, entry_price, initial_tp);
+    g_BacktestTrades[targetIdx].final_risk_points     = CalculateRiskPoints(type, entry_price, final_sl);
+    g_BacktestTrades[targetIdx].final_reward_points   = CalculateRewardPoints(type, entry_price, final_tp);
+    g_BacktestTrades[targetIdx].trailing_modified     = trailing_modified;
+    g_BacktestTrades[targetIdx].trailing_count        = trailing_count;
+    g_BacktestTrades[targetIdx].tp_expanded           = tp_expanded;
+    g_BacktestTrades[targetIdx].tp_expand_count       = tp_expand_count;
+    g_BacktestTrades[targetIdx].max_favorable_points  = max_favorable_points;
+    g_BacktestTrades[targetIdx].max_adverse_points    = max_adverse_points;
+    g_BacktestTrades[targetIdx].close_reason          = close_reason;
     
-    g_TradeCount = newSize;
     // MT5 commission & swap are already negative numbers representing costs, so we add them.
     double net_profit = profit + commission + swap;
-    PrintFormat("💾 [SAVED] Trade #%d: %s %s [%s] | Entry: %.5f | Exit: %.5f | Profit: %.2f | Commission: %.2f | Swap: %.2f | Net: %.2f",
-                g_TradeCount, type, tf, session, entry_price, exit_price, profit, commission, swap, net_profit);
+    PrintFormat("💾 [SAVED] Trade #%d: %s [%s | %s] %s | Lot: %.2f | Entry: %.5f | Exit: %.5f | Profit: %.2f | Net: %.2f",
+                targetIdx + 1, type, entry_structure, close_type, session, lot_size, entry_price, exit_price, profit, net_profit);
 }
 
 //+------------------------------------------------------------------+
@@ -388,27 +402,29 @@ void RecordRejectedToBacktestTrades(string type, double price, string reason)
     int newSize = g_TradeCount + 1;
     ArrayResize(g_BacktestTrades, newSize);
     
-    g_BacktestTrades[g_TradeCount].ticket        = 0;
-    g_BacktestTrades[g_TradeCount].symbol        = _Symbol;
-    g_BacktestTrades[g_TradeCount].type          = type;
-    g_BacktestTrades[g_TradeCount].session       = type; // "BUY" atau "SELL"
-    g_BacktestTrades[g_TradeCount].entry_price   = price;
-    g_BacktestTrades[g_TradeCount].exit_price    = 0;
-    g_BacktestTrades[g_TradeCount].sl            = 0;
-    g_BacktestTrades[g_TradeCount].tp            = 0;
-    g_BacktestTrades[g_TradeCount].profit        = 0;
-    g_BacktestTrades[g_TradeCount].entry_time    = TimeCurrent();
-    g_BacktestTrades[g_TradeCount].exit_time     = 0;
-    g_BacktestTrades[g_TradeCount].lot_size      = 0;
-    g_BacktestTrades[g_TradeCount].magic_number  = MagicNumber_M15;
-    g_BacktestTrades[g_TradeCount].timeframe     = "M15";
-    g_BacktestTrades[g_TradeCount].spread_cost   = 0;
-    g_BacktestTrades[g_TradeCount].commission    = 0;
-    g_BacktestTrades[g_TradeCount].swap          = 0;
-    g_BacktestTrades[g_TradeCount].session_name  = GetCurrentSession();
-    g_BacktestTrades[g_TradeCount].is_dst        = IsServerInDST(TimeCurrent());
-    g_BacktestTrades[g_TradeCount].status        = "REJECTED";
-    g_BacktestTrades[g_TradeCount].reject_reason = reason;
+    g_BacktestTrades[g_TradeCount].ticket          = 0;
+    g_BacktestTrades[g_TradeCount].symbol          = _Symbol;
+    g_BacktestTrades[g_TradeCount].type            = type;
+    g_BacktestTrades[g_TradeCount].session         = type; // "BUY" atau "SELL"
+    g_BacktestTrades[g_TradeCount].entry_structure = "REJECTED";
+    g_BacktestTrades[g_TradeCount].close_type      = "REJECTED";
+    g_BacktestTrades[g_TradeCount].entry_price     = price;
+    g_BacktestTrades[g_TradeCount].exit_price      = 0;
+    g_BacktestTrades[g_TradeCount].sl              = 0;
+    g_BacktestTrades[g_TradeCount].tp              = 0;
+    g_BacktestTrades[g_TradeCount].profit          = 0;
+    g_BacktestTrades[g_TradeCount].entry_time      = TimeCurrent();
+    g_BacktestTrades[g_TradeCount].exit_time       = 0;
+    g_BacktestTrades[g_TradeCount].lot_size        = 0;
+    g_BacktestTrades[g_TradeCount].magic_number    = MagicNumber_M15;
+    g_BacktestTrades[g_TradeCount].timeframe       = "M15";
+    g_BacktestTrades[g_TradeCount].spread_cost     = 0;
+    g_BacktestTrades[g_TradeCount].commission      = 0;
+    g_BacktestTrades[g_TradeCount].swap            = 0;
+    g_BacktestTrades[g_TradeCount].session_name    = GetCurrentSession();
+    g_BacktestTrades[g_TradeCount].is_dst          = IsServerInDST(TimeCurrent());
+    g_BacktestTrades[g_TradeCount].status          = "REJECTED";
+    g_BacktestTrades[g_TradeCount].reject_reason   = reason;
     if(reason == "Body Ratio Filter")
     {
         g_BacktestTrades[g_TradeCount].body_ratio        = g_LastBodyRatio;
@@ -457,74 +473,132 @@ bool CanPrintRejectLogs()
 }
 
 //+------------------------------------------------------------------+
-//| Capture dan simpan OPEN trades yang tidak ditutup sampai akhir    |
+//| Capture dan simpan OPEN trades serta sinkronisasi deals penutupan |
 //+------------------------------------------------------------------+
 void CaptureOpenTrades()
 {
-    // 🔧 FIX: Capture OPEN trades dari PositionSelect() 
+    // 1. Capture posisi yang masih OPEN di terminal (jika ada)
     int openPositions = PositionsTotal();
-    
-    if (openPositions == 0)
+    if (openPositions > 0)
     {
-        return;
-    }
-    
-    PrintFormat("🔍 [CAPTURE OPEN] Menemukan %d open positions", openPositions);
-    
-    for (int i = 0; i < openPositions; i++)
-    {
-        ulong ticket = PositionGetTicket(i);
-        if (ticket <= 0) continue;
+        PrintFormat("🔍 [CAPTURE OPEN] Menemukan %d open positions", openPositions);
         
-        // Select position properly
-        if (!PositionSelectByTicket(ticket))
+        for (int i = 0; i < openPositions; i++)
         {
-            PrintFormat("   ❌ Failed to select position with ticket %I64u", ticket);
-            continue;
+            ulong ticket = PositionGetTicket(i);
+            if (ticket <= 0) continue;
+            if (!PositionSelectByTicket(ticket)) continue;
+            
+            ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+            string type = (pos_type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
+            double entry_price = PositionGetDouble(POSITION_PRICE_OPEN);
+            double sl = PositionGetDouble(POSITION_SL);
+            double tp = PositionGetDouble(POSITION_TP);
+            datetime entry_time = (datetime)PositionGetInteger(POSITION_TIME);
+            datetime exit_time = TimeCurrent();
+            double lot_size = PositionGetDouble(POSITION_VOLUME);
+            double unrealized_profit = PositionGetDouble(POSITION_PROFIT);
+            double current_price = PositionGetDouble(POSITION_PRICE_CURRENT);
+            
+            SaveTradeToArray(ticket, _Symbol, type,
+                            entry_price, current_price,
+                            sl, tp, unrealized_profit,
+                            entry_time, exit_time,
+                            lot_size, MagicNumber_M15, "M15",
+                            0, 0, 0, GetCurrentSession(),
+                            sl, tp, sl, tp,
+                            false, 0, false, 0,
+                            0, 0, "END_OF_TEST_CLOSE",
+                            0, 0, false, "N/A",
+                            "BoS", "24H_FORCE");
         }
+    }
+
+    // 2. 🔄 SYNC HISTORY DEALS: Pastikan SEMUA posisi yang ditutup oleh MT5 di akhir backtest masuk ke array
+    HistorySelect(0, TimeCurrent());
+    int totalDeals = HistoryDealsTotal();
+    PrintFormat("🔄 [DEAL SYNC] Memeriksa %d history deals untuk sinkronisasi akhir...", totalDeals);
+    
+    for (int i = 0; i < totalDeals; i++)
+    {
+        ulong dealTicket = HistoryDealGetTicket(i);
+        ENUM_DEAL_ENTRY dealEntry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
+        if (dealEntry != DEAL_ENTRY_OUT && dealEntry != DEAL_ENTRY_INOUT) continue;
         
-        // Get position details
-        ENUM_POSITION_TYPE pos_type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-        string type = (pos_type == POSITION_TYPE_BUY) ? "BUY" : "SELL";
-        double entry_price = PositionGetDouble(POSITION_PRICE_OPEN);
-        double sl = PositionGetDouble(POSITION_SL);
-        double tp = PositionGetDouble(POSITION_TP);
-        datetime entry_time = (datetime)PositionGetInteger(POSITION_TIME);
-        datetime exit_time = TimeCurrent();  // Use current time as exit time for open positions
-        double lot_size = PositionGetDouble(POSITION_VOLUME);
-        double unrealized_profit = PositionGetDouble(POSITION_PROFIT);
-        double current_price = PositionGetDouble(POSITION_PRICE_CURRENT);
+        ulong posId = (ulong)HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+        if (posId <= 0) continue;
         
-        // ℹ️ Hitung estimasi current P&L untuk open position
-        double estimated_profit = unrealized_profit;
-        
-        // Cek apakah trade sudah ada di array
-        bool already_saved = false;
+        // Cek apakah posisi ini sudah tercatat dengan status EXECUTED di array
+        bool alreadySaved = false;
         for (int j = 0; j < g_TradeCount; j++)
         {
-            if (g_BacktestTrades[j].ticket == ticket)
+            if (g_BacktestTrades[j].ticket == posId && g_BacktestTrades[j].profit != 0)
             {
-                already_saved = true;
-                PrintFormat("   [SKIP OPEN] Ticket %I64u sudah tersimpan sebelumnya", ticket);
+                alreadySaved = true;
                 break;
             }
         }
         
-        if (already_saved) continue;
+        if (alreadySaved) continue;
         
-        // 💾 Simpan open position dengan exit_price = current_price
-        PrintFormat("💾 [OPEN TRADE CAPTURED] Ticket: %I64u | Type: %s | Entry: %.5f | Current: %.5f | Unrealized P&L: %.2f",
-                    ticket, type, entry_price, current_price, estimated_profit);
+        // Ambil data deal OUT (exit)
+        double exitPrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+        datetime exitTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+        double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+        double commission = HistoryDealGetDouble(dealTicket, DEAL_COMMISSION);
+        double swapVal = HistoryDealGetDouble(dealTicket, DEAL_SWAP);
+        double dealLot = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+        long dealReason = HistoryDealGetInteger(dealTicket, DEAL_REASON);
         
-        SaveTradeToArray(ticket, _Symbol, type,
-                        entry_price, current_price,  // Use current price as exit
-                        sl, tp, estimated_profit,
-                        entry_time, exit_time,
-                        lot_size, MagicNumber_M15, "M15",
-                        0, 0, 0, GetCurrentSession(),
-                        sl, tp, sl, tp,
+        string exitType = "EXPERT_CLOSE";
+        if (dealReason == DEAL_REASON_SL) exitType = "HIT_SL";
+        else if (dealReason == DEAL_REASON_TP) exitType = "HIT_TP1";
+        else if (dealReason == DEAL_REASON_CLIENT) exitType = "MANUAL_CLOSE";
+        
+        // Ambil data deal IN (entry) untuk posisi ini
+        double entryPrice = exitPrice;
+        datetime entryTime = exitTime;
+        string posTypeStr = "BUY";
+        
+        if (HistorySelectByPosition(posId))
+        {
+            int posDealsTotal = HistoryDealsTotal();
+            for (int k = 0; k < posDealsTotal; k++)
+            {
+                ulong inDealTicket = HistoryDealGetTicket(k);
+                ENUM_DEAL_ENTRY inEntry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(inDealTicket, DEAL_ENTRY);
+                if (inEntry == DEAL_ENTRY_IN)
+                {
+                    entryPrice = HistoryDealGetDouble(inDealTicket, DEAL_PRICE);
+                    entryTime = (datetime)HistoryDealGetInteger(inDealTicket, DEAL_TIME);
+                    ENUM_DEAL_TYPE dType = (ENUM_DEAL_TYPE)HistoryDealGetInteger(inDealTicket, DEAL_TYPE);
+                    posTypeStr = (dType == DEAL_TYPE_BUY) ? "BUY" : "SELL";
+                    double inVol = HistoryDealGetDouble(inDealTicket, DEAL_VOLUME);
+                    if (inVol > 0) dealLot = inVol;
+                    commission += HistoryDealGetDouble(inDealTicket, DEAL_COMMISSION);
+                    swapVal += HistoryDealGetDouble(inDealTicket, DEAL_SWAP);
+                    break;
+                }
+            }
+        }
+        
+        double exitSpread = (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) * _Point;
+        double spreadCost = exitSpread * dealLot * 100;
+        
+        PrintFormat("📥 [END SYNC CAPTURED] Ticket: %I64u | Type: %s | Entry: %.5f | Exit: %.5f | Profit: %.2f",
+                    posId, posTypeStr, entryPrice, exitPrice, profit);
+                    
+        SaveTradeToArray(posId, _Symbol, posTypeStr,
+                        entryPrice, exitPrice,
+                        entryPrice, exitPrice, profit,
+                        entryTime, exitTime,
+                        dealLot, MagicNumber_M15, "M15",
+                        spreadCost, commission, swapVal, GetCurrentSession(),
+                        entryPrice, exitPrice, entryPrice, exitPrice,
                         false, 0, false, 0,
-                        0, 0, "OPEN");  // Assume no spread/commission/swap for open trades at capture time
+                        0, 0, exitType,
+                        0, 0, false, "N/A",
+                        "BoS", exitType);
     }
 }
 
@@ -607,8 +681,8 @@ void ExportBacktestToCSV()
     // ✅ Write header hanya jika file baru (BACKTEST atau file belum ada)
     if (!fileExists || !isLiveTrading)
     {
-        // Header — schema v2: kolom Session_IsDST ditambahkan setelah Session
-        FileWrite(handle, "Ticket", "Symbol", "Type", "EntryPrice", "ExitPrice",
+        // Header — schema v2: kolom Session_IsDST ditambahkan setelah Session, EntryStructure & CloseType
+        FileWrite(handle, "Ticket", "Symbol", "Type", "EntryStructure", "CloseType", "EntryPrice", "ExitPrice",
                   "SL", "TP", "Profit", "Spread_Cost", "Commission", "Swap", "Net_Profit",
                   "Session", "Session_IsDST",
                   "EntryTime", "ExitTime", "LotSize", "MagicNumber", "Timeframe",
@@ -662,6 +736,8 @@ void ExportBacktestToCSV()
                   IntegerToString(currentTicket),
                   g_BacktestTrades[i].symbol,
                   g_BacktestTrades[i].type,
+                  g_BacktestTrades[i].entry_structure,
+                  g_BacktestTrades[i].close_type,
                   DoubleToString(g_BacktestTrades[i].entry_price, _Digits),
                   DoubleToString(g_BacktestTrades[i].exit_price, _Digits),
                   DoubleToString(g_BacktestTrades[i].sl, _Digits),
@@ -806,7 +882,62 @@ void ExportBacktestSummaryToCSV()
 }
 
 //+------------------------------------------------------------------+
-//| Export market data (OHLCV + EMA200) ke file CSV                    |
+//| DYNAMIC REAL-TICK SPREAD TRACKING (Non-hardcoded Broker Spread)  |
+//+------------------------------------------------------------------+
+struct BarSpreadRecord
+{
+    datetime time;
+    int      maxSpread;
+};
+
+static BarSpreadRecord g_BarSpreadM15[];
+static int             g_BarSpreadCountM15 = 0;
+
+void TrackDynamicSpread_M15()
+{
+    datetime barTime = iTime(_Symbol, PERIOD_M15, 0);
+    if (barTime <= 0) return;
+    
+    int currentSpread = (int)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+    if (currentSpread <= 0)
+    {
+        MqlTick tick;
+        if (SymbolInfoTick(_Symbol, tick) && tick.ask > tick.bid)
+            currentSpread = (int)MathRound((tick.ask - tick.bid) / _Point);
+    }
+    if (currentSpread <= 0) currentSpread = 4;
+    
+    // Update atau Tambah record untuk bar M15 berjalan
+    if (g_BarSpreadCountM15 > 0 && g_BarSpreadM15[g_BarSpreadCountM15 - 1].time == barTime)
+    {
+        if (currentSpread > g_BarSpreadM15[g_BarSpreadCountM15 - 1].maxSpread)
+            g_BarSpreadM15[g_BarSpreadCountM15 - 1].maxSpread = currentSpread;
+    }
+    else
+    {
+        int size = ArraySize(g_BarSpreadM15);
+        if (g_BarSpreadCountM15 >= size)
+            ArrayResize(g_BarSpreadM15, size == 0 ? 1000 : size * 2);
+        g_BarSpreadM15[g_BarSpreadCountM15].time = barTime;
+        g_BarSpreadM15[g_BarSpreadCountM15].maxSpread = currentSpread;
+        g_BarSpreadCountM15++;
+    }
+}
+
+int GetMaxSpreadForBar_M15(datetime barTime, int defaultSpread)
+{
+    for (int i = g_BarSpreadCountM15 - 1; i >= 0; i--)
+    {
+        if (g_BarSpreadM15[i].time == barTime)
+            return g_BarSpreadM15[i].maxSpread;
+        if (g_BarSpreadM15[i].time < barTime)
+            break;
+    }
+    return defaultSpread;
+}
+
+//+------------------------------------------------------------------+
+//| Export market data (OHLCV + EMA200 + Dynamic Spread) ke file CSV |
 //+------------------------------------------------------------------+
 void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
 {
@@ -848,6 +979,8 @@ void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
         if (dt.year != targetYear) continue;  // skip data di luar tahun berkas
         
         double emaVal = (i < emaCopied) ? emaBuffer[i] : 0;
+        int spreadVal = (tf == PERIOD_M15) ? GetMaxSpreadForBar_M15(rates[i].time, rates[i].spread) : rates[i].spread;
+        
         FileWrite(handle,
                   TimeToString(rates[i].time, TIME_DATE|TIME_SECONDS),
                   DoubleToString(rates[i].open, _Digits),
@@ -855,7 +988,7 @@ void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
                   DoubleToString(rates[i].low, _Digits),
                   DoubleToString(rates[i].close, _Digits),
                   IntegerToString(rates[i].tick_volume),
-                  IntegerToString(rates[i].spread),
+                  IntegerToString(spreadVal),
                   DoubleToString(emaVal, _Digits));
     }
     
@@ -1154,10 +1287,10 @@ void ExportAllData()
 //| SESSION ZONE TRACKING - Modul Terpisah                           |
 //+------------------------------------------------------------------+
 // Input parameters untuk Session Zone
-input bool EnableSessionZone = true;           // Enable/Disable Session Zone tracking
-input bool ShowSessionZoneVisuals = true;      // Tampilkan zona sesi di chart
-input bool ExportSessionZoneData = true;       // Export data session zone ke CSV
-input color SessionAsiaColor = clrRed;       // Warna Asia Session
+input bool EnableSessionZone = true;           // Master: Aktifkan Pelacakan Sesi Pasar (Sydney/Asia/London/NY)
+input bool ShowSessionZoneVisuals = true;      // Visual: Gambar Kotak Background Warna-Warni di Chart
+input bool ExportSessionZoneData = true;       // Output: Simpan Data Sesi ke File SessionZone_*.csv
+input color SessionAsiaColor = clrRed;         // Warna Asia Session
 input color SessionLondonColor = clrYellow;    // Warna London Session
 input color SessionNewYorkColor = clrBlue;     // Warna New York Session
 input color SessionSydneyColor = clrGreen;     // Warna Sydney Session
@@ -1165,10 +1298,10 @@ input color SessionSydneyColor = clrGreen;     // Warna Sydney Session
 //+------------------------------------------------------------------+
 //| AUTO EXPORT REALTIME - Input Parameters                          |
 //+------------------------------------------------------------------+
-input bool EnableAutoExportRealtime = false;   // ✅ Aktifkan auto export berkala (live trading)
-input int  AutoExportIntervalMinutes = 60;     // Interval export (menit) - default 60 menit
-input bool EnableAutoExportLogs = false;       // Tampilkan log detail auto export
-input string BacktestResultPath = "D:\\Project\\Project MT5\\Backtest_result";  // Path folder backtest result
+// input bool EnableAutoExportRealtime = false;   // ✅ Aktifkan auto export berkala (live trading)
+// input int  AutoExportIntervalMinutes = 60;     // Interval export (menit) - default 60 menit
+// input bool EnableAutoExportLogs = false;       // Tampilkan log detail auto export
+// input string BacktestResultPath = "D:\\Project\\Project MT5\\Backtest_result";  // Path folder backtest result
 
 //+------------------------------------------------------------------+
 //| AUTO EXPORT REALTIME - Global Variables (legacy, timer dihapus)   |
@@ -1216,7 +1349,7 @@ int g_SessionZoneNamesCount = 0;
 // Saat DST aktif, broker GMT+2 menjadi GMT+3, jadi semua jam server
 // terlihat maju 1 jam. Helper di bawah akan menormalisasinya kembali
 // agar window jam sesi tetap konsisten di winter & summer.
-input bool EnableDSTHandling = true;   // true = auto-handle EU DST
+input bool EnableDSTHandling = true;   //  Koreksi Jam Sesi Otomatis (Penyesuaian Musim Panas/Dingin Broker)
 
 //+------------------------------------------------------------------+
 //| Last Sunday of given month (Maret atau Oktober)                  |
@@ -1665,10 +1798,10 @@ void DisplaySessionInfo()
 //----------------------------------------------------------------------------------------------//
 //Khusus H1
 //----------------------------------------------------------------------------------------------//
-input int WindowSize_H1 = 15;    // Ukuran window untuk deteksi high/low (H1)
-input int ZoneLength_H1 = 50;   // Panjang zona yang digambar (H1)
-input int MovingPeriod_H1 = 200;  // Periode moving average
-input int MovingShift_H1 = 0;
+input int WindowSize_H1 = 15;     // Jumlah Candle Konfirmasi Swing Pivot HH/LL (H1)
+input int ZoneLength_H1 = 50;     // Panjang Garis Visual Vertikal (H1)
+input int MovingPeriod_H1 = 200;  // Periode moving average (H1)
+input int MovingShift_H1 = 0;     // Pergeseran Horizontal Garis EMA (Shift Bar H1)
 
 double   lastHH_byTime_H1 = -1;  // Last higher high (nilai harga) H1
 datetime lastTimeHH_H1    = 0;   // Waktu last HH H1
@@ -1954,10 +2087,10 @@ void UpdateAcceptedLevelVisuals_H1(double level, string type, datetime time)
 //------------------------------------------------------------------------------+
 
 // Parameter input yang bisa diubah user (M15 optimized)
-input int WindowSize_M15 = 25;    // Ukuran window untuk deteksi high/low (M15)
-input int ZoneLength_M15 = 100;  // Panjang zona yang digambar (M15)
-input int MovingPeriod_M15 = 200;  // Periode moving average (M15)
-input int MovingShift_M15 = 0;  // Shift moving average (M15)
+input int WindowSize_M15 = 25;    // Jumlah Candle Konfirmasi Swing Pivot HH/LL (M15)
+input int ZoneLength_M15 = 100;   // Panjang Garis Visual Vertikal (M15)
+input int MovingPeriod_M15 = 200; // Periode moving average (M15)
+input int MovingShift_M15 = 0;    // Pergeseran Horizontal Garis EMA (Shift Bar M15)
 
 // --- Assume these variables are declared globally in the original script ---
 // --- Variabel high/low ---
@@ -2105,67 +2238,115 @@ datetime lastEntryTime_M15 = 0;
 
 bool hasEnteredSellTrade_M15 = false;
 datetime lastSellEntryTime_M15 = 0;
-int entryCountBuy_M15 = 0;      // Counter untuk entry BUY M15
-int entryCountSell_M15 = 0;     // Counter untuk entry SELL M15
+int entryCountBuy_M15 = 0;      // Total counter entry BUY M15 (legacy)
+int entryCountSell_M15 = 0;     // Total counter entry SELL M15 (legacy)
+int bosCycleBuy_M15 = 0;        // Counter khusus siklus entry BoS BUY
+int bosCycleSell_M15 = 0;       // Counter khusus siklus entry BoS SELL
+bool hasEnteredCHoCHBuy_M15 = false;  // Flag 1x entry CHoCH BUY per reversal
+bool hasEnteredCHoCHSell_M15 = false; // Flag 1x entry CHoCH SELL per reversal
 
 int handleEMA_H1;  // Handle untuk EMA200 di timeframe H1
 double ema200_H1;  // Nilai EMA200 di timeframe H1
 double lastClose_H1; // Harga close terakhir di H1
 
-// Parameter input untuk SL dan TP M15
-//--- Entry 1 parameters M15
-input int DefaultSL_Buy_M15  = 3000;   // Stop Loss untuk Buy Entry 1 (dalam poin) M15
-input int DefaultTP_Buy_M15  = 3000;   // Take Profit untuk Buy Entry 1 (dalam poin) M15
-input int DefaultSL_Sell_M15 = 3000;   // Stop Loss untuk Sell Entry 1 (dalam poin) M15
-input int DefaultTP_Sell_M15 = 3000;   // Take Profit untuk Sell Entry 1 (dalam poin) M15
-//--- Entry 2 parameters M15
-input int Entry2SL_Buy_M15  = 2000;   // Stop Loss untuk Buy Entry 2 (dalam poin) M15
-input int Entry2TP_Buy_M15  = 2500;   // Take Profit untuk Buy Entry 2 (dalam poin) M15
-input int Entry2SL_Sell_M15 = 2000;  // Stop Loss untuk Sell Entry 2 (dalam poin) M15
-input int Entry2TP_Sell_M15 = 2500;  // Take Profit untuk Sell Entry 2 (dalam poin) M15
-//--- Entry 3 parameters M15
-input int Entry3SL_Buy_M15  = 3500;   // Stop Loss untuk Buy Entry 3 (dalam poin) M15
-input int Entry3TP_Buy_M15  = 3000;   // Take Profit untuk Buy Entry 3 (dalam poin) M15
-input int Entry3SL_Sell_M15 = 3500;  // Stop Loss untuk Sell Entry 3 (dalam poin) M15
-input int Entry3TP_Sell_M15 = 3000;  // Take Profit untuk Sell Entry 3 (dalam poin) M15
-input ulong MagicNumber_M15 = 12345; // Magic number untuk EA M15
-input int MaxEntriesPerCycle_M15 = 2; // Max entries per CHoCH cycle M15 // FIX #4: Changed from 3 to 1
+//+------------------------------------------------------------------+
+//| PARAMETER VOLUME & SL/TP (M15)                                   |
+//+------------------------------------------------------------------+
+input double LotSize_M15             = 0.05;  // [Lot Size] Volume Transaksi Setiap Entry Order (Default 0.05)
+input int    DefaultSL_Buy_M15       = 6000;  // [Batas SL] Maksimal Jarak SL Buy (Poin, 60 USD pada Base 4500)
+input int    DefaultTP_Buy_M15       = 6000;  // [TP Awal] Target Profit Buy Awal (Poin, 60 USD pada Base 4500)
+input int    DefaultSL_Sell_M15      = 6000;  // [Batas SL] Maksimal Jarak SL Sell (Poin, 60 USD pada Base 4500)
+input int    DefaultTP_Sell_M15      = 6000;  // [TP Awal] Target Profit Sell Awal (Poin, 60 USD pada Base 4500)
+input int    MinSL_Points_M15        = 3000;  // [Batas Min SL] Minimal Jarak SL (Poin, 30 USD pada Base 4500)
+input int    SL_Buffer_Points_M15    = 2000;  // [Buffer SL] Jarak Tambahan di Luar Swing LL/HH (Poin, 20 USD pada Base 4500)
 
-// FIX #3: Hold time constraints
-input int MinHoldHours_M15 = 4;  // Minimum hold time before allowing TP exit (hours)
-input int MaxHoldHours_M15 = 24; // Maximum hold time, force close after this (hours)
+// --- Parameter Legacy Entry 2 & 3 (Nonaktif: disamaratakan ke Default SL & TP) ---
+// input int Entry2SL_Buy_M15  = 2000;
+// input int Entry2TP_Buy_M15  = 2500;
+// input int Entry2SL_Sell_M15 = 2000;
+// input int Entry2TP_Sell_M15 = 2500;
+// input int Entry3SL_Buy_M15  = 3500;
+// input int Entry3TP_Buy_M15  = 3000;
+// input int Entry3SL_Sell_M15 = 3500;
+// input int Entry3TP_Sell_M15 = 3000;
 
-// --- Trailing Stop Parameters M15 ---
-input bool EnableTrailingStop_M15   = true;  // Aktifkan Trailing Stop M15
-input bool EnableTrailingLogs_M15   = false; // Aktifkan log verbose Trailing Stop M15 (per tick)
-input bool EnableModifyLogs_M15     = false; // Aktifkan log modifikasi posisi M15 (BAR DYNAMIC MODIFY)
-input bool EnableSystemTradeLogs_M15 = false; // Aktifkan log sistem transaksi CTrade (position modified, dkk)
+input ulong MagicNumber_M15          = 12345; // ID Unik Transaksi EA (Pembeda dari Order Manual / Bot Lain)
+input int MaxBoSCycle_M15            = 2;     // [Siklus BoS] Maksimal Jumlah Entry BoS Berulang per Siklus (Default 2)
+
+// --- ENTRY STRUCTURE TOGGLES M15 ---
+input bool EnableCHoCHEntry_M15      = true;  // [Trigger] Master: Aktifkan Entry saat Sinyal CHoCH Terkonfirmasi (Change of Character)
+input bool EnableBoSEntry_M15        = true;  // [Trigger] Master: Aktifkan Entry saat Sinyal BoS Terkonfirmasi (Break of Structure)
+
+// --- HOLD TIME CONSTRAINTS M15 ---
+input bool EnableHoldTimeConstraints_M15 = true;  // Master Toggle: Aktifkan Batas Durasi Hold Posisi M15 (True = Force 24h Close aktif)
+input int  MinHoldHours_M15              = 4;     // Minimum Durasi Hold sebelum Early Profit Exit (Jam)
+input int  MaxHoldHours_M15              = 24;    // Maksimum Durasi Hold, Posisi Ditutup Paksa (24 Jam)
+
+// --- PROFIT TARGET EXIT M15 ---
+input bool   EnableProfitTargetExit_M15 = false;  // [Exit Profit USD] Master: Aktifkan Penutupan Posisi Otomatis saat Menyentuh Target USD
+input double ProfitTargetExit_USD_M15   = 300.0; // [Exit Profit USD] Target Nominal Profit untuk Menutup Posisi (USD)
+
+// --- PRICE-RATIO DYNAMIC SCALING (OPSI 1) ---
+input bool   EnablePriceRatioScaling_M15 = true;   // [Dynamic Scaling] Skalakan Jarak SL/TP & Lot Proporsional terhadap Harga Emas
+input double BaseReferencePrice_M15      = 4500.0; // [Dynamic Scaling] Harga Acuan Baseline (Default: 4500.0 USD)
+
+//+------------------------------------------------------------------+
+//| Helper: Hitung Rasio Harga Acuan Emas (Opsi 1 Scaling)           |
+//+------------------------------------------------------------------+
+double GetPriceRatio_M15(double currentPrice)
+{
+    if (!EnablePriceRatioScaling_M15 || BaseReferencePrice_M15 <= 0 || currentPrice <= 0)
+        return 1.0;
+    return currentPrice / BaseReferencePrice_M15;
+}
+
+//+------------------------------------------------------------------+
+//| Helper: Hitung Lot Size Ter-Skalakan (Mencegah Over-Risk)        |
+//+------------------------------------------------------------------+
+double GetScaledLotSize_M15(double currentPrice)
+{
+    if (!EnablePriceRatioScaling_M15 || BaseReferencePrice_M15 <= 0 || currentPrice <= 0)
+        return LotSize_M15;
+    double ratio = currentPrice / BaseReferencePrice_M15;
+    double scaledLot = LotSize_M15 / ratio;
+    return NormalizeDouble(MathMax(0.01, scaledLot), 2);
+}
+
+// --- TRAILING STOP & LOGGING M15 ---
+input bool EnableTrailingStop_M15    = true;  // [Trailing] Master: Aktifkan Dynamic Trailing Stop SL & TP (M15)
+input int  TrailingDistance_M15      = 6000;  // [Trailing] Jarak Dynamic Trailing Stop dari Harga Pasar (Poin, 60 USD pada Base 4500)
+input int  TP_Expansion_Trigger_M15  = 2000;  // [Trailing] Sisa Jarak ke TP untuk Memicu Ekspansi (Poin, 20 USD pada Base 4500)
+input int  TP_Expansion_Min_M15      = 4000;  // [Trailing] Minimal Penambahan Jarak TP saat Diperluas (Poin, 40 USD pada Base 4500)
+input bool EnableTrailingLogs_M15    = false; // [Log] Tampilkan Rincian Kalkulasi Trailing Stop
+input bool EnableModifyLogs_M15      = false; // [Log] Tampilkan Notifikasi Geser Harga SL/TP ke Broker
+input bool EnableSystemTradeLogs_M15 = false; // [Log] Tampilkan Log Transaksi Internal MT5 (CTrade)
 
 //+------------------------------------------------------------------+
 //| H4 EMA FILTER - Input Parameters                                 |
 //+------------------------------------------------------------------+
-input bool   EnableH4EMAFilter  = true;   // Aktifkan filter EMA H4 sebagai konfirmasi trend
-input int    EMA_H4_Period      = 200;    // Periode EMA untuk H4 (default 200)
-input bool   H4EMA_LogOnly      = false; // true=LOG ONLY (tidak blokir), false=ACTIVE
+input bool   EnableH4EMAFilter     = true;   // [Filter H4] Master: Aktifkan Filter Arah Tren Higher Timeframe (H4)
+input int    EMA_H4_Period         = 200;    // [Filter H4] Periode Garis EMA H4 (Default 200)
+input bool   H4EMA_LogOnly         = false;  // [Filter H4] Mode Catat Saja (False = Aktif Blokir Entry Lawan Tren)
+input bool   EnableEMASlopeFilter  = true;   // [Filter Slope] Master: Aktifkan Filter Kemiringan EMA200 M15 (True/False)
 
 //+------------------------------------------------------------------+
-//| BAR BODY RATIO FILTER - Input Parameters                         |
+//| BAR BODY RATIO FILTER - Kualitas Kekuatan Candle Entry           |
 //+------------------------------------------------------------------+
-// Filter candle lemah (doji/indecision) sebelum entry.
-// Body < MinBodyRatio * TotalRange → candle dianggap tidak valid untuk entry.
-input bool   EnableBodyRatioFilter      = true;   // Aktifkan filter body ratio candle
-input double MinBodyRatio               = 0.40;   // Minimum ratio body/range (default 40%)
-input bool   BodyRatio_LogOnly          = false;  // true=LOG ONLY (tidak blokir), false=ACTIVE
-// --- H4 EMA Stretch-Aware BR Override (Forensic Analysis 2023 - Section 12.5.1) ---
-// Analisis forensik menunjukkan filter BR < 40% salah blokir 5 dari 8 trade WIN di 2023
-// ketika harga berada di zona trending moderat (0.5%-1.9% dari EMA200 H4).
-// Rule A: Jika |H4 gap%| > H4_MaxStretch_Pct → enforce strict BR (MinBodyRatio)
-// Rule B: Jika H4 gap 0.5%-MaxStretch% + momentum H4 searah trade → MinBR = H4_TrendMinBody
-input bool   Enable_H4_BR_Override      = true;   // Aktifkan H4 EMA stretch-aware BR override
-input double H4_MaxStretch_Pct          = 1.8;    // Max H4 gap% sebelum enforce strict BR (default 1.8%)
-input double H4_MinTrend_Pct            = 0.5;    // Min H4 gap% untuk zona trending (default 0.5%)
-input double H4_TrendMinBody            = 0.15;   // MinBodyRatio saat zona trending (default 15%)
-input int    H4_Momentum_Bars           = 4;      // Jumlah bar H4 untuk hitung momentum (4 bar = 16 jam)
+input bool   EnableBodyRatioFilter = false;  // [Filter Body] Master: Filter Candle Lemah / Doji Saat Entry (Default: false sesuai Replay)
+input double MinBodyRatio          = 0.40;   // [Filter Body] Minimal Ketebalan Body Candle Standar (40%)
+input bool   BodyRatio_LogOnly     = false;  // [Filter Body] Mode Catat Saja (False = Aktif Blokir Candle Lemah)
+// --- H4 EMA Stretch-Aware BR Override (Penyesuaian Ambang Dinamis) ---
+input bool   Enable_H4_BR_Override = true;   // [Dinamis H4] Master: Relaksasi Filter saat H4 Trending Kuat
+input double H4_MinTrend_Pct       = 0.5;    // [Dinamis H4] Jarak Min Harga ke EMA H4 untuk Mulai Relaksasi (0.5%)
+input double H4_MaxStretch_Pct     = 1.8;    // [Dinamis H4] Jarak Max Harga ke EMA H4 Sebelum Diperketat (1.8%)
+input double H4_TrendMinBody       = 0.15;   // [Dinamis H4] Toleransi Body Lebih Longgar di Zona Trending (15%)
+input int    H4_Momentum_Bars      = 4;      // [Dinamis H4] Jumlah Bar H4 Pengecekan Momentum (4 Bar = 16 Jam)
+
+//+------------------------------------------------------------------+
+//| SESSION FILTER - Input Parameters                                |
+//+------------------------------------------------------------------+
+input bool   EnableSessionFilter   = false;  // [Filter Sesi] Master: Aktifkan Filter Pembatasan Jam Trading Sesi Tertentu (Default: false sesuai Replay)
+input bool   Session_LogOnly       = false;  // [Filter Sesi] Mode Catat Saja (False = Aktif Blokir Entry di Jam Terlarang)
 
 //+------------------------------------------------------------------+
 //| Capture Current Market Structure State                            |
@@ -2234,11 +2415,15 @@ double sellEntryPrice_M15 = 0.0;   // Harga entry posisi sell M15
 bool trailingActivatedBuy_M15 = false; // Flag trailing aktif untuk buy M15
 bool trailingActivatedSell_M15 = false; // Flag trailing aktif untuk sell M15
 
-input bool BackfillOnLoad_M15 = true;   // langsung scan & gambar dari history saat attach
-input int  WarmupBars_M15     = 200;    // jumlah bar history untuk backfill
+//+------------------------------------------------------------------+
+//| BACKFILL & WARMUP - Rekonstruksi Struktur Pasar saat Start       |
+//+------------------------------------------------------------------+
+input bool BackfillOnLoad_M15 = true;   // [Warmup M15] Master: Pindai & Gambar Struktur Histori saat EA Dimuat
+input int  WarmupBars_M15     = 200;    // [Warmup M15] Jumlah Candle Histori M15 yang Dipindai (Default 200)
 
-input bool BackfillOnLoad_H1 = true;   // langsung scan & gambar dari history saat attach
-input int  WarmupBars_H1    = 200;    // jumlah bar history untuk backfill
+input bool BackfillOnLoad_H1  = true;   // [Warmup H1] Pindai & Gambar Struktur Histori H1 saat EA Dimuat
+input int  WarmupBars_H1      = 200;    // [Warmup H1] Jumlah Candle Histori H1 yang Dipindai (Default 200)
+
 
 input bool EnableDrawLines_H1 = false; // ✅ ON/OFF gambar line/zone H1. true=TAMPILKAN, false=sembunyikan (logic tetap jalan). Default false biar backtest bersih.
 
@@ -2262,6 +2447,9 @@ struct TradeRecord_M15
     double    profit;
     string    type;
     string    session;
+    double    lot_size;        // Lot size yang dieksekusi
+    string    entry_structure; // "CHoCH", "BoS_1", "BoS_2", etc.
+    string    close_type;      // "HIT_SL", "HIT_TP1", "HIT_TP2", "24H_FORCE", "PROFIT_TARGET", etc.
     int       trailing_step; // Langkah trailing stop aktif (0 = belum aktif, 1, 2, 3)
     double    initial_sl;
     double    initial_tp;
@@ -2277,6 +2465,7 @@ struct TradeRecord_M15
     double    body_ratio_min;
     bool      body_ratio_passed;
     string    body_ratio_mode;
+    double    entry_spread;    // Spread broker saat entry dalam poin/harga
 };
 
 TradeRecord_M15 currentBuyTrade_M15;   // Untuk posisi buy aktif M15
@@ -2304,6 +2493,10 @@ void InitTrailingSummary_M15(TradeRecord_M15 &tradeRec, double sl, double tp)
     tradeRec.body_ratio_min       = 0;
     tradeRec.body_ratio_passed    = false;
     tradeRec.body_ratio_mode      = "N/A";
+    tradeRec.lot_size             = 0.05;
+    tradeRec.entry_structure      = "N/A";
+    tradeRec.close_type           = "N/A";
+    tradeRec.entry_spread         = (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) * _Point;
 }
 
 void ApplyBodyRatioSummary_M15(TradeRecord_M15 &tradeRec)
@@ -2466,6 +2659,7 @@ void ResetMode2Bearish_M15()
     bearishSearchCompleted_M15 = false;
 }
 
+/*
 //+------------------------------------------------------------------+
 //| SYNC LAST SESSION CSV - Find and copy last session CSV files     |
 //| from Backtest_result\ to MQL5 sandbox (same-month resume)         |
@@ -2793,6 +2987,7 @@ void ReverseSyncCSV()
         }
     }
 }
+*/
 
 //+------------------------------------------------------------------+
 //| Helper dedup visual: waktu formasi TERTUA harga-sama (window)     |
@@ -3941,7 +4136,7 @@ void SetExportDate()
                 if (RenameFileViaCopy(oldResults, newResults))
                 {
                     PrintFormat("   ✅ Renamed: %s → %s", oldResults, newResults);
-                    DeleteFileW(BacktestResultPath + "\\" + oldResults);
+                    // DeleteFileW(BacktestResultPath + "\\" + oldResults);
                 }
                 else
                     PrintFormat("   ❌ Gagal rename: %s", oldResults);
@@ -3955,7 +4150,7 @@ void SetExportDate()
                 if (RenameFileViaCopy(oldLLHH, newLLHH))
                 {
                     PrintFormat("   ✅ Renamed: %s → %s", oldLLHH, newLLHH);
-                    DeleteFileW(BacktestResultPath + "\\" + oldLLHH);
+                    // DeleteFileW(BacktestResultPath + "\\" + oldLLHH);
                 }
                 else
                     PrintFormat("   ❌ Gagal rename: %s", oldLLHH);
@@ -3969,7 +4164,7 @@ void SetExportDate()
                 if (RenameFileViaCopy(oldSummary, newSummary))
                 {
                     PrintFormat("   ✅ Renamed: %s → %s", oldSummary, newSummary);
-                    DeleteFileW(BacktestResultPath + "\\" + oldSummary);
+                    // DeleteFileW(BacktestResultPath + "\\" + oldSummary);
                 }
                 else
                     PrintFormat("   ❌ Gagal rename: %s", oldSummary);
@@ -3983,7 +4178,7 @@ void SetExportDate()
                 if (RenameFileViaCopy(oldState, newState))
                 {
                     PrintFormat("   ✅ Renamed: %s → %s", oldState, newState);
-                    DeleteFileW(BacktestResultPath + "\\" + oldState);
+                    // DeleteFileW(BacktestResultPath + "\\" + oldState);
                 }
                 else
                     PrintFormat("   ❌ Gagal rename: %s", oldState);
@@ -4042,7 +4237,7 @@ void SetExportDate()
             if (RenameFileViaCopy(oldFilename, newFilename))
             {
                 Print("📅 ROLLING FILE: File renamed from ", oldFilename, " to ", newFilename);
-                DeleteFileW(BacktestResultPath + "\\" + oldFilename);
+                // DeleteFileW(BacktestResultPath + "\\" + oldFilename);
                 
                 // Rename file lainnya juga
                 string oldLLHHFile = "LLHHBOSData_" + _Symbol + "_" + g_ExportDateStr + ".csv";
@@ -4051,7 +4246,7 @@ void SetExportDate()
                 {
                     if (RenameFileViaCopy(oldLLHHFile, newLLHHFile))
                     {
-                        DeleteFileW(BacktestResultPath + "\\" + oldLLHHFile);
+                        // DeleteFileW(BacktestResultPath + "\\" + oldLLHHFile);
                     }
                 }
                 
@@ -4061,7 +4256,7 @@ void SetExportDate()
                 {
                     if (RenameFileViaCopy(oldSummaryFile, newSummaryFile))
                     {
-                        DeleteFileW(BacktestResultPath + "\\" + oldSummaryFile);
+                        // DeleteFileW(BacktestResultPath + "\\" + oldSummaryFile);
                     }
                 }
                 
@@ -4071,7 +4266,7 @@ void SetExportDate()
                 {
                     if (RenameFileViaCopy(oldStateFile, newStateFile))
                     {
-                        DeleteFileW(BacktestResultPath + "\\" + oldStateFile);
+                        // DeleteFileW(BacktestResultPath + "\\" + oldStateFile);
                     }
                 }
 
@@ -4085,7 +4280,9 @@ void SetExportDate()
                     if (FileIsExist(oldMD))
                     {
                         if (RenameFileViaCopy(oldMD, newMD))
-                            DeleteFileW(BacktestResultPath + "\\" + oldMD);
+                        {
+                            // DeleteFileW(BacktestResultPath + "\\" + oldMD);
+                        }
                     }
                 }
 
@@ -4094,7 +4291,9 @@ void SetExportDate()
                 if (FileIsExist(oldSZFile))
                 {
                     if (RenameFileViaCopy(oldSZFile, newSZFile))
-                        DeleteFileW(BacktestResultPath + "\\" + oldSZFile);
+                    {
+                        // DeleteFileW(BacktestResultPath + "\\" + oldSZFile);
+                    }
                 }
             }
         }
@@ -4252,6 +4451,8 @@ bool LoadMarketStructureState()
         else if (key == "M15_time_postChoCH_LL") time_postChoCH_LL_M15 = StringToTime(value);
         else if (key == "M15_entryCountBuy") entryCountBuy_M15 = (int)StringToInteger(value);
         else if (key == "M15_entryCountSell") entryCountSell_M15 = (int)StringToInteger(value);
+        else if (key == "M15_bosCycleBuy") bosCycleBuy_M15 = (int)StringToInteger(value);
+        else if (key == "M15_bosCycleSell") bosCycleSell_M15 = (int)StringToInteger(value);
         else if (key == "M15_lastEntryTime") lastEntryTime_M15 = StringToTime(value);
         else if (key == "M15_lastBarTime") g_LastProcessedBarTime_M15 = StringToTime(value);
         
@@ -4452,6 +4653,8 @@ void SaveMarketStructureState()
     FileWrite(handle, "M15_time_postChoCH_LL=" + TimeToString(time_postChoCH_LL_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_entryCountBuy=" + IntegerToString(entryCountBuy_M15));
     FileWrite(handle, "M15_entryCountSell=" + IntegerToString(entryCountSell_M15));
+    FileWrite(handle, "M15_bosCycleBuy=" + IntegerToString(bosCycleBuy_M15));
+    FileWrite(handle, "M15_bosCycleSell=" + IntegerToString(bosCycleSell_M15));
     FileWrite(handle, "M15_lastEntryTime=" + TimeToString(lastEntryTime_M15, TIME_DATE|TIME_SECONDS));
     FileWrite(handle, "M15_lastBarTime=" + TimeToString(lastBarTime_M15, TIME_DATE|TIME_SECONDS));
     
@@ -4661,32 +4864,39 @@ void ApplyTrailingStop_M15()
         double sl = PositionGetDouble(POSITION_SL);
         double tp = PositionGetDouble(POSITION_TP);
         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+        double ratio = GetPriceRatio_M15(positionOpen);
 
         if(posType == POSITION_TYPE_BUY)
         {
-            // 1. Perhitungan SL Tetap 3000 Poin (Bisa Naik & Turun)
-            double trailingDistance = 3000 * _Point;
+            // 1. Perhitungan Dynamic Trailing SL (Bisa Naik & Menjaga Jarak Trailing)
+            double trailingDistance = TrailingDistance_M15 * ratio * _Point;
             double targetSL = NormalizeDouble(currentBid - trailingDistance, _Digits);
             
-            // Batas maksimal SL: maksimal 3000 pips (3000 poin) di bawah harga entry (positionOpen)
-            double minSL = NormalizeDouble(positionOpen - 3000 * _Point, _Digits);
+            // Batas maksimal SL awal: maksimal DefaultSL_Buy_M15 * ratio di bawah harga entry (positionOpen)
+            double minSL = NormalizeDouble(positionOpen - DefaultSL_Buy_M15 * ratio * _Point, _Digits);
             // Dan jangan sampai lebih dekat dari 150 poin ke harga Bid saat ini (agar tidak invalid stop)
             double maxSL = NormalizeDouble(currentBid - 150 * _Point, _Digits);
             
             targetSL = MathMax(minSL, MathMin(maxSL, targetSL));
 
-            // 2. Perhitungan TP Dinamis (TP awal 3500 poin, melebar ke atas saat didekati, tidak boleh menyempit)
+            // ✅ One-Way Ratchet: SL hanya boleh bergerak naik (tidak boleh mundur jika harga terkoreksi)
+            if(sl > 0)
+            {
+                targetSL = MathMax(sl, targetSL);
+            }
+
+            // 2. Perhitungan TP Dinamis (TP awal dari posisi, melebar ke atas saat didekati)
             double targetTP = tp;
             if(targetTP == 0)
             {
-                targetTP = NormalizeDouble(positionOpen + 3500 * _Point, _Digits);
+                targetTP = NormalizeDouble(positionOpen + DefaultTP_Buy_M15 * ratio * _Point, _Digits);
             }
             
-            // Cek apakah harga sudah mendekati TP (jarak <= 1000 poin)
-            if(targetTP - currentBid <= 1000 * _Point)
+            // Cek apakah harga sudah mendekati TP (jarak <= TP_Expansion_Trigger_M15 * ratio)
+            if(targetTP - currentBid <= TP_Expansion_Trigger_M15 * ratio * _Point)
             {
-                // Jika mendekati, perluas TP ke atas (tambahkan ekspansi dinamis berdasarkan ATR atau minimal 2000 poin)
-                double tpExpansion = MathMax(2000 * _Point, avgATR * 3.0);
+                // Jika mendekati, perluas TP ke atas (tambahkan ekspansi dinamis proporsional TP_Expansion_Min_M15 * ratio)
+                double tpExpansion = TP_Expansion_Min_M15 * ratio * _Point;
                 targetTP = NormalizeDouble(currentBid + tpExpansion, _Digits);
             }
             
@@ -4725,29 +4935,35 @@ void ApplyTrailingStop_M15()
         }
         else if(posType == POSITION_TYPE_SELL)
         {
-            // 1. Perhitungan SL Tetap 3000 Poin (Bisa Naik & Turun)
-            double trailingDistance = 3000 * _Point;
+            // 1. Perhitungan Dynamic Trailing SL (Bisa Turun & Menjaga Jarak Trailing)
+            double trailingDistance = TrailingDistance_M15 * ratio * _Point;
             double targetSL = NormalizeDouble(currentAsk + trailingDistance, _Digits);
             
-            // Batas maksimal SL: maksimal 3000 pips (3000 poin) di atas harga entry (positionOpen)
-            double minSL = NormalizeDouble(positionOpen + 3000 * _Point, _Digits);
+            // Batas maksimal SL awal: maksimal DefaultSL_Sell_M15 * ratio di atas harga entry (positionOpen)
+            double minSL = NormalizeDouble(positionOpen + DefaultSL_Sell_M15 * ratio * _Point, _Digits);
             // Dan jangan sampai lebih dekat dari 150 poin ke harga Ask saat ini
             double maxSL = NormalizeDouble(currentAsk + 150 * _Point, _Digits);
             
             targetSL = MathMin(minSL, MathMax(maxSL, targetSL));
 
-            // 2. Perhitungan TP Dinamis (TP awal 3500 poin, melebar ke bawah saat didekati, tidak boleh menyempit)
+            // ✅ One-Way Ratchet: SL hanya boleh bergerak turun (tidak boleh mundur jika harga terkoreksi)
+            if(sl > 0)
+            {
+                targetSL = MathMin(sl, targetSL);
+            }
+
+            // 2. Perhitungan TP Dinamis (TP awal dari posisi, melebar ke bawah saat didekati)
             double targetTP = tp;
             if(targetTP == 0)
             {
-                targetTP = NormalizeDouble(positionOpen - 3500 * _Point, _Digits);
+                targetTP = NormalizeDouble(positionOpen - DefaultTP_Sell_M15 * ratio * _Point, _Digits);
             }
             
-            // Cek apakah harga sudah mendekati TP (jarak <= 1000 poin)
-            if(currentAsk - targetTP <= 1000 * _Point)
+            // Cek apakah harga sudah mendekati TP (jarak <= TP_Expansion_Trigger_M15 * ratio)
+            if(currentAsk - targetTP <= TP_Expansion_Trigger_M15 * ratio * _Point)
             {
-                // Jika mendekati, perluas TP ke bawah (kurangi ekspansi dinamis berdasarkan ATR atau minimal 2000 poin)
-                double tpExpansion = MathMax(2000 * _Point, avgATR * 3.0);
+                // Jika mendekati, perluas TP ke bawah (kurangi ekspansi dinamis proporsional TP_Expansion_Min_M15 * ratio)
+                double tpExpansion = TP_Expansion_Min_M15 * ratio * _Point;
                 targetTP = NormalizeDouble(currentAsk - tpExpansion, _Digits);
             }
             
@@ -4757,6 +4973,7 @@ void ApplyTrailingStop_M15()
                 targetTP = MathMin(tp, targetTP);
             }
 
+            // Modifikasi posisi jika target SL atau TP berbeda cukup signifikan (misal >= 10 poin)
             if(MathAbs(targetSL - sl) >= 10 * _Point || MathAbs(targetTP - tp) >= 10 * _Point)
             {
                 if(trade.PositionModify(ticket, targetSL, targetTP))
@@ -4835,23 +5052,32 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
 {
     if (tradeRec.ticket == 0) return;
     
+    string closeReason = "";
+    
     // Check if the position is still open to evaluate active exit rules
     if (PositionSelectByTicket(tradeRec.ticket))
     {
         double positionProfit = PositionGetDouble(POSITION_PROFIT);
-        datetime positionOpenTime = (datetime)PositionGetInteger(POSITION_TIME);
+        datetime posTime = (datetime)PositionGetInteger(POSITION_TIME);
+        datetime positionOpenTime = (posTime > 0) ? posTime : tradeRec.entry_time;
+        if (positionOpenTime <= 0) positionOpenTime = TimeCurrent();
+        
         UpdateExcursion_M15(tradeRec,
                             SymbolInfoDouble(_Symbol, SYMBOL_BID),
                             SymbolInfoDouble(_Symbol, SYMBOL_ASK));
         
         bool shouldClose = false;
-        string closeReason = "";
         
-        // 1. Exit Rule: Profit >= 300 USD
-        if (positionProfit >= 300.0)
+        int holdSeconds = (int)(TimeCurrent() - positionOpenTime);
+        int holdHours   = holdSeconds / 3600;
+
+        // 1. Exit Rule: Profit Target USD (dengan validasi MinHold jika toggle hold time aktif)
+        bool minHoldSatisfied = !EnableHoldTimeConstraints_M15 || (holdHours >= MinHoldHours_M15);
+        if (EnableProfitTargetExit_M15 && positionProfit >= ProfitTargetExit_USD_M15 && minHoldSatisfied)
         {
             shouldClose = true;
-            closeReason = StringFormat("Profit >= 300 USD (Running: %.2f USD)", positionProfit);
+            closeReason = StringFormat("Profit >= %.2f USD (Running: %.2f USD, Hold: %d jam)", ProfitTargetExit_USD_M15, positionProfit, holdHours);
+            tradeRec.close_type = "PROFIT_TARGET";
         }
         
         // 2. Exit Rule: 3 BOS confirmed in the direction of the trend (including triggering BoS)
@@ -4877,6 +5103,18 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
             {
                 shouldClose = true;
                 closeReason = StringFormat("Telah terjadi %d BoS %s terkonfirmasi sejak awal tren", bosCount, expectedDirection);
+                tradeRec.close_type = "3_BOS_EXIT";
+            }
+        }
+
+        // 3. Exit Rule: Max Hold Hours Exceeded (Force Close saat batas waktu tercapai)
+        if (!shouldClose && EnableHoldTimeConstraints_M15)
+        {
+            if (holdHours >= MaxHoldHours_M15)
+            {
+                shouldClose = true;
+                closeReason = StringFormat("Batas Waktu Hold Tercapai (%d jam >= Max %d jam)", holdHours, MaxHoldHours_M15);
+                tradeRec.close_type = "24H_FORCE";
             }
         }
         
@@ -4911,8 +5149,13 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
         bool found = false;
         
         // Cari di history deal
-        HistorySelect(0, TimeCurrent());
+        HistorySelectByPosition(tradeRec.ticket);
         int totalDeals = HistoryDealsTotal();
+        if (totalDeals == 0)
+        {
+            HistorySelect(0, TimeCurrent());
+            totalDeals = HistoryDealsTotal();
+        }
         PrintFormat("   Finding deals... Total deals in history: %d", totalDeals);
         
         string exitType = "UNKNOWN";
@@ -4921,28 +5164,32 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
             ulong dealTicket = HistoryDealGetTicket(i);
             if(HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID) == tradeRec.ticket)
             {
-                profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
-                exitPrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
-                exitTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
-                found = true;
-                
-                long dealReason = HistoryDealGetInteger(dealTicket, DEAL_REASON);
-                if (dealReason == DEAL_REASON_SL)
-                    exitType = "STOP_LOSS";
-                else if (dealReason == DEAL_REASON_TP)
-                    exitType = "TAKE_PROFIT";
-                else if (dealReason == DEAL_REASON_EXPERT)
+                ENUM_DEAL_ENTRY dealEntry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
+                if (dealEntry == DEAL_ENTRY_OUT || dealEntry == DEAL_ENTRY_INOUT)
                 {
-                    exitType = "EXPERT_CLOSE";
+                    profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+                    exitPrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+                    exitTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+                    found = true;
+                    
+                    long dealReason = HistoryDealGetInteger(dealTicket, DEAL_REASON);
+                    if (dealReason == DEAL_REASON_SL)
+                        exitType = "STOP_LOSS";
+                    else if (dealReason == DEAL_REASON_TP)
+                        exitType = "TAKE_PROFIT";
+                    else if (dealReason == DEAL_REASON_EXPERT)
+                    {
+                        exitType = "EXPERT_CLOSE";
+                    }
+                    else if (dealReason == DEAL_REASON_CLIENT)
+                        exitType = "MANUAL_CLOSE";
+                    else
+                        exitType = "REASON_" + IntegerToString(dealReason);
+                    
+                    PrintFormat("   ✅ Found deal OUT for Ticket %I64u: Exit Price=%.5f, Profit=%.2f, Reason=%s (%d)", 
+                                tradeRec.ticket, exitPrice, profit, exitType, dealReason);
+                    break;
                 }
-                else if (dealReason == DEAL_REASON_CLIENT)
-                    exitType = "MANUAL_CLOSE";
-                else
-                    exitType = "REASON_" + IntegerToString(dealReason);
-                
-                PrintFormat("   ✅ Found deal for Ticket %I64u: Exit Price=%.5f, Profit=%.2f, Reason=%s (%d)", 
-                            tradeRec.ticket, exitPrice, profit, exitType, dealReason);
-                break;
             }
         }
         
@@ -4958,36 +5205,45 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
                         exitType);
             
             // 💾 Simpan trade ke array untuk export CSV/DB
-            double lotSize = 0.01; // Default lot size
+            double lotSize = (tradeRec.lot_size > 0) ? tradeRec.lot_size : 0.05; // Actual lot size
             
             // Get current session saat trade entry
             string entrySession = (tradeRec.session != "") ? tradeRec.session : GetCurrentSession();
             double finalSL = (tradeRec.final_sl != 0) ? tradeRec.final_sl : tradeRec.sl;
             double finalTP = (tradeRec.final_tp != 0) ? tradeRec.final_tp : tradeRec.tp;
             
-            // Hitung spread cost dan commission dari history deals
+            // Hitung spread cost dan commission dari history deals secara dinamis mengikuti pasar broker MT5
             double spreadCost = 0;
             double commission = 0;
             double swapVal = 0;
-            HistorySelect(0, TimeCurrent());
-            int totalDeals = HistoryDealsTotal();
-            for(int j = totalDeals-1; j >= 0; j--)
+            double exitSpread = (double)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD) * _Point;
+            double entrySpread = (tradeRec.entry_spread > 0) ? tradeRec.entry_spread : exitSpread;
+            
+            HistorySelectByPosition(tradeRec.ticket);
+            int totalDealsForCosts = HistoryDealsTotal();
+            if (totalDealsForCosts == 0)
+            {
+                HistorySelect(0, TimeCurrent());
+                totalDealsForCosts = HistoryDealsTotal();
+            }
+            for(int j = totalDealsForCosts-1; j >= 0; j--)
             {
                 ulong dealTicket = HistoryDealGetTicket(j);
                 ENUM_DEAL_ENTRY dealEntry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
                 if(HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID) == tradeRec.ticket)
                 {
+                    double dealVol = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+                    if(dealVol > 0) lotSize = dealVol; // ✅ Baca lot sebenarnya dari DEAL_VOLUME
+                    
                     if(dealEntry == DEAL_ENTRY_IN)
                     {
-                        // Estimasi spread cost untuk entry: ~2.5 pips untuk XAUUSD
-                        double spreadPips = 2.5;
-                        spreadCost += spreadPips * HistoryDealGetDouble(dealTicket, DEAL_VOLUME) * _Point * 100;
+                        // Biaya spread dinamis entry (USD)
+                        spreadCost += entrySpread * dealVol * 100;
                     }
                     else if(dealEntry == DEAL_ENTRY_OUT)
                     {
-                        // Estimasi spread cost untuk exit
-                        double spreadPips = 2.5;
-                        spreadCost += spreadPips * HistoryDealGetDouble(dealTicket, DEAL_VOLUME) * _Point * 100;
+                        // Biaya spread dinamis exit (USD)
+                        spreadCost += exitSpread * dealVol * 100;
                     }
                     // Akumulasi commission & swap (signed values from MT5)
                     commission += HistoryDealGetDouble(dealTicket, DEAL_COMMISSION);
@@ -4995,6 +5251,48 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
                 }
             }
             
+            // Tentukan close_type terperinci
+            string closeType = "UNKNOWN";
+            if (exitType == "STOP_LOSS")
+            {
+                closeType = "HIT_SL";
+            }
+            else if (exitType == "TAKE_PROFIT")
+            {
+                if (tradeRec.tp_expand_count > 0)
+                    closeType = "HIT_TP" + IntegerToString(tradeRec.tp_expand_count + 1);
+                else
+                    closeType = "HIT_TP1";
+            }
+            else if (exitType == "EXPERT_CLOSE")
+            {
+                if (tradeRec.close_type != "" && tradeRec.close_type != "N/A" && tradeRec.close_type != "UNKNOWN")
+                    closeType = tradeRec.close_type;
+                else if (closeReason != "")
+                {
+                    if (StringFind(closeReason, "Profit >=") >= 0)
+                        closeType = "PROFIT_TARGET";
+                    else if (StringFind(closeReason, "Batas Waktu Hold") >= 0)
+                        closeType = "24H_FORCE";
+                    else if (StringFind(closeReason, "BoS") >= 0)
+                        closeType = "3_BOS_EXIT";
+                    else
+                        closeType = "EXPERT_CLOSE";
+                }
+                else
+                    closeType = "EXPERT_CLOSE";
+            }
+            else if (exitType == "MANUAL_CLOSE")
+            {
+                closeType = "MANUAL_CLOSE";
+            }
+            else
+            {
+                closeType = exitType;
+            }
+
+            string entryStruct = (tradeRec.entry_structure != "" && tradeRec.entry_structure != "N/A") ? tradeRec.entry_structure : "BoS";
+
             SaveTradeToArray(tradeRec.ticket, _Symbol, tradeRec.type,
                              tradeRec.entry_price, exitPrice,
                              finalSL, finalTP, profit,
@@ -5006,9 +5304,10 @@ void CheckTradeClosure_M15(TradeRecord_M15 &tradeRec)
                              tradeRec.trailing_modified, tradeRec.trailing_count,
                              tradeRec.tp_expanded, tradeRec.tp_expand_count,
                              tradeRec.max_favorable_points, tradeRec.max_adverse_points,
-                             exitType,
+                             (closeReason != "") ? closeReason : exitType,
                              tradeRec.body_ratio, tradeRec.body_ratio_min,
-                             tradeRec.body_ratio_passed, tradeRec.body_ratio_mode);
+                             tradeRec.body_ratio_passed, tradeRec.body_ratio_mode,
+                             entryStruct, closeType);
                         
             // Reset trade record
             tradeRec.ticket = 0;
@@ -5040,22 +5339,36 @@ double GetEMA200_H1()
     return emaH1;
 }
 
-// Get current M15 EMA200 trend (True = Trending Up, False = Trending Down)
+// Get current M15 EMA200 trend for BUY (True = Trending Up / Sloping Up, False = Down/Flat)
 bool IsEMATrendingUp_M15()
 {
-    double emaCurrent = 0, emaPrevious = 0;
+    if (!EnableEMASlopeFilter) return true;
     double emaBuffer[];
-    // Get current bar EMA
-    if (CopyBuffer(iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE), 0, 0, 1, emaBuffer) > 0)
-        emaCurrent = emaBuffer[0];
-    // Get previous bar EMA
-    if (CopyBuffer(iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE), 0, 1, 1, emaBuffer) > 0)
-        emaPrevious = emaBuffer[0];
+    int handle = (handleEMA_M15 != 0 && handleEMA_M15 != INVALID_HANDLE) ? handleEMA_M15 : iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE);
+    if (CopyBuffer(handle, 0, 1, 2, emaBuffer) < 2)
+        return true;
     
-    bool trendingUp = (emaCurrent > emaPrevious);
-    PrintFormat("📈 [EMA SLOPE M15] Current: %.5f vs Previous: %.5f → Trending: %s", 
-                emaCurrent, emaPrevious, trendingUp ? "UP" : "DOWN");
+    // In CopyBuffer without ArraySetAsSeries: index 0 is older bar (rates[2]), index 1 is newer closed bar (rates[1])
+    bool trendingUp = (emaBuffer[1] > emaBuffer[0]);
+    PrintFormat("📈 [EMA SLOPE BUY M15] Bar[1]: %.5f vs Bar[2]: %.5f → Trending: %s (Filter: %s)", 
+                emaBuffer[1], emaBuffer[0], trendingUp ? "UP" : "DOWN", trendingUp ? "PASS" : "REJECT");
     return trendingUp;
+}
+
+// Get current M15 EMA200 trend for SELL (True = Trending Down / Sloping Down, False = Up/Flat)
+bool IsEMATrendingDown_M15()
+{
+    if (!EnableEMASlopeFilter) return true;
+    double emaBuffer[];
+    int handle = (handleEMA_M15 != 0 && handleEMA_M15 != INVALID_HANDLE) ? handleEMA_M15 : iMA(_Symbol, PERIOD_M15, 200, 0, MODE_EMA, PRICE_CLOSE);
+    if (CopyBuffer(handle, 0, 1, 2, emaBuffer) < 2)
+        return true;
+    
+    // In CopyBuffer without ArraySetAsSeries: index 0 is older bar (rates[2]), index 1 is newer closed bar (rates[1])
+    bool trendingDown = (emaBuffer[1] < emaBuffer[0]);
+    PrintFormat("📉 [EMA SLOPE SELL M15] Bar[1]: %.5f vs Bar[2]: %.5f → Trending: %s (Filter: %s)", 
+                emaBuffer[1], emaBuffer[0], trendingDown ? "DOWN" : "UP", trendingDown ? "PASS" : "REJECT");
+    return trendingDown;
 }
 
 // Check if H1 is bullish (close > EMA200)
@@ -5341,19 +5654,28 @@ bool IsCandleStrong(MqlRates &rates[], bool isBuyTrade)
 //+------------------------------------------------------------------+
 bool IsSessionAllowedForEntry()
 {
+    // Jika filter dinonaktifkan total, selalu izinkan entry
+    if (!EnableSessionFilter) return true;
+
     string currentSession = GetCurrentSession();
     MqlDateTime dt;
     TimeToStruct(TimeCurrent(), dt);
     
-    // Jika sesi adalah Asia, blokir khusus untuk jam 01:00
+    // Jika sesi adalah Asia, evaluasi pembatasan jam 01:00
     if (currentSession == "Asia" && dt.hour == 1)
     {
         static datetime lastLogTime = 0;
         if (TimeCurrent() - lastLogTime >= 300) // Log tiap 5 menit max untuk hindari spam
         {
-            //PrintFormat("❌ [SESSION REJECT] Entry ditolak: Sesi %s, jam %02d:00 (entry diblokir khusus jam ini)", currentSession, dt.hour);
+            PrintFormat("%s [SESSION] Sesi %s, jam %02d:00 (%s)", 
+                        Session_LogOnly ? "📊 [LOG ONLY]" : "❌ [REJECT]",
+                        currentSession, dt.hour,
+                        Session_LogOnly ? "entry TETAP DIIZINKAN - mode log" : "entry ditolak khusus jam ini");
             lastLogTime = TimeCurrent();
         }
+        
+        // Mode catat saja: tetap izinkan entry
+        if (Session_LogOnly) return true;
         return false;
     }
     
@@ -6915,6 +7237,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 llAfterBosConfirmedFlag_M15   = false;
                 bosBullishJustLogged_M15      = false;  // 🔓 Reset log untuk trigger BoS baru
                 entryCountBuy_M15             = 0;      // Reset entry counter untuk cycle baru (Bullish)
+                bosCycleBuy_M15               = 0;      // Reset counter siklus BoS BUY
+                hasEnteredCHoCHBuy_M15        = false;  // Reset status entry CHoCH BUY
                 // 🔧 FIX: SAVE & Clear array entries - Check ALL open positions, reset only if closed
                 PrintFormat("🔄 [CHoCH BULLISH RESET] Checking %d active BUY trades before reset...", activeBuyCount_M15);
                 for(int j = 0; j < 10; j++) {
@@ -6942,6 +7266,133 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 ResetMode2_M15(); // Reset variabel MODE 2                   
                 Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset untuk siklus baru.");
                 UpdateAcceptedLevelVisuals_M15(-1, "LL", rates_M15[1].time);
+
+                //=== ENTRY BUY SAAT CHoCH BULLISH M15 === //
+                if (EnableCHoCHEntry_M15 &&
+                    !hasEnteredCHoCHBuy_M15 &&
+                    rates_M15[0].close > ema200_M15)
+                {
+                    ResetLastBodyRatioMetrics();
+                    bool isFiltered = false;
+                    string rejectReason = "N/A";
+                    
+                    if (!IsH1ConfirmedBullish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H1 EMA200 Filter";
+                    }
+                    else if (!IsH4ConfirmedBullish())
+                    {
+                        isFiltered = true;
+                        rejectReason = "H4 EMA Filter";
+                    }
+                    else if (!IsEMATrendingUp_M15())
+                    {
+                        isFiltered = true;
+                        rejectReason = "EMA Slope Filter";
+                    }
+                    else if (!IsCandleStrong(rates_M15, true))  // true = BUY context
+                    {
+                        isFiltered = true;
+                        rejectReason = "Body Ratio Filter";
+                    }
+                    else if (!IsSessionAllowedForEntry())
+                    {
+                        isFiltered = true;
+                        rejectReason = "Session Filter";
+                    }
+                    
+                    if (!isFiltered)
+                    {
+                        double entryPrice_M15 = rates_M15[1].close + 3 * _Point;
+                        double sl_M15, tp_M15;
+                        
+                        double priceRatio_Buy    = GetPriceRatio_M15(entryPrice_M15);
+                        double scaledLot_Buy     = GetScaledLotSize_M15(entryPrice_M15);
+                        double dynamicSL_Buy     = preChochLL_M15 > 0 ? preChochLL_M15 : lastAcceptedLL_M15;
+                        double maxSLDistance_Buy = DefaultSL_Buy_M15 * priceRatio_Buy * _Point;
+                        double minSLDistance_Buy = MinSL_Points_M15 * priceRatio_Buy * _Point;
+                        
+                        double distanceToLL_Buy  = entryPrice_M15 - dynamicSL_Buy;
+                        
+                        if (distanceToLL_Buy > maxSLDistance_Buy)
+                        {
+                            sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
+                            PrintFormat("📌 [Hybrid SL Buy CHoCH] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", distanceToLL_Buy / _Point, sl_M15);
+                        }
+                        else
+                        {
+                            sl_M15 = dynamicSL_Buy - SL_Buffer_Points_M15 * priceRatio_Buy * _Point;
+                            if (entryPrice_M15 - sl_M15 > maxSLDistance_Buy)
+                            {
+                                sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
+                                PrintFormat("📌 [Hybrid SL Buy CHoCH] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", distanceToLL_Buy / _Point, sl_M15);
+                            }
+                            else if (entryPrice_M15 - sl_M15 < minSLDistance_Buy)
+                            {
+                                sl_M15 = entryPrice_M15 - minSLDistance_Buy;
+                                PrintFormat("📌 [Hybrid SL Buy CHoCH] ZONA 1 (Terlalu Dekat: %.0f poin). SL dilebarkan ke Min SL: %.5f", distanceToLL_Buy / _Point, sl_M15);
+                            }
+                            else
+                            {
+                                PrintFormat("📌 [Hybrid SL Buy CHoCH] ZONA 2 (Ideal: %.0f poin). SL menggunakan LL + %.0f poin buffer: %.5f", distanceToLL_Buy / _Point, SL_Buffer_Points_M15 * priceRatio_Buy, sl_M15);
+                            }
+                        }
+                        
+                        tp_M15 = entryPrice_M15 + DefaultTP_Buy_M15 * priceRatio_Buy * _Point;
+                        
+                        if (trade.Buy(scaledLot_Buy, NULL, entryPrice_M15, sl_M15, tp_M15, "CHoCH Buy M15")) 
+                        {
+                            hasEnteredCHoCHBuy_M15 = true;
+                            entryCountBuy_M15++;
+                            PrintFormat("✅ ENTRY BUY CHoCH di harga M15 %.5f (Lot: %.2f | Ratio: %.2fx)", entryPrice_M15, scaledLot_Buy, priceRatio_Buy);
+                            Print("[TRAILING RESET M15] Buy flags reset (CHoCH)");
+                            lastEntryTime_M15 = TimeCurrent();
+                            buyEntryPrice_M15 = entryPrice_M15;
+                            trailingActivatedBuy_M15 = false;
+                            currentBuyTrade_M15.ticket = trade.ResultOrder();
+                            currentBuyTrade_M15.entry_price = entryPrice_M15;
+                            currentBuyTrade_M15.sl = sl_M15;
+                            currentBuyTrade_M15.tp = tp_M15;
+                            currentBuyTrade_M15.entry_time = TimeCurrent();
+                            currentBuyTrade_M15.type = "BUY";
+                            currentBuyTrade_M15.session = GetCurrentSession();
+                            currentBuyTrade_M15.trailing_step = 0;
+                            InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
+                            currentBuyTrade_M15.lot_size = scaledLot_Buy;
+                            currentBuyTrade_M15.entry_structure = "CHoCH";
+                            ApplyBodyRatioSummary_M15(currentBuyTrade_M15);
+                            
+                            int buyTradeIndex = -1;
+                            for(int k = 0; k < 10; k++) {
+                                if(activeBuyTrades_M15[k].ticket == 0) {
+                                    buyTradeIndex = k;
+                                    break;
+                                }
+                            }
+                            if(buyTradeIndex >= 0) {
+                                activeBuyTrades_M15[buyTradeIndex] = currentBuyTrade_M15;
+                                activeBuyCount_M15 = entryCountBuy_M15;
+                            }
+                            PrintFormat("🚀 [BUY CHoCH M15] Ticket: %I64u | Price: %.5f | SL: %.5f | TP: %.5f | Time: %s",
+                                        currentBuyTrade_M15.ticket, currentBuyTrade_M15.entry_price, currentBuyTrade_M15.sl, currentBuyTrade_M15.tp,
+                                        TimeToString(currentBuyTrade_M15.entry_time, TIME_DATE|TIME_SECONDS));
+                        } 
+                        else 
+                        {
+                            Print("❌ Gagal melakukan entry BUY CHoCH M15");
+                        }
+                    }
+                    else
+                    {
+                        double estimatedEntry = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+                        if (estimatedEntry <= 0) {
+                            MqlTick lastTick;
+                            if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.ask;
+                        }
+                        RecordRejectedToBacktestTrades("BUY", estimatedEntry, "CHoCH " + rejectReason);
+                    }
+                }
         }
 
     //--------------+
@@ -7038,6 +7489,138 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
             postChoCH_HH_M15              = -1;      // Reset flag HH setelah BoS Bullish
             time_postChoCH_HH_M15         = -1;
             entryCountSell_M15            = 0;      // Reset entry counter untuk cycle baru (Bearish)
+            bosCycleSell_M15              = 0;      // Reset counter siklus BoS SELL
+            hasEnteredCHoCHSell_M15       = false;  // Reset status entry CHoCH SELL
+            
+            //=== ENTRY SELL SAAT CHoCH BEARISH M15 === //
+            if (EnableCHoCHEntry_M15 &&
+                !hasEnteredCHoCHSell_M15 &&
+                rates_M15[0].close < ema200_M15)
+            {
+                ResetLastBodyRatioMetrics();
+                bool isFiltered = false;
+                string rejectReason = "N/A";
+                
+                if (!IsH1ConfirmedBearish())
+                {
+                    isFiltered = true;
+                    rejectReason = "H1 EMA200 Filter";
+                }
+                else if (!IsH4ConfirmedBearish())
+                {
+                    isFiltered = true;
+                    rejectReason = "H4 EMA Filter";
+                }
+                else if (!IsEMATrendingDown_M15())
+                {
+                    isFiltered = true;
+                    rejectReason = "EMA Slope Filter";
+                }
+                else if (!IsCandleStrong(rates_M15, false)) // false = SELL context
+                {
+                    isFiltered = true;
+                    rejectReason = "Body Ratio Filter";
+                }
+                else if (!IsSessionAllowedForEntry())
+                {
+                    isFiltered = true;
+                    rejectReason = "Session Filter";
+                }
+                
+                if (!isFiltered)
+                {
+                    double entryPrice_M15 = rates_M15[1].close - 5 * _Point;
+                    double sl_M15, tp_M15;
+                    
+                    double priceRatio_Sell    = GetPriceRatio_M15(entryPrice_M15);
+                    double scaledLot_Sell     = GetScaledLotSize_M15(entryPrice_M15);
+                    double dynamicSL_Sell     = preChochHH_M15 > 0 ? preChochHH_M15 : lastAcceptedHH_M15;
+                    double maxSLDistance_Sell = DefaultSL_Sell_M15 * priceRatio_Sell * _Point;
+                    double minSLDistance_Sell = MinSL_Points_M15 * priceRatio_Sell * _Point;
+                    double distanceToHH_Sell  = dynamicSL_Sell - entryPrice_M15;
+                    
+                    if (distanceToHH_Sell > maxSLDistance_Sell)
+                    {
+                        sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
+                        PrintFormat("📌 [Hybrid SL Sell CHoCH] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", distanceToHH_Sell / _Point, sl_M15);
+                    }
+                    else
+                    {
+                        sl_M15 = dynamicSL_Sell + SL_Buffer_Points_M15 * priceRatio_Sell * _Point;
+                        if (sl_M15 - entryPrice_M15 > maxSLDistance_Sell)
+                        {
+                            sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
+                            PrintFormat("📌 [Hybrid SL Sell CHoCH] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", distanceToHH_Sell / _Point, sl_M15);
+                        }
+                        else if (sl_M15 - entryPrice_M15 < minSLDistance_Sell)
+                        {
+                            sl_M15 = entryPrice_M15 + minSLDistance_Sell;
+                            PrintFormat("📌 [Hybrid SL Sell CHoCH] ZONA 1 (Terlalu Dekat: %.0f poin). SL dilebarkan ke Min SL: %.5f", distanceToHH_Sell / _Point, sl_M15);
+                        }
+                        else
+                        {
+                            PrintFormat("📌 [Hybrid SL Sell CHoCH] ZONA 2 (Ideal: %.0f poin). SL menggunakan HH + %.0f poin buffer: %.5f", distanceToHH_Sell / _Point, SL_Buffer_Points_M15 * priceRatio_Sell, sl_M15);
+                        }
+                    }
+
+                    tp_M15 = entryPrice_M15 - DefaultTP_Sell_M15 * priceRatio_Sell * _Point;
+                    PrintFormat("📌 [CHoCH Sell Entry] TP: %.0f poin", DefaultTP_Sell_M15 * priceRatio_Sell);
+
+                    if (trade.Sell(scaledLot_Sell, NULL, entryPrice_M15, sl_M15, tp_M15))
+                    {
+                        hasEnteredCHoCHSell_M15 = true;
+                        entryCountSell_M15++;
+                        PrintFormat("✅ ENTRY SELL CHoCH dilakukan di harga M15 %.5f (Lot: %.2f | Ratio: %.2fx)", entryPrice_M15, scaledLot_Sell, priceRatio_Sell);
+                        Print("[TRAILING RESET M15] Sell flags reset (CHoCH)");
+                        lastSellEntryTime_M15 = TimeCurrent();
+                        sellEntryPrice_M15 = entryPrice_M15;
+                        trailingActivatedSell_M15 = false;
+                        currentSellTrade_M15.ticket = trade.ResultOrder();
+                        currentSellTrade_M15.entry_price = entryPrice_M15;
+                        currentSellTrade_M15.sl = sl_M15;
+                        currentSellTrade_M15.tp = tp_M15;
+                        currentSellTrade_M15.entry_time = TimeCurrent();
+                        currentSellTrade_M15.type = "SELL";
+                        currentSellTrade_M15.session = GetCurrentSession();
+                        currentSellTrade_M15.trailing_step = 0;
+                        InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
+                        currentSellTrade_M15.lot_size = scaledLot_Sell;
+                        currentSellTrade_M15.entry_structure = "CHoCH";
+                        ApplyBodyRatioSummary_M15(currentSellTrade_M15);
+                        
+                        int sellTradeIndex = -1;
+                        for(int k = 0; k < 10; k++) {
+                            if(activeSellTrades_M15[k].ticket == 0) {
+                                sellTradeIndex = k;
+                                break;
+                            }
+                        }
+                        if(sellTradeIndex >= 0) {
+                            activeSellTrades_M15[sellTradeIndex] = currentSellTrade_M15;
+                            activeSellCount_M15 = entryCountSell_M15;
+                        }
+                        PrintFormat("🚀 [SELL CHoCH M15] Ticket: %I64u | Price: %.5f | SL: %.5f | TP: %.5f | Time: %s",
+                                    currentSellTrade_M15.ticket, currentSellTrade_M15.entry_price, currentSellTrade_M15.sl, currentSellTrade_M15.tp,
+                                    TimeToString(currentSellTrade_M15.entry_time, TIME_DATE|TIME_SECONDS));
+                    }
+                    else
+                    {
+                        Print("❌ Gagal melakukan entry SELL CHoCH M15");
+                    }
+                }
+                else
+                {
+                    double estimatedEntry = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+                    if (estimatedEntry <= 0) {
+                        MqlTick lastTick;
+                        if (SymbolInfoTick(_Symbol, lastTick)) estimatedEntry = lastTick.bid;
+                    }
+                    RecordRejectedToBacktestTrades("SELL", estimatedEntry, "CHoCH " + rejectReason);
+                }
+            }
+
+            ResetMode2Bearish_M15(); // Reset variabel MODE 2 untuk siklus baru
+            Print("🔄 [CHoCH RESET M15] Variabel MODE 2 di-reset");
             // 🔧 FIX: SAVE & Clear array entries - Check ALL open positions, reset only if closed
             PrintFormat("🔄 [CHoCH BEARISH RESET] Checking %d active SELL trades before reset...", activeSellCount_M15);
             for(int j = 0; j < 10; j++) {
@@ -7160,6 +7743,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         
         // SAVE BoS DATA - price = HH yang di-break (bosBullishBreakLevel_M15), previousPrice = LL referensi
         SaveLLHHBOSToArray("BoS", "Bullish", bosBullishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedLL_M15, 0);
+        bosCycleBuy_M15++; // ✅ Increment siklus BoS Market Structure murni
+        PrintFormat("📊 [BoS BULLISH M15] Market Structure BoS Cycle (Buy): %d / %d", bosCycleBuy_M15, MaxBoSCycle_M15);
         // Bersihkan HH line — level udah ke-sweep oleh BoS Bullish M15
         ObjectDelete(0, "line_lastAcceptedHH_M15");
         ObjectDelete(0, "label_lastAcceptedHH_M15");
@@ -7177,15 +7762,20 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         }
         
         // --- ENTRY LOGIC ENABLED WITH FILTERS ---
-        if (bosBullishConfirmedFlag_M15 &&
-            rates_M15[0].close > ema200_M15 &&
-            entryCountBuy_M15 < MaxEntriesPerCycle_M15)
+        if (EnableBoSEntry_M15 &&
+            bosBullishConfirmedFlag_M15 &&
+            rates_M15[0].close > ema200_M15)
         {
             ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
-            if (!IsH1ConfirmedBullish())
+            if (bosCycleBuy_M15 > MaxBoSCycle_M15)
+            {
+                isFiltered = true;
+                rejectReason = "Max BOS Cycle Limit (" + IntegerToString(MaxBoSCycle_M15) + ")";
+            }
+            else if (!IsH1ConfirmedBullish())
             {
                 isFiltered = true;
                 rejectReason = "H1 EMA200 Filter";
@@ -7219,9 +7809,11 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 
                 // Tentukan SL/TP berdasarkan entry ke berapa
                 // ✅ Hybrid SL 3 Zones:
+                double priceRatio_Buy    = GetPriceRatio_M15(entryPrice_M15);
+                double scaledLot_Buy     = GetScaledLotSize_M15(entryPrice_M15);
                 double dynamicSL_Buy     = lastAcceptedLL_M15;
-                double maxSLDistance_Buy = DefaultSL_Buy_M15 * _Point; // Batas Max Toleransi (3000)
-                double minSLDistance_Buy = 1500 * _Point;              // Batas Transisi / Terlalu Dekat (1500)
+                double maxSLDistance_Buy = DefaultSL_Buy_M15 * priceRatio_Buy * _Point; // Batas Max Toleransi
+                double minSLDistance_Buy = MinSL_Points_M15 * priceRatio_Buy * _Point;              // Batas Min Toleransi
                 
                 double distanceToLL_Buy  = entryPrice_M15 - dynamicSL_Buy;
                 
@@ -7229,32 +7821,38 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 {
                     // Zona 3: Terlalu Jauh (> Max), batasi ke Max
                     sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
-                    PrintFormat("📌 [Hybrid SL Buy Entry %d] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", entryCountBuy_M15 + 1, distanceToLL_Buy / _Point, sl_M15);
+                    PrintFormat("📌 [Hybrid SL Buy BoS Entry %d] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", bosCycleBuy_M15, distanceToLL_Buy / _Point, sl_M15);
                 }
                 else
                 {
-                    // Zona 2: Ideal (< Max), gunakan LL + buffer 1000 point
-                    sl_M15 = dynamicSL_Buy - 1000 * _Point;
+                    // Zona 2: Ideal (< Max), gunakan LL + buffer SL_Buffer_Points_M15 * ratio
+                    sl_M15 = dynamicSL_Buy - SL_Buffer_Points_M15 * priceRatio_Buy * _Point;
                     
                     // Pastikan SL dengan tambahan buffer tidak melebihi Max SL
                     if (entryPrice_M15 - sl_M15 > maxSLDistance_Buy)
                     {
                         sl_M15 = entryPrice_M15 - maxSLDistance_Buy;
-                        PrintFormat("📌 [Hybrid SL Buy Entry %d] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", entryCountBuy_M15 + 1, distanceToLL_Buy / _Point, sl_M15);
+                        PrintFormat("📌 [Hybrid SL Buy BoS Entry %d] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", bosCycleBuy_M15, distanceToLL_Buy / _Point, sl_M15);
+                    }
+                    else if (entryPrice_M15 - sl_M15 < minSLDistance_Buy)
+                    {
+                        sl_M15 = entryPrice_M15 - minSLDistance_Buy;
+                        PrintFormat("📌 [Hybrid SL Buy BoS Entry %d] ZONA 1 (Terlalu Dekat: %.0f poin). SL dilebarkan ke Min SL: %.5f", bosCycleBuy_M15, distanceToLL_Buy / _Point, sl_M15);
                     }
                     else
                     {
-                        PrintFormat("📌 [Hybrid SL Buy Entry %d] ZONA 2 (Ideal: %.0f poin). SL menggunakan LL + 1000 poin buffer: %.5f", entryCountBuy_M15 + 1, distanceToLL_Buy / _Point, sl_M15);
+                        PrintFormat("📌 [Hybrid SL Buy BoS Entry %d] ZONA 2 (Ideal: %.0f poin). SL menggunakan LL + %.0f poin buffer: %.5f", bosCycleBuy_M15, distanceToLL_Buy / _Point, SL_Buffer_Points_M15 * priceRatio_Buy, sl_M15);
                     }
                 }
                 
-                tp_M15 = entryPrice_M15 + DefaultTP_Buy_M15 * _Point;
+                tp_M15 = entryPrice_M15 + DefaultTP_Buy_M15 * priceRatio_Buy * _Point;
                 
-                if (trade.Buy(0.05, NULL, entryPrice_M15, sl_M15, tp_M15, "BoS Buy M15")) 
+                if (trade.Buy(scaledLot_Buy, NULL, entryPrice_M15, sl_M15, tp_M15, "BoS Buy M15")) 
                 {
-                    Print("✅ ENTRY BUY di harga M15 ", entryPrice_M15);
-                    Print("[TRAILING RESET M15] Buy flags reset"); // Log reset saat entry
-                    Print("📊 Entry Count (Buy): ", ++entryCountBuy_M15, "/", MaxEntriesPerCycle_M15);
+                    entryCountBuy_M15++;
+                    PrintFormat("✅ ENTRY BUY BoS di harga M15 %.5f (Lot: %.2f | Ratio: %.2fx)", entryPrice_M15, scaledLot_Buy, priceRatio_Buy);
+                    Print("[TRAILING RESET M15] Buy flags reset (BoS)"); // Log reset saat entry
+                    PrintFormat("📊 BoS Cycle (Buy): %d / %d", bosCycleBuy_M15, MaxBoSCycle_M15);
                     // hasEnteredTrade_M15 = true;  // ⚙️ DIHAPUS - Tidak perlu, gunakan counter saja
                     lastEntryTime_M15 = TimeCurrent();
                     buyEntryPrice_M15 = entryPrice_M15; // Simpan harga entry
@@ -7268,6 +7866,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentBuyTrade_M15.session = GetCurrentSession();
                     currentBuyTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentBuyTrade_M15, sl_M15, tp_M15);
+                    currentBuyTrade_M15.lot_size = scaledLot_Buy;
+                    currentBuyTrade_M15.entry_structure = "BoS_" + IntegerToString(bosCycleBuy_M15);
                     ApplyBodyRatioSummary_M15(currentBuyTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
@@ -7368,6 +7968,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         
         // SAVE BoS BEARISH DATA - price = LL yang di-break (bosBearishBreakLevel_M15), previousPrice = HH referensi
         SaveLLHHBOSToArray("BoS", "Bearish", bosBearishBreakLevel_M15, rates_M15[1].time, "M15", "Confirmed", lastAcceptedHH_M15, 0);
+        bosCycleSell_M15++; // ✅ Increment siklus BoS Market Structure murni
+        PrintFormat("📊 [BoS BEARISH M15] Market Structure BoS Cycle (Sell): %d / %d", bosCycleSell_M15, MaxBoSCycle_M15);
         // Bersihkan LL line — level udah ke-sweep oleh BoS Bearish M15
         ObjectDelete(0, "line_lastAcceptedLL_M15");
         ObjectDelete(0, "label_lastAcceptedLL_M15");
@@ -7393,15 +7995,20 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
         }
         //=== ENTRY SELL SAAT BoS BEARISH M15 === //
         // --- ENTRY LOGIC WITH H1 & EMA FILTERS ---
-        if (bosBearishConfirmedFlag_M15 &&
-            rates_M15[0].close < ema200_M15 &&
-            entryCountSell_M15 < MaxEntriesPerCycle_M15)
+        if (EnableBoSEntry_M15 &&
+            bosBearishConfirmedFlag_M15 &&
+            rates_M15[0].close < ema200_M15)
         {
             ResetLastBodyRatioMetrics();
             bool isFiltered = false;
             string rejectReason = "N/A";
             
-            if (!IsH1ConfirmedBearish())
+            if (bosCycleSell_M15 > MaxBoSCycle_M15)
+            {
+                isFiltered = true;
+                rejectReason = "Max BOS Cycle Limit (" + IntegerToString(MaxBoSCycle_M15) + ")";
+            }
+            else if (!IsH1ConfirmedBearish())
             {
                 isFiltered = true;
                 rejectReason = "H1 EMA200 Filter";
@@ -7411,7 +8018,7 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 isFiltered = true;
                 rejectReason = "H4 EMA Filter";
             }
-            else if (IsEMATrendingUp_M15())
+            else if (!IsEMATrendingDown_M15())
             {
                 isFiltered = true;
                 rejectReason = "EMA Slope Filter";
@@ -7435,50 +8042,50 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                 
                 // Tentukan SL/TP berdasarkan entry ke berapa
                 // ✅ Hybrid SL 3 Zones:
+                double priceRatio_Sell    = GetPriceRatio_M15(entryPrice_M15);
+                double scaledLot_Sell     = GetScaledLotSize_M15(entryPrice_M15);
                 double dynamicSL_Sell     = lastAcceptedHH_M15;
-                double maxSLDistance_Sell = DefaultSL_Sell_M15 * _Point; // Batas Max Toleransi (3000)
+                double maxSLDistance_Sell = DefaultSL_Sell_M15 * priceRatio_Sell * _Point; // Batas Max Toleransi
+                double minSLDistance_Sell = MinSL_Points_M15 * priceRatio_Sell * _Point;               // Batas Min Toleransi
                 double distanceToHH_Sell  = dynamicSL_Sell - entryPrice_M15;
                 
                 if (distanceToHH_Sell > maxSLDistance_Sell)
                 {
                     // Zona 3: Terlalu Jauh (> Max), batasi ke Max
                     sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
-                    PrintFormat("📌 [Hybrid SL Sell Entry %d] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", entryCountSell_M15 + 1, distanceToHH_Sell / _Point, sl_M15);
+                    PrintFormat("📌 [Hybrid SL Sell BoS Entry %d] ZONA 3 (Terlalu Jauh: %.0f poin). SL dibatasi ke Max: %.5f", bosCycleSell_M15, distanceToHH_Sell / _Point, sl_M15);
                 }
                 else
                 {
-                    // Zona 2: Ideal (< Max), gunakan HH + buffer 1000 point
-                    sl_M15 = dynamicSL_Sell + 1000 * _Point;
+                    // Zona 2: Ideal (< Max), gunakan HH + buffer SL_Buffer_Points_M15 * ratio
+                    sl_M15 = dynamicSL_Sell + SL_Buffer_Points_M15 * priceRatio_Sell * _Point;
                     
                     // Pastikan SL dengan tambahan buffer tidak melebihi Max SL
                     if (sl_M15 - entryPrice_M15 > maxSLDistance_Sell)
                     {
                         sl_M15 = entryPrice_M15 + maxSLDistance_Sell;
-                        PrintFormat("📌 [Hybrid SL Sell Entry %d] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", entryCountSell_M15 + 1, distanceToHH_Sell / _Point, sl_M15);
+                        PrintFormat("📌 [Hybrid SL Sell BoS Entry %d] ZONA 2 (Ideal: %.0f poin). SL + Buffer melebihi Max, dibatasi ke Max SL: %.5f", bosCycleSell_M15, distanceToHH_Sell / _Point, sl_M15);
+                    }
+                    else if (sl_M15 - entryPrice_M15 < minSLDistance_Sell)
+                    {
+                        sl_M15 = entryPrice_M15 + minSLDistance_Sell;
+                        PrintFormat("📌 [Hybrid SL Sell BoS Entry %d] ZONA 1 (Terlalu Dekat: %.0f poin). SL dilebarkan ke Min SL: %.5f", bosCycleSell_M15, distanceToHH_Sell / _Point, sl_M15);
                     }
                     else
                     {
-                        PrintFormat("📌 [Hybrid SL Sell Entry %d] ZONA 2 (Ideal: %.0f poin). SL menggunakan HH + 1000 poin buffer: %.5f", entryCountSell_M15 + 1, distanceToHH_Sell / _Point, sl_M15);
+                        PrintFormat("📌 [Hybrid SL Sell BoS Entry %d] ZONA 2 (Ideal: %.0f poin). SL menggunakan HH + %.0f poin buffer: %.5f", bosCycleSell_M15, distanceToHH_Sell / _Point, SL_Buffer_Points_M15 * priceRatio_Sell, sl_M15);
                     }
                 }
 
-                // TP bervariasi sesuai entry
-                if (entryCountSell_M15 == 0) {
-                    tp_M15 = entryPrice_M15 - DefaultTP_Sell_M15 * _Point;
-                    Print("📌 [BoS Sell Entry 1] TP: ", DefaultTP_Sell_M15, " poin");
-                } else if (entryCountSell_M15 == 1) {
-                    tp_M15 = entryPrice_M15 - Entry2TP_Sell_M15 * _Point;
-                    Print("📌 [BoS Sell Entry 2] TP: ", Entry2TP_Sell_M15, " poin");
-                } else {
-                    tp_M15 = entryPrice_M15 - Entry3TP_Sell_M15 * _Point;
-                    Print("📌 [BoS Sell Entry 3] TP: ", Entry3TP_Sell_M15, " poin");
-                }
+                tp_M15 = entryPrice_M15 - DefaultTP_Sell_M15 * priceRatio_Sell * _Point;
+                PrintFormat("📌 [BoS Sell Entry %d] TP: %.0f poin", bosCycleSell_M15, DefaultTP_Sell_M15 * priceRatio_Sell);
 
-                if (trade.Sell(0.05, NULL, entryPrice_M15, sl_M15, tp_M15))
+                if (trade.Sell(scaledLot_Sell, NULL, entryPrice_M15, sl_M15, tp_M15))
                 {
-                    Print("✅ ENTRY SELL dilakukan di harga M15 ", entryPrice_M15);
-                    Print("[TRAILING RESET M15] Sell flags reset"); // Log reset saat entry
-                    Print("📊 Entry Count (Sell): ", ++entryCountSell_M15, "/", MaxEntriesPerCycle_M15);
+                    entryCountSell_M15++;
+                    PrintFormat("✅ ENTRY SELL BoS di harga M15 %.5f (Lot: %.2f | Ratio: %.2fx)", entryPrice_M15, scaledLot_Sell, priceRatio_Sell);
+                    Print("[TRAILING RESET M15] Sell flags reset (BoS)"); // Log reset saat entry
+                    PrintFormat("📊 BoS Cycle (Sell): %d / %d", bosCycleSell_M15, MaxBoSCycle_M15);
                     // hasEnteredSellTrade_M15 = true;  // ⚙️ DIHAPUS - Tidak perlu, gunakan counter saja
                     lastSellEntryTime_M15 = TimeCurrent();
                     sellEntryPrice_M15 = entryPrice_M15; // Simpan harga entry
@@ -7492,6 +8099,8 @@ void DetectAndDraw_M15(MqlRates &rates_M15[], bool backfillMode)
                     currentSellTrade_M15.session = GetCurrentSession();
                     currentSellTrade_M15.trailing_step = 0;
                     InitTrailingSummary_M15(currentSellTrade_M15, sl_M15, tp_M15);
+                    currentSellTrade_M15.lot_size = scaledLot_Sell;
+                    currentSellTrade_M15.entry_structure = "BoS_" + IntegerToString(bosCycleSell_M15);
                     ApplyBodyRatioSummary_M15(currentSellTrade_M15);
                     
                     // 🔧 FIX: Find empty slot instead of using counter (prevent overwrite of open positions)
@@ -8980,9 +9589,10 @@ void DetectAndDraw_H1(MqlRates &rates_H1[], bool backfillMode)
 void OnTick()
 {
     //+------------------------------------------------------------------+
-    //| SESSION ZONE TRACKING - Dipanggil setiap tick                     |
+    //| SESSION ZONE TRACKING & REAL-TICK SPREAD - Dipanggil setiap tick |
     //+------------------------------------------------------------------+
     UpdateSessionZoneTracking();    // Update tracking sesi
+    TrackDynamicSpread_M15();       // Update real-tick max spread per bar M15
     
     // 🔧 FIX: Rate-limit Visual Updates ke 1 menit sekali (Mencegah Lag Parah Saat Backtest)
     static datetime lastVisualUpdate = 0;

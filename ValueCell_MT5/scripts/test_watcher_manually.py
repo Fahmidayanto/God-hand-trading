@@ -1,9 +1,18 @@
+import os
 import sys
 import logging
 from pathlib import Path
+from dotenv import load_dotenv
 
-# Add backend directory to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+# Setup paths and env
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = SCRIPT_DIR.parent
+BACKEND_DIR = PROJECT_ROOT / "backend"
+sys.path.insert(0, str(BACKEND_DIR))
+
+for env_candidate in [BACKEND_DIR / ".env", PROJECT_ROOT / ".env", PROJECT_ROOT.parent / ".env"]:
+    if env_candidate.exists():
+        load_dotenv(env_candidate)
 
 logging.basicConfig(level=logging.INFO)
 from app.core.database import init_db_pool, close_db_pool

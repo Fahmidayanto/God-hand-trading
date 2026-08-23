@@ -168,19 +168,19 @@ class LLMDecisionEngine:
             LLMProvider(
                 "9inference-DeepSeek",
                 "https://9inference.cloud/v1/package",
-                os.getenv("NINEINFERENCE_API_KEY", "sk_live_66f741e252367899a56bef4608f5acf27003944a9e3b535f"),
+                os.getenv("NINEINFERENCE_API_KEY", ""),
                 "deepseek-v4-flash-0731",
             ),
             LLMProvider(
                 "Groq-Qwen",
                 "https://api.groq.com/openai/v1",
-                os.getenv("GROQ_API_KEY", "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"),
+                os.getenv("GROQ_API_KEY", ""),
                 "qwen/qwen3.6-27b",
             ),
             LLMProvider(
                 "NVIDIA-MiniMax-M3",
                 "https://integrate.api.nvidia.com/v1",
-                "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",
+                os.getenv("NVIDIA_MINIMAX_API_KEY", os.getenv("NVIDIA_API_KEY", "")),
                 "minimaxai/minimax-m3",
             ),
         ]

@@ -67,14 +67,20 @@ class MarketDataStreamer:
                         ts = datetime.strptime(row["Time"], "%Y.%m.%d %H:%M:%S").replace(tzinfo=timezone.utc)
                         if ts < from_dt:
                             continue
-                        candles.append({
+                        candle_obj = {
                             "time": int(ts.timestamp()),
                             "open": float(row["Open"]),
                             "high": float(row["High"]),
                             "low": float(row["Low"]),
                             "close": float(row["Close"]),
                             "ema200": round(float(row["EMA200"]), 2),
-                        })
+                        }
+                        if "Spread" in row and row["Spread"].strip():
+                            try:
+                                candle_obj["spread"] = int(row["Spread"].strip())
+                            except ValueError:
+                                pass
+                        candles.append(candle_obj)
                     except (KeyError, ValueError) as e:
                         logger.warning(f"Skipping row in {file_path.name}: {e}")
                         continue
