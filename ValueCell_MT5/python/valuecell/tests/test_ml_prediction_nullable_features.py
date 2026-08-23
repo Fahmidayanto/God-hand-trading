@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import numpy as np
 import pandas as pd
 
 from valuecell.agents.ml_prediction_agent import MLPredictionAgent
@@ -29,3 +30,26 @@ def test_v5_nullable_simulation_values_use_numeric_defaults():
     assert features["spread_to_atr_ratio"] == 0.15 / 5.0
     assert features["init_risk_points"] == 300.0
     assert features["init_risk_pct"] == (300.0 / 3350.0) * 100.0
+
+
+def test_artifact_feature_names_override_stale_metadata():
+    agent = MLPredictionAgent.__new__(MLPredictionAgent)
+    agent.metadata = {"mfe_features": ["stale_feature"]}
+    agent.mfe_model = SimpleNamespace(feature_names_in_=np.array(["atr_14", "day_of_week"]))
+    agent.mfe_scaler = SimpleNamespace(feature_names_in_=np.array(["atr_14", "day_of_week"]))
+
+    assert agent._artifact_feature_names("mfe") == ["atr_14", "day_of_week"]
+
+
+def test_artifact_feature_names_reject_model_scaler_mismatch():
+    agent = MLPredictionAgent.__new__(MLPredictionAgent)
+    agent.metadata = {"mae_features": []}
+    agent.mae_model = SimpleNamespace(feature_names_in_=np.array(["atr_14"]))
+    agent.mae_scaler = SimpleNamespace(feature_names_in_=np.array(["day_of_week"]))
+
+    try:
+        agent._artifact_feature_names("mae")
+    except ValueError as error:
+        assert "model/scaler feature contracts do not match" in str(error)
+    else:
+        raise AssertionError("Expected mismatched artifacts to be rejected")

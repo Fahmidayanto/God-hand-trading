@@ -130,10 +130,31 @@ class MLPredictionAgent:
                 scaler_file = self.model_path / "filter_scaler.pkl"
                 self.scaler = joblib.load(scaler_file)
                 logger.info(f"✅ Scaler loaded: {scaler_file}")
+
+            if self.model_type.startswith("regression_v"):
+                self.mfe_feature_names = self._artifact_feature_names("mfe")
+                self.mae_feature_names = self._artifact_feature_names("mae")
                 
         except Exception as e:
             logger.error(f"❌ Failed to load model: {e}")
             raise RuntimeError(f"Model loading failed: {e}")
+
+    def _artifact_feature_names(self, target: str) -> List[str]:
+        """Use fitted artifacts as feature contract; metadata is fallback only."""
+        model_names = list(getattr(getattr(self, f"{target}_model"), "feature_names_in_", []))
+        scaler_names = list(getattr(getattr(self, f"{target}_scaler"), "feature_names_in_", []))
+        metadata_names = list(self.metadata.get(f"{target}_features", []))
+
+        if model_names and scaler_names and model_names != scaler_names:
+            raise ValueError(f"{target.upper()} model/scaler feature contracts do not match")
+
+        artifact_names = model_names or scaler_names
+        if artifact_names and metadata_names != artifact_names:
+            logger.warning(
+                f"⚠️ {target.upper()} metadata feature list is stale; "
+                "using fitted artifact feature_names_in_"
+            )
+        return artifact_names or metadata_names
 
     def _extract_v5_features(
         self,
@@ -467,7 +488,7 @@ class MLPredictionAgent:
                 features = self._extract_v5_features(market_data, entry_price, structure_signal)
 
                 # Make prediction for MFE
-                mfe_feat_names = self.metadata["mfe_features"]
+                mfe_feat_names = self.mfe_feature_names
                 mfe_df = pd.DataFrame(
                     [[self._resolve_feature_value(features, name) for name in mfe_feat_names]],
                     columns=mfe_feat_names,
@@ -477,7 +498,7 @@ class MLPredictionAgent:
                 predicted_mfe = float(self.mfe_model.predict(mfe_scaled_df)[0])
 
                 # Make prediction for MAE
-                mae_feat_names = self.metadata["mae_features"]
+                mae_feat_names = self.mae_feature_names
                 mae_df = pd.DataFrame(
                     [[self._resolve_feature_value(features, name) for name in mae_feat_names]],
                     columns=mae_feat_names,

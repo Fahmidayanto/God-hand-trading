@@ -3621,8 +3621,16 @@ export default function SimulationOfDead() {
             }} 
           />
           
-          {/* ThreeJS WebGL Canvas */}
-          <GhostLoaderCanvas percent={loadProgress.percent} />
+          <style>{`
+            @keyframes floatGhost {
+              0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
+              50% { transform: translateY(-10px) rotate(4deg) scale(1.02); }
+            }
+            @keyframes ambientPulse {
+              0% { background-color: rgba(8, 8, 8, 0.8); }
+              100% { background-color: rgba(15, 23, 42, 0.85); }
+            }
+          `}</style>
 
           {/* Lapis 2: Card Popup Glassmorphism dengan pendaran neon */}
           <div 
@@ -4192,153 +4200,6 @@ export default function SimulationOfDead() {
         </div>
       )}
     </div>
-  );
-}
-
-interface GhostLoaderCanvasProps {
-  percent: number;
-}
-
-function GhostLoaderCanvas({ percent }: GhostLoaderCanvasProps) {
-  const mountRef = useRef<HTMLCanvasElement>(null);
-  const percentRef = useRef(percent);
-
-  // Sync percent to ref to avoid re-initializing the ThreeJS scene on every percentage change
-  useEffect(() => {
-    percentRef.current = percent;
-  }, [percent]);
-
-  useEffect(() => {
-    const canvas = mountRef.current;
-    if (!canvas) return;
-
-    const parent = canvas.parentElement;
-    if (!parent) return;
-
-    // Standard Setup
-    const scene = new THREE.Scene();
-
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.15));
-
-    const dirLight1 = new THREE.DirectionalLight(0x3b82f6, 1.5);
-    dirLight1.position.set(5, 5, 2);
-    scene.add(dirLight1);
-
-    const pointLight = new THREE.PointLight(0xec4899, 2, 20);
-    pointLight.position.set(-3, -2, 3);
-    scene.add(pointLight);
-
-    // Camera with temporary aspect ratio of 1
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.z = 3.5; // Start close for dramatic reveal
-
-    // Renderer
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-
-    // TorusKnot
-    const geometry = new THREE.TorusKnotGeometry(1.2, 0.4, 150, 20);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x1f2937,
-      metalness: 0.9,
-      roughness: 0.1,
-      wireframe: false
-    });
-    const torusKnot = new THREE.Mesh(geometry, material);
-    scene.add(torusKnot);
-
-    let currentProgress = 0;
-    let reqId: number;
-    let elapsed = 0;
-    const clock = new THREE.Clock();
-
-    const animate = () => {
-      reqId = requestAnimationFrame(animate);
-
-      const delta = clock.getDelta();
-      elapsed += delta;
-
-      const target = percentRef.current;
-      const isLoading = target < 100;
-
-      if (isLoading) {
-        // Smoothly interpolate currentProgress to target
-        currentProgress += (target - currentProgress) * 0.08;
-
-        const scaleVal = (currentProgress / 100) * 1.3;
-        torusKnot.scale.set(scaleVal, scaleVal, scaleVal);
-
-        const spinSpeed = 0.2 + (currentProgress / 100) * 2.5;
-        torusKnot.rotation.x = elapsed * spinSpeed;
-        torusKnot.rotation.y = elapsed * (spinSpeed * 1.2);
-      } else {
-        // Settle scale back to 1.0 (spring easing effect)
-        torusKnot.scale.x += (1.0 - torusKnot.scale.x) * 0.08;
-        torusKnot.scale.y = torusKnot.scale.x;
-        torusKnot.scale.z = torusKnot.scale.x;
-
-        // Dramatic Zoom-Out Camera
-        camera.position.z += (7.5 - camera.position.z) * 0.05;
-
-        // Cinematic spin
-        torusKnot.rotation.x += delta * 0.3;
-        torusKnot.rotation.y += delta * 0.4;
-      }
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    // ResizeObserver to always match parent dimensions perfectly (critical for Tauri desktop client)
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const width = parent.clientWidth || entry.contentRect.width || window.innerWidth;
-        const height = parent.clientHeight || entry.contentRect.height || window.innerHeight;
-        
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height);
-      }
-    });
-    resizeObserver.observe(parent);
-
-    // Cleanup
-    return () => {
-      cancelAnimationFrame(reqId);
-      resizeObserver.disconnect();
-      geometry.dispose();
-      material.dispose();
-      renderer.dispose();
-    };
-  }, []);
-
-  return (
-    <>
-      <style>{`
-        @keyframes floatGhost {
-          0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
-          50% { transform: translateY(-10px) rotate(4deg) scale(1.02); }
-        }
-        @keyframes ambientPulse {
-          0% { background-color: rgba(8, 8, 8, 0.8); }
-          100% { background-color: rgba(15, 23, 42, 0.85); }
-        }
-      `}</style>
-      <canvas
-        ref={mountRef}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          pointerEvents: "none",
-          zIndex: 0
-        }}
-      />
-    </>
   );
 }
 
