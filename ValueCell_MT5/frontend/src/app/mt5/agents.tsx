@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { BarChart3, Building2, Brain, Shield, Bot, Scale } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Particles from "@tsparticles/react";
 import MT5Footer from "./components/MT5Footer";
 
@@ -10,7 +12,7 @@ interface Agent {
   signals_today: number;
   signal: string;
   confidence: number;
-  icon: string;
+  icon: LucideIcon;
   color: string;
 }
 
@@ -26,7 +28,7 @@ export default function AgentsPage() {
       signals_today: 0,
       signal: "HOLD",
       confidence: 0,
-      icon: "📊",
+      icon: BarChart3,
       color: "blue",
     },
     {
@@ -38,7 +40,7 @@ export default function AgentsPage() {
       signals_today: 0,
       signal: "HOLD",
       confidence: 0,
-      icon: "🏗️",
+      icon: Building2,
       color: "purple",
     },
     {
@@ -50,7 +52,7 @@ export default function AgentsPage() {
       signals_today: 0,
       signal: "FILTER",
       confidence: 0,
-      icon: "🧠",
+      icon: Brain,
       color: "emerald",
     },
     {
@@ -62,7 +64,7 @@ export default function AgentsPage() {
       signals_today: 0,
       signal: "ACTIVE",
       confidence: 0,
-      icon: "🛡️",
+      icon: Shield,
       color: "amber",
     },
   ]);
@@ -204,8 +206,8 @@ export default function AgentsPage() {
 
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none">
-            🤖
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none">
+            <Bot size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -235,11 +237,11 @@ export default function AgentsPage() {
               {/* Agent Header */}
               <div className="flex items-center gap-5 mb-6">
                 <div
-                  className={`w-20 h-20 rounded-2xl flex items-center justify-center text-4xl border-2 transition-all duration-300 hover:scale-110 hover:rotate-[5deg] ${getColorClass(
+                  className={`w-20 h-20 rounded-2xl flex items-center justify-center border-2 transition-all duration-300 hover:scale-110 hover:rotate-[5deg] ${getColorClass(
                     agent.color
                   )}`}
                 >
-                  {agent.icon}
+                  <agent.icon size={36} strokeWidth={1.6} aria-hidden="true" />
                 </div>
                 <div className="flex-1">
                   <div className="text-2xl font-bold mb-2">{agent.name}</div>
@@ -316,7 +318,7 @@ export default function AgentsPage() {
 
         {/* Consensus System */}
         <div className="glass-card">
-          <h2 className="mb-4 text-xl font-semibold">⚖️ Agent Consensus System</h2>
+          <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2"><Scale size={18} aria-hidden="true" /> Agent Consensus System</h2>
           <p className="text-[var(--text-secondary)] mb-6">
             The system combines signals from all agents using weighted voting. A
             minimum of 40% confidence is required for trade execution.

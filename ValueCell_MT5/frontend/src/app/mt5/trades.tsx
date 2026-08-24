@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { CalendarDays, X, Loader2 } from "lucide-react";
+import { CalendarDays, X, Loader2, BarChart3, Briefcase, ClipboardList, TrendingUp } from "lucide-react";
 import {
   createChart,
   type IChartApi,
@@ -2025,8 +2025,8 @@ export default function TradesPage() {
 
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
-              📊
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
+              <BarChart3 size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
             </div>
             <div>
               <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -2099,7 +2099,7 @@ export default function TradesPage() {
           <div className="glass-card mb-8">
             <div className="mb-5">
               <ChartToolbar
-                title={<span className="text-xl font-semibold">📈 XAUUSD {activeTimeframe} Chart</span>}
+                title={<span className="text-xl font-semibold inline-flex items-center gap-2"><TrendingUp size={18} aria-hidden="true" /> XAUUSD {activeTimeframe} Chart</span>}
                 activeTimeframe={activeTimeframe}
                 onTimeframeChange={changeTimeframe}
                 selectedYear={selectedYear}
@@ -2160,7 +2160,7 @@ export default function TradesPage() {
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                 }`}
             >
-              <span>💼</span> Recent Trades
+              <Briefcase size={16} aria-hidden="true" /> Recent Trades
             </button>
             <button
               onClick={() => setActiveBottomTab('monthly-summary')}
@@ -2169,14 +2169,14 @@ export default function TradesPage() {
                 : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                 }`}
             >
-              <span>📋</span> Monthly Summary
+              <ClipboardList size={16} aria-hidden="true" /> Monthly Summary
             </button>
           </div>
 
           {activeBottomTab === 'recent-trades' ? (
             <div className="glass-card">
               <div className="flex justify-between items-center mb-6">
-                <span className="text-xl font-semibold">💼 Recent Trades</span>
+                <span className="text-xl font-semibold inline-flex items-center gap-2"><Briefcase size={18} aria-hidden="true" /> Recent Trades</span>
 
                 {/* Filter Tabs */}
                 <div className="flex gap-2">
@@ -2314,7 +2314,7 @@ export default function TradesPage() {
           ) : (
             <div className="glass-card">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <h2 className="text-xl font-semibold">📋 Monthly Performance Summary</h2>
+                <h2 className="text-xl font-semibold inline-flex items-center gap-2"><ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary</h2>
 
                 {/* Filter Controls (Year Dropdown & Profit/Loss Tabs mixed with glassmorphism) */}
                 <div className="flex flex-wrap items-center gap-3">

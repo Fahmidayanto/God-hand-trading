@@ -31,7 +31,7 @@ export default function MT5Footer() {
         </a>
       </div>
       <div>
-        © 2026 God Hand Trading System • Version 1.0.0 • Built with ✋⚡
+        © 2026 God Hand Trading System • Version 1.0.0 • Built with 
       </div>
     </footer>
   );

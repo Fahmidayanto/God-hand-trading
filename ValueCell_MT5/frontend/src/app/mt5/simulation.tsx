@@ -12,7 +12,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard, ArrowUp, ArrowDown, ArrowUpDown, Ghost, Brain, Newspaper, Shield, Building2, Clock3, AlertTriangle, Bot, Settings, Target, Zap, ClipboardList, Database, FileText } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -545,10 +545,10 @@ interface SimFrame {
 }
 
 const AGENT_PANEL_DEFS = [
-  { key: "market_structure" as const, name: "Market Structure Agent", icon: "🏗️", color: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)" },
-  { key: "ml_prediction" as const, name: "ML Filter Agent", icon: "🧠", color: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)" },
-  { key: "sentiment" as const, name: "Sentiment Agent", icon: "📰", color: "var(--neon-emerald)", bg: "rgba(16,185,129,0.2)" },
-  { key: "risk_management" as const, name: "Risk Manager", icon: "🛡️", color: "var(--neon-amber)", bg: "rgba(251,191,36,0.2)" },
+  { key: "market_structure" as const, name: "Market Structure Agent", icon: Building2, color: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)" },
+  { key: "ml_prediction" as const, name: "ML Filter Agent", icon: Brain, color: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)" },
+  { key: "sentiment" as const, name: "Sentiment Agent", icon: Newspaper, color: "var(--neon-emerald)", bg: "rgba(16,185,129,0.2)" },
+  { key: "risk_management" as const, name: "Risk Manager", icon: Shield, color: "var(--neon-amber)", bg: "rgba(251,191,36,0.2)" },
 ];
 
 // Helper to dynamically resolve CHoCH and BOS cycle count from a chronological event list
@@ -2401,8 +2401,8 @@ export default function SimulationOfDead() {
         style={{ borderColor: "rgba(var(--neon-blue-rgb), 0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
         <div className="flex items-center gap-4">
-          <div className={cn("flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none", isPlaying && "animate-pulse")}>
-            👻
+          <div className={cn("flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none", isPlaying && "animate-pulse")}>
+            <Ghost size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -2692,7 +2692,7 @@ export default function SimulationOfDead() {
             {/* Current Playhead Time */}
             {currentCandle && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/8 border border-purple-500/20 shadow-[0_0_10px_rgba(168,85,247,0.1)] text-xs font-semibold text-purple-300 font-mono">
-                <span>🕒</span>
+                <Clock3 size={12} aria-hidden="true" />
                 <span>{new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")}</span>
               </div>
             )}
@@ -2701,16 +2701,16 @@ export default function SimulationOfDead() {
 
         {/* ── Orchestrator Simulation ── */}
         {simLoading && (
-          <p className="text-sm text-[var(--text-secondary)] mt-2">⏳ Running Orchestrator Simulation…</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-2 flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Running Orchestrator Simulation…</p>
         )}
         {simError && (
-          <div className="mt-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
-            ⚠️ {simError}
+          <div className="mt-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 text-sm flex items-start gap-1.5">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5" aria-hidden="true" /> {simError}
           </div>
         )}
         {simMetrics && simMetrics.total_signals > 0 && (
           <div className="mt-3 p-3 rounded-lg bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)]">
-            <p className="text-sm font-semibold text-[var(--neon-blue)] mb-2">🧠 Orchestrator Simulation</p>
+            <p className="text-sm font-semibold text-[var(--neon-blue)] mb-2 flex items-center gap-1.5"><Brain size={14} aria-hidden="true" /> Orchestrator Simulation</p>
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
               <span>Total signals: <strong className="text-[var(--text-primary)]">{simMetrics.total_signals}</strong></span>
               <span>Win rate: <strong className="text-[var(--text-primary)]">{(simMetrics.win_rate * 100).toFixed(1)}%</strong></span>
@@ -2722,7 +2722,7 @@ export default function SimulationOfDead() {
           </div>
         )}
         {simMetrics && simMetrics.total_signals === 0 && (
-          <p className="text-sm text-[var(--text-secondary)] mt-2">🧠 Orchestrator Simulation: No signals.</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-2 flex items-center gap-1.5"><Brain size={14} aria-hidden="true" /> Orchestrator Simulation: No signals.</p>
         )}
 
         {/* ── Error ── */}
@@ -2738,7 +2738,7 @@ export default function SimulationOfDead() {
             className="flex items-center justify-center flex-col gap-3 text-[var(--text-secondary,#94a3b8)] flex-shrink-0"
             style={{ height: "700px" }}
           >
-            <span className="text-5xl">🎬</span>
+            <Clapperboard size={44} strokeWidth={1.5} aria-hidden="true" className="opacity-70" />
             <p className="text-sm">Pilih rentang tanggal dan klik <strong>Load</strong> untuk memulai replay.</p>
           </div>
         )}
@@ -2798,7 +2798,7 @@ export default function SimulationOfDead() {
         {/* ── Agent Consensus (100% Copy of Dashboard Layout, bound to activeFrame) ── */}
         <div className="glass-card mt-4">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
-            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: 0 }}>🤖 Agent Consensus</h2>
+            <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: 0 }} className="flex items-center gap-2"><Bot size={18} aria-hidden="true" /> Agent Consensus</h2>
             {isFrameLoading && (
               <span className="text-xs text-cyan-400 animate-pulse flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-full">
                 <Loader2 className="size-3 animate-spin" />
@@ -2845,7 +2845,7 @@ export default function SimulationOfDead() {
                         borderColor: isActive ? def.color : 'rgba(71, 85, 105, 0.2)' 
                       }}
                     >
-                      {def.icon}
+                      {def.icon && <def.icon size={16} aria-hidden="true" />}
                     </div>
                     <div className="agent-details">
                       <div className="agent-name font-semibold text-xs text-slate-200">{def.name}</div>
@@ -2919,7 +2919,7 @@ export default function SimulationOfDead() {
             >
               <div className="flex items-center gap-2.5">
                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-                  ⚙️
+                  <Settings size={14} aria-hidden="true" />
                 </span>
                 <span>Strategy Settings & Parameters</span>
               </div>
@@ -2954,7 +2954,7 @@ export default function SimulationOfDead() {
                     {/* Left Column: Trend & Cycle Schema Map */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">🎯 Trend &amp; Cycle Schema Map</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none inline-flex items-center gap-1"><Target size={11} aria-hidden="true" /> Trend &amp; Cycle Schema Map</span>
                       </div>
                       
                       <MarketStructure3DVisualizer
@@ -3157,7 +3157,7 @@ export default function SimulationOfDead() {
                     <div className="space-y-4">
                       <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none flex items-center gap-1">
-                          🛡️ Veto Mode &amp; Consensus Map
+                          <Shield size={13} className="inline shrink-0" aria-hidden="true" /> Veto Mode &amp; Consensus Map
                           <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R &gt;= 1.35. No Veto -> Mengikuti voting demokratis." />
                         </span>
                       </div>
@@ -3291,7 +3291,7 @@ export default function SimulationOfDead() {
           <div className="glass-card flex-shrink-0">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
-              ⚡ Daftar Posisi
+              <Zap size={14} className="inline shrink-0" aria-hidden="true" /> Daftar Posisi
             </h2>
 
             {activePositions.length === 0 ? (
@@ -3473,7 +3473,7 @@ export default function SimulationOfDead() {
         {/* ── Monthly Summary Section (100% Identical to trades.tsx) ── */}
         <div className="glass-card mt-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h2 className="text-xl font-semibold">📋 Monthly Performance Summary</h2>
+            <h2 className="text-xl font-semibold inline-flex items-center gap-2"><ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary</h2>
 
             {/* Filter Controls */}
             <div className="flex flex-wrap items-center gap-3">
@@ -3612,23 +3612,13 @@ export default function SimulationOfDead() {
       {/* Progress popup for Loading Replay Data */}
       {loadProgress.visible && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-auto">
-          {/* Radial Gradient Ambient Pulse Lapis 1 */}
-          <div 
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-[28px] animate-in fade-in duration-700" 
-            style={{ 
-              backgroundImage: "radial-gradient(circle at 50% 50%, rgba(15, 23, 42, 0.7) 0%, rgba(8, 8, 8, 0.85) 100%)",
-              animation: "ambientPulse 8s ease-in-out infinite alternate" 
-            }} 
-          />
-          
+          {/* Backdrop Blur Saja - UI Ghost Engine Tetap Terlihat */}
+          <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-xl animate-in fade-in duration-700" />
+
           <style>{`
             @keyframes floatGhost {
               0%, 100% { transform: translateY(0px) rotate(0deg) scale(1); }
               50% { transform: translateY(-10px) rotate(4deg) scale(1.02); }
-            }
-            @keyframes ambientPulse {
-              0% { background-color: rgba(8, 8, 8, 0.8); }
-              100% { background-color: rgba(15, 23, 42, 0.85); }
             }
           `}</style>
 
@@ -3838,7 +3828,7 @@ export default function SimulationOfDead() {
                   className="p-2.5 rounded-xl text-lg border"
                   style={{ background: selectedAgent.bg, borderColor: selectedAgent.color }}
                 >
-                  {selectedAgent.icon}
+                  {selectedAgent.icon && <selectedAgent.icon size={18} aria-hidden="true" />}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-100 tracking-tight">
@@ -3898,7 +3888,7 @@ export default function SimulationOfDead() {
               {/* Specific Metadata Panel (e.g. LanceDB Pattern Matching for Market Structure) */}
               {selectedAgent.meta && (selectedAgent.meta.win_rate !== undefined || selectedAgent.meta.pattern_count !== undefined) && (
                 <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-4">
-                  <h4 className="text-sm font-semibold text-slate-300">📊 Database LanceDB Pattern Matching</h4>
+                  <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Database size={14} aria-hidden="true" /> Database LanceDB Pattern Matching</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-slate-400">Pola Serupa Terdeteksi</div>
@@ -4106,7 +4096,7 @@ export default function SimulationOfDead() {
                   {/* News Headlines */}
                   <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
                     <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                      📰 Berita Utama Pasar (Generasi LLM)
+                      <Newspaper size={13} aria-hidden="true" /> Berita Utama Pasar (Generasi LLM)
                     </h4>
                     {activeFrame.debug_news && activeFrame.debug_news.length > 0 ? (
                       <div className="space-y-2.5">
@@ -4131,7 +4121,7 @@ export default function SimulationOfDead() {
                   {/* Calendar Events */}
                   <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
                     <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                      📅 Jadwal Rilis Data Ekonomi (Generasi LLM)
+                      <CalendarDays size={14} aria-hidden="true" /> Jadwal Rilis Data Ekonomi (Generasi LLM)
                     </h4>
                     {activeFrame.debug_events && activeFrame.debug_events.length > 0 ? (
                       <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/40 text-xs">
@@ -4180,7 +4170,7 @@ export default function SimulationOfDead() {
 
               {/* Reasoning Block */}
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-slate-300">📝 Analisis & Rationale (Reasoning)</h4>
+                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><FileText size={14} aria-hidden="true" /> Analisis & Rationale (Reasoning)</h4>
                 <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 text-sm text-slate-300 leading-relaxed font-sans min-h-[100px] whitespace-pre-wrap">
                   {selectedAgent.reasoning || "Tidak ada rincian analisis dari agen."}
                 </div>

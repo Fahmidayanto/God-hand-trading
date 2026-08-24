@@ -7,6 +7,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
+import { BatteryCharging, Loader2, PenLine } from "lucide-react";
 import Particles from "@tsparticles/react";
 import { useRongsokanMarketStructureLines, useSessionZones, useRongsokanBacktestTrades, useRongsokanChartData, type BacktestTrade } from "@/api/mt5_agents";
 import {
@@ -1794,7 +1795,7 @@ export default function RongsokanPage() {
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none">
-              🔋
+              <BatteryCharging size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
             </div>
             <div>
               <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -1855,7 +1856,7 @@ export default function RongsokanPage() {
           <div className="glass-card mb-8">
             <div className="mb-5">
               <ChartToolbar
-                title={<span className="text-xl font-semibold">🔋 XAUUSD {activeTimeframe} Chart</span>}
+                title={<span className="text-xl font-semibold"><BatteryCharging size={26} aria-hidden="true" className="text-[var(--text-primary)]" /> XAUUSD {activeTimeframe} Chart</span>}
                 activeTimeframe={activeTimeframe}
                 onTimeframeChange={handleTimeframeChange}
                 selectedYear={selectedYear}
@@ -1920,7 +1921,7 @@ export default function RongsokanPage() {
           <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
             <div className="text-center mb-4">
               <div className="text-purple-300 font-semibold text-sm mb-2">
-                📅 Loading Full History
+                <Loader2 size={14} className="inline animate-spin shrink-0" aria-hidden="true" />  Loading Full History
               </div>
               <div className="text-3xl font-bold text-white mb-1">
                 {loadProgress.percent}%
@@ -1946,7 +1947,7 @@ export default function RongsokanPage() {
           <div className="bg-gray-900 border border-cyan-500/30 rounded-xl p-6 shadow-2xl w-96">
             <div className="text-center mb-4">
               <div className="text-cyan-300 font-semibold text-sm mb-2">
-                ✍️ Drawing Structure Lines
+                <PenLine size={14} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Drawing Structure Lines
               </div>
               <div className="text-3xl font-bold text-white mb-1">
                 {drawLineProgress.percent}%

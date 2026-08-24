@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Building2, Clock3, TrendingUp, BarChart3, CalendarDays, RefreshCw, Globe, Landmark, Monitor } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ChartToolbarProps {
@@ -64,10 +66,10 @@ const ACCENT_CYCLE: AccentKey[] = ["purple", "cyan", "blue", "amber", "emerald",
 
 const timeframes = ["M1", "M15", "M30", "H1", "H4", "D1"];
 
-const timezoneOptions: Array<{ value: "utc" | "broker" | "local"; label: string; icon: string }> = [
-  { value: "utc", label: "UTC", icon: "🌐" },
-  { value: "broker", label: "Broker", icon: "🏦" },
-  { value: "local", label: "Local", icon: "🖥️" },
+const timezoneOptions: Array<{ value: "utc" | "broker" | "local"; label: string; icon: LucideIcon }> = [
+  { value: "utc", label: "UTC", icon: Globe },
+  { value: "broker", label: "Broker", icon: Landmark },
+  { value: "local", label: "Local", icon: Monitor },
 ];
 
 function activeButtonStyle(accent: AccentKey) {
@@ -250,7 +252,7 @@ export default function ChartToolbar({
             style={activeButtonStyle("blue")}
             data-accent="blue"
           >
-            <span>{activeTimezoneLabel.icon}</span>
+            <activeTimezoneLabel.icon size={13} aria-hidden="true" />
             <span>{activeTimezoneLabel.label}</span>
             <span className="ml-0.5">▾</span>
           </button>
@@ -269,7 +271,7 @@ export default function ChartToolbar({
                   style={active ? activeItemStyle(accent) : undefined}
                   data-accent={accent}
                 >
-                  <span>{tz.icon}</span>
+                  <tz.icon size={13} aria-hidden="true" />
                   <span>{tz.label}</span>
                 </div>
               );
@@ -299,7 +301,7 @@ export default function ChartToolbar({
               style={showStructure ? activeItemStyle("purple") : undefined}
               data-accent="purple"
             >
-              <span>🏗️</span>
+              <Building2 size={13} aria-hidden="true" />
               <span>Structure</span>
               {structureLines?.total_points != null && (
                 <span className={cn("text-[10px] font-semibold ml-auto", showStructure ? "text-white/70" : "text-[var(--text-tertiary)]")}>
@@ -317,7 +319,7 @@ export default function ChartToolbar({
               style={showSessions ? activeItemStyle("cyan") : undefined}
               data-accent="cyan"
             >
-              <span>🕒</span>
+              <Clock3 size={13} aria-hidden="true" />
               <span>Sessions</span>
               {sessionZonesData?.total_zones != null && (
                 <span className={cn("text-[10px] font-semibold ml-auto", showSessions ? "text-white/70" : "text-[var(--text-tertiary)]")}>
@@ -335,7 +337,7 @@ export default function ChartToolbar({
               style={showEMA200 ? activeItemStyle("amber") : undefined}
               data-accent="amber"
             >
-              <span>📈</span>
+              <TrendingUp size={13} aria-hidden="true" />
               <span>EMA 200</span>
             </div>
 
@@ -348,7 +350,7 @@ export default function ChartToolbar({
               style={showTrades ? activeItemStyle("blue") : undefined}
               data-accent="blue"
             >
-              <span>📊</span>
+              <BarChart3 size={13} aria-hidden="true" />
               <span>Trades</span>
               {backtestTradesData?.total_trades != null && (
                 <span className={cn("text-[10px] font-semibold ml-auto", showTrades ? "text-white/70" : "text-[var(--text-tertiary)]")}>
@@ -365,7 +367,7 @@ export default function ChartToolbar({
               className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs text-[var(--text-secondary)] transition-all cursor-pointer hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
               data-accent="emerald"
             >
-              <span>🔄</span>
+              <RefreshCw size={13} aria-hidden="true" />
               <span>Refresh data</span>
             </div>
 
@@ -380,7 +382,7 @@ export default function ChartToolbar({
               )}
               data-accent="ruby"
             >
-              <span>📅</span>
+              <CalendarDays size={13} aria-hidden="true" />
               <span>Load full history</span>
               {isFullHistoryLoaded && (
                 <span className="ml-auto text-[10px] font-semibold text-cyan-400/80 uppercase tracking-wider">Aktif</span>

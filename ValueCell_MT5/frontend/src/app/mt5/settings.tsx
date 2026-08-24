@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Settings, SlidersHorizontal, Plug, Palette, Bell, AlertTriangle } from "lucide-react";
 import Particles from "@tsparticles/react";
 import MT5Footer from "./components/MT5Footer";
 
@@ -187,7 +188,7 @@ export default function SettingsPage() {
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
-            ⚙️
+            <Settings size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -202,7 +203,7 @@ export default function SettingsPage() {
         <div className="grid grid-cols-2 gap-6">
           {/* Trading Parameters */}
           <div className="glass-card">
-            <h2 className="mb-5 text-xl font-semibold">💼 Trading Parameters</h2>
+            <h2 className="mb-5 text-xl font-semibold"><SlidersHorizontal size={18} aria-hidden="true" className="inline shrink-0" /> Trading Parameters</h2>
 
             <div className="py-5 border-b border-[rgba(100,116,139,0.1)]">
               <div className="flex justify-between items-center mb-2">
@@ -313,7 +314,7 @@ export default function SettingsPage() {
 
           {/* MT5 Configuration */}
           <div className="glass-card">
-            <h2 className="mb-5 text-xl font-semibold">🔌 MT5 Connection</h2>
+            <h2 className="mb-5 text-xl font-semibold"><Plug size={18} aria-hidden="true" className="inline shrink-0" /> MT5 Connection</h2>
 
             <div className="py-5 border-b border-[rgba(100,116,139,0.1)]">
               <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-3">
@@ -393,7 +394,7 @@ export default function SettingsPage() {
 
           {/* Appearance */}
           <div className="glass-card">
-            <h2 className="mb-5 text-xl font-semibold">🎨 Appearance</h2>
+            <h2 className="mb-5 text-xl font-semibold"><Palette size={18} aria-hidden="true" className="inline shrink-0" /> Appearance</h2>
 
             <div className="py-5 border-b border-[rgba(100,116,139,0.1)]">
               <div className="text-[15px] font-semibold text-[var(--text-primary)] mb-3">
@@ -494,7 +495,7 @@ export default function SettingsPage() {
 
           {/* Notifications */}
           <div className="glass-card">
-            <h2 className="mb-5 text-xl font-semibold">🔔 Notifications</h2>
+            <h2 className="mb-5 text-xl font-semibold"><Bell size={18} aria-hidden="true" className="inline shrink-0" /> Notifications</h2>
 
             <div className="py-5 border-b border-[rgba(100,116,139,0.1)]">
               <div className="flex justify-between items-center">
@@ -618,7 +619,7 @@ export default function SettingsPage() {
         {/* Danger Zone */}
         <div className="glass-card mt-6 !border-[rgba(239,68,68,0.3)]">
           <h2 className="mb-4 text-xl font-semibold text-[var(--neon-ruby)]">
-            ⚠️ Danger Zone
+            <AlertTriangle size={20} aria-hidden="true" className="inline shrink-0 text-[var(--neon-ruby)]" /> Danger Zone
           </h2>
           <div className="flex justify-between items-center">
             <div>

@@ -10,7 +10,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors, Clapperboard, MapPin, Shield, Clock3, Move, Zap, Bot, Brain, Lightbulb, Check, BarChart3, Package, Wallet, Tag, Scale, ClipboardList, AlertTriangle } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -592,7 +592,7 @@ function EntryToggle({
         <div className="text-xs font-semibold text-slate-200">{label}</div>
         {description && <div className="mt-0.5 text-[10px] text-slate-500">{description}</div>}
         {disabled && disabledReason && (
-          <div className="mt-0.5 text-[9px] text-amber-400/80">⚠️ {disabledReason}</div>
+          <div className="mt-0.5 text-[9px] text-amber-400/80"><AlertTriangle size={10} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" /> {disabledReason}</div>
         )}
       </div>
       <button
@@ -1105,7 +1105,7 @@ export function calculateLiquidityPools(
       }
     }
 
-    const labelPrefix = hasEqualLevel ? (isHigh ? "🎯 EQH" : "🎯 EQL") : (isHigh ? "🎯 BSL" : "🎯 SSL");
+    const labelPrefix = hasEqualLevel ? (isHigh ? "EQH" : "EQL") : (isHigh ? "BSL" : "SSL");
     rawPools.push({
       id: `${poolType}-${startTime}-${price.toFixed(2)}`,
       type: poolType,
@@ -1905,7 +1905,7 @@ export default function ReplayTrades() {
   const [selectedRrRatio, setSelectedRrRatio] = useState<number>(2.0);
   const [activePlanner, setActivePlanner] = useState<PositionPlanner | null>(null);
 
-  // ── Cut / Jump to Bar Replay (TradingView Bar Replay ✂️)
+  // ── Cut / Jump to Bar Replay (TradingView Bar Replay )
   const [isCutMode, setIsCutMode] = useState<boolean>(false);
   const [cutHoverInfo, setCutHoverInfo] = useState<{
     x: number;
@@ -4315,7 +4315,7 @@ export default function ReplayTrades() {
       >
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
           <div className="flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-lg sm:text-xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-cyan-rgb),0.15)] select-none">
-            🎬
+            <Clapperboard size={18} strokeWidth={1.8} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-lg sm:text-xl font-bold text-[var(--text-primary)] leading-none mb-0.5 whitespace-nowrap">
@@ -4334,13 +4334,13 @@ export default function ReplayTrades() {
             <>
               {/* Playback Control Deck */}
               <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
-                {/* Jump / Cut to Bar (TradingView Bar Replay ✂️) */}
+                {/* Jump / Cut to Bar (TradingView Bar Replay ) */}
                 <button
                   onClick={() => {
                     setIsCutMode((prev) => !prev);
                     if (plannerTool !== "none") setPlannerTool("none");
                   }}
-                  title="Jump to Bar (TradingView ✂️) - Klik candle di chart untuk memotong replay ke titik tersebut"
+                  title="Jump to Bar (TradingView ) - Klik candle di chart untuk memotong replay ke titik tersebut"
                   className={cn(
                     "flex items-center gap-1 px-2 py-1 rounded-lg font-semibold text-xs transition-all duration-150 active:scale-95 cursor-pointer border select-none",
                     isCutMode
@@ -4403,7 +4403,7 @@ export default function ReplayTrades() {
                   value={speed}
                   onChange={(val) => setSpeed(val as any)}
                   options={["1x", "2x", "3x", "5x", "10x", "50x", "100x", "1000x"]}
-                  getLabel={(s) => `⚡ ${s}`}
+                  getLabel={(s) => `${s}`}
                   accent="cyan"
                   className="w-20 text-xs"
                 />
@@ -4626,7 +4626,7 @@ export default function ReplayTrades() {
             className="flex items-center justify-center flex-col gap-3 text-[var(--text-secondary,#94a3b8)] flex-shrink-0"
             style={{ height: "790px" }}
           >
-            <span className="text-5xl">🎬</span>
+            <Clapperboard size={44} strokeWidth={1.5} aria-hidden="true" className="opacity-70 mx-auto" />
             <p className="text-sm">Pilih rentang tanggal dan klik <strong>Load</strong> untuk memulai replay.</p>
           </div>
         )}
@@ -4730,7 +4730,7 @@ export default function ReplayTrades() {
               <span>Short</span>
             </button>
 
-            {/* Jump to Bar (TradingView Bar Replay ✂️) */}
+            {/* Jump to Bar (TradingView Bar Replay ) */}
             <button
               type="button"
               id="btn-cut-tool"
@@ -4738,7 +4738,7 @@ export default function ReplayTrades() {
                 setIsCutMode((prev) => !prev);
                 if (plannerTool !== "none") setPlannerTool("none");
               }}
-              title="Jump to Bar (TradingView ✂️) - Klik candle di chart untuk memotong & melompat ke waktu tersebut"
+              title="Jump to Bar (TradingView ) - Klik candle di chart untuk memotong & melompat ke waktu tersebut"
               className={cn(
                 "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all cursor-pointer",
                 isCutMode
@@ -4921,7 +4921,7 @@ export default function ReplayTrades() {
                       title="Set Entry ke harga candle replay saat ini"
                       className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-cyan-400 hover:bg-slate-700 cursor-pointer"
                     >
-                      📍 Candle
+                      <MapPin size={9} className="inline mr-0.5 -mt-px" aria-hidden="true" />Candle
                     </button>
                   )}
                 </div>
@@ -5216,7 +5216,7 @@ export default function ReplayTrades() {
               {dragMode === "tp" || hoveredDragTarget === "tp" ? (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5 text-emerald-400">
-                    <span>🎯 Target TP:</span>
+                    <Target size={11} className="inline mr-0.5 -mt-px" aria-hidden="true" /><span>Target TP:</span>
                     <span className="text-white font-bold">{activePlanner.tpPrice.toFixed(2)}</span>
                     <span className="text-emerald-400/80 font-normal text-[11px]">
                       (+{(Math.abs(activePlanner.tpPrice - activePlanner.entryPrice) * 10).toFixed(1)} pips)
@@ -5239,7 +5239,7 @@ export default function ReplayTrades() {
               ) : dragMode === "sl" || hoveredDragTarget === "sl" ? (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5 text-rose-400">
-                    <span>🛡️ Stop Loss:</span>
+                    <Shield size={11} className="inline mr-0.5 -mt-px" aria-hidden="true" /><span>Stop Loss:</span>
                     <span className="text-white font-bold">{activePlanner.slPrice.toFixed(2)}</span>
                     <span className="text-rose-400/80 font-normal text-[11px]">
                       (-{(Math.abs(activePlanner.entryPrice - activePlanner.slPrice) * 10).toFixed(1)} pips)
@@ -5262,7 +5262,7 @@ export default function ReplayTrades() {
               ) : dragMode === "width" || hoveredDragTarget === "width" ? (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5 text-violet-400">
-                    <span>⏱️ Lebar Waktu:</span>
+                    <Clock3 size={11} className="inline mr-0.5 -mt-px" aria-hidden="true" /><span>Lebar Waktu:</span>
                     <span className="text-white font-bold">{activePlanner.durationBars || 15} Candle M15</span>
                   </div>
                   <div className="h-3.5 w-px bg-slate-700" />
@@ -5274,7 +5274,7 @@ export default function ReplayTrades() {
               ) : dragMode === "move" || hoveredDragTarget === "move" ? (
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-1.5 text-cyan-400">
-                    <span>✢ Pindah Posisi Bebas:</span>
+                    <Move size={11} className="inline mr-0.5 -mt-px" aria-hidden="true" /><span>Pindah Posisi Bebas:</span>
                     <span className="text-white font-bold">${activePlanner.entryPrice.toFixed(2)}</span>
                   </div>
                   <div className="h-3.5 w-px bg-slate-700" />
@@ -5284,7 +5284,7 @@ export default function ReplayTrades() {
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 text-cyan-400">
-                  <span className="text-xs">📍 Entry Level:</span>
+                  <span className="text-xs"><MapPin size={11} className="inline mr-0.5 -mt-px" aria-hidden="true" />Entry Level:</span>
                   <span className="text-white font-bold">{activePlanner.entryPrice.toFixed(2)}</span>
                 </div>
               )}
@@ -5310,7 +5310,7 @@ export default function ReplayTrades() {
 
                 {/* Bottom Instruction Pill */}
                 <div className="absolute bottom-6 -translate-x-1/2 px-3 py-1 rounded-md bg-amber-950/90 border border-amber-500/80 text-[11px] text-amber-200 font-sans font-semibold shadow-lg whitespace-nowrap">
-                  ✂️ Klik untuk memotong replay ke titik ini (Esc untuk batal)
+                  <Scissors size={11} className="inline mr-1 -mt-px" aria-hidden="true" />Klik untuk memotong replay ke titik ini (Esc untuk batal)
                 </div>
               </div>
             </div>
@@ -5347,7 +5347,7 @@ export default function ReplayTrades() {
           <div className="glass-card flex-shrink-0">
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
-              ⚡ Daftar Posisi
+              <Zap size={14} className="inline shrink-0" aria-hidden="true" /> Daftar Posisi
               {activePositions.length > 0 && (
                 <span className="ml-auto text-xs font-normal text-slate-400">
                   <span className="text-cyan-400 font-semibold">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
@@ -5364,7 +5364,7 @@ export default function ReplayTrades() {
               <div className="mb-4 rounded-xl border border-purple-500/40 bg-gradient-to-br from-purple-950/40 via-slate-950/80 to-purple-900/15 p-4 shadow-lg backdrop-blur-md">
                 <div className="flex items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
                   <div className="flex items-center gap-2 text-sm font-bold text-purple-300">
-                    <span className="text-base">🤖</span>
+                    <Bot size={15} aria-hidden="true" />
                     <span>LLM Trade Setup ({decisionEngine === "llm" ? "7-Step Reasoning" : "CHoCH & BOS"})</span>
                     {llmRecommendation?.cycle_stage && (
                       <span className={cn(
@@ -5409,7 +5409,7 @@ export default function ReplayTrades() {
                       onClick={() => (decisionEngine === "llm" ? requestDecisionSetup() : requestLLMSetup())}
                       className="rounded-md border border-purple-500/40 bg-purple-500/20 px-3.5 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/30 transition-all cursor-pointer shadow-sm"
                     >
-                      🧠 Analisis Sekarang (LLM)
+                      <Brain size={13} className="inline mr-1 -mt-px" aria-hidden="true" />Analisis Sekarang (LLM)
                     </button>
                   </div>
                 )}
@@ -5478,7 +5478,7 @@ export default function ReplayTrades() {
                         return (
                           <div className="rounded-lg border border-purple-500/30 bg-slate-950/95 p-3 text-xs leading-relaxed text-slate-200 shadow-sm">
                             <div className="font-bold text-purple-300 flex items-center gap-1.5 mb-1.5 pb-1 border-b border-slate-800/80 text-xs">
-                              <span>💡</span> Analisis & Pertimbangan AI:
+                              <Lightbulb size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" /> Analisis & Pertimbangan AI:
                             </div>
                             <div className="whitespace-pre-line text-slate-300 font-sans leading-relaxed text-[11px] space-y-1">
                               {reasoningStr}
@@ -5495,7 +5495,7 @@ export default function ReplayTrades() {
                             onClick={() => rejectLLMSetup(llmRecommendation.reasoning || `Ditolak oleh LLM (${sigUpper})`)}
                             className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-colors cursor-pointer active:scale-95"
                           >
-                            <span>✓</span>
+                            <Check size={12} className="inline shrink-0" aria-hidden="true" />
                             <span>Pahami Keputusan ({sigUpper} - Stand Aside)</span>
                           </button>
                         ) : (
@@ -5505,7 +5505,7 @@ export default function ReplayTrades() {
                               onClick={executeLLMSetup}
                               className="flex items-center gap-1.5 rounded-lg border border-emerald-500/60 bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition-all cursor-pointer shadow-sm active:scale-95"
                             >
-                              <span>✓</span>
+                              <Check size={12} className="inline shrink-0" aria-hidden="true" />
                               <span>Eksekusi Trade ({sigUpper})</span>
                             </button>
                             <button
@@ -5513,7 +5513,7 @@ export default function ReplayTrades() {
                               onClick={() => rejectLLMSetup("Ditolak oleh User")}
                               className="flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/25 transition-all cursor-pointer active:scale-95"
                             >
-                              <span>✗</span>
+                              <X size={12} className="inline shrink-0" aria-hidden="true" />
                               <span>Tolak Setup</span>
                             </button>
                           </>
@@ -5789,7 +5789,7 @@ export default function ReplayTrades() {
                         <tr>
                           <td colSpan={4} className="py-3 px-4 text-left font-bold text-slate-300">
                             <div className="flex items-center gap-2">
-                              <span className="text-cyan-400">📊 TOTAL REKAPITULASI:</span>
+                              <span className="text-cyan-400"><BarChart3 size={12} className="inline mr-1 -mt-px" aria-hidden="true" />TOTAL REKAPITULASI:</span>
                               <span className="text-[11px] font-normal text-slate-400">
                                 ({executedPositions.length} Dieksekusi · {rejectedPositions.length} Ditolak)
                               </span>
@@ -5839,7 +5839,7 @@ export default function ReplayTrades() {
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      🎯 Total Posisi
+                      <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Total Posisi
                     </div>
                     <div className="flex items-baseline gap-1.5 font-bold text-lg text-white font-mono">
                       <span>{activePositions.length}</span>
@@ -5862,7 +5862,7 @@ export default function ReplayTrades() {
 
                   <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      📊 Win Rate
+                      <BarChart3 size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Win Rate
                     </div>
                     <div className="flex items-baseline gap-1.5 font-bold text-lg text-emerald-400 font-mono">
                       <span>{winRate}%</span>
@@ -5874,7 +5874,7 @@ export default function ReplayTrades() {
 
                   <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      📦 Volume Lot
+                      <Package size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Volume Lot
                     </div>
                     <div className="flex items-baseline gap-1.5 font-bold text-lg text-cyan-300 font-mono">
                       <span>{totalLots.toFixed(2)}</span>
@@ -5892,7 +5892,7 @@ export default function ReplayTrades() {
                       : "border-rose-500/30 bg-rose-950/20"
                   )}>
                     <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      💰 Total Net Profit
+                      <Wallet size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Total Net Profit
                     </div>
                     <div className={cn(
                       "flex items-baseline gap-1.5 font-bold text-lg font-mono",
@@ -6035,13 +6035,13 @@ export default function ReplayTrades() {
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, session_filter: !prev.session_filter }))}
                       />
                       <EntryToggle
-                        label="🛡️ EMA Stretch Filter"
+                        label=" EMA Stretch Filter"
                         description="Peringatkan/HOLD jika jarak harga >3.5x ATR dari M15 EMA200"
                         checked={entryFilterParams.ema_stretch_filter}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_stretch_filter: !prev.ema_stretch_filter }))}
                       />
                       <EntryToggle
-                        label="🛡️ BOS Cycle Stage Filter"
+                        label=" BOS Cycle Stage Filter"
                         description="Peringatkan/HOLD jika sudah mencapai BOS ke-4+ berturut-turut tanpa pullback"
                         checked={entryFilterParams.bos_cycle_filter}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, bos_cycle_filter: !prev.bos_cycle_filter }))}
@@ -6054,7 +6054,7 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-cyan-300">
-                            ⚙️ SmartRule Engine
+                            <Settings size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />SmartRule Engine
                             <StrategyTooltip
                               fungsi="Menggunakan aturan baku Smart Money Concepts (SMC) dan filter teknikal deterministik secara instan tanpa memanggil AI."
                               contoh="Entry otomatis dievaluasi berdasarkan break struktur CHoCH/BOS dan filter EMA200."
@@ -6089,7 +6089,7 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🧠 LLM 7-Step Reasoning
+                            <Brain size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />LLM 7-Step Reasoning
                             <StrategyTooltip
                               fungsi="AI melakukan analisis kontekstual mendalam melalui 7 tahapan: Regime, Structure, Catalyst, Risk Asymmetry, Path Dependency, Decision, & Invalidation."
                               contoh="Menganalisis multi-timeframe M15/H1/H4 dan memberikan justifikasi komprehensif sebelum merumuskan trade setup."
@@ -6124,10 +6124,10 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🤖 Gunakan LLM untuk SL/TP/Lot
+                            <Bot size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Gunakan LLM untuk SL/TP/Lot
                             <StrategyTooltip
                               fungsi="Saat terdeteksi struktur CHoCH atau BOS, AI langsung menganalisis dan memunculkan kartu rekomendasi setup posisi (Signal, SL, TP, & Lot) di Daftar Posisi dengan tombol Eksekusi dan Tolak."
-                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik '✓ Eksekusi' untuk membuka posisi atau '✗ Tolak'."
+                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik 'Eksekusi' untuk membuka posisi atau 'Tolak'."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6167,7 +6167,7 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-purple-300">
-                            🏷️ Visual Supply &amp; Demand
+                            <Tag size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual Supply &amp; Demand
                             <StrategyTooltip
                               fungsi="Menampilkan zona Order Block / Resistance (Ungu) dan Support (Emas) berdasarkan struktur pasar secara visual di grafik tanpa bertubrukan dengan warna SL (Merah) dan TP (Hijau)."
                               contoh="Puncak swing high membentuk kotak Ungu Supply Zone. Lembah swing low membentuk kotak Emas Demand Zone."
@@ -6208,10 +6208,10 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-sky-300">
-                            🎯 Visual Liquidity Pools (BSL / SSL)
+                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual Liquidity Pools (BSL / SSL)
                             <StrategyTooltip
                               fungsi="Menampilkan garis level likuiditas Buy-Side (Cyan / Equal Highs) dan Sell-Side (Orange / Equal Lows) tempat target perburuan likuiditas dan Stop Loss pasar terkumpul."
-                              contoh="Garis Cyan 🎯 BSL di atas puncak swing high. Garis Orange 🎯 SSL di bawah lembah swing low. Garis otomatis berubah menjadi (Swept) jika telah tertembus harga."
+                              contoh="Garis Cyan BSL di atas puncak swing high. Garis Orange SSL di bawah lembah swing low. Garis otomatis berubah menjadi (Swept) jika telah tertembus harga."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6674,7 +6674,7 @@ export default function ReplayTrades() {
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
                           <div className="flex items-center text-xs font-semibold text-emerald-300">
-                            ⚖️ Price-Ratio Dynamic Scaling (Opsi 1)
+                            <Scale size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Price-Ratio Dynamic Scaling (Opsi 1)
                             <StrategyTooltip
                               fungsi="Menyesuaikan jarak SL, TP, buffer ayunan struktur, dan ukuran lot secara proporsional dari harga patokan dasar (mis. 2000 USD). Menjaga risiko dolar ($) tetap konstan di semua era harga Gold (1000 vs 2000 vs 5000 USD) tanpa lagging indikator."
                               contoh="Harga Emas $5000 (2.5x dari $2000) → SL & TP otomatis melebar 2.5x ($75), lot mengecil dari 0.05 ke 0.02 → Total risiko kerugian tetap konstan $150 USD."
@@ -6736,7 +6736,7 @@ export default function ReplayTrades() {
                           <div className="mt-1 mb-3 rounded-xl border border-cyan-500/25 bg-cyan-950/20 p-2.5">
                             <div className="mb-2 flex items-center justify-between">
                               <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                                <span>⚡</span> Quick Presets Range Emas (Data Teruji)
+                                <Zap size={13} className="inline mr-1 -mt-px" aria-hidden="true" />Quick Presets Range Emas (Data Teruji)
                               </span>
                               <span className="text-[9px] text-slate-400">Auto-fill SL, TP &amp; Lot</span>
                             </div>
@@ -6800,7 +6800,7 @@ export default function ReplayTrades() {
                                   buf: 20,
                                   trig: 20,
                                   exp: 40,
-                                  badge: "⭐ +15.3k$",
+                                  badge: " +15.3k$",
                                 },
                               ].map((preset) => {
                                 const isCurrent = strategyParams.base_reference_price === preset.base &&
@@ -6992,7 +6992,7 @@ export default function ReplayTrades() {
         {/* ── Monthly Summary Section (100% Identical to trades.tsx) ── */}
         <div className="glass-card mt-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-            <h2 className="text-xl font-semibold">📋 Monthly Performance Summary</h2>
+            <h2 className="text-xl font-semibold inline-flex items-center gap-2"><ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary</h2>
 
             {/* Filter Controls */}
             <div className="flex flex-wrap items-center gap-3">
@@ -7180,7 +7180,7 @@ export default function ReplayTrades() {
           <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
             <div className="text-center mb-4">
               <div className="text-purple-300 font-semibold text-sm mb-2">
-                📅 Loading Replay Data
+                <Loader2 size={14} className="inline animate-spin mr-1.5 -mt-0.5" aria-hidden="true" />Loading Replay Data
               </div>
               <div className="text-3xl font-bold text-white mb-1">
                 {loadProgress.percent}%

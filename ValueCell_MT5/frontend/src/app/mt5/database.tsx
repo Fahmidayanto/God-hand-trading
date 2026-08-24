@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Loader2, Database as DatabaseIcon, Zap, RefreshCw, Search, TableProperties, Layers, Hash, Info, ListFilter, AlertTriangle } from "lucide-react";
+import { Loader2, Database as DatabaseIcon, Zap, RefreshCw, Search, TableProperties, Layers, Hash, Info, ListFilter, AlertTriangle, CheckCircle2 } from "lucide-react";
 
 interface Stats {
   neon_stats: {
@@ -382,8 +382,8 @@ export default function Database() {
       <div className="px-12 py-8 text-slate-200">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
-            💾
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
+            <DatabaseIcon size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -546,7 +546,7 @@ export default function Database() {
           {/* Data Grid */}
           <div className="bg-[rgba(15,23,42,0.45)] border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.03),_0_20px_50px_rgba(0,0,0,0.5)]">
             {loading && <div className="p-8 text-center text-slate-400">Loading data from NeonDB...</div>}
-            {error && <div className="p-8 text-center text-red-400 font-medium">⚠️ Error: {error}</div>}
+            {error && <div className="p-8 text-center text-red-400 font-medium inline-flex items-center justify-center gap-1.5 w-full"><AlertTriangle size={14} aria-hidden="true" /> Error: {error}</div>}
             {!loading && !error && previewData && (
               <div className="overflow-auto max-h-[500px] db-inspector-scroll">
                 <table className="w-full border-collapse text-sm text-left">
@@ -748,7 +748,7 @@ export default function Database() {
                   <div className="p-8 text-center text-slate-400">Loading data from LanceDB...</div>
                 )}
                 {lanceError && (
-                  <div className="p-8 text-center text-red-400 font-medium">⚠️ Error: {lanceError}</div>
+                  <div className="p-8 text-center text-red-400 font-medium inline-flex items-center justify-center gap-1.5 w-full"><AlertTriangle size={14} aria-hidden="true" /> Error: {lanceError}</div>
                 )}
                 {!lanceLoading && !lanceError && lancePreviewData && (
                   <div className="overflow-auto max-h-[500px] db-inspector-scroll">
@@ -1022,7 +1022,7 @@ export default function Database() {
                   {/* Summary Banner */}
                   {diffData.type === "csv_extra" && (
                     <div className="bg-amber-500/10 border border-amber-500/20 text-amber-300 p-4 rounded-xl text-sm flex flex-col gap-1">
-                      <span className="font-bold">⚠️ Temuan Selisih: Data Baru di CSV</span>
+                      <span className="font-bold inline-flex items-center gap-1.5"><AlertTriangle size={14} aria-hidden="true" /> Temuan Selisih: Data Baru di CSV</span>
                       <span>
                         Terdapat <strong>{diffData.count.toLocaleString()} baris</strong> yang hanya ada di CSV dan tidak ada di NeonDB. Tabel di bawah hanya menampilkan selisih tersebut:
                       </span>
@@ -1030,7 +1030,7 @@ export default function Database() {
                   )}
                   {diffData.type === "db_extra" && (
                     <div className="bg-blue-500/10 border border-blue-500/20 text-blue-300 p-4 rounded-xl text-sm flex flex-col gap-1">
-                      <span className="font-bold">ℹ️ Temuan Selisih: Data Lebih Banyak di Database</span>
+                      <span className="font-bold inline-flex items-center gap-1.5"><Info size={14} aria-hidden="true" /> Temuan Selisih: Data Lebih Banyak di Database</span>
                       <span>
                         Terdapat <strong>{diffData.count.toLocaleString()} baris</strong> yang hanya ada di NeonDB dan tidak ada di CSV lokal. Tabel di bawah hanya menampilkan selisih tersebut:
                       </span>
@@ -1038,7 +1038,7 @@ export default function Database() {
                   )}
                   {diffData.type === "synced" && (
                     <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 p-4 rounded-xl text-sm flex flex-col gap-1 text-center py-10">
-                      <span className="font-bold text-lg">✅ Sinkronisasi Sempurna</span>
+                      <span className="font-bold text-lg inline-flex items-center gap-2"><CheckCircle2 size={18} aria-hidden="true" /> Sinkronisasi Sempurna</span>
                       <span>Tidak ada baris yang hanya muncul di salah satu sisi. CSV dan NeonDB sudah sama untuk file ini.</span>
                     </div>
                   )}

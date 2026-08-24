@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { RotateCcw, MousePointer2 } from "lucide-react";
 import GridLayout, { Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
@@ -73,7 +74,7 @@ export default function DraggableLayout({
               : "bg-[var(--glass-secondary)] text-[var(--text-primary)] border border-[var(--glass-border)]"
           }`}
         >
-          {isDraggable ? "🔓 Edit Mode" : "🔒 Lock Layout"}
+          {isDraggable ? "Edit Mode" : "Lock Layout"}
         </button>
         
         {isDraggable && (
@@ -81,7 +82,7 @@ export default function DraggableLayout({
             onClick={resetLayout}
             className="px-4 py-2 bg-[var(--neon-ruby)] text-white rounded-lg text-sm font-semibold transition-all"
           >
-            🔄 Reset
+            <RotateCcw size={13} className="inline mr-1 -mt-px" aria-hidden="true" />Reset
           </button>
         )}
       </div>
@@ -90,7 +91,7 @@ export default function DraggableLayout({
       {isDraggable && (
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[55]">
           <div className="bg-[rgba(59,130,246,0.95)] text-white px-6 py-3 rounded-lg shadow-2xl animate-pulse text-center">
-            <div className="text-lg font-semibold mb-1">🖱️ Edit Mode Active</div>
+            <div className="text-lg font-semibold mb-1"><MousePointer2 size={16} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Edit Mode Active</div>
             <div className="text-sm">Drag headers (⋮⋮) to rearrange • Drag corners to resize</div>
           </div>
         </div>

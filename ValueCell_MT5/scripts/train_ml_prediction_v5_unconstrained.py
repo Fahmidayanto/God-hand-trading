@@ -92,6 +92,8 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
         # Load backtest results for real trade profit mapping
         real_trades = {}
         entry_structures = {}
+        ea_status = {}
+        ea_reject_reason = {}
         if paths["results"].exists():
             try:
                 results_df = pd.read_csv(paths["results"])
@@ -100,9 +102,15 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                     t_time = parse_time(r.get("EntryTime"))
                     t_type = str(r.get("Type", "")).strip().upper()
                     if not pd.isna(t_time) and t_type in ("BUY", "SELL"):
-                        real_trades[(t_time, t_type)] = safe_float(r.get("Net_Profit"))
+                        # EA EntryTime = bar M15 SETELAH event struktur (offset +15 menit).
+                        # Kunci mapping = waktu event struktur = EntryTime - 15 menit.
+                        event_key = (t_time - pd.Timedelta(minutes=15), t_type)
+                        real_trades[event_key] = safe_float(r.get("Net_Profit"))
                         # EntryStructure (CHoCH/BoS_1/BoS_2): fitur kategorikal sinyal
-                        entry_structures[(t_time, t_type)] = str(r.get("EntryStructure", "")).strip()
+                        entry_structures[event_key] = str(r.get("EntryStructure", "")).strip()
+                        # Status + Reject_Reason: keputusan filter asli EA (EXECUTED / REJECTED)
+                        ea_status[event_key] = str(r.get("Status", "")).strip().upper()
+                        ea_reject_reason[event_key] = str(r.get("Reject_Reason", "N/A")).strip()
             except Exception as e:
                 logger.warning(f"Failed to load backtest results for mapping: {e}")
 
@@ -252,17 +260,64 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
             # Map actual net profit or simulate trade outcome
             actual_net_profit = real_trades.get((entry_time, signal))
             if actual_net_profit is None:
-                # Simulated profit rule: if MFE reaches 2000 points before MAE reaches 2000 points
-                # simple SL 20 USD, TP 20 USD simulated trade using 0.1 lots
-                if mae_target >= 2000.0 and mfe_target < 2000.0:
-                    actual_net_profit = -200.0
-                elif mfe_target >= 2000.0:
-                    actual_net_profit = 200.0
+                # Simulasi meniru logika SL/TP EA Dev_Bot_v11_Gold (hybrid zone + price-ratio):
+                #   SL anchor = swing referensi (LL utk BUY / HH utk SELL) + buffer 2000 poin x ratio
+                #   Hybrid zone: jarak < MinSL(3000) dilebarkan ke 3000; > MaxSL(6000 x ratio) dipotong
+                #   TP = 6000 poin x ratio; lot basis 0.05 (konsisten dgn PnL riil EA)
+                # Simulasi bar-per-bar: sentuh SL/TP mana yang kena lebih dulu dalam window 24 jam.
+                BASE_REF = 4500.0
+                ratio = max(entry_price, 1.0) / BASE_REF
+                point = 0.01  # 1 broker point = 0.01 USD price move
+
+                swing_ref = None
+                if signal == "BUY":
+                    # LL referensi = low terendah window sebelum entry (pullback leg bullish)
+                    hist_lows = m15_history["low"].tail(96) if not m15_history.empty else None
+                    if hist_lows is not None and len(hist_lows) > 0:
+                        swing_ref = float(hist_lows.min())
                 else:
-                    # closed at end of window
+                    hist_highs = m15_history["high"].tail(96) if not m15_history.empty else None
+                    if hist_highs is not None and len(hist_highs) > 0:
+                        swing_ref = float(hist_highs.max())
+
+                min_sl_dist = 3000 * point          # MinSL_Points_M15
+                max_sl_dist = 6000 * ratio * point  # DefaultSL_Buy/Sell_M15 x ratio
+                buffer = 2000 * ratio * point       # SL_Buffer_Points_M15 x ratio
+                tp_dist = 6000 * ratio * point      # DefaultTP_Buy/Sell_M15 x ratio
+
+                if signal == "BUY":
+                    sl_price = (swing_ref - buffer) if swing_ref else (entry_price - min_sl_dist)
+                    sl_dist = entry_price - sl_price
+                    if sl_dist > max_sl_dist:
+                        sl_price = entry_price - max_sl_dist
+                    elif sl_dist < min_sl_dist:
+                        sl_price = entry_price - min_sl_dist
+                    tp_price = entry_price + tp_dist
+                else:
+                    sl_price = (swing_ref + buffer) if swing_ref else (entry_price + min_sl_dist)
+                    sl_dist = sl_price - entry_price
+                    if sl_dist > max_sl_dist:
+                        sl_price = entry_price + max_sl_dist
+                    elif sl_dist < min_sl_dist:
+                        sl_price = entry_price + min_sl_dist
+                    tp_price = entry_price - tp_dist
+
+                # Bar-per-bar: first touch wins (konsisten eksekusi MT5: SL diprioritaskan saat keduanya kena di bar sama)
+                sim_profit_usd = None
+                for _, fb in forward_bars.iterrows():
+                    hit_sl = (fb["low"] <= sl_price) if signal == "BUY" else (fb["high"] >= sl_price)
+                    hit_tp = (fb["high"] >= tp_price) if signal == "BUY" else (fb["low"] <= tp_price)
+                    if hit_sl:
+                        sim_profit_usd = -(abs(entry_price - sl_price)) * 10.0 * 0.1  # 0.1 lot basis sim
+                        break
+                    if hit_tp:
+                        sim_profit_usd = abs(tp_price - entry_price) * 10.0 * 0.1
+                        break
+                if sim_profit_usd is None:
                     final_close = float(forward_bars.iloc[-1]["close"])
                     profit_points = (final_close - entry_price) * 100.0 if signal == "BUY" else (entry_price - final_close) * 100.0
-                    actual_net_profit = (profit_points / 10.0) * 1.0  # approximate USD profit
+                    sim_profit_usd = (profit_points / 10.0) * 1.0  # approximate USD profit
+                actual_net_profit = sim_profit_usd
 
             # Compute session features
             sess_feats = session_features(sessions, entry_time, entry_price, m15_atr)
@@ -271,6 +326,9 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
 
             # EntryStructure dari CSV real trade (kosong = sinyal tanpa eksekusi)
             entry_structure = entry_structures.get((entry_time, signal), "")
+            # Status + Reject_Reason asli EA (EXECUTED / REJECTED + alasan filter)
+            ea_event_status = ea_status.get((entry_time, signal), "")
+            ea_event_reject_reason = ea_reject_reason.get((entry_time, signal), "N/A")
 
             sample = {
                 "source_year": suffix,
@@ -286,6 +344,8 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                 "session_name": session_name,
                 "session_is_dst": session_is_dst,
                 "entry_structure": entry_structure if entry_structure else "NONE",
+                "ea_status": ea_event_status if ea_event_status else "NO_MATCH",
+                "ea_reject_reason": ea_event_reject_reason if ea_event_reject_reason else "N/A",
                 **all_raw,
                 **momentum_features(m15_history, entry_price),
                 **sess_feats,
@@ -312,6 +372,7 @@ def build_feature_matrix_v5(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, List[s
     excluded = {
         "source_year", "entry_time", "year", "timeframe", "entry_price", "source", "reject_reason",
         "mfe_target", "mae_target",
+        "ea_status", "ea_reject_reason",
         "close_reason", "mfe_points", "mae_points", "mfe_to_rr", "mae_to_rr",
         "final_rr", "final_risk_points", "final_reward_points",
         "trailing_modified", "trailing_count", "tp_expanded", "tp_expand_count", "actual_net_profit",
@@ -546,13 +607,22 @@ def main() -> int:
 
     model_df, _, _ = build_feature_matrix_v5(dataset)
 
+    # Price-Ratio Dynamic Scaling (EA Dev_Bot_v11_Gold: BaseReferencePrice=4500).
+    # Target dinormalisasi ke basis harga acuan 4500: target_norm = target_points x 4500 / entry_price.
+    # Konsisten dengan cara EA menskalakan SL/TP (ratio = currentPrice / 4500).
+    BASE_REFERENCE_PRICE = 4500.0
+    price_ratio = dataset["entry_price"].clip(lower=1.0) / BASE_REFERENCE_PRICE
+    dataset["mfe_target_norm"] = dataset["mfe_target"] / price_ratio
+    dataset["mae_target_norm"] = dataset["mae_target"] / price_ratio
+    logger.info("Targets normalized to base reference price {} (price-ratio scaling)", BASE_REFERENCE_PRICE)
+
     train_mask = dataset["year"] <= 2024
     val_mask = dataset["year"] == 2025
     test_mask = dataset["year"] >= 2026
 
     # --- Target 1: MFE ---
     logger.info("--- Fitting MFE Regressor ---")
-    y_train_mfe = dataset.loc[train_mask, "mfe_target"]
+    y_train_mfe = dataset.loc[train_mask, "mfe_target_norm"]
     mfe_model, mfe_scaler, mfe_features, mfe_winner_name = select_and_fit_regressor(model_df, y_train_mfe, train_mask, "MFE")
     mfe_metrics, mfe_preds = evaluate_regressor(
         mfe_model, mfe_scaler, mfe_features, dataset, model_df, "mfe", train_mask, val_mask, test_mask
@@ -560,7 +630,7 @@ def main() -> int:
 
     # --- Target 2: MAE ---
     logger.info("--- Fitting MAE Regressor ---")
-    y_train_mae = dataset.loc[train_mask, "mae_target"]
+    y_train_mae = dataset.loc[train_mask, "mae_target_norm"]
     mae_model, mae_scaler, mae_features, mae_winner_name = select_and_fit_regressor(model_df, y_train_mae, train_mask, "MAE")
     mae_metrics, mae_preds = evaluate_regressor(
         mae_model, mae_scaler, mae_features, dataset, model_df, "mae", train_mask, val_mask, test_mask

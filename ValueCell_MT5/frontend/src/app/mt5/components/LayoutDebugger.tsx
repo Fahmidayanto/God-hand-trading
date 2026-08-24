@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Search } from "lucide-react";
 
 export default function LayoutDebugger() {
   const [isEnabled, setIsEnabled] = useState(true);
@@ -13,7 +14,7 @@ export default function LayoutDebugger() {
         className="fixed top-4 right-4 z-[100] px-4 py-2 bg-purple-600 text-white rounded-lg shadow-lg hover:bg-purple-700 transition-all text-sm font-semibold"
         title="Toggle Layout Debugger"
       >
-        🔍 Layout Debug
+         <Search size={13} className="inline mr-1.5 -mt-0.5" aria-hidden="true" />Layout Debug
       </button>
 
       {/* CSS for visual debugging */}

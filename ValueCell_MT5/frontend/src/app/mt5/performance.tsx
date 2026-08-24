@@ -17,6 +17,9 @@ import {
   ArrowDownRight,
   X,
   Loader2,
+  BarChart3,
+  CircleDollarSign,
+  ClipboardList,
 } from "lucide-react";
 import MT5Footer from "./components/MT5Footer";
 import {
@@ -399,8 +402,8 @@ export default function PerformancePage() {
 
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
-            📈
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
+            <TrendingUp size={26} aria-hidden="true" className="text-[var(--text-primary)]" />
           </div>
           <div>
             <h1 className="text-[36px] font-bold text-[var(--text-primary)] leading-none mb-1">
@@ -741,7 +744,7 @@ export default function PerformancePage() {
         <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* Equity Curve */}
           <div className="glass-card">
-            <h2 className="mb-4 text-xl font-semibold">💰 Equity Curve</h2>
+            <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2"><Wallet size={18} aria-hidden="true" /> Equity Curve</h2>
             <div className="h-[350px]">
               <Line data={equityData} options={chartOptions} />
             </div>
@@ -749,8 +752,8 @@ export default function PerformancePage() {
 
           {/* Win/Loss Distribution */}
           <div className="glass-card">
-            <h2 className="mb-4 text-xl font-semibold">
-              📊 Win/Loss Distribution
+            <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2">
+              <BarChart3 size={18} aria-hidden="true" /> Win/Loss Distribution
             </h2>
             <div className="h-[350px]">
               <Doughnut
@@ -774,7 +777,7 @@ export default function PerformancePage() {
         <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
           {/* Monthly Returns */}
           <div className="glass-card">
-            <h2 className="mb-4 text-xl font-semibold">📅 Monthly Returns</h2>
+            <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2"><CalendarDays size={18} aria-hidden="true" /> Monthly Returns</h2>
             <div className="h-[350px]">
               <Bar data={monthlyReturnsData} options={chartOptions} />
             </div>
@@ -782,7 +785,7 @@ export default function PerformancePage() {
 
           {/* Drawdown */}
           <div className="glass-card">
-            <h2 className="mb-4 text-xl font-semibold">📉 Drawdown Analysis</h2>
+            <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2"><TrendingDown size={18} aria-hidden="true" /> Drawdown Analysis</h2>
             <div className="h-[350px]">
               <Line data={drawdownData} options={chartOptions} />
             </div>
@@ -792,7 +795,7 @@ export default function PerformancePage() {
         {/* Monthly Profit/Loss Chart */}
         {monthlyPNL.length > 0 && (
           <div className="glass-card mb-6">
-            <h2 className="mb-4 text-xl font-semibold">💵 Monthly Profit/Loss Breakdown</h2>
+            <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2"><CircleDollarSign size={18} aria-hidden="true" /> Monthly Profit/Loss Breakdown</h2>
             <div className="h-[350px]">
               <Bar 
                 data={monthlyProfitLossData} 
@@ -858,8 +861,8 @@ export default function PerformancePage() {
 
         {/* Monthly Performance Table */}
         <div className="glass-card">
-          <h2 className="mb-4 text-xl font-semibold">
-            📋 Monthly Performance Summary
+          <h2 className="mb-4 text-xl font-semibold inline-flex items-center gap-2">
+            <ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary
           </h2>
 
           <div className="overflow-hidden">

@@ -1,5 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
+import {
+  Target, Zap, Flag, RefreshCw, Rocket, ArrowDown, ArrowUp, Inbox, Send, Pencil,
+  OctagonX, Minus, FileText, XCircle, Info, AlertTriangle, CircleDot, CircleStop,
+  Link2, Unlink, BarChart3, TrendingUp,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // Activity Log Types
 export type EventType =
@@ -49,33 +55,33 @@ export interface ActivityLogsResponse {
   has_more: boolean;
 }
 
-// Icon mapping for event types
-export const EVENT_TYPE_ICONS: Record<EventType, string> = {
-  SIGNAL_GENERATED: "🎯",
-  SIGNAL_EXECUTED: "⚡",
-  SIGNAL_CLOSED: "🏁",
-  STRUCTURE_CHOCH: "🔄",
-  STRUCTURE_BOS: "🚀",
-  STRUCTURE_LL: "⬇️",
-  STRUCTURE_HH: "⬆️",
-  POSITION_OPENED: "📥",
-  POSITION_CLOSED: "📤",
-  POSITION_MODIFIED: "✏️",
-  TRADE_WIN: "🎯",
-  TRADE_LOSS: "🛑",
-  TRADE_BREAKEVEN: "➖",
-  ORDER_PLACED: "📝",
-  ORDER_CANCELLED: "❌",
-  SYSTEM_INFO: "ℹ️",
-  SYSTEM_ERROR: "❌",
-  SYSTEM_WARNING: "⚠️",
-  SYSTEM_STARTUP: "🟢",
-  SYSTEM_SHUTDOWN: "🔴",
-  CONNECTION_ESTABLISHED: "🔗",
-  CONNECTION_LOST: "⚠️",
-  AGENT_SYNC: "🔄",
-  PRICE_UPDATE: "📊",
-  MARKET_ANALYSIS: "📈",
+// Icon mapping for event types (Lucide components)
+export const EVENT_TYPE_ICONS: Record<EventType, LucideIcon> = {
+  SIGNAL_GENERATED: Target,
+  SIGNAL_EXECUTED: Zap,
+  SIGNAL_CLOSED: Flag,
+  STRUCTURE_CHOCH: RefreshCw,
+  STRUCTURE_BOS: Rocket,
+  STRUCTURE_LL: ArrowDown,
+  STRUCTURE_HH: ArrowUp,
+  POSITION_OPENED: Inbox,
+  POSITION_CLOSED: Send,
+  POSITION_MODIFIED: Pencil,
+  TRADE_WIN: Target,
+  TRADE_LOSS: OctagonX,
+  TRADE_BREAKEVEN: Minus,
+  ORDER_PLACED: FileText,
+  ORDER_CANCELLED: XCircle,
+  SYSTEM_INFO: Info,
+  SYSTEM_ERROR: XCircle,
+  SYSTEM_WARNING: AlertTriangle,
+  SYSTEM_STARTUP: CircleDot,
+  SYSTEM_SHUTDOWN: CircleStop,
+  CONNECTION_ESTABLISHED: Link2,
+  CONNECTION_LOST: Unlink,
+  AGENT_SYNC: RefreshCw,
+  PRICE_UPDATE: BarChart3,
+  MARKET_ANALYSIS: TrendingUp,
 };
 
 // Severity class mapping

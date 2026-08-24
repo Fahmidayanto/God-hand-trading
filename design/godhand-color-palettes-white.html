@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>God Hand Trading - Rekomendasi Palet Gradient Putih</title>
+<style>
+  :root {
+    --page-bg: #0a0a0c;
+    --card-border: rgba(255,255,255,0.08);
+    --text-hi: #f4f4f5;
+    --text-lo: #9ca3af;
+    --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+    --sans: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--page-bg);
+    font-family: var(--sans);
+    color: var(--text-hi);
+    padding: 48px 32px 80px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  .site-header { margin-bottom: 56px; }
+  .site-header h1 { font-size: 30px; letter-spacing: -0.5px; }
+  .site-header h1 span { opacity: 0.45; font-weight: 300; }
+  .brand-gradient {
+    background: linear-gradient(135deg, #FFFFFF, #C7CCD4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .site-header p { color: var(--text-lo); margin-top: 10px; font-size: 14px; line-height: 1.6; max-width: 720px; }
+  .site-header code { font-family: var(--mono); }
+
+  .palette {
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    overflow: hidden;
+    margin-bottom: 40px;
+    background: rgba(255,255,255,0.015);
+    transition: border-color 0.2s ease;
+  }
+  .palette:hover { border-color: rgba(255,255,255,0.18); }
+
+  .pal-head { display: flex; align-items: baseline; gap: 16px; padding: 24px 28px 16px; }
+  .pal-num {
+    font-family: var(--mono); font-size: 13px; color: var(--text-lo);
+    border: 1px solid var(--card-border); border-radius: 999px; padding: 4px 12px;
+  }
+  .pal-name { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .pal-tag { color: var(--text-lo); font-size: 13px; margin-left: auto; text-align: right; }
+
+  .gradient-strip { height: 64px; margin: 0 28px; border-radius: 12px; position: relative; overflow: hidden; }
+  .gradient-strip::after {
+    content: attr(data-label);
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 12px;
+    color: rgba(0,0,0,0.55); font-weight: 700;
+  }
+
+  .pal-body {
+    display: grid;
+    grid-template-columns: minmax(320px, 5fr) minmax(360px, 6fr);
+    gap: 28px; padding: 24px 28px 28px;
+  }
+  @media (max-width: 900px) { .pal-body { grid-template-columns: 1fr; } }
+
+  .swatch-group h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--text-lo); margin: 18px 0 10px;
+  }
+  .swatch-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch { flex: 1 1 72px; min-width: 72px; border-radius: 10px; overflow: hidden; border: 1px solid var(--card-border); }
+  .swatch .chip { height: 44px; width: 100%; }
+  .swatch .meta { padding: 7px 9px; background: rgba(255,255,255,0.03); }
+  .swatch .hex { font-family: var(--mono); font-size: 10.5px; color: var(--text-hi); display: block; }
+  .swatch .role { font-size: 10px; color: var(--text-lo); }
+
+  .mock {
+    border-radius: 14px; background: var(--p-deep);
+    border: 1px solid rgba(255,255,255,0.07);
+    padding: 20px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .mock-topbar { display: flex; align-items: center; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .mock-logo {
+    width: 34px; height: 34px; border-radius: 9px; background: var(--p-grad);
+    box-shadow: 0 0 18px rgba(255,255,255,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #0b0f19; font-weight: 800;
+  }
+  .mock-title { font-size: 13px; font-weight: 700; color: var(--p-text); }
+  .mock-sub { font-size: 10.5px; color: var(--p-muted); }
+  .mock-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stat { background: var(--p-surface); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px 12px; }
+  .stat .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: var(--p-muted); }
+  .stat .val { font-family: var(--mono); font-size: 14px; font-weight: 700; margin-top: 4px; }
+  .val.up { color: var(--p-success); } .val.down { color: var(--p-danger); }
+  .stat.hl { border-color: rgba(255,255,255,0.35); box-shadow: 0 0 16px rgba(255,255,255,0.08); }
+  .stat.hl .val { background: var(--p-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mock-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--p-grad); color: #0b0f19; font-weight: 700; font-size: 12px;
+    border: none; border-radius: 9px; padding: 9px 18px;
+    cursor: pointer; transition: filter 0.2s ease;
+    box-shadow: 0 4px 14px rgba(255,255,255,0.18);
+  }
+  .btn-primary:hover { filter: brightness(0.94); }
+  .badge {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    padding: 6px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .badge.buy { color: var(--p-success); background: color-mix(in srgb, var(--p-success) 12%, transparent); border: 1px solid color-mix(in srgb, var(--p-success) 30%, transparent); }
+  .badge.sell { color: var(--p-danger); background: color-mix(in srgb, var(--p-danger) 12%, transparent); border: 1px solid color-mix(in srgb, var(--p-danger) 30%, transparent); }
+  .sparkline { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 2px; }
+  .sparkline i { flex: 1; border-radius: 2px 2px 0 0; background: var(--p-grad); opacity: 0.85; }
+
+  .pal-note { padding: 0 28px 26px; font-size: 12.5px; color: var(--text-lo); line-height: 1.65; }
+  .pal-note b { color: var(--text-hi); }
+  .pal-note code { font-family: var(--mono); font-size: 11px; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+
+  .summary { margin-top: 64px; }
+  .summary h2 { font-size: 18px; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-lo); padding: 10px 14px; border-bottom: 1px solid var(--card-border); }
+  td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  td .mini-grad { display: inline-block; width: 54px; height: 14px; border-radius: 4px; vertical-align: middle; margin-right: 10px; border: 1px solid rgba(255,255,255,0.15); }
+  .fit-high { color: #34D399; font-weight: 600; }
+  footer { margin-top: 48px; color: var(--text-lo); font-size: 12px; line-height: 1.7; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>God Hand Trading <span>/</span> <span class="brand-gradient">Rekomendasi Palet Gradient Putih</span></h1>
+  <p>
+    5 kandidat gradient bernuansa putih untuk aksen UI di atas background gelap.
+    Estetika platinum/luxe: bersih, mahal, dan sangat legibel. Semantik hijau (profit/BUY)
+    dan merah (loss/SELL) tetap dipertahankan. Aturan wajib: teks di atas elemen putih
+    harus selalu gelap (#0B0F19).
+  </p>
+</header>
+<!-- ═══════ W1. PLATINUM PURE ═══════ -->
+<section class="palette" style="
+  --p-void:#08090B; --p-deep:#0D0F12; --p-surface:#14171C;
+  --p-a1:#FFFFFF; --p-a2:#C7CCD4;
+  --p-grad:linear-gradient(135deg,#FFFFFF,#C7CCD4);
+  --p-success:#34D399; --p-danger:#F87171;
+  --p-text:#F8FAFC; --p-muted:#8A919E;">
+  <div class="pal-head">
+    <span class="pal-num">W1</span>
+    <h2 class="pal-name">Platinum Pure</h2>
+    <span class="pal-tag">Pure White x Silver Gray<br>Bersih, netral, Apple-style</span>
+  </div>
+  <div class="gradient-strip" style="background:linear-gradient(135deg,#FFFFFF,#C7CCD4)" data-label="linear-gradient(135deg, #FFFFFF, #C7CCD4)"></div>
+  <div class="pal-body">
+    <div class="swatch-group">
+      <h3>Gradient Stops</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid rgba(255,255,255,0.1)"></div><div class="meta"><span class="hex">#FFFFFF</span><span class="role">putih murni</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#E5E7EB"></div><div class="meta"><span class="hex">#E5E7EB</span><span class="role">stop tengah (opsional)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#C7CCD4"></div><div class="meta"><span class="hex">#C7CCD4</span><span class="role">silver gray</span></div></div>
+      </div>
+      <h3>Semantik (tetap)</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#34D399"></div><div class="meta"><span class="hex">#34D399</span><span class="role">sukses / BUY</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F87171"></div><div class="meta"><span class="hex">#F87171</span><span class="role">bahaya / SELL</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#08090B"></div><div class="meta"><span class="hex">#08090B</span><span class="role">teks di atas putih</span></div></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-topbar">
+        <div class="mock-logo">G</div>
+        <div><div class="mock-title">Ghost Engine</div><div class="mock-sub">Replay trades dan validasi strategi</div></div>
+      </div>
+      <div class="mock-stats">
+        <div class="stat hl"><div class="lbl">Net PnL</div><div class="val">+2.450 USD</div></div>
+        <div class="stat"><div class="lbl">Win Rate</div><div class="val up">68%</div></div>
+        <div class="stat"><div class="lbl">Drawdown</div><div class="val down">-4.2%</div></div>
+      </div>
+      <div class="sparkline"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:60%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:100%"></i></div>
+      <div class="mock-actions">
+        <button class="btn-primary" type="button">Load Replay</button>
+        <span class="badge buy">BUY 0.01</span>
+        <span class="badge sell">SELL 0.02</span>
+      </div>
+    </div>
+  </div>
+  <p class="pal-note">
+    <b>Karakter:</b> kontras maksimum, terlihat paling mahal dan modern. Glow putih lembut
+    menggantikan neon warna. Mapping token: <code>--neon-blue-rgb: 255, 255, 255</code>,
+    <code>--neon-cyan-rgb: 199, 204, 212</code>. Cocok jadi default paling aman.
+  </p>
+</section>
+<!-- ═══════ W2. GHOST SILK ═══════ -->
+<section class="palette" style="
+  --p-void:#070910; --p-deep:#0C1018; --p-surface:#131926;
+  --p-a1:#FAFBFC; --p-a2:#D3DAE3;
+  --p-grad:linear-gradient(135deg,#FAFBFC,#D3DAE3);
+  --p-success:#34D399; --p-danger:#F87171;
+  --p-text:#F1F5F9; --p-muted:#7C8DA6;">
+  <div class="pal-head">
+    <span class="pal-num">W2</span>
+    <h2 class="pal-name">Ghost Silk</h2>
+    <span class="pal-tag">Off-White x Slate<br>Sinonim dengan tema Ghost Engine</span>
+  </div>
+  <div class="gradient-strip" style="background:linear-gradient(135deg,#FAFBFC,#D3DAE3)" data-label="linear-gradient(135deg, #FAFBFC, #D3DAE3)"></div>
+  <div class="pal-body">
+    <div class="swatch-group">
+      <h3>Gradient Stops</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#FAFBFC;border-bottom:1px solid rgba(255,255,255,0.1)"></div><div class="meta"><span class="hex">#FAFBFC</span><span class="role">ghost white</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#E4E9EF"></div><div class="meta"><span class="hex">#E4E9EF</span><span class="role">stop tengah (opsional)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#D3DAE3"></div><div class="meta"><span class="hex">#D3DAE3</span><span class="role">slate silver</span></div></div>
+      </div>
+      <h3>Semantik (tetap)</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#34D399"></div><div class="meta"><span class="hex">#34D399</span><span class="role">sukses / BUY</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F87171"></div><div class="meta"><span class="hex">#F87171</span><span class="role">bahaya / SELL</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#0C1018"></div><div class="meta"><span class="hex">#0C1018</span><span class="role">teks di atas putih</span></div></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-topbar">
+        <div class="mock-logo">G</div>
+        <div><div class="mock-title">Ghost Engine</div><div class="mock-sub">Replay trades dan validasi strategi</div></div>
+      </div>
+      <div class="mock-stats">
+        <div class="stat hl"><div class="lbl">Net PnL</div><div class="val">+2.450 USD</div></div>
+        <div class="stat"><div class="lbl">Win Rate</div><div class="val up">68%</div></div>
+        <div class="stat"><div class="lbl">Drawdown</div><div class="val down">-4.2%</div></div>
+      </div>
+      <div class="sparkline"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:60%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:100%"></i></div>
+      <div class="mock-actions">
+        <button class="btn-primary" type="button">Load Replay</button>
+        <span class="badge buy">BUY 0.01</span>
+        <span class="badge sell">SELL 0.02</span>
+      </div>
+    </div>
+  </div>
+  <p class="pal-note">
+    <b>Karakter:</b> putih dengan hint slate kebiruan, nyaman di mata dan paling serasi
+    dengan background navy gelap yang sudah ada sekarang. Transisi paling mulus dari tema
+    aktif. Mapping token: <code>--neon-blue-rgb: 250, 251, 252</code>,
+    <code>--neon-cyan-rgb: 211, 218, 227</code>.
+  </p>
+</section>
+<!-- ═══════ W3. IVORY CHAMPAGNE ═══════ -->
+<section class="palette" style="
+  --p-void:#0B0A08; --p-deep:#12100C; --p-surface:#1A1712;
+  --p-a1:#FFFDF7; --p-a2:#EFE3C8;
+  --p-grad:linear-gradient(135deg,#FFFDF7,#EFE3C8);
+  --p-success:#34D399; --p-danger:#F87171;
+  --p-text:#FAF7F2; --p-muted:#A39482;">
+  <div class="pal-head">
+    <span class="pal-num">W3</span>
+    <h2 class="pal-name">Ivory Champagne</h2>
+    <span class="pal-tag">Ivory x Champagne<br>Putih hangat, luxury hotel vibe</span>
+  </div>
+  <div class="gradient-strip" style="background:linear-gradient(135deg,#FFFDF7,#EFE3C8)" data-label="linear-gradient(135deg, #FFFDF7, #EFE3C8)"></div>
+  <div class="pal-body">
+    <div class="swatch-group">
+      <h3>Gradient Stops</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#FFFDF7;border-bottom:1px solid rgba(255,255,255,0.1)"></div><div class="meta"><span class="hex">#FFFDF7</span><span class="role">ivory white</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F7F0DF"></div><div class="meta"><span class="hex">#F7F0DF</span><span class="role">stop tengah (opsional)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#EFE3C8"></div><div class="meta"><span class="hex">#EFE3C8</span><span class="role">champagne</span></div></div>
+      </div>
+      <h3>Semantik (tetap)</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#34D399"></div><div class="meta"><span class="hex">#34D399</span><span class="role">sukses / BUY</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F87171"></div><div class="meta"><span class="hex">#F87171</span><span class="role">bahaya / SELL</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#12100C"></div><div class="meta"><span class="hex">#12100C</span><span class="role">teks di atas putih</span></div></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-topbar">
+        <div class="mock-logo">G</div>
+        <div><div class="mock-title">Ghost Engine</div><div class="mock-sub">Replay trades dan validasi strategi</div></div>
+      </div>
+      <div class="mock-stats">
+        <div class="stat hl"><div class="lbl">Net PnL</div><div class="val">+2.450 USD</div></div>
+        <div class="stat"><div class="lbl">Win Rate</div><div class="val up">68%</div></div>
+        <div class="stat"><div class="lbl">Drawdown</div><div class="val down">-4.2%</div></div>
+      </div>
+      <div class="sparkline"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:60%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:100%"></i></div>
+      <div class="mock-actions">
+        <button class="btn-primary" type="button">Load Replay</button>
+        <span class="badge buy">BUY 0.01</span>
+        <span class="badge sell">SELL 0.02</span>
+      </div>
+    </div>
+  </div>
+  <p class="pal-note">
+    <b>Karakter:</b> pewaris langsung identitas emas "God Hand" tapi dalam bentuk putih hangat.
+    Terasa mewah tenang, tidak agresif. Background charcoal hangat membuat ivory bersinar alami.
+    Mapping token: <code>--neon-blue-rgb: 255, 253, 247</code>,
+    <code>--neon-cyan-rgb: 239, 227, 200</code>.
+  </p>
+</section>
+<!-- ═══════ W4. ARCTIC DIAMOND ═══════ -->
+<section class="palette" style="
+  --p-void:#060A10; --p-deep:#0A1220; --p-surface:#101B2E;
+  --p-a1:#FFFFFF; --p-a2:#CFE0EE;
+  --p-grad:linear-gradient(135deg,#FFFFFF,#CFE0EE);
+  --p-success:#34D399; --p-danger:#F87171;
+  --p-text:#F1F5F9; --p-muted:#7C8DA6;">
+  <div class="pal-head">
+    <span class="pal-num">W4</span>
+    <h2 class="pal-name">Arctic Diamond</h2>
+    <span class="pal-tag">White x Ice Blue<br>Putih kristal, dingin presisi</span>
+  </div>
+  <div class="gradient-strip" style="background:linear-gradient(135deg,#FFFFFF,#CFE0EE)" data-label="linear-gradient(135deg, #FFFFFF, #CFE0EE)"></div>
+  <div class="pal-body">
+    <div class="swatch-group">
+      <h3>Gradient Stops</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid rgba(255,255,255,0.1)"></div><div class="meta"><span class="hex">#FFFFFF</span><span class="role">diamond white</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#E8F1F8"></div><div class="meta"><span class="hex">#E8F1F8</span><span class="role">stop tengah (opsional)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#CFE0EE"></div><div class="meta"><span class="hex">#CFE0EE</span><span class="role">ice blue</span></div></div>
+      </div>
+      <h3>Semantik (tetap)</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#34D399"></div><div class="meta"><span class="hex">#34D399</span><span class="role">sukses / BUY</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F87171"></div><div class="meta"><span class="hex">#F87171</span><span class="role">bahaya / SELL</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#0A1220"></div><div class="meta"><span class="hex">#0A1220</span><span class="role">teks di atas putih</span></div></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-topbar">
+        <div class="mock-logo">G</div>
+        <div><div class="mock-title">Ghost Engine</div><div class="mock-sub">Replay trades dan validasi strategi</div></div>
+      </div>
+      <div class="mock-stats">
+        <div class="stat hl"><div class="lbl">Net PnL</div><div class="val">+2.450 USD</div></div>
+        <div class="stat"><div class="lbl">Win Rate</div><div class="val up">68%</div></div>
+        <div class="stat"><div class="lbl">Drawdown</div><div class="val down">-4.2%</div></div>
+      </div>
+      <div class="sparkline"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:60%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:100%"></i></div>
+      <div class="mock-actions">
+        <button class="btn-primary" type="button">Load Replay</button>
+        <span class="badge buy">BUY 0.01</span>
+        <span class="badge sell">SELL 0.02</span>
+      </div>
+    </div>
+  </div>
+  <p class="pal-note">
+    <b>Karakter:</b> kesan kristal es yang tajam dan presisi. Background navy arktik membuat
+    bagian ice blue pada gradient terasa menyatu dengan halaman. Cocok untuk identitas
+    "cold precision trading". Mapping token: <code>--neon-blue-rgb: 255, 255, 255</code>,
+    <code>--neon-cyan-rgb: 207, 224, 238</code>.
+  </p>
+</section>
+<!-- ═══════ W5. PEARL LAVENDER ═══════ -->
+<section class="palette" style="
+  --p-void:#07060D; --p-deep:#0D0B16; --p-surface:#141126;
+  --p-a1:#FEFDFF; --p-a2:#DCD6EE;
+  --p-grad:linear-gradient(135deg,#FEFDFF,#DCD6EE);
+  --p-success:#34D399; --p-danger:#F87171;
+  --p-text:#F5F3FF; --p-muted:#8E85AD;">
+  <div class="pal-head">
+    <span class="pal-num">W5</span>
+    <h2 class="pal-name">Pearl Lavender</h2>
+    <span class="pal-tag">Pearl x Soft Lavender<br>Putih mutiara, elegan lembut</span>
+  </div>
+  <div class="gradient-strip" style="background:linear-gradient(135deg,#FEFDFF,#DCD6EE)" data-label="linear-gradient(135deg, #FEFDFF, #DCD6EE)"></div>
+  <div class="pal-body">
+    <div class="swatch-group">
+      <h3>Gradient Stops</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#FEFDFF;border-bottom:1px solid rgba(255,255,255,0.1)"></div><div class="meta"><span class="hex">#FEFDFF</span><span class="role">pearl white</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#EDE9F7"></div><div class="meta"><span class="hex">#EDE9F7</span><span class="role">stop tengah (opsional)</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#DCD6EE"></div><div class="meta"><span class="hex">#DCD6EE</span><span class="role">soft lavender</span></div></div>
+      </div>
+      <h3>Semantik (tetap)</h3>
+      <div class="swatch-row">
+        <div class="swatch"><div class="chip" style="background:#34D399"></div><div class="meta"><span class="hex">#34D399</span><span class="role">sukses / BUY</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#F87171"></div><div class="meta"><span class="hex">#F87171</span><span class="role">bahaya / SELL</span></div></div>
+        <div class="swatch"><div class="chip" style="background:#0D0B16"></div><div class="meta"><span class="hex">#0D0B16</span><span class="role">teks di atas putih</span></div></div>
+      </div>
+    </div>
+    <div class="mock">
+      <div class="mock-topbar">
+        <div class="mock-logo">G</div>
+        <div><div class="mock-title">Ghost Engine</div><div class="mock-sub">Replay trades dan validasi strategi</div></div>
+      </div>
+      <div class="mock-stats">
+        <div class="stat hl"><div class="lbl">Net PnL</div><div class="val">+2.450 USD</div></div>
+        <div class="stat"><div class="lbl">Win Rate</div><div class="val up">68%</div></div>
+        <div class="stat"><div class="lbl">Drawdown</div><div class="val down">-4.2%</div></div>
+      </div>
+      <div class="sparkline"><i style="height:30%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:75%"></i><i style="height:60%"></i><i style="height:90%"></i><i style="height:70%"></i><i style="height:100%"></i></div>
+      <div class="mock-actions">
+        <button class="btn-primary" type="button">Load Replay</button>
+        <span class="badge buy">BUY 0.01</span>
+        <span class="badge sell">SELL 0.02</span>
+      </div>
+    </div>
+  </div>
+  <p class="pal-note">
+    <b>Karakter:</b> putih dengan hint ungu lavender yang sangat tipis, elegan dan unik tanpa
+    meninggalkan zona netral. Background deep purple membuat kesan mutiara makin kuat.
+    Mapping token: <code>--neon-blue-rgb: 254, 253, 255</code>,
+    <code>--neon-cyan-rgb: 220, 214, 238</code>.
+  </p>
+</section>
+<!-- ═══════ TABEL RINGKASAN ═══════ -->
+<div class="summary">
+  <h2>Ringkasan Perbandingan</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>Palet</th>
+        <th>Gradient Putih</th>
+        <th>Karakter</th>
+        <th>Catatan</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>W1</td>
+        <td><b>Platinum Pure</b></td>
+        <td><span class="mini-grad" style="background:linear-gradient(135deg,#FFFFFF,#C7CCD4)"></span>#FFFFFF ke #C7CCD4</td>
+        <td>Bersih, netral, kontras maksimum</td>
+        <td class="fit-high">Paling aman - default terbaik</td>
+      </tr>
+      <tr>
+        <td>W2</td>
+        <td><b>Ghost Silk</b></td>
+        <td><span class="mini-grad" style="background:linear-gradient(135deg,#FAFBFC,#D3DAE3)"></span>#FAFBFC ke #D3DAE3</td>
+        <td>Slate white, serasi navy gelap</td>
+        <td class="fit-high">Transisi termulus dari tema aktif</td>
+      </tr>
+      <tr>
+        <td>W3</td>
+        <td><b>Ivory Champagne</b></td>
+        <td><span class="mini-grad" style="background:linear-gradient(135deg,#FFFDF7,#EFE3C8)"></span>#FFFDF7 ke #EFE3C8</td>
+        <td>Putih hangat mewah</td>
+        <td class="fit-high">Pewaris identitas emas God Hand</td>
+      </tr>
+      <tr>
+        <td>W4</td>
+        <td><b>Arctic Diamond</b></td>
+        <td><span class="mini-grad" style="background:linear-gradient(135deg,#FFFFFF,#CFE0EE)"></span>#FFFFFF ke #CFE0EE</td>
+        <td>Kristal es, dingin presisi</td>
+        <td class="fit-high">Identitas cold precision trading</td>
+      </tr>
+      <tr>
+        <td>W5</td>
+        <td><b>Pearl Lavender</b></td>
+        <td><span class="mini-grad" style="background:linear-gradient(135deg,#FEFDFF,#DCD6EE)"></span>#FEFDFF ke #DCD6EE</td>
+        <td>Mutiara, hint lavender tipis</td>
+        <td class="fit-high">Paling unik tapi tetap netral</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  Aturan implementasi palet putih: (1) teks di atas elemen putih WAJIB gelap (#0B0F19),
+  (2) glow neon diganti box-shadow putih lembut rgba(255,255,255,0.15-0.25),
+  (3) border kartu cukup rgba(255,255,255,0.08-0.12), (4) hover tombol putih pakai
+  brightness turun bukan naik agar tidak "hilang", (5) chart line/candle tetap
+  hijau/merah untuk arah, putih hanya untuk aksen UI dan CTA utama.
+  Petakan hasil pilihan ke token global.css baris 77-97.
+</footer>
+</body>
+</html>

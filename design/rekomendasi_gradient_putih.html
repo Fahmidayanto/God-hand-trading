@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>5 Rekomendasi Gradien Putih Premium — God-Hand Design System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --bg-card: rgba(15, 23, 42, 0.65);
+      --bg-card-inner: rgba(2, 6, 23, 0.55);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-subtle: rgba(148, 163, 184, 0.12);
+      --accent-cyan: #06b6d4;
+      --accent-purple: #8b5cf6;
+      --accent-gold: #f59e0b;
+      --font-sans: 'Outfit', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    [data-theme="light"] {
+      --bg-dark: #f1f5f9;
+      --bg-card: rgba(255, 255, 255, 0.85);
+      --bg-card-inner: rgba(248, 250, 252, 0.9);
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border-subtle: rgba(15, 23, 42, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      min-height: 100vh;
+      line-height: 1.6;
+      overflow-x: hidden;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(6, 182, 212, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 40%),
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 6rem;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 4rem;
+      position: relative;
+    }
+
+    .badge-top {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      border-radius: 9999px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      margin-bottom: 1.25rem;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.05);
+    }
+
+    .badge-top span.dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ffffff;
+      box-shadow: 0 0 10px #ffffff;
+    }
+
+    h1.hero-title {
+      font-size: clamp(2.2rem, 5vw, 3.75rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #64748b 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    p.hero-desc {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 2rem;
+    }
+
+    /* ── Controls Bar ── */
+    .controls-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-toggle-theme {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1.2rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
+    }
+
+    .btn-toggle-theme:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    /* ── Grid of Palettes ── */
+    .gradient-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+      gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+      .gradient-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .gradient-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 24px;
+      padding: 1.75rem;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, box-shadow 0.3s ease;
+      display: flex;
+      flex-col: column;
+      gap: 1.25rem;
+    }
+
+    .gradient-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255, 255, 255, 0.25);
+      box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6), 0 0 30px rgba(255, 255, 255, 0.05);
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .num-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.25rem 0.6rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-muted);
+    }
+
+    .gradient-name {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-top: 0.25rem;
+    }
+
+    .gradient-category {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    /* ── Live Visual Showcase Banner ── */
+    .preview-canvas {
+      height: 140px;
+      border-radius: 16px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.3), 0 10px 25px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .preview-canvas-label {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: #090d16;
+      letter-spacing: -0.02em;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.4);
+      padding: 0.4rem 1.2rem;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    /* ── Interactive UI Showcase Components ── */
+    .specimen-box {
+      background: var(--bg-card-inner);
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .specimen-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Component 1: Gradient Text */
+    .comp-text-gradient {
+      font-size: 1.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: inline-block;
+    }
+
+    /* Component 2: Gradient Border Card */
+    .comp-border-card {
+      position: relative;
+      border-radius: 12px;
+      padding: 1px;
+      background: linear-gradient(135deg, transparent, transparent);
+    }
+
+    .comp-border-card-inner {
+      background: #0b1120;
+      padding: 0.85rem 1rem;
+      border-radius: 11px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    [data-theme="light"] .comp-border-card-inner {
+      background: #ffffff;
+    }
+
+    /* Component 3: Button & Pill */
+    .comp-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-gradient {
+      padding: 0.55rem 1.1rem;
+      border-radius: 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #0b1120;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      box-shadow: 0 4px 15px rgba(255, 255, 255, 0.15);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn-gradient:hover {
+      transform: scale(1.03) translateY(-1px);
+      box-shadow: 0 8px 25px rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-gradient:active {
+      transform: scale(0.97);
+    }
+
+    .pill-gradient-border {
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* Component 4: Progress Line */
+    .comp-progress-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .comp-progress-bar {
+      height: 6px;
+      width: 100%;
+      background: rgba(148, 163, 184, 0.15);
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+
+    .comp-progress-fill {
+      height: 100%;
+      width: 78%;
+      border-radius: 9999px;
+    }
+
+    /* ── Code Snippet & Copy ── */
+    .code-box {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .code-text {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: #94a3b8;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: none;
+    }
+
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #f8fafc;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0.4rem 0.8rem;
+      border-radius: 8px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-copy:hover {
+      background: #ffffff;
+      color: #0b1120;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-copy.copied {
+      background: #10b981;
+      color: #ffffff;
+      border-color: #10b981;
+    }
+
+    /* ── Color Swatches ── */
+    .color-stops {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .color-stop-chip {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .color-circle {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    /* ── Toast Notification ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 0.85rem 1.5rem;
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      font-weight: 600;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(6, 182, 212, 0.3);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* ── Individual Gradients Definition ── */
+    /* 1. Frost Titanium */
+    .grad-1-bg { background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%); }
+    .grad-1-text { background-image: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%); }
+    .grad-1-border { background: linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%); }
+
+    /* 2. Pearlescent Opal */
+    .grad-2-bg { background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #E0E7FF 70%, #C7D2FE 100%); }
+    .grad-2-text { background-image: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #E0E7FF 70%, #C7D2FE 100%); }
+    .grad-2-border { background: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #E0E7FF 70%, #C7D2FE 100%); }
+
+    /* 3. Silver Quartz */
+    .grad-3-bg { background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.6) 50%, rgba(203, 213, 225, 0.2) 100%); }
+    .grad-3-text { background-image: linear-gradient(180deg, #FFFFFF 0%, #E2E8F0 50%, #CBD5E1 100%); }
+    .grad-3-border { background: linear-gradient(180deg, rgba(255, 255, 255, 0.9) 0%, rgba(203, 213, 225, 0.3) 100%); }
+
+    /* 4. Starlight Velvet */
+    .grad-4-bg { background: linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 40%, #FEF3C7 75%, #FDE68A 100%); }
+    .grad-4-text { background-image: linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 40%, #FEF3C7 75%, #FDE68A 100%); }
+    .grad-4-border { background: linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 40%, #FEF3C7 75%, #FDE68A 100%); }
+
+    /* 5. Cyber Glaze */
+    .grad-5-bg { background: linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 35%, #CCFBF1 70%, #99F6E4 100%); }
+    .grad-5-text { background-image: linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 35%, #CCFBF1 70%, #99F6E4 100%); }
+    .grad-5-border { background: linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 35%, #CCFBF1 70%, #99F6E4 100%); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- ── Header ── -->
+    <header>
+      <div class="badge-top">
+        <span class="dot"></span>
+        God-Hand Trading Design Tokens
+      </div>
+      <h1 class="hero-title">5 Rekomendasi Gradien Warna Putih</h1>
+      <p class="hero-desc">
+        Kurasi gradasi putih (White & Platinum Gradients) premium untuk tipografi berkilau, kartu glassmorphism, tombol aksi, dan border glow berestetika modern.
+      </p>
+
+      <div class="controls-bar">
+        <button class="btn-toggle-theme" onclick="toggleTheme()">
+          🌓 Switch Theme (Dark / Light)
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Grid Showcase ── -->
+    <div class="gradient-grid">
+
+      <!-- ── 01. Frost Titanium ── -->
+      <div class="gradient-card">
+        <div class="card-top">
+          <div>
+            <div class="num-pill">PALETTE 01</div>
+            <h2 class="gradient-name">Frost Titanium</h2>
+            <div class="gradient-category">Pure Metallic Silver White</div>
+          </div>
+        </div>
+
+        <div class="preview-canvas grad-1-bg">
+          <div class="preview-canvas-label">FROST TITANIUM</div>
+        </div>
+
+        <div class="color-stops">
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FFFFFF;"></span> #FFFFFF (0%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#E2E8F0;"></span> #E2E8F0 (50%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#94A3B8;"></span> #94A3B8 (100%)</div>
+        </div>
+
+        <div class="specimen-box">
+          <div class="specimen-title">⚡ Penerapan Komponen UI</div>
+          
+          <!-- Text Gradient -->
+          <div class="comp-text-gradient grad-1-text">
+            $4,233.97 USD (+323.4%)
+          </div>
+
+          <!-- Border Card -->
+          <div class="comp-border-card grad-1-border">
+            <div class="comp-border-card-inner">
+              <span style="font-size:0.85rem; font-weight:600;">Active Strategy Node</span>
+              <span class="pill-gradient-border" style="border: 1px solid rgba(255,255,255,0.4);">M15 CHoCH</span>
+            </div>
+          </div>
+
+          <!-- Button -->
+          <div class="comp-row">
+            <button class="btn-gradient grad-1-bg" onclick="copyCSS('linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%)')">
+              ⚡ Execute Order
+            </button>
+            <div class="pill-gradient-border">
+              <span>Status:</span> <strong style="color:#ffffff;">CONNECTED</strong>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="comp-progress-wrap">
+            <div class="comp-progress-bar">
+              <div class="comp-progress-fill grad-1-bg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-text" id="code-1">linear-gradient(135deg, #FFFFFF 0%, #E2E8F0 50%, #94A3B8 100%)</div>
+          <button class="btn-copy" onclick="copyFromElement('code-1', this)">📋 Copy CSS</button>
+        </div>
+      </div>
+
+      <!-- ── 02. Pearlescent Opal ── -->
+      <div class="gradient-card">
+        <div class="card-top">
+          <div>
+            <div class="num-pill">PALETTE 02</div>
+            <h2 class="gradient-name">Pearlescent Opal</h2>
+            <div class="gradient-category">Soft Iridescent Lavender White</div>
+          </div>
+        </div>
+
+        <div class="preview-canvas grad-2-bg">
+          <div class="preview-canvas-label">PEARLESCENT OPAL</div>
+        </div>
+
+        <div class="color-stops">
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FFFFFF;"></span> #FFFFFF (0%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#F8FAFC;"></span> #F8FAFC (30%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#E0E7FF;"></span> #E0E7FF (70%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#C7D2FE;"></span> #C7D2FE (100%)</div>
+        </div>
+
+        <div class="specimen-box">
+          <div class="specimen-title">⚡ Penerapan Komponen UI</div>
+          
+          <!-- Text Gradient -->
+          <div class="comp-text-gradient grad-2-text">
+            Autonomous Multi-Agent
+          </div>
+
+          <!-- Border Card -->
+          <div class="comp-border-card grad-2-border">
+            <div class="comp-border-card-inner">
+              <span style="font-size:0.85rem; font-weight:600;">Consensus Engine</span>
+              <span class="pill-gradient-border" style="border: 1px solid #c7d2fe;">94.8% Confidence</span>
+            </div>
+          </div>
+
+          <!-- Button -->
+          <div class="comp-row">
+            <button class="btn-gradient grad-2-bg" onclick="copyCSS('linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #E0E7FF 70%, #C7D2FE 100%)')">
+              ✨ Run Simulation
+            </button>
+            <div class="pill-gradient-border">
+              <span>Filter:</span> <strong style="color:#e0e7ff;">PASSED</strong>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="comp-progress-wrap">
+            <div class="comp-progress-bar">
+              <div class="comp-progress-fill grad-2-bg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-text" id="code-2">linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #E0E7FF 70%, #C7D2FE 100%)</div>
+          <button class="btn-copy" onclick="copyFromElement('code-2', this)">📋 Copy CSS</button>
+        </div>
+      </div>
+
+      <!-- ── 03. Silver Quartz ── -->
+      <div class="gradient-card">
+        <div class="card-top">
+          <div>
+            <div class="num-pill">PALETTE 03</div>
+            <h2 class="gradient-name">Silver Quartz</h2>
+            <div class="gradient-category">High-Tech Translucent Glass White</div>
+          </div>
+        </div>
+
+        <div class="preview-canvas grad-3-bg">
+          <div class="preview-canvas-label" style="background: rgba(0,0,0,0.6); color: #ffffff;">SILVER QUARTZ</div>
+        </div>
+
+        <div class="color-stops">
+          <div class="color-stop-chip"><span class="color-circle" style="background:rgba(255,255,255,0.95);"></span> 95% White (0%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:rgba(241,245,249,0.6);"></span> 60% Slate (50%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:rgba(203,213,225,0.2);"></span> 20% Fade (100%)</div>
+        </div>
+
+        <div class="specimen-box">
+          <div class="specimen-title">⚡ Penerapan Komponen UI</div>
+          
+          <!-- Text Gradient -->
+          <div class="comp-text-gradient grad-3-text">
+            Glassmorphic HUD Card
+          </div>
+
+          <!-- Border Card -->
+          <div class="comp-border-card grad-3-border">
+            <div class="comp-border-card-inner">
+              <span style="font-size:0.85rem; font-weight:600;">Vector Memory LanceDB</span>
+              <span class="pill-gradient-border" style="border: 1px solid rgba(255,255,255,0.3);">Top 5 Matches</span>
+            </div>
+          </div>
+
+          <!-- Button -->
+          <div class="comp-row">
+            <button class="btn-gradient grad-3-bg" onclick="copyCSS('linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.6) 50%, rgba(203, 213, 225, 0.2) 100%)')">
+              🛡️ Inspect Pattern
+            </button>
+            <div class="pill-gradient-border">
+              <span>Cosine:</span> <strong style="color:#ffffff;">0.982</strong>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="comp-progress-wrap">
+            <div class="comp-progress-bar">
+              <div class="comp-progress-fill grad-3-bg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-text" id="code-3">linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(241,245,249,0.6) 50%, rgba(203,213,225,0.2) 100%)</div>
+          <button class="btn-copy" onclick="copyFromElement('code-3', this)">📋 Copy CSS</button>
+        </div>
+      </div>
+
+      <!-- ── 04. Starlight Velvet ── -->
+      <div class="gradient-card">
+        <div class="card-top">
+          <div>
+            <div class="num-pill">PALETTE 04</div>
+            <h2 class="gradient-name">Starlight Velvet</h2>
+            <div class="gradient-category">Warm Ivory & Champagne White</div>
+          </div>
+        </div>
+
+        <div class="preview-canvas grad-4-bg">
+          <div class="preview-canvas-label">STARLIGHT VELVET</div>
+        </div>
+
+        <div class="color-stops">
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FFFFFF;"></span> #FFFFFF (0%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FFFBEB;"></span> #FFFBEB (40%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FEF3C7;"></span> #FEF3C7 (75%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FDE68A;"></span> #FDE68A (100%)</div>
+        </div>
+
+        <div class="specimen-box">
+          <div class="specimen-title">⚡ Penerapan Komponen UI</div>
+          
+          <!-- Text Gradient -->
+          <div class="comp-text-gradient grad-4-text">
+            Gold-Hand Prestige Tier
+          </div>
+
+          <!-- Border Card -->
+          <div class="comp-border-card grad-4-border">
+            <div class="comp-border-card-inner">
+              <span style="font-size:0.85rem; font-weight:600;">Net Profit Factor</span>
+              <span class="pill-gradient-border" style="border: 1px solid #fde68a;">3.42x Max RR</span>
+            </div>
+          </div>
+
+          <!-- Button -->
+          <div class="comp-row">
+            <button class="btn-gradient grad-4-bg" onclick="copyCSS('linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 40%, #FEF3C7 75%, #FDE68A 100%)')">
+              👑 Claim Yield
+            </button>
+            <div class="pill-gradient-border">
+              <span>Tier:</span> <strong style="color:#fde68a;">GOLD VIP</strong>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="comp-progress-wrap">
+            <div class="comp-progress-bar">
+              <div class="comp-progress-fill grad-4-bg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-text" id="code-4">linear-gradient(135deg, #FFFFFF 0%, #FFFBEB 40%, #FEF3C7 75%, #FDE68A 100%)</div>
+          <button class="btn-copy" onclick="copyFromElement('code-4', this)">📋 Copy CSS</button>
+        </div>
+      </div>
+
+      <!-- ── 05. Cyber Glaze ── -->
+      <div class="gradient-card">
+        <div class="card-top">
+          <div>
+            <div class="num-pill">PALETTE 05</div>
+            <h2 class="gradient-name">Cyber Glaze</h2>
+            <div class="gradient-category">Cold Cyan-Tinted Frosted White</div>
+          </div>
+        </div>
+
+        <div class="preview-canvas grad-5-bg">
+          <div class="preview-canvas-label">CYBER GLAZE</div>
+        </div>
+
+        <div class="color-stops">
+          <div class="color-stop-chip"><span class="color-circle" style="background:#FFFFFF;"></span> #FFFFFF (0%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#F0FDFA;"></span> #F0FDFA (35%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#CCFBF1;"></span> #CCFBF1 (70%)</div>
+          <div class="color-stop-chip"><span class="color-circle" style="background:#99F6E4;"></span> #99F6E4 (100%)</div>
+        </div>
+
+        <div class="specimen-box">
+          <div class="specimen-title">⚡ Penerapan Komponen UI</div>
+          
+          <!-- Text Gradient -->
+          <div class="comp-text-gradient grad-5-text">
+            Ghost Engine Replay
+          </div>
+
+          <!-- Border Card -->
+          <div class="comp-border-card grad-5-border">
+            <div class="comp-border-card-inner">
+              <span style="font-size:0.85rem; font-weight:600;">Realtime Bridge State</span>
+              <span class="pill-gradient-border" style="border: 1px solid #99f6e4;">XAUUSD M15</span>
+            </div>
+          </div>
+
+          <!-- Button -->
+          <div class="comp-row">
+            <button class="btn-gradient grad-5-bg" onclick="copyCSS('linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 35%, #CCFBF1 70%, #99F6E4 100%)')">
+              ✂️ Jump to Bar
+            </button>
+            <div class="pill-gradient-border">
+              <span>Latency:</span> <strong style="color:#99f6e4;">0.42 ms</strong>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="comp-progress-wrap">
+            <div class="comp-progress-bar">
+              <div class="comp-progress-fill grad-5-bg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="code-box">
+          <div class="code-text" id="code-5">linear-gradient(135deg, #FFFFFF 0%, #F0FDFA 35%, #CCFBF1 70%, #99F6E4 100%)</div>
+          <button class="btn-copy" onclick="copyFromElement('code-5', this)">📋 Copy CSS</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Toast ── -->
+  <div id="toast">
+    <span>✅</span>
+    <span id="toast-msg">CSS Gradient berhasil disalin ke clipboard!</span>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      if (current === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toast-msg');
+      toastMsg.innerText = msg;
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2400);
+    }
+
+    function copyCSS(cssString) {
+      navigator.clipboard.writeText(cssString).then(() => {
+        showToast('CSS Gradient disalin: ' + cssString.substring(0, 32) + '...');
+      });
+    }
+
+    function copyFromElement(elementId, btn) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const text = el.innerText.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = '✅ Copied!';
+        btn.classList.add('copied');
+        showToast('CSS Gradient disalin ke clipboard!');
+        setTimeout(() => {
+          btn.innerText = originalText;
+          btn.classList.remove('copied');
+        }, 1800);
+      });
+    }
+  </script>
+</body>
+</html>
