@@ -32,7 +32,9 @@ from train_ml_prediction_v5_unconstrained import (  # noqa: E402
     select_and_fit_regressor,
 )
 
-ATR_FLOOR = 0.5
+# Price-Ratio Dynamic Scaling (EA Dev_Bot_v11_Gold: BaseReferencePrice=4500).
+# Target dinormalisasi ke basis harga acuan 4500, konsisten dengan scaling SL/TP EA.
+BASE_REFERENCE_PRICE = 4500.0
 
 
 def main() -> int:
@@ -43,7 +45,7 @@ def main() -> int:
     dataset = pd.read_csv(dataset_path)
     logger.info("Dataset loaded: {} samples ({} - {})", len(dataset), dataset["year"].min(), dataset["year"].max())
 
-    atr_safe = dataset["atr_14"].clip(lower=ATR_FLOOR)
+    atr_safe = dataset["entry_price"].clip(lower=1.0) / BASE_REFERENCE_PRICE
     dataset["mfe_target_norm"] = dataset["mfe_target"] / atr_safe
     dataset["mae_target_norm"] = dataset["mae_target"] / atr_safe
 
@@ -83,18 +85,19 @@ def main() -> int:
     logger.info("Synced model_v8_final_* -> model_v8_foldfinal_* (inference path)")
 
     summary = {
-        "model_type": "regression_v8_final_atr_normalized",
+        "model_type": "regression_v8_final_price_ratio_normalized",
         "training_script": "train_ml_prediction_v8_final.py",
         "train_years": f"{int(dataset['year'].min())}-{int(dataset['year'].max())}",
         "n_samples_total": n_train,
         "note": (
             "No held-out test year -- every sample (2017-2026) was used for training. "
             "This model's validity rests on the walk-forward folds (summary_v8.json) "
-            "proving the ATR-normalized approach generalizes; it has not itself been "
+            "proving the price-ratio-normalized approach generalizes; it has not itself been "
             "scored against unseen data. Blind-test with a year outside 2017-2026 "
             "(e.g. 2016) once available."
         ),
-        "atr_floor": ATR_FLOOR,
+        "normalization": "price_ratio",
+        "base_reference_price": BASE_REFERENCE_PRICE,
         "mfe_winner": mfe_winner,
         "mfe_features": mfe_features,
         "mae_winner": mae_winner,

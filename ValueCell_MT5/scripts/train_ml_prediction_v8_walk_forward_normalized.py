@@ -1,18 +1,18 @@
 """
 Walk-forward validation for ML Prediction v8 -- same expanding-window folds as
-v7, but regression targets are normalized by ATR at entry time instead of raw
-points:
+v7, but regression targets are normalized by Price-Ratio Dynamic Scaling
+(EA Dev_Bot_v11_Gold: BaseReferencePrice=4500) instead of raw points:
 
-    mfe_target_norm = mfe_target / atr_14
-    mae_target_norm = mae_target / atr_14
+    mfe_target_norm = mfe_target / (entry_price / 4500)
+    mae_target_norm = mae_target / (entry_price / 4500)
 
 Root cause this fixes: gold's price level moved from ~$1,800 (2020) to
 ~$4,600+ (2026), so raw-point MFE/MAE targets grew ~5x over the same window.
 A model trained on 2020-2025 raw points cannot extrapolate to 2026's scale
 (v7 fold2026 underestimated MFE by 2.06x and accepted zero trades). Predicting
-the ATR-relative ratio instead lets the model learn "how big a move is
-relative to current volatility", which stays roughly stable across price
-regimes; predictions are converted back to points (* ATR) after inference.
+the price-ratio-relative target instead lets the model learn "how big a move is
+relative to current price level", exactly matching how the EA scales SL/TP/lot;
+predictions are converted back to points (* entry_price / 4500) after inference.
 
 IMPORTANT: mfe_target_norm/mae_target_norm must be dropped from the feature
 matrix before fitting -- otherwise the target leaks into its own features
@@ -48,20 +48,21 @@ from train_ml_prediction_v5_unconstrained import (  # noqa: E402
 )
 
 TEST_YEARS = [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
-ATR_FLOOR = 0.5
+# Price-Ratio Dynamic Scaling (EA Dev_Bot_v11_Gold: BaseReferencePrice=4500)
+BASE_REFERENCE_PRICE = 4500.0
 
 
 def main() -> int:
     output_dir = PYTHON_DIR / "valuecell" / "models" / "saved" / "filter_latest"
     dataset_path = output_dir / "dataset_v5_unconstrained.csv"
 
-    logger.info("=== ML Prediction v8 Walk-Forward (ATR-Normalized Targets) ===")
+    logger.info("=== ML Prediction v8 Walk-Forward (Price-Ratio Normalized Targets) ===")
     dataset = pd.read_csv(dataset_path)
     logger.info("Dataset loaded: {} samples ({} - {})", len(dataset), dataset["year"].min(), dataset["year"].max())
 
-    atr_safe = dataset["atr_14"].clip(lower=ATR_FLOOR)
-    dataset["mfe_target_norm"] = dataset["mfe_target"] / atr_safe
-    dataset["mae_target_norm"] = dataset["mae_target"] / atr_safe
+    price_ratio_safe = (dataset["entry_price"] / BASE_REFERENCE_PRICE).clip(lower=1.0 / BASE_REFERENCE_PRICE)
+    dataset["mfe_target_norm"] = dataset["mfe_target"] / price_ratio_safe
+    dataset["mae_target_norm"] = dataset["mae_target"] / price_ratio_safe
 
     model_df, _, _ = build_feature_matrix_v5(dataset)
     # Critical: drop the normalized targets from the feature matrix so they
@@ -94,7 +95,7 @@ def main() -> int:
         )
         pred_mae_norm = mae_model.predict(mae_scaler.transform(model_df.loc[test_mask, mae_features]))
 
-        atr_test = atr_safe.loc[test_mask].values
+        atr_test = price_ratio_safe.loc[test_mask].values
         pred_mfe_points = pred_mfe_norm * atr_test
         pred_mae_points = pred_mae_norm * atr_test
 
@@ -148,14 +149,16 @@ def main() -> int:
     fold_report.to_csv(fold_report_path, index=False)
 
     summary = {
-        "model_type": "regression_v8_walk_forward_atr_normalized",
+        "model_type": "regression_v8_walk_forward_price_ratio_normalized",
         "training_script": "train_ml_prediction_v8_walk_forward_normalized.py",
         "test_years": TEST_YEARS,
-        "note": "Same walk-forward folds as v7, but targets are ATR-normalized "
-                "(mfe_target/atr_14, mae_target/atr_14) to fix extrapolation failure "
-                "across gold's 2020->2026 price regime shift (~2.6x). Predictions "
-                "converted back to points via * atr_14 before scoring.",
-        "atr_floor": ATR_FLOOR,
+        "note": "Same walk-forward folds as v7, but targets are price-ratio normalized "
+                "(mfe_target/(entry_price/4500), mae_target/(entry_price/4500)) to fix "
+                "extrapolation failure across gold's 2020->2026 price regime shift (~2.6x). "
+                "Matches EA Dev_Bot_v11_Gold Price-Ratio Dynamic Scaling (BaseReferencePrice=4500). "
+                "Predictions converted back to points via * entry_price / 4500 before scoring.",
+        "normalization": "price_ratio",
+        "base_reference_price": BASE_REFERENCE_PRICE,
         "folds": fold_summaries,
     }
     (output_dir / "summary_v8.json").write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")

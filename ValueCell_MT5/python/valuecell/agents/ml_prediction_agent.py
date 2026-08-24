@@ -77,6 +77,20 @@ class MLPredictionAgent:
         is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8")
         if is_regression and self.metadata and "optimal_rr_threshold" in self.metadata:
             self.threshold = float(self.metadata["optimal_rr_threshold"])
+
+        # ML gate config (anti-overfit, dipilih dari struktur walk-forward, bukan grid search):
+        # - RR_GATE_THRESHOLD=1.0: hanya veto trade dengan expected RR ekstrem buruk.
+        #   Grid OOS menunjukkan 0.8-1.2 semua profit; 1.0 = tengah zona stabil.
+        # - GATE_MIN_TRAIN_SAMPLES=500: gate OFF saat fold dilatih < 500 sampel
+        #   (fold awal 2020-2021 terbukti salah pilah karena data tipis).
+        self.rr_gate_threshold = 1.0
+        self.gate_min_train_samples = int(
+            (self.metadata or {}).get("gate_min_train_samples", 500)
+        )
+        # Jumlah sampel training fold produksi aktif (dari metadata jika ada).
+        self.production_train_samples = int(
+            (self.metadata or {}).get("production_train_samples", 10**9)
+        )
         
         logger.info(
             f"✅ {self.name} v{self.version} initialized | "
@@ -96,9 +110,14 @@ class MLPredictionAgent:
             # Check model type
             self.model_type = self.metadata.get("model_type", "classification")
             
-            # Targets are ATR-normalized (mfe_target/atr_14, mae_target/atr_14) in v8+;
-            # predictions must be multiplied back by current atr_14 to get points.
+            # Targets are normalized in v8+; predictions must be denormalized to points.
+            # Price-Ratio Dynamic Scaling (EA Dev_Bot_v11_Gold: BaseReferencePrice=4500):
+            # training target = target_points / (entry_price / 4500), so inference
+            # multiplies back by entry_price / 4500.
             self.norm_target = self.model_type.startswith("regression_v8")
+            self.base_reference_price = float(
+                self.metadata.get("base_reference_price", 4500.0)
+            )
 
             if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
                 # Load MFE model and scaler
@@ -111,7 +130,7 @@ class MLPredictionAgent:
 
                 logger.info("✅ v5 Dual Regression Models and Scalers loaded successfully.")
             elif self.model_type.startswith("regression_v8"):
-                # v8: walk-forward fold model, trained on 2020-2025 with ATR-normalized
+                # v8: walk-forward fold model, trained with price-ratio normalized
                 # targets (fixes extrapolation failure across gold's price regime shift).
                 fold = self.metadata.get("production_fold", "2026")
                 self.mfe_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mfe.pkl")
@@ -120,7 +139,7 @@ class MLPredictionAgent:
                 self.mae_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mae.pkl")
                 self.mae_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mae.pkl")
 
-                logger.info(f"✅ v8 Dual Regression Models (fold{fold}, ATR-normalized) and Scalers loaded successfully.")
+                logger.info(f"✅ v8 Dual Regression Models (fold{fold}, price-ratio normalized) and Scalers loaded successfully.")
             else:
                 # Load standard classification model and scaler
                 model_file = self.model_path / "filter_model_xgb.pkl"
@@ -507,27 +526,47 @@ class MLPredictionAgent:
                 mae_scaled_df = pd.DataFrame(mae_scaled, columns=mae_feat_names)
                 predicted_mae = float(self.mae_model.predict(mae_scaled_df)[0])
 
-                # v8 targets are ATR-normalized (mfe_target/atr_14) -- convert back to points
+                # v8 targets are price-ratio normalized (target/(entry_price/4500)) --
+                # convert back to points by multiplying with entry_price / 4500
                 if getattr(self, "norm_target", False):
-                    atr_14_now = max(0.5, float(features.get("atr_14", 0.5)))
-                    predicted_mfe *= atr_14_now
-                    predicted_mae *= atr_14_now
+                    price_ratio_now = max(entry_price, 1.0) / self.base_reference_price
+                    predicted_mfe *= price_ratio_now
+                    predicted_mae *= price_ratio_now
 
                 # Ensure predicted values are reasonable/positive
                 predicted_mfe = max(0.0, predicted_mfe)
                 predicted_mae = max(1.0, predicted_mae)
 
                 expected_rr = predicted_mfe / predicted_mae
-                
-                # Consensus signal based on expected_rr vs threshold
-                if expected_rr >= self.threshold:
+
+                # ML gate anti-overfit: gate hanya VETO jika (a) fold produksi
+                # dilatih dengan cukup sampel, dan (b) expected RR di bawah
+                # ambang veto. Di atas ambang = teruskan tanpa menyentuh sinyal
+                # (EA filter tetap otoritatif). Fold tipis = gate pasif.
+                gate_active = self.production_train_samples >= self.gate_min_train_samples
+                if not gate_active or expected_rr >= self.rr_gate_threshold:
                     signal = structure_signal
-                    confidence = min(1.0, expected_rr / 2.0) # Map to confidence score
-                    reasoning = f"Model predicts favorable dynamic R:R = {expected_rr:.2f} (predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) which is above the threshold ({self.threshold:.2f})."
+                    confidence = min(1.0, max(0.65, expected_rr / 3.0))
+                    if not gate_active:
+                        reasoning = (
+                            f"ML gate pasif (fold training {self.production_train_samples} < "
+                            f"{self.gate_min_train_samples} sampel). Sinyal {structure_signal} diteruskan "
+                            f"dengan prediksi R:R = {expected_rr:.2f} (MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts)."
+                        )
+                    else:
+                        reasoning = (
+                            f"Model predicts favorable dynamic R:R = {expected_rr:.2f} "
+                            f"(predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) "
+                            f"which is above the veto threshold ({self.rr_gate_threshold:.2f})."
+                        )
                 else:
                     signal = "HOLD"
-                    confidence = max(0.0, min(1.0, 1.0 - (expected_rr / self.threshold) if self.threshold > 0 else 0.5))
-                    reasoning = f"Model predicts unfavorable dynamic R:R = {expected_rr:.2f} (predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) which is below the threshold ({self.threshold:.2f}). Filtering setup."
+                    confidence = max(0.0, min(1.0, 1.0 - (expected_rr / self.rr_gate_threshold) if self.rr_gate_threshold > 0 else 0.5))
+                    reasoning = (
+                        f"Model predicts unfavorable dynamic R:R = {expected_rr:.2f} "
+                        f"(predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) "
+                        f"which is below the veto threshold ({self.rr_gate_threshold:.2f}). Filtering setup."
+                    )
                 
                 # Top contributing features
                 top_features = [{"name": name, "value": features[name], "importance": 1.0} for name in mfe_feat_names[:5]]
@@ -544,7 +583,8 @@ class MLPredictionAgent:
                     "predicted_mfe": round(predicted_mfe, 2),
                     "predicted_mae": round(predicted_mae, 2),
                     "expected_rr": round(expected_rr, 3),
-                    "threshold": self.threshold,
+                    "threshold": self.rr_gate_threshold,
+                    "gate_active": gate_active,
                     "features": features,
                     "top_features": top_features,
                     "model_type": self.model_type,

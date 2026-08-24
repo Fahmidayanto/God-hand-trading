@@ -1,63 +1,116 @@
 {
-  "model_type": "regression_v8_final_atr_normalized",
-  "version": "v8_final_atr_normalized_20260720",
-  "created_at": "2026-07-20T03:02:53.708000",
-  "training_script": "train_ml_prediction_v8_final.py",
-  "production_fold": "final",
-  "note": "Production model = v8 final (no held-out year, trained on the entire 2017-2026 dataset, 2384 samples). Promoted to production after blind-testing on 2015 (242 samples, genuinely never trained on) and 2016 (244 samples, genuinely never trained on) -- both years profitable and reasonably calibrated (bias close to 1.0), though prediction accuracy (R2) is weaker the further back from the training window. See blind_test_results below. Model files are physically named model_v8_foldfinal_{mfe,mae}.pkl / scaler_v8_foldfinal_{mfe,mae}.pkl (copied from model_v8_final_*.pkl to fit MLPredictionAgent's existing fold{N} loading convention -- no code change needed). Targets are ATR-normalized (mfe_target/atr_14, mae_target/atr_14); predictions are converted back to points via * atr_14 at inference time (see ml_prediction_agent.py norm_target handling).",
-  "n_samples_total": 2384,
-  "train_years": "2017-2026",
-  "mfe_winner_name": "XGBoost_d3_n120_lr002_f10",
+  "model_type": "regression_v5",
+  "version": "v5_unconstrained_20260824_080649",
+  "created_at": "2026-08-24T08:06:49.855236",
+  "training_script": "train_ml_prediction_v5_unconstrained.py",
+  "n_samples_total": 1942,
+  "mfe_winner_name": "RandomForest_d5_n200_leaf15_f15",
   "mfe_features": [
-    "atr_14_pct",
     "session_range_points",
-    "last_bos_age_hours",
-    "session_is_dst_NO",
-    "last_choch_direction",
     "distance_to_session_high_atr",
-    "hour_of_day",
-    "distance_to_last_ll_pips",
-    "distance_to_session_low_atr",
-    "h4_atr_14_pct"
-  ],
-  "mae_winner_name": "RandomForest_d5_n200_leaf15_f25",
-  "mae_features": [
-    "atr_14_pct",
-    "hour_of_day",
-    "last_choch_direction",
-    "h4_vol_ratio",
-    "choch_to_bos_hours",
+    "last_choch_age_hours",
+    "h4_atr_14_pct",
+    "h4_atr_14",
     "distance_to_session_low_atr",
     "price_position_session_range",
-    "h1_vol_ratio",
-    "distance_to_last_ll_pips",
-    "distance_to_session_high_atr",
-    "session_name_Tokyo_London_Overlap",
-    "h1_atr_14_pct",
-    "h4_atr_14_pct",
-    "momentum_3_atr",
-    "last_choch_age_hours",
-    "atr_14",
-    "momentum_5_atr",
-    "h1_ext_ema200_distance_atr",
-    "momentum_10_atr",
     "vol_ratio",
+    "init_risk_pct",
+    "h1_vol_ratio",
+    "spread_pct",
+    "h4_ema200_distance_pct",
+    "momentum_3_atr",
+    "distance_to_last_ll_pips",
+    "spread"
+  ],
+  "mfe_metrics": {
+    "train": {
+      "r2": -1.5648242270395682,
+      "mae": 2041.1112077669563,
+      "y_mean": 1378.0530451866405,
+      "y_pred_mean": 3312.3064376065763,
+      "y_std": 1433.0997365789062
+    },
+    "validation": {
+      "r2": -0.15384587704537234,
+      "mae": 2845.3174335747754,
+      "y_mean": 3405.9565217391296,
+      "y_pred_mean": 5048.549283591924,
+      "y_std": 3339.227517670639
+    },
+    "test": {
+      "r2": 0.058012230756216976,
+      "mae": 5684.1813874486115,
+      "y_mean": 8129.462962962959,
+      "y_pred_mean": 6961.723873050366,
+      "y_std": 9726.340658768899
+    }
+  },
+  "mae_winner_name": "RandomForest_d5_n200_leaf15_f15",
+  "mae_features": [
+    "h1_atr_14_pct",
     "distance_to_last_hh_pips",
+    "h1_atr_14",
+    "price_position_session_range",
+    "h4_atr_14_pct",
+    "atr_14_pct",
+    "m15_ema200_distance_pct",
+    "distance_to_last_ll_pips",
+    "distance_to_session_low_atr",
     "session_range_points",
     "m15_ema200_distance_atr",
-    "h4_atr_14",
+    "distance_to_session_high_atr",
+    "h1_ext_ema200_distance_atr",
+    "h4_vol_ratio",
     "minutes_from_session_open"
   ],
-  "optimal_rr_threshold": 1.0,
-  "optimal_rr_threshold_source": "Carried over from the walk-forward S4 baseline threshold (not independently re-tuned for v8_final specifically) -- 2015+2016 blind-test sample size (486 rows combined) was judged too small for a robust dedicated grid search.",
-  "blind_test_results": {
-    "2015_full_year": {"samples": 242, "mfe_r2": -0.0594, "mae_r2": 0.0186, "mfe_bias": 0.9955, "mae_bias": 0.9919, "s4_trades": 106, "s4_win_rate": 0.547, "s4_net_profit": 1516.46, "s4_profit_factor": 1.75, "s5_trades": 97, "s5_win_rate": 0.557, "s5_net_profit": 1532.94, "s5_profit_factor": 1.82},
-    "2016_full_year": {"samples": 244, "mfe_r2": 0.2713, "mae_r2": 0.0832, "mfe_bias": 1.0659, "mae_bias": 1.0181, "s4_trades": 116, "s4_win_rate": 0.569, "s4_net_profit": 2990.88, "s4_profit_factor": 2.24, "s5_trades": 112, "s5_win_rate": 0.589, "s5_net_profit": 3238.21, "s5_profit_factor": 2.49}
+  "mae_metrics": {
+    "train": {
+      "r2": -1.9363717772095907,
+      "mae": 1971.773955278211,
+      "y_mean": 1341.5717092337923,
+      "y_pred_mean": 3223.633638610881,
+      "y_std": 1279.9059884939181
+    },
+    "validation": {
+      "r2": -0.08526123593804624,
+      "mae": 2081.3704177282143,
+      "y_mean": 2729.2134387351816,
+      "y_pred_mean": 4020.653067379482,
+      "y_std": 2589.4833863594085
+    },
+    "test": {
+      "r2": 0.04688827972458376,
+      "mae": 3628.585980581369,
+      "y_mean": 5659.345679012348,
+      "y_pred_mean": 5225.001432753041,
+      "y_std": 4858.765945515816
+    }
   },
-  "in_sample_reference": {
-    "note": "2017-2026 in-sample Scenario 4/5 (model already trained on this data -- optimistic, not a validity claim, kept for reference only)",
-    "s4_net_profit": 69881.91, "s4_profit_factor": 2.60,
-    "s5_net_profit": 70021.36, "s5_profit_factor": 2.61
+  "optimal_rr_threshold": 0.85,
+  "best_validation_threshold": {
+    "split": "validation_2025",
+    "rr_threshold": 0.85,
+    "candidates": 253,
+    "accepted": 187,
+    "accepted_rate": 0.7391304347826086,
+    "winrate": 0.3155080213903743,
+    "net_profit": 5451.955333333331,
+    "avg_net_profit": 29.154841354723693,
+    "profit_factor": 2.1248598934122582,
+    "max_drawdown": -930.5833333333335,
+    "expectancy": 29.154841354723693
   },
-  "previous_model": "regression_v8_walk_forward_atr_normalized fold2026 (production_fold=2026, trained on 2017-2025, walk-forward validated) -- see summary_v8.json for its fold-by-fold metrics"
+  "test_metrics_at_optimal_threshold": {
+    "split": "test_2026",
+    "rr_threshold": 0.85,
+    "candidates": 162,
+    "accepted": 148,
+    "accepted_rate": 0.9135802469135802,
+    "winrate": 0.33783783783783783,
+    "net_profit": 6984.592533333333,
+    "avg_net_profit": 47.19319279279279,
+    "profit_factor": 2.146881992461127,
+    "max_drawdown": -1340.7646666666678,
+    "expectancy": 47.19319279279279
+  }
 }
