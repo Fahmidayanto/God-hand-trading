@@ -163,9 +163,22 @@
             stroke-dasharray: 8 6;
             animation: flowDash 24s linear infinite;
             pointer-events: none;
-            transition: stroke 0.25s ease, stroke-width 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
-            opacity: 0.8;
+            transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+            opacity: 0.85;
             filter: drop-shadow(0 0 5px var(--line-color, rgba(0, 229, 255, 0.5)));
+        }
+
+        /* Live Drafting Rubber-band Line */
+        .draft-flow-line {
+            fill: none;
+            stroke: #ffeb3b !important;
+            stroke-width: 3.5px !important;
+            stroke-dasharray: 8 5 !important;
+            filter: drop-shadow(0 0 10px #ffeb3b) !important;
+            animation: flowDash 4s linear infinite !important;
+            pointer-events: none !important;
+            opacity: 1 !important;
+            z-index: 200;
         }
 
         .flow-path.dimmed {
@@ -2366,68 +2379,79 @@
 
                 <!-- Content panels populated dynamically -->
                 <div class="panel-content" id="panel-orch-to-msa-info">
-                    <h2 class="panel-section-title">Data Transfer: Orchestrator ➔ Market Structure Agent</h2>
-                    <p class="panel-text">Kontrak delegasi tugas dari Orchestrator ke Market Structure Agent (MSA) untuk menganalisis 3 jenis event struktur pasar (CHoCH, HH/LL, BoS) dengan konteks multi-timeframe dan pencocokan kemiripan vektor LanceDB.</p>
+                    <h2 class="panel-section-title">Data Transfer: Orchestrator &rarr; Market Structure Agent</h2>
+                    <p class="panel-text">Kontrak pemanggilan modul dari Orchestrator ke Market Structure Agent melalui metode Python <code>msa.analyze(...)</code> untuk mengevaluasi 3 jenis event struktur pasar (CHoCH, HH/LL, BoS).</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">1. Delegasi Event 1: CHoCH (Change of Character - Inisiasi Pembalikan)</span>
+                            <span class="meta-label">1. Delegasi Event 1: CHoCH (Inisiasi Pembalikan Tren)</span>
                             <span class="meta-value">
-                                • <strong>Konteks:</strong> Terjadi saat harga menembus batas swing sebelumnya (patah struktur awal).<br>
-                                • <strong>Instruksi ORCH ke MSA:</strong> Reset siklus lama, buka analisis arah baru, dan validasi karakter pembalikan tren.
+                                &bull; <strong>Konteks:</strong> Event terbaru di <code>structure_events[0]</code> adalah <code>CHoCH</code> (patah struktur awal).<br>
+                                &bull; <strong>Perilaku MSA:</strong> Reset siklus lama, set state ke <code>IDLE</code>, dan kembalikan sinyal <code>HOLD</code>.
                             </span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
-                                [Payload ORCH ➔ MSA - Kasus CHoCH]:<br>
+                                [Parameter Aktual &amp; Nilai Riil - Kasus CHoCH]:<br>
                                 {<br>
-                                &nbsp;&nbsp;"action": "ANALYZE_CHOCH_REVERSAL",<br>
                                 &nbsp;&nbsp;"symbol": "XAUUSD",<br>
-                                &nbsp;&nbsp;"timeframe": "M15",<br>
-                                &nbsp;&nbsp;"event_type": "CHOCH_BULLISH",<br>
-                                &nbsp;&nbsp;"broken_resistance": 2640.00,<br>
-                                &nbsp;&nbsp;"candle_close": 2645.50,<br>
-                                &nbsp;&nbsp;"multi_tf_ema": { "m15_ema200": 2638.20, "h1_ema200": 2630.50, "h4_ema200": 2615.00 },<br>
-                                &nbsp;&nbsp;"last_swing_events": ["LL_4309.97", "Accepted"]<br>
-                                }
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"df_m15": "&lt;DataFrame: close=2632.50, ema200=2638.20&gt;",<br>
+                                &nbsp;&nbsp;"structure_events": [<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "CHoCH", "direction": "Bullish", "price": 2632.50, "status": "Accepted" }<br>
+                                &nbsp;&nbsp;],<br>
+                                &nbsp;&nbsp;"price_ratio": 0.5850,<br>
+                                &nbsp;&nbsp;"veto_mode": "hard"<br>
+                                }<br>
+                                <span style="color:#80d8ff;">&rarr; Output MSA:</span> { "signal": "HOLD", "confidence": 0.0, "phase": "IDLE" }
                             </div>
                         </li>
 
                         <li>
                             <span class="meta-label">2. Delegasi Event 2: HH / LL (Swing Points - Setup &amp; Pemanasan)</span>
                             <span class="meta-value">
-                                • <strong>Konteks:</strong> Terjadi saat titik puncak baru (Higher High) atau lembah baru (Lower Low) terkunci.<br>
-                                • <strong>Instruksi ORCH ke MSA:</strong> Kalkulasi keselarasan Multi-TF EMA (M15 +0.2, H1 +0.1, H4 +0.1), cari kemiripan pola di LanceDB, dan terbitkan status <code>PENDING_SETUP</code> untuk warmup multi-agen.
+                                &bull; <strong>Konteks:</strong> Titik swing baru terbentuk setelah CHoCH (misal: <code>HH @ 2648.80</code>).<br>
+                                &bull; <strong>Perilaku MSA:</strong> Validasi sekuens CHoCH (lookback 10 event), query LanceDB (16-D), hitung initial confidence (0.40 + boost), set state ke <code>PENDING_SETUP</code>, dan kembalikan <code>pre_signal</code> untuk pemanasan agen lain.
                             </span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
-                                [Payload ORCH ➔ MSA - Kasus HH / LL]:<br>
+                                [Parameter Aktual &amp; Nilai Riil - Kasus HH / LL]:<br>
                                 {<br>
-                                &nbsp;&nbsp;"action": "EVALUATE_SWING_UPDATE",<br>
                                 &nbsp;&nbsp;"symbol": "XAUUSD",<br>
-                                &nbsp;&nbsp;"swing_type": "HH",<br>
-                                &nbsp;&nbsp;"swing_price": 2648.80,<br>
-                                &nbsp;&nbsp;"price_ratio": 0.7511,<br>
                                 &nbsp;&nbsp;"session": "London",<br>
-                                &nbsp;&nbsp;"lancedb_vector_search": true,<br>
-                                &nbsp;&nbsp;"expected_phase": "PENDING_SETUP_WARMUP"<br>
-                                }
+                                &nbsp;&nbsp;"df_m15": "&lt;DataFrame: 200 bar, close=2648.80, ema200=2638.20, atr=8.50&gt;",<br>
+                                &nbsp;&nbsp;"df_h1": "&lt;DataFrame: 50 bar, ema200=2635.10&gt;",<br>
+                                &nbsp;&nbsp;"df_h4": "&lt;DataFrame: 20 bar, ema200=2628.40&gt;",<br>
+                                &nbsp;&nbsp;"structure_events": [<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "HH", "direction": "Bullish", "price": 2648.80, "timeframe": "M15", "status": "Accepted" },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "HL", "direction": "Bullish", "price": 2635.10, "timeframe": "M15", "status": "Accepted" },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "CHoCH", "direction": "Bullish", "price": 2632.50, "timeframe": "M15", "status": "Accepted" }<br>
+                                &nbsp;&nbsp;],<br>
+                                &nbsp;&nbsp;"price_ratio": 0.5886,<br>
+                                &nbsp;&nbsp;"veto_mode": "hard"<br>
+                                }<br>
+                                <span style="color:#80d8ff;">&rarr; Output MSA:</span> { "signal": "HOLD", "confidence": 0.700, "phase": "PENDING_SETUP", "pre_signal": { "setup_id": "msa-a3f9c1d2b4e87f23", "hh_price": 2648.80, "initial_confidence": 0.700, "win_rate_historical": 0.785, "pattern_count": 14 } }
                             </div>
                         </li>
 
                         <li>
                             <span class="meta-label">3. Delegasi Event 3: BoS (Break of Structure - Pemicu Eksekusi)</span>
                             <span class="meta-value">
-                                • <strong>Konteks:</strong> Terjadi saat candle berikutnya menembus level HH atau LL setelah pullback selesai.<br>
-                                • <strong>Instruksi ORCH ke MSA:</strong> Ubah sinyal dari <code>HOLD</code> menjadi <code>BUY</code> atau <code>SELL</code> terkonfirmasi, tentukan confidence final MSA (misal: 0.85), dan serahkan ke Consensus Engine.
+                                &bull; <strong>Konteks:</strong> Candle berikutnya menembus level HH/LL terkunci (misal close di 2652.30 &gt; 2648.80).<br>
+                                &bull; <strong>Perilaku MSA:</strong> Hitung Multi-TF score (+0.4) + LanceDB boost (+0.30) &rarr; ubah sinyal jadi <code>BUY</code> (conf: 0.85), set state ke <code>BOS_TRIGGERED</code>, dan setorkan ke Orchestrator voting.
                             </span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
-                                [Payload ORCH ➔ MSA - Kasus BoS Trigger]:<br>
+                                [Parameter Aktual &amp; Nilai Riil - Kasus BoS Trigger]:<br>
                                 {<br>
-                                &nbsp;&nbsp;"action": "CONFIRMED_BOS_ENTRY_TRIGGER",<br>
                                 &nbsp;&nbsp;"symbol": "XAUUSD",<br>
-                                &nbsp;&nbsp;"bos_direction": "Bullish",<br>
-                                &nbsp;&nbsp;"breakout_price": 2652.30,<br>
-                                &nbsp;&nbsp;"trigger_candle_close": 2652.30,<br>
-                                &nbsp;&nbsp;"atr14": 24.5,<br>
-                                &nbsp;&nbsp;"pipeline_action": "EXECUTE_CONSENSUS_VOTING"<br>
-                                }
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"df_m15": "&lt;DataFrame: close=2652.30, ema200=2638.20&gt;",<br>
+                                &nbsp;&nbsp;"df_h1": "&lt;DataFrame: ema200=2635.10&gt;",<br>
+                                &nbsp;&nbsp;"df_h4": "&lt;DataFrame: ema200=2628.40&gt;",<br>
+                                &nbsp;&nbsp;"structure_events": [<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "BoS", "direction": "Bullish", "price": 2652.30, "timeframe": "M15", "status": "Accepted" },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;{ "type": "HH", "direction": "Bullish", "price": 2648.80, "timeframe": "M15", "status": "Accepted" }<br>
+                                &nbsp;&nbsp;],<br>
+                                &nbsp;&nbsp;"price_ratio": 0.5894,<br>
+                                &nbsp;&nbsp;"veto_mode": "hard"<br>
+                                }<br>
+                                <span style="color:#80d8ff;">&rarr; Output MSA:</span> { "signal": "BUY", "confidence": 0.850, "phase": "BOS_TRIGGERED" }
                             </div>
                         </li>
                     </ul>
@@ -2636,64 +2660,132 @@
                     <p class="panel-text">Memvalidasi bahwa sebelum terbentuknya titik swing baru (HH/LL), memang telah terjadi pembalikan tren awal (CHoCH) yang valid.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">Fungsi Validasi</span>
-                            <span class="meta-value"><code>_has_recent_choch(direction, max_lookback=10)</code></span>
-                        </li>
-                        <li>
-                            <span class="meta-label">Aturan Sekuens</span>
+                            <span class="meta-label">1. Logika Validasi Sekuens</span>
                             <span class="meta-value">
-                                &bull; <strong>Bullish Setup:</strong> CHoCH Bullish aktif diikuti pembentukan <code>HH</code>.<br>
-                                &bull; <strong>Bearish Setup:</strong> CHoCH Bearish aktif diikuti pembentukan <code>LL</code>.
+                                &bull; Fungsi: <code>_has_recent_choch(direction, max_lookback=10)</code><br>
+                                &bull; Iterasi mundur: <code>events[1:max_lookback]</code> — memeriksa hingga 9 event sebelum HH/LL.<br>
+                                &bull; <strong>Bullish Sekuens:</strong> CHoCH Bullish aktif mendahului pembentukan <code>HH</code>.<br>
+                                &bull; <strong>Bearish Sekuens:</strong> CHoCH Bearish aktif mendahului pembentukan <code>LL</code>.
                             </span>
                         </li>
                         <li>
-                            <span class="meta-label">Pencegahan Konflik</span>
-                            <span class="meta-value">Jika ditemukan BoS lama di tengah sekuens, siklus CHoCH sebelumnya dianggap selesai dan dibatalkan agar tidak tertukar dengan arah setup baru.</span>
+                            <span class="meta-label">2. Ilustrasi Lookback 10 Event (Bukan 10 Candle)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(0,0,0,0.35); border-radius: 6px; font-size: 0.71rem; line-height: 1.7; font-family: monospace; color: #cfd8dc;">
+                                <span style="color:#90a4ae;">// Event = kejadian struktur pasar (CHoCH/BoS/HH/LL)</span><br>
+                                <span style="color:#90a4ae;">// Satu event bisa terbentuk setelah puluhan candle berlalu</span><br><br>
+                                <span style="color:#fff;">[0]</span> <span style="color:#ffcc80;">HH</span> &nbsp;&nbsp;&larr; sedang dievaluasi (e1)<br>
+                                <span style="color:#fff;">[1]</span> HL &nbsp;&nbsp;&nbsp;engine mundur ...<br>
+                                <span style="color:#fff;">[2]</span> <span style="color:#69f0ae;">CHoCH Bullish</span> &larr; <span style="color:#69f0ae;">KETEMU! result = True ✅</span><br>
+                                <span style="color:#fff;">[3]</span> LL<br>
+                                <span style="color:#fff;">[4]</span> <span style="color:#ff5252;">BoS</span> &nbsp;&nbsp;&nbsp;&larr; <span style="color:#ff5252;">kalau ini ditemukan dulu → BATAL ❌</span><br>
+                                <span style="color:#90a4ae;">...</span><br>
+                                <span style="color:#fff;">[9]</span> <span style="color:#90a4ae;">(batas akhir lookback — CHoCH kadaluarsa)</span>
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Contoh Payload Data Riil (Evaluasi CHoCH XAUUSD)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(0, 229, 255, 0.04); border-left: 3px solid #00e5ff; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"eval_function": "_has_recent_choch('Bullish', max_lookback=10)",<br>
+                                &nbsp;&nbsp;"event_e1_type": "HH",<br>
+                                &nbsp;&nbsp;"event_e1_direction": "BULLISH",<br>
+                                &nbsp;&nbsp;"lookback_scanned": 9,<br>
+                                &nbsp;&nbsp;"bos_found_in_lookback": false,<br>
+                                &nbsp;&nbsp;"choch_found_direction": "BULL",<br>
+                                &nbsp;&nbsp;"result": true,<br>
+                                &nbsp;&nbsp;"triggered_branch": "PENDING_SETUP - Bullish (CHoCH + HH)",<br>
+                                &nbsp;&nbsp;"signal_output": "HOLD"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">4. Aturan Gugurnya Siklus (Sequence Hygiene)</span>
+                            <span class="meta-value">
+                                &bull; <strong>BoS Ditemukan Duluan:</strong> Jika ditemukan event <code>BoS</code> sebelum CHoCH saat iterasi mundur, fungsi langsung kembalikan <code>False</code> — siklus CHoCH dianggap sudah selesai.<br>
+                                &bull; <strong>Lookback Habis:</strong> Jika sudah iterasi 9 event tanpa CHoCH ditemukan, fungsi kembalikan <code>False</code> — CHoCH kadaluarsa.
+                            </span>
                         </li>
                     </ul>
                 </div>
 
                 <div class="panel-content" id="panel-ms-sub2">
                     <h2 class="panel-section-title">MSA Step 2: Mengunci Level Breakout</h2>
-                    <p class="panel-text">Mengunci koordinat harga tertinggi (HH) atau terendah (LL) sebagai level ambang batas pemicu BoS.</p>
+                    <p class="panel-text">Mengunci koordinat harga tertinggi (HH) atau terendah (LL) sebagai level ambang batas pemicu BoS, sekaligus menghitung keyakinan awal dan memulai query LanceDB.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">Penyimpanan Level Referensi</span>
+                            <span class="meta-label">1. Penyimpanan Level Referensi</span>
                             <span class="meta-value">
-                                &bull; Bullish: <code>self._pending_hh_price = price</code><br>
-                                &bull; Bearish: <code>self._pending_ll_price = price</code>
+                                &bull; Bullish Setup: <code>self._pending_hh_price = price</code> (contoh: 2648.80)<br>
+                                &bull; Bearish Setup: <code>self._pending_ll_price = price</code> (contoh: 2620.40)<br>
+                                &bull; Query LanceDB langsung dijalankan di step ini untuk menyiapkan <code>win_rate_historical</code> dan <code>pattern_count</code>.<br>
+                                &bull; State machine: <code>self._phase = AgentPhase.PENDING_SETUP</code>
                             </span>
                         </li>
                         <li>
-                            <span class="meta-label">Fungsi Ambang Batas</span>
-                            <span class="meta-value">Level ini menjadi batas mutlak untuk lilin candle M15 di masa depan. Konfirmasi BoS hanya sah jika harga penutupan (close) menembus melampaui level referensi ini.</span>
+                            <span class="meta-label">2. Contoh Payload Data Riil — <code>pre_signal</code> (XAUUSD M15)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(0, 229, 255, 0.04); border-left: 3px solid #00e5ff; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"setup_id": "sha256:a3f9c...b72e",<br>
+                                &nbsp;&nbsp;"event_type": "HH",<br>
+                                &nbsp;&nbsp;"direction": "Bullish",<br>
+                                &nbsp;&nbsp;"hh_price": 2648.80,<br>
+                                &nbsp;&nbsp;"ll_price": null,<br>
+                                &nbsp;&nbsp;"initial_confidence": 0.700,<br>
+                                &nbsp;&nbsp;"win_rate_historical": 0.785,<br>
+                                &nbsp;&nbsp;"pattern_count": 14,<br>
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"status": "PENDING_SETUP - menunggu BoS"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Aturan Validasi Breakout</span>
+                            <span class="meta-value">
+                                &bull; <strong>Konfirmasi Sah:</strong> BoS hanya terpicu jika harga penutupan lilin (Candle Close) menembus melampaui level terkunci.<br>
+                                &bull; <strong>Filter False Breakout:</strong> Sentuhan sesaat atau penolakan ekor (wick rejection) tidak diakui sebagai BoS.
+                            </span>
                         </li>
                     </ul>
                 </div>
 
                 <div class="panel-content" id="panel-ms-sub3">
                     <h2 class="panel-section-title">MSA Step 3: Kemiripan Pola (LanceDB)</h2>
-                    <p class="panel-text">Pencarian pola historis ke database vektor LanceDB untuk mengekstrak statistik performa BoS masa lalu.</p>
+                    <p class="panel-text">Pencarian pola historis ke database vektor LanceDB untuk mengekstrak statistik performa BoS masa lalu menggunakan vektor 16-dimensi.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">Query Pencocokan Vektor</span>
-                            <span class="meta-value"><code>self.pattern_matcher.find_similar_patterns()</code> (16-Dimensi Vektor)</span>
-                        </li>
-                        <li>
-                            <span class="meta-label">Parameter Pencocokan</span>
+                            <span class="meta-label">1. Parameter Pencarian Vektor (16-D)</span>
                             <span class="meta-value">
-                                &bull; Event: <code>BoS</code> | Arah: <code>Bullish / Bearish</code><br>
-                                &bull; Rasio Jarak Harga terhadap <code>EMA200 M15</code><br>
-                                &bull; Sesi Trading: <code>London</code> / <code>NewYork</code> / <code>Asia</code><br>
-                                &bull; Konteks: <code>prior_choch = True</code>
+                                &bull; Fungsi: <code>self.pattern_matcher.find_similar_patterns()</code><br>
+                                &bull; Ambang Batas: Cosine Similarity &ge; 0.70 (<code>min_similarity=0.7</code>)<br>
+                                &bull; Limit pencarian: <code>limit=1000</code> pola historis.<br>
+                                &bull; Input: <code>event_type, direction, price, ema200, session, prior_choch, price_ratio</code>
                             </span>
                         </li>
                         <li>
-                            <span class="meta-label">Statistik yang Diambil</span>
+                            <span class="meta-label">2. Contoh Output Aktual — <code>find_similar_patterns()</code> (XAUUSD M15)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(213, 0, 249, 0.04); border-left: 3px solid #d500f9; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"total_count": 14,<br>
+                                &nbsp;&nbsp;"completed_count": 14,<br>
+                                &nbsp;&nbsp;"win_rate": 0.785,<br>
+                                &nbsp;&nbsp;"avg_profit": 42.3,<br>
+                                &nbsp;&nbsp;"recommendation": "STRONG_BUY",<br>
+                                &nbsp;&nbsp;"net_profit_statistics": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"total": 592.0,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"average": 42.3<br>
+                                &nbsp;&nbsp;},<br>
+                                &nbsp;&nbsp;"outcome_distribution": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"wins": 11, "losses": 3, "rejected": 0<br>
+                                &nbsp;&nbsp;}<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Dampak ke Initial Confidence (Step 4)</span>
                             <span class="meta-value">
-                                &bull; Jumlah Sampel: <code>total_count</code><br>
-                                &bull; Win Rate Historis: <code>win_rate</code> (%)<br>
-                                &bull; Rata-rata Keuntungan: <code>avg_profit</code> (Pips)
+                                &bull; <strong>Boost dihitung di agent</strong> via <code>_apply_winrate_boost()</code>, bukan di output LanceDB.<br>
+                                &bull; Win rate 78.5% (&ge; 75%) &rarr; boost <code>+0.30</code> diterapkan ke skor dasar <code>0.40</code> &rarr; <code>final: 0.70</code>.
                             </span>
                         </li>
                     </ul>
@@ -2701,19 +2793,39 @@
 
                 <div class="panel-content" id="panel-ms-sub4">
                     <h2 class="panel-section-title">MSA Step 4: Initial Confidence & Boost</h2>
-                    <p class="panel-text">Kalkulasi skor keyakinan awal setup sebelum candle penembusan (BoS) terjadi.</p>
+                    <p class="panel-text">Kalkulasi skor keyakinan awal setup — dijalankan sebagai logika inline di dalam <code>_on_choch_hh_formed()</code>, bukan fungsi terpisah.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">Skor Keyakinan Dasar</span>
-                            <span class="meta-value"><code>initial_conf = 0.40</code> (Status masih potensi setup)</span>
+                            <span class="meta-label">1. Logika Kalkulasi (Kode Aktual)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(0,0,0,0.35); border-radius: 6px; font-size: 0.71rem; line-height: 1.7; font-family: monospace; color: #cfd8dc;">
+                                <span style="color:#90a4ae;"># Inline di _on_choch_hh_formed() — market_structure_agent.py L554</span><br>
+                                initial_conf = <span style="color:#ffcc80;">0.4</span><br>
+                                win_rate = <span style="color:#ffcc80;">0.0</span><br>
+                                <span style="color:#90a4ae;">if</span> pattern_analysis <span style="color:#90a4ae;">and</span> total_count <span style="color:#90a4ae;">&ge;</span> <span style="color:#ffcc80;">5</span>:<br>
+                                &nbsp;&nbsp;win_rate = pattern_analysis[<span style="color:#69f0ae;">"win_rate"</span>]<br>
+                                &nbsp;&nbsp;initial_conf = self.<span style="color:#80d8ff;">_apply_winrate_boost</span>(initial_conf, win_rate)
+                            </div>
                         </li>
                         <li>
-                            <span class="meta-label">Tabel Penyesuaian Win Rate (Sampel >= 5)</span>
+                            <span class="meta-label">2. Tabel Tier Boost — <code>_apply_winrate_boost()</code> (L819-829)</span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.4); border-radius: 6px; font-family: monospace; font-size: 0.72rem; line-height: 1.5; color: #fff;">
-                                &bull; Win Rate &ge; 75%: <span style="color: #00e676; font-weight: bold;">+0.30 Boost</span> (Conf: 0.70)<br>
-                                &bull; Win Rate 60% s/d 74%: <span style="color: #00e676; font-weight: bold;">+0.20 Boost</span> (Conf: 0.60)<br>
-                                &bull; Win Rate 45% s/d 59%: <span style="color: #ffaa00; font-weight: bold;">+0.10 Boost</span> (Conf: 0.50)<br>
-                                &bull; Win Rate &lt; 45%: <span style="color: #ff1744; font-weight: bold;">-0.10 Penalty</span> (Conf: 0.30)
+                                &bull; win_rate &ge; 0.75: <span style="color: #00e676; font-weight: bold;">confidence += 0.30</span> &rarr; Conf: 0.70<br>
+                                &bull; win_rate &ge; 0.60: <span style="color: #69f0ae; font-weight: bold;">confidence += 0.20</span> &rarr; Conf: 0.60<br>
+                                &bull; win_rate &ge; 0.45: <span style="color: #ffaa00; font-weight: bold;">confidence += 0.10</span> &rarr; Conf: 0.50<br>
+                                &bull; win_rate &lt; 0.45: <span style="color: #ff1744; font-weight: bold;">confidence -= 0.10</span> &rarr; Conf: 0.30
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Contoh Kalkulasi Riil (XAUUSD Bullish)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"initial_conf": 0.40,<br>
+                                &nbsp;&nbsp;"pattern_total_count": 14,<br>
+                                &nbsp;&nbsp;"win_rate_from_lancedb": 0.785,<br>
+                                &nbsp;&nbsp;"branch_taken": "win_rate &ge; 0.75 &rarr; confidence += 0.30",<br>
+                                &nbsp;&nbsp;"initial_confidence": 0.700,<br>
+                                &nbsp;&nbsp;"stored_in_pre_signal": true<br>
+                                }
                             </div>
                         </li>
                     </ul>
@@ -2721,20 +2833,41 @@
 
                 <div class="panel-content" id="panel-ms-sub5">
                     <h2 class="panel-section-title">MSA Step 5: PENDING_SETUP & Pre-Signal</h2>
-                    <p class="panel-text">Mengunci bukti setup, melakukan transisi status state machine, dan menyiagakan sub-agen lainnya.</p>
+                    <p class="panel-text">Mengunci bukti setup ke <code>pre_signal</code> dict, memindahkan state machine ke <code>PENDING_SETUP</code>, lalu mengembalikan hasil ke Orchestrator.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">State Machine Transition</span>
-                            <span class="meta-value"><code>self._phase = AgentPhase.PENDING_SETUP</code></span>
-                        </li>
-                        <li>
-                            <span class="meta-label">Identitas Unik Setup</span>
-                            <span class="meta-value">Hash SHA256: <code>setup_id</code> (berdasarkan Simbol, Timeframe, Level Harga, dan Timestamp).</span>
-                        </li>
-                        <li>
-                            <span class="meta-label">Payload Pre-Signal (Warmup)</span>
+                            <span class="meta-label">1. Transisi State Machine & Penyimpanan</span>
                             <span class="meta-value">
-                                MSA mengembalikan <code>signal: "HOLD"</code> dengan status <code>PENDING_SETUP - menunggu BoS</code>. Orchestrator menggunakan payload ini untuk memicu <em>warmup</em> pada <strong>ML Prediction Agent</strong> dan <strong>Sentiment Agent</strong> agar komputasi siap sebelum lilin BoS terjadi.
+                                &bull; State Transition: <code>IDLE &rarr; PENDING_SETUP</code><br>
+                                &bull; Kode: <code>self._phase = AgentPhase.PENDING_SETUP</code> (L606)<br>
+                                &bull; Setup disimpan ke: <code>self._pending_pre_signal = pre_signal</code> (L607)<br>
+                                &bull; Evidence snapshot dibangun via <code>_build_evidence_snapshot()</code> (L593)
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">2. Contoh <code>pre_signal</code> Dict Aktual (XAUUSD Bullish)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(0, 230, 118, 0.04); border-left: 3px solid #00e676; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"setup_id": "msa-a3f9c1d2b4e87f23",<br>
+                                &nbsp;&nbsp;"event_type": "HH",<br>
+                                &nbsp;&nbsp;"direction": "Bullish",<br>
+                                &nbsp;&nbsp;"hh_price": 2648.80,<br>
+                                &nbsp;&nbsp;"ll_price": null,<br>
+                                &nbsp;&nbsp;"initial_confidence": 0.700,<br>
+                                &nbsp;&nbsp;"win_rate_historical": 0.785,<br>
+                                &nbsp;&nbsp;"pattern_count": 14,<br>
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"status": "PENDING_SETUP - menunggu BoS"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Apa yang Terjadi Setelah MSA Mengembalikan Pre-Signal</span>
+                            <span class="meta-value">
+                                &bull; MSA mengembalikan <code>signal: "HOLD"</code> ke Orchestrator melalui <code>_build_response()</code>.<br>
+                                &bull; <strong>Orchestrator</strong> (bukan MSA) yang memutuskan untuk memulai warmup ML Prediction & Sentiment Agent.<br>
+                                &bull; MSA hanya menyimpan state dan menunggu event BoS berikutnya pada siklus analisis berikutnya.
                             </span>
                         </li>
                     </ul>
@@ -4333,7 +4466,62 @@
                 }
             }
 
-            // Connection Editor Click Actions
+            // Connection Editor Click Actions & Live Rubber-band
+            let draftRafId = null;
+            let lastDraftEvent = null;
+
+            function handleDraftLineMove(e) {
+                if (!sourceNodeId || !sourceNodePort) return;
+                lastDraftEvent = e;
+                if (!draftRafId) {
+                    draftRafId = requestAnimationFrame(renderDraftLine);
+                }
+            }
+
+            function renderDraftLine() {
+                draftRafId = null;
+                if (!sourceNodeId || !sourceNodePort || !lastDraftEvent) return;
+
+                const e = lastDraftEvent;
+                const sourceCard = document.getElementById(sourceNodeId);
+                const canvas = document.getElementById('svg-canvas');
+                if (!sourceCard || !canvas) return;
+
+                const rectA = sourceCard.getBoundingClientRect();
+                const rectCanvas = canvas.getBoundingClientRect();
+                const startCoord = getPortCoordinates(rectA, sourceNodePort, rectCanvas);
+                if (!startCoord) return;
+
+                const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+                const curX = clientX - rectCanvas.left;
+                const curY = clientY - rectCanvas.top;
+
+                let draftPath = document.getElementById('draft-connection-line');
+                if (!draftPath) {
+                    draftPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    draftPath.id = 'draft-connection-line';
+                    draftPath.setAttribute('class', 'draft-flow-line');
+                    canvas.appendChild(draftPath);
+                }
+                draftPath.style.display = 'block';
+
+                const sx = startCoord.x, sy = startCoord.y;
+                const midX = (sx + curX) / 2;
+                const midY = (sy + curY) / 2;
+                let d = '';
+                if (startCoord.dir === 'right') {
+                    d = `M ${sx} ${sy} C ${Math.max(sx + 50, midX)} ${sy}, ${Math.min(curX - 50, midX)} ${curY}, ${curX} ${curY}`;
+                } else if (startCoord.dir === 'left') {
+                    d = `M ${sx} ${sy} C ${Math.min(sx - 50, midX)} ${sy}, ${Math.max(curX + 50, midX)} ${curY}, ${curX} ${curY}`;
+                } else if (startCoord.dir === 'down') {
+                    d = `M ${sx} ${sy} C ${sx} ${Math.max(sy + 50, midY)}, ${curX} ${Math.min(curY - 50, midY)}, ${curX} ${curY}`;
+                } else {
+                    d = `M ${sx} ${sy} C ${sx} ${Math.min(sy - 50, midY)}, ${curX} ${Math.max(curY + 50, midY)}, ${curX} ${curY}`;
+                }
+                draftPath.setAttribute('d', d);
+            }
+
             function handlePortClick(e, cardId, portName) {
                 e.stopPropagation(); // Avoid selecting or dragging node
                 hideDeletePopup();
@@ -4344,7 +4532,6 @@
                         clearConnectionSelection();
                     } else {
                         connectPorts(sourceNodeId, sourceNodePort, cardId, portName);
-                        clearConnectionSelection();
                     }
                     return;
                 }
@@ -4354,11 +4541,25 @@
                 sourceNodePort = portName;
                 document.getElementById(cardId).classList.add('connecting-source');
                 e.currentTarget.classList.add('connecting-source-port');
+
+                document.addEventListener('mousemove', handleDraftLineMove, { passive: true });
+                document.addEventListener('touchmove', handleDraftLineMove, { passive: true });
             }
 
             function clearConnectionSelection() {
                 sourceNodeId = null;
                 sourceNodePort = null;
+                if (draftRafId) {
+                    cancelAnimationFrame(draftRafId);
+                    draftRafId = null;
+                }
+                lastDraftEvent = null;
+                document.removeEventListener('mousemove', handleDraftLineMove);
+                document.removeEventListener('touchmove', handleDraftLineMove);
+
+                const draftPath = document.getElementById('draft-connection-line');
+                if (draftPath) draftPath.remove();
+
                 document.querySelectorAll('.node-card, .agent-card').forEach(card => {
                     card.classList.remove('connecting-source');
                 });
@@ -4381,16 +4582,19 @@
                     // Simply push the connection to allow multiple outputs from the same port/side
                     connections.push({ from: fromId, fromPort, to: toId, toPort });
                 }
-                saveLayoutState();
+                clearConnectionSelection();
                 drawLines();
             }
 
             function toggleConnection(fromId, toId) {
                 // Internal fallback: remove all connections between these two cards
                 connections = connections.filter(conn => !(conn.from === fromId && conn.to === toId));
-                saveLayoutState();
+                clearConnectionSelection();
                 drawLines();
             }
+
+            // Safe stub for legacy saveLayoutState calls
+            function saveLayoutState() {}
 
             function getNameForCard(id) {
                 const card = document.getElementById(id);
