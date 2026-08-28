@@ -13,7 +13,7 @@
     <style>
         :root {
             --bg-color: #0b0f19;
-            --card-bg: #111928;
+            --card-bg: #0c1322;
             --border-color: rgba(255, 255, 255, 0.12);
             --glow-color: rgba(0, 229, 255, 0.2);
 
@@ -239,7 +239,7 @@
 
         /* Card components styling */
         .node-card {
-            background: var(--card-bg);
+            background: #0c1322 !important;
             border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.12));
             border-top: 3px solid var(--theme-color, rgba(0, 229, 255, 0.8));
             border-radius: 16px;
@@ -258,9 +258,9 @@
         }
 
         .node-card:hover {
-            transform: translateY(-4px) scale(1.02);
             border-color: var(--theme-color);
-            box-shadow: 0 10px 40px var(--glow-color), 0 0 25px var(--glow-color);
+            box-shadow: 0 8px 30px var(--glow-color), 0 0 20px var(--glow-color);
+            filter: brightness(1.08);
         }
 
         .node-card.selected {
@@ -592,6 +592,17 @@
             border-color: rgba(0, 229, 255, 0.3);
         }
 
+        #node-llm-msa {
+            --theme-color: #b388ff;
+            --theme-border: rgba(179, 136, 255, 0.45);
+            --glow-color: rgba(179, 136, 255, 0.22);
+        }
+        #node-llm-msa .card-icon {
+            color: #b388ff;
+            background: rgba(179, 136, 255, 0.1);
+            border-color: rgba(179, 136, 255, 0.3);
+        }
+
         #node-con-sub2 {
             --theme-color: #b388ff;
             --theme-border: rgba(179, 136, 255, 0.4);
@@ -643,7 +654,7 @@
         }
 
         .agent-card {
-            background: var(--card-bg);
+            background: #0c1322 !important;
             border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.12));
             border-top: 3px solid var(--theme-color, rgba(0, 229, 255, 0.8));
             border-radius: 16px;
@@ -663,9 +674,9 @@
         }
 
         .agent-card:hover {
-            transform: translateY(-4px) scale(1.02);
             border-color: var(--theme-color);
-            box-shadow: 0 10px 40px var(--glow-color), 0 0 25px var(--glow-color);
+            box-shadow: 0 8px 30px var(--glow-color), 0 0 20px var(--glow-color);
+            filter: brightness(1.08);
         }
 
         .agent-card.selected {
@@ -1326,6 +1337,163 @@
             }
         }
 
+        .toast-notification {
+            position: fixed;
+            bottom: 2.5rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(13, 21, 39, 0.95);
+            border: 1px solid rgba(0, 229, 255, 0.5);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 229, 255, 0.25);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            z-index: 9999;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .toast-notification.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Unified Dropdown Menu Styling */
+        .header-dropdown-container,
+        .toolbar-dropdown-container {
+            position: relative;
+            display: inline-block;
+            pointer-events: auto;
+        }
+
+        .header-dropdown-btn {
+            background: rgba(17, 25, 40, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(12px);
+            transition: all 0.2s ease;
+        }
+
+        .header-dropdown-btn:hover {
+            border-color: #00e5ff;
+            background: rgba(0, 229, 255, 0.1);
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+        }
+
+        .zoom-btn.action-menu-btn {
+            width: auto;
+            padding: 0 12px;
+            gap: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #00e5ff;
+            border-color: rgba(0, 229, 255, 0.35);
+            background: rgba(0, 229, 255, 0.08);
+            display: flex;
+            align-items: center;
+        }
+
+        .zoom-btn.action-menu-btn:hover {
+            background: rgba(0, 229, 255, 0.18);
+            border-color: #00e5ff;
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.3);
+        }
+
+        .header-dropdown-menu,
+        .toolbar-dropdown-menu {
+            display: none;
+            position: absolute;
+            background: #0d1527;
+            border: 1.5px solid rgba(0, 229, 255, 0.35);
+            border-radius: 12px;
+            padding: 0.4rem;
+            min-width: 230px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 229, 255, 0.15);
+            z-index: 10000;
+            backdrop-filter: blur(16px);
+            animation: dropdownFadeIn 0.15s ease-out;
+        }
+
+        .header-dropdown-menu {
+            top: calc(100% + 8px);
+            left: 0;
+        }
+
+        .toolbar-dropdown-menu {
+            bottom: calc(100% + 10px);
+            left: 0;
+        }
+
+        .header-dropdown-menu.show,
+        .toolbar-dropdown-menu.show {
+            display: block;
+        }
+
+        @keyframes dropdownFadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(0, 229, 255, 0.12);
+            color: #00e5ff;
+        }
+
+        .dropdown-item.danger:hover {
+            background: rgba(255, 23, 68, 0.15);
+            color: #ff1744;
+        }
+
+        .dropdown-item .item-icon {
+            font-size: 1.1rem;
+            flex-shrink: 0;
+        }
+
+        .dropdown-item .item-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .dropdown-item .item-desc {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            line-height: 1.2;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+            margin: 0.35rem 0.4rem;
+        }
+
         .floating-popup {
             display: none;
             position: absolute;
@@ -1411,31 +1579,6 @@
             <h1>HYBRID ARSITEKTUR SYSTEM</h1>
             <p>MT5 Ecosystem & AI-Powered Multi-Agent Decision Flow</p>
         </div>
-
-        <!-- Dropdown Menu Opsi Kanvas -->
-        <div class="header-dropdown-container" id="header-dropdown-container">
-            <button class="header-dropdown-btn" id="header-menu-btn" onclick="toggleHeaderMenu(event)" title="Opsi & Pengaturan Kanvas">
-                <span>⚙️ Opsi Kanvas</span>
-                <span class="dropdown-chevron">▼</span>
-            </button>
-            <div class="header-dropdown-menu" id="header-dropdown-menu">
-                <button class="dropdown-item" onclick="resetLayout(); closeHeaderMenu();">
-                    <span class="item-icon">🔄</span>
-                    <div class="item-text">
-                        <div class="item-title">Reset Layout</div>
-                        <div class="item-desc">Kembalikan koordinat kartu & zoom ke awal</div>
-                    </div>
-                </button>
-                <div class="dropdown-divider"></div>
-                <button class="dropdown-item danger" onclick="deleteAllArrows(); closeHeaderMenu();">
-                    <span class="item-icon">🗑️</span>
-                    <div class="item-text">
-                        <div class="item-title">Hapus Semua Panah</div>
-                        <div class="item-desc">Bersihkan semua koneksi garis antar kartu</div>
-                    </div>
-                </button>
-            </div>
-        </div>
     </header>
 
     <div class="main-container">
@@ -1459,6 +1602,40 @@
             <button class="zoom-btn" id="zoom-out-btn" onclick="zoomOut()" title="Zoom Out (Scroll Down)">➖</button>
             <button class="zoom-btn" id="zoom-reset-btn" onclick="zoomReset()" title="Reset Zoom (1:1)">1:1</button>
             <button class="zoom-btn" id="zoom-fit-btn" onclick="fitView()" title="Fit to Screen (Pusatkan Diagram)">⛶</button>
+
+            <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+
+            <!-- Manual Save & Reset Dropdown Controls -->
+            <div class="toolbar-dropdown-container" id="toolbar-dropdown-container">
+                <button class="zoom-btn action-menu-btn" id="toolbar-menu-btn" onclick="toggleToolbarMenu(event)" title="Opsi Simpan &amp; Reset Layout">
+                    <span>💾 Layout</span>
+                    <span style="font-size: 0.65rem;">▲</span>
+                </button>
+                <div class="toolbar-dropdown-menu" id="toolbar-dropdown-menu">
+                    <button class="dropdown-item" onclick="saveManualLayout(); closeToolbarMenu();">
+                        <span class="item-icon">💾</span>
+                        <div class="item-text">
+                            <div class="item-title">Simpan Layout</div>
+                            <div class="item-desc">Simpan posisi kartu &amp; garis saat ini</div>
+                        </div>
+                    </button>
+                    <button class="dropdown-item" onclick="resetLayout(); closeToolbarMenu();">
+                        <span class="item-icon">🔄</span>
+                        <div class="item-text">
+                            <div class="item-title">Reset Layout</div>
+                            <div class="item-desc">Kembalikan ke posisi bawaan sistem</div>
+                        </div>
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button class="dropdown-item danger" onclick="deleteAllArrows(); closeToolbarMenu();">
+                        <span class="item-icon">🗑️</span>
+                        <div class="item-text">
+                            <div class="item-title">Hapus Semua Panah</div>
+                            <div class="item-desc">Bersihkan seluruh koneksi garis</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div class="diagram-area" id="diagram-viewport">
@@ -1659,56 +1836,136 @@
                                 </div>
                             </div>
                             <div class="card-content" style="font-size: 0.75rem;">
-                                Mengevaluasi swing High/Low, BOS, CHoCH, dan validitas area FVG/OB.
+                                Spesialis struktur grafik: Validasi CHoCH, HH/LL, BoS, dan pencocokan pola LanceDB.
                             </div>
                         </div>
 
-                        <!-- Sub-box 1: Cek Keselarasan EMA Multi-TF -->
+                        <!-- MSA Step 1: Validasi CHoCH & Urutan -->
                         <div class="agent-card" id="node-ms-sub1" onclick="selectNode('ms-sub1')"
                             style="width: 100%; padding: 1rem;">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
-                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📊</div>
-                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">1. Cek
-                                    EMA Multi-TF</div>
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔍</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">1. Validasi CHoCH</div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Kalkulasi keselarasan arah harga close terhadap EMA200 di timeframe M15 (+0.2), H1
-                                (+0.1/-0.1), dan H4 (+0.1/-0.1).
+                                Memeriksa urutan event dan memastikan status CHoCH aktif mendahului swing point baru via <code>_has_recent_choch</code>.
                             </div>
                         </div>
 
-                        <!-- Sub-box 2: Kemiripan Pola & Skor (LanceDB) -->
+                        <!-- MSA Step 2: Kunci Level Breakout -->
                         <div class="agent-card" id="node-ms-sub2" onclick="selectNode('ms-sub2')"
                             style="width: 100%; padding: 1rem;">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
-                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔮</div>
-                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-lancedb);">2.
-                                    Kemiripan & Skor</div>
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🎯</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">2. Kunci Level Breakout</div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Mencocokkan pola historis di LanceDB (similarity >= 0.7) dan menerapkan boost/penalty
-                                (+0.3 s/d -0.1) ke confidence.
+                                Menyimpan harga trigger <code>HH</code> (Bullish) atau <code>LL</code> (Bearish) sebagai ambang batas mutlak konfirmasi BoS.
+                            </div>
+                        </div>
+
+                        <!-- MSA Step 3: Kemiripan Pola LanceDB -->
+                        <div class="agent-card" id="node-ms-sub3" onclick="selectNode('ms-sub3')"
+                            style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔮</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-lancedb);">3. Pola LanceDB</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
+                                Query pencocokan vektor 16-D ke LanceDB (similarity >= 0.70) untuk mengekstrak win rate pola serupa masa lalu.
+                            </div>
+                        </div>
+
+                        <!-- MSA Step 4: Initial Confidence & Boost -->
+                        <div class="agent-card" id="node-ms-sub4" onclick="selectNode('ms-sub4')"
+                            style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">⚖️</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-risk);">4. Initial Confidence</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
+                                Menghitung keyakinan awal (basis 0.40) disesuaikan boost/penalty win rate historis (+0.30 s/d -0.10).
+                            </div>
+                        </div>
+
+                        <!-- MSA Step 5: State PENDING_SETUP & Warmup -->
+                        <div class="agent-card" id="node-ms-sub5" onclick="selectNode('ms-sub5')"
+                            style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00;">🚀</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">5. PENDING_SETUP & Warmup</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
+                                Transisi state ke PENDING_SETUP & menerbitkan pre-signal HOLD untuk warmup ML Agent dan Sentiment Agent.
+                            </div>
+                        </div>
+
+                        <!-- Data Transfer: MSA -> ORCH Output Info Box -->
+                        <div class="agent-card transfer-card" id="node-msa-to-orch-info" onclick="selectNode('msa-to-orch-info')"
+                            style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
+                                    📥</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: MSA &rarr; ORCH</div>
+                            </div>
+                            <div class="card-content"
+                                style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Output Hasil Analisis &amp; Hak Suara:
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                    • signal: "BUY" / "SELL" / "HOLD"<br>
+                                    • confidence: 0.850 | weight: 25%<br>
+                                    • evidence_snapshot: Rekam Pasar
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- LLM MSA Critic (Shadow Mode) Card -->
+                        <div class="agent-card" id="node-llm-msa" onclick="selectNode('llm-msa')"
+                            style="width: 100%; padding: 1rem; border-color: rgba(179, 136, 255, 0.45); background: rgba(179, 136, 255, 0.03);">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #b388ff; background: rgba(179, 136, 255, 0.1);">
+                                    🤖</div>
+                                <div>
+                                    <div class="card-title" style="font-size: 0.8rem; color: #b388ff;">LLM MSA Critic</div>
+                                    <p style="font-size: 0.62rem; color: var(--text-secondary)">Shadow AI Audit (Non-Blocking)</p>
+                                </div>
+                            </div>
+                            <div class="card-content"
+                                style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Menerima <code>evidence_snapshot</code> MSA:
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #b388ff; border: 1px solid rgba(179, 136, 255, 0.25); line-height: 1.4;">
+                                    • audit: BoS, Multi-TF EMA, LanceDB<br>
+                                    • model: AgentRouter GLM-5.2 / Groq<br>
+                                    • verdict: SUPPORT / CAUTION / OPPOSE
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Data Transfer: MSA -> ML Agent Info Box -->
+                    <!-- Data Transfer: MSA -> ORCH -> ML Agent Info Box -->
                     <div class="agent-card transfer-card" id="node-msa-to-ml-info" onclick="selectNode('msa-to-ml-info')"
                         style="padding: 1rem; width: 240px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
                                 📤</div>
-                            <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: MSA &rarr;
-                                ML</div>
+                            <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: MSA &rarr; ORCH &rarr; ML</div>
                         </div>
                         <div class="card-content"
                             style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
-                            • <strong>Arah Sinyal:</strong> "BUY"/"SELL" (Tanpa confidence score MSA)<br>
-                            • <strong>Data Market Mentah:</strong> Bar M15, M15 history, H1/H4 trend, events, & entry
-                            price.
+                            Distribusi Sinyal Struktur &amp; Data Mentah:
+                            <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                • structure_signal: "BUY" / "SELL"<br>
+                                • market_data: Bar M15, H1/H4 Trend, Events<br>
+                                • isolasi: Tanpa skor confidence MSA (Anti-Bias)
+                            </div>
                         </div>
                     </div>
 
@@ -1804,20 +2061,23 @@
                         </div>
                     </div>
 
-                    <!-- Data Transfer: MSA -> Sentiment Agent Info Box -->
+                    <!-- Data Transfer: MSA -> ORCH -> Sentiment Agent Info Box -->
                     <div class="agent-card transfer-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')"
-                        style="padding: 1rem; width: 220px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
+                        style="padding: 1rem; width: 240px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
                                 📤</div>
-                            <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: MSA &rarr;
-                                Sent</div>
+                            <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: MSA &rarr; ORCH &rarr; SENT</div>
                         </div>
                         <div class="card-content"
                             style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
-                            • <strong>Arah Sinyal:</strong> "BUY"/"SELL" (Sinyal terkonfirmasi)<br>
-                            • <strong>Confidence Awal:</strong> Skor keyakinan dari struktur SMC.
+                            Distribusi Konteks Berita &amp; Arah:
+                            <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                • signal: "BUY" / "SELL" (Arah Sinyal)<br>
+                                • context: News Feed, Kalender, Anchor Score<br>
+                                • validasi: FinBERT Sentiment &amp; Event Filter
+                            </div>
                         </div>
                     </div>
 
@@ -2134,19 +2394,20 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Detail Side Panel -->
-            <div class="detail-panel" id="side-panel">
-                <div class="resize-handle" id="panel-resize-handle"></div>
-                <button class="panel-close-btn" onclick="closeSidePanel()" title="Tutup Panel Detail">×</button>
-                <div class="panel-placeholder" id="panel-placeholder" style="display: none;">
-                    <svg viewBox="0 0 24 24">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="16" x2="12" y2="12" />
-                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                    </svg>
-                    <p>Klik salah satu komponen untuk melihat detail arsitektur, parameter, dan relasi data.</p>
-                </div>
+    <!-- Detail Side Panel (Positioned on root body level to avoid canvas transform leak) -->
+    <div class="detail-panel" id="side-panel">
+        <div class="resize-handle" id="panel-resize-handle"></div>
+        <button class="panel-close-btn" onclick="closeSidePanel()" title="Tutup Panel Detail">×</button>
+        <div class="panel-placeholder" id="panel-placeholder" style="display: none;">
+            <svg viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <p>Klik salah satu komponen untuk melihat detail arsitektur, parameter, dan relasi data.</p>
+        </div>
 
                 <!-- Content panels populated dynamically -->
                 <div class="panel-content" id="panel-orch-to-msa-info">
@@ -2406,60 +2667,264 @@
                                 Block (OB).</span>
                         </li>
                         <li>
-                            <span class="meta-label">Alur Kerja Deteksi & Trigger CHoCH (ON)</span>
-                            <div class="meta-value"
-                                style="font-family: inherit; font-size: 0.82rem; line-height: 1.5; color: #d1d5db; margin-top: 0.5rem; word-break: normal;">
-                                <strong style="color: var(--color-watcher)">1. Pemicu dari Orchestrator</strong><br>
-                                Saat Expert Advisor (EA) mendeteksi struktur baru di grafik, backend memanggil method
-                                entry agent: <code>MarketStructureAgent.analyze(self, ...)</code>.<br>
-                                <em>Data Load:</em> Mengambil harga close saat ini (current_price), data EMA200 terbaru
-                                untuk TF M15, H1, H4, serta memuat daftar event struktur pasar historis dari
-                                database.<br><br>
+                            <span class="meta-label">Dua Tahap Operasional</span>
+                            <span class="meta-value">
+                                • <strong>Tahap 1: Pre-Analysis</strong> (CHoCH + HH/LL terbentuk) ➔ State PENDING_SETUP &amp; Warmup Sub-Agent.<br>
+                                • <strong>Tahap 2: Execution Trigger</strong> (BoS terkonfirmasi) ➔ State BOS_TRIGGERED &amp; Sinyal Final BUY/SELL.
+                            </span>
+                        </li>
+                    </ul>
+                </div>
 
-                                <strong style="color: var(--color-watcher)">2. Deteksi Skenario CHoCH</strong><br>
-                                Agent menganalisis urutan 3 event struktur pasar terbaru. Jika event terbaru (e1) adalah
-                                tipe CHOCH, agent mengarahkan eksekusi ke:
-                                <code>self._on_choch_confirmed(self, ...)</code>.<br><br>
+                <div class="panel-content" id="panel-ms-sub1">
+                    <h2 class="panel-section-title">MSA Step 1: Validasi CHoCH & Urutan</h2>
+                    <p class="panel-text">Memvalidasi bahwa sebelum terbentuknya titik swing baru (HH/LL), memang telah terjadi pembalikan tren awal (CHoCH) yang valid.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Fungsi Validasi</span>
+                            <span class="meta-value"><code>_has_recent_choch(direction, max_lookback=10)</code></span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Aturan Sekuens</span>
+                            <span class="meta-value">
+                                &bull; <strong>Bullish Setup:</strong> CHoCH Bullish aktif diikuti pembentukan <code>HH</code>.<br>
+                                &bull; <strong>Bearish Setup:</strong> CHoCH Bearish aktif diikuti pembentukan <code>LL</code>.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Pencegahan Konflik</span>
+                            <span class="meta-value">Jika ditemukan BoS lama di tengah sekuens, siklus CHoCH sebelumnya dianggap selesai dan dibatalkan agar tidak tertukar dengan arah setup baru.</span>
+                        </li>
+                    </ul>
+                </div>
 
-                                <strong style="color: var(--color-watcher)">3. Langkah Awal: Cek Keselarasan EMA
-                                    Multi-TF (Multi-TF EMA Score)</strong><br>
-                                Dilakukan PERTAMA (Sebelum mencari pola). Agent memanggil
-                                <code>_calculate_multi_tf_score</code> untuk menghitung keselarasan arah harga saat ini
-                                dengan tren EMA200 di tiga timeframe berbeda:<br>
-                                • M15: Jika searah tren EMA200 (harga > EMA untuk Bullish), mendapat skor +0.2 (jika
-                                tidak searah mendapat +0.0).<br>
-                                • H1: Jika searah tren EMA200 H1, mendapat skor +0.1 (jika tidak searah dikurangi
-                                -0.1).<br>
-                                • H4: Jika searah tren EMA200 H4, mendapat skor +0.1 (jika tidak searah dikurangi
-                                -0.1).<br>
-                                <em>Skor Confidence Awal:</em> Diatur dengan rumus
-                                <code>confidence = 0.5 + tf_score</code> (berkisar antara 0.3 sampai 0.9).<br><br>
+                <div class="panel-content" id="panel-ms-sub2">
+                    <h2 class="panel-section-title">MSA Step 2: Mengunci Level Breakout</h2>
+                    <p class="panel-text">Mengunci koordinat harga tertinggi (HH) atau terendah (LL) sebagai level ambang batas pemicu BoS.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Penyimpanan Level Referensi</span>
+                            <span class="meta-value">
+                                &bull; Bullish: <code>self._pending_hh_price = price</code><br>
+                                &bull; Bearish: <code>self._pending_ll_price = price</code>
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Fungsi Ambang Batas</span>
+                            <span class="meta-value">Level ini menjadi batas mutlak untuk lilin candle M15 di masa depan. Konfirmasi BoS hanya sah jika harga penutupan (close) menembus melampaui level referensi ini.</span>
+                        </li>
+                    </ul>
+                </div>
 
-                                <strong style="color: var(--color-watcher)">4. Langkah Kedua: Pencarian Kemiripan Pola
-                                    (Pattern Similarity Search)</strong><br>
-                                Dilakukan KEDUA setelah menghitung skor EMA. Agent memanggil
-                                <code>self._analyze_patterns()</code> yang memicu query ke database vektor LanceDB
-                                melalui <code>self.pattern_matcher.find_similar_patterns()</code>.<br>
-                                Mencari data historis yang memiliki representasi 16-dimensi vektor paling mirip (skor
-                                similarity >= 0.7) berdasarkan tipe event, arah, jarak harga ke EMA200, sesi pasar, jam
-                                trading, dan konteks sebelumnya.<br><br>
+                <div class="panel-content" id="panel-ms-sub3">
+                    <h2 class="panel-section-title">MSA Step 3: Kemiripan Pola (LanceDB)</h2>
+                    <p class="panel-text">Pencarian pola historis ke database vektor LanceDB untuk mengekstrak statistik performa BoS masa lalu.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Query Pencocokan Vektor</span>
+                            <span class="meta-value"><code>self.pattern_matcher.find_similar_patterns()</code> (16-Dimensi Vektor)</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Parameter Pencocokan</span>
+                            <span class="meta-value">
+                                &bull; Event: <code>BoS</code> | Arah: <code>Bullish / Bearish</code><br>
+                                &bull; Rasio Jarak Harga terhadap <code>EMA200 M15</code><br>
+                                &bull; Sesi Trading: <code>London</code> / <code>NewYork</code> / <code>Asia</code><br>
+                                &bull; Konteks: <code>prior_choch = True</code>
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Statistik yang Diambil</span>
+                            <span class="meta-value">
+                                &bull; Jumlah Sampel: <code>total_count</code><br>
+                                &bull; Win Rate Historis: <code>win_rate</code> (%)<br>
+                                &bull; Rata-rata Keuntungan: <code>avg_profit</code> (Pips)
+                            </span>
+                        </li>
+                    </ul>
+                </div>
 
-                                <strong style="color: var(--color-watcher)">5. Langkah Ketiga: Penyesuaian Skor
-                                    Confidence (Boost / Penalty)</strong><br>
-                                Jika hasil pencarian menemukan minimal 5 pola historis serupa, skor confidence awal
-                                disesuaikan (<code>_apply_winrate_boost</code>):<br>
-                                • Win Rate >= 75%: +0.3 (Boost sangat baik)<br>
-                                • Win Rate >= 60%: +0.2 (Boost baik)<br>
-                                • Win Rate >= 45%: +0.1 (Boost sedang)<br>
-                                • Win Rate &lt; 45%: -0.1 (Penalty karena win rate rendah)<br><br>
+                <div class="panel-content" id="panel-ms-sub4">
+                    <h2 class="panel-section-title">MSA Step 4: Initial Confidence & Boost</h2>
+                    <p class="panel-text">Kalkulasi skor keyakinan awal setup sebelum candle penembusan (BoS) terjadi.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Skor Keyakinan Dasar</span>
+                            <span class="meta-value"><code>initial_conf = 0.40</code> (Status masih potensi setup)</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Tabel Penyesuaian Win Rate (Sampel >= 5)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.5rem; background: rgba(0,0,0,0.4); border-radius: 6px; font-family: monospace; font-size: 0.72rem; line-height: 1.5; color: #fff;">
+                                &bull; Win Rate &ge; 75%: <span style="color: #00e676; font-weight: bold;">+0.30 Boost</span> (Conf: 0.70)<br>
+                                &bull; Win Rate 60% s/d 74%: <span style="color: #00e676; font-weight: bold;">+0.20 Boost</span> (Conf: 0.60)<br>
+                                &bull; Win Rate 45% s/d 59%: <span style="color: #ffaa00; font-weight: bold;">+0.10 Boost</span> (Conf: 0.50)<br>
+                                &bull; Win Rate &lt; 45%: <span style="color: #ff1744; font-weight: bold;">-0.10 Penalty</span> (Conf: 0.30)
+                            </div>
+                        </li>
+                    </ul>
+                </div>
 
-                                <strong style="color: var(--color-watcher)">6. Keputusan Akhir & Veto</strong><br>
-                                • Skor confidence akhir dibatasi dalam rentang 0.0 sampai 1.0.<br>
-                                • <em>Hard Veto:</em> Jika confidence akhir di bawah 0.60 dan veto_mode diatur ke
-                                "hard", sinyal entri langsung dibatalkan dan diganti menjadi <strong>HOLD
-                                    (Veto)</strong>.<br>
-                                • Jika lolos, response dictionary dikembalikan ke orchestrator dengan sinyal final
-                                (BUY/SELL).
+                <div class="panel-content" id="panel-ms-sub5">
+                    <h2 class="panel-section-title">MSA Step 5: PENDING_SETUP & Pre-Signal</h2>
+                    <p class="panel-text">Mengunci bukti setup, melakukan transisi status state machine, dan menyiagakan sub-agen lainnya.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">State Machine Transition</span>
+                            <span class="meta-value"><code>self._phase = AgentPhase.PENDING_SETUP</code></span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Identitas Unik Setup</span>
+                            <span class="meta-value">Hash SHA256: <code>setup_id</code> (berdasarkan Simbol, Timeframe, Level Harga, dan Timestamp).</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Payload Pre-Signal (Warmup)</span>
+                            <span class="meta-value">
+                                MSA mengembalikan <code>signal: "HOLD"</code> dengan status <code>PENDING_SETUP - menunggu BoS</code>. Orchestrator menggunakan payload ini untuk memicu <em>warmup</em> pada <strong>ML Prediction Agent</strong> dan <strong>Sentiment Agent</strong> agar komputasi siap sebelum lilin BoS terjadi.
+                            </span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-msa-to-orch-info">
+                    <h2 class="panel-section-title">Data Transfer: MSA &rarr; Orchestrator (Output)</h2>
+                    <p class="panel-text">Mengirimkan objek hasil analisis struktur pasar (<code>ms_result</code>) kembali ke Orchestrator Agent sebagai dasar koordinasi multi-agen dan setoran voting konsensus.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Tujuan Data</span>
+                            <span class="meta-value">
+                                &bull; Disimpan di memori runtime: <code>agent_results["market_structure"]</code><br>
+                                &bull; Diteruskan sebagai parameter <code>structure_signal</code> ke ML Prediction Agent.<br>
+                                &bull; Diteruskan sebagai acuan arah ke Sentiment Analysis Agent.<br>
+                                &bull; Disetorkan sebagai <strong>Hak Voting Resmi 25%</strong> ke Weighted Consensus Engine.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Struktur Parameter Payload (ms_result)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.72rem; line-height: 1.5; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25);">
+                                {<br>
+                                &nbsp;&nbsp;"signal": "BUY",  // "BUY" | "SELL" | "HOLD"<br>
+                                &nbsp;&nbsp;"confidence": 0.850,  // Nilai float 0.0 s/d 1.0<br>
+                                &nbsp;&nbsp;"phase": "BOS_TRIGGERED",  // "PENDING_SETUP" | "BOS_TRIGGERED"<br>
+                                &nbsp;&nbsp;"voting_weight": 0.25,  // Bobot hak suara 25%<br>
+                                &nbsp;&nbsp;"reasoning": "BoS Bullish @ 2645.50 + Multi-TF EMA align (+0.4) + LanceDB boost (+0.30)",<br>
+                                &nbsp;&nbsp;"evidence_snapshot": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"trigger_price": 2645.50,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"ema200_m15": 2638.20,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"similar_winrate": 78.5<br>
+                                &nbsp;&nbsp;}<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Perlakuan Khusus (Hard Veto)</span>
+                            <span class="meta-value">Jika MSA mengembalikan sinyal <code>HOLD</code> atau confidence di bawah ambang batas (<code>&lt; 0.60</code>), Orchestrator dapat langsung menghentikan proses voting (*Veto Keras*), mencegah sistem mengeksekusi order yang tidak didukung struktur teknikal valid.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-llm-msa">
+                    <h2 class="panel-section-title">LLM MSA Critic (Shadow Mode)</h2>
+                    <p class="panel-text">Lapisan penasihat kecerdasan buatan (*AI Specialist Critic*) yang bertugas mengaudit bukti struktur pasar (evidence snapshot) secara mendalam tanpa menghambat kecepatan eksekusi algoritma trading.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Prinsip Asinkron Non-Blocking (Shadow Mode)</span>
+                            <span class="meta-value">
+                                Dijalankan pada thread latar belakang (<code>mode = "SHADOW"</code>) dengan mekanisme cache non-blocking. Jika koneksi API LLM mengalami latensi atau timeout, <strong>eksekusi order MT5 tetap berjalan 100% tepat waktu</strong> tanpa interupsi.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Paket Data yang Diterima (evidence_snapshot)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #b388ff; border: 1px solid rgba(179, 136, 255, 0.25);">
+                                {<br>
+                                &nbsp;&nbsp;"setup_id": "SET_20260828_XAUUSD_M15_01",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"broken_level": 2640.00,  // Batas swing yang ditembus<br>
+                                &nbsp;&nbsp;"trigger_price": 2645.50,  // Harga close konfirmasi BoS<br>
+                                &nbsp;&nbsp;"multi_tf_ema": { "m15_ema200": 2638.20, "h1_ema200": 2630.50, "h4_ema200": 2615.00 },<br>
+                                &nbsp;&nbsp;"lancedb_matches": { "similar_count": 15, "avg_winrate": 78.5 },<br>
+                                &nbsp;&nbsp;"engine_confidence": 0.850<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Format Evaluasi Standar (CouncilVoteContract)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #00e676; border: 1px solid rgba(0, 230, 118, 0.25);">
+                                {<br>
+                                &nbsp;&nbsp;"agent": "llm_msa",<br>
+                                &nbsp;&nbsp;"status": "completed",<br>
+                                &nbsp;&nbsp;"vote": "BUY",<br>
+                                &nbsp;&nbsp;"verdict": "SUPPORT",  // "SUPPORT" | "CAUTION" | "OPPOSE"<br>
+                                &nbsp;&nbsp;"confidence": 0.880,<br>
+                                &nbsp;&nbsp;"data_quality": 0.950,<br>
+                                &nbsp;&nbsp;"supporting_factors": ["Clean BoS above swing high", "Multi-TF EMA alignment confirmed"],<br>
+                                &nbsp;&nbsp;"risk_flags": [],<br>
+                                &nbsp;&nbsp;"reasoning": "Penembusan struktur bersih tanpa wick panjang penolakan (rejection), probabilitas kelanjutan tren bullish tinggi."<br>
+                                }
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-msa-to-ml-info">
+                    <h2 class="panel-section-title">Data Transfer: MSA &rarr; Orchestrator &rarr; ML Prediction Agent</h2>
+                    <p class="panel-text">Penyaluran terkoordinasi arah sinyal struktur pasar dari Market Structure Agent melalui Orchestrator ke ML Prediction Agent bersama paket data market komprehensif untuk 3 skenario pasar riil.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Jalur Distribusi 2 Tahap</span>
+                            <span class="meta-value">
+                                <strong>1. MSA &rarr; Orchestrator:</strong> MSA menyetorkan objek <code>ms_result</code> yang berisi arah sinyal (<code>structure_signal = "BUY"/"SELL"</code>).<br>
+                                <strong>2. Orchestrator &rarr; ML Agent:</strong> Orchestrator membungkus parameter <code>structure_signal</code> tersebut bersama paket data pasar lengkap (OHLCV M15, histori bar, tren H1/H4, zona sesi) lalu mengeksekusi metode <code>self.agents["ml_prediction"].analyze(...)</code>.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Prinsip Isolasi Anti-Bias</span>
+                            <span class="meta-value">
+                                Orchestrator <strong>hanya meneruskan arah sinyal murni</strong> (BUY/SELL) ke ML Agent <strong>tanpa menyertakan skor confidence dari MSA</strong>. Hal ini penting agar model kecerdasan buatan XGBoost melakukan evaluasi statistik secara objektif dan independen tanpa terpengaruh oleh tingkat keyakinan agen struktur.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Skenario 1: CHoCH (Change of Character - Inisiasi Pembalikan Tren)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25);">
+                                // [MSA &rarr; ORCH Payload - Kasus CHoCH]<br>
+                                {<br>
+                                &nbsp;&nbsp;"signal": "HOLD",  // Belum ada transaksi entri<br>
+                                &nbsp;&nbsp;"phase": "PENDING_SETUP",  // Menunggu konfirmasi Swing High/Low<br>
+                                &nbsp;&nbsp;"confidence": 0.400,  // Base confidence awal<br>
+                                &nbsp;&nbsp;"reasoning": "CHoCH Bullish terdeteksi @ 2640.00, membatalkan siklus lama"<br>
+                                }<br><br>
+                                <span style="color: #00e5ff;">&bull; Tindakan ORCH &rarr; ML:</span> Menyimpan status pembalikan awal ke runtime state tanpa memicu prediksi berat ML (hemat resource komputasi).
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Skenario 2: HH / LL (Swing Points - Kunci Level Breakout &amp; Warmup)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25);">
+                                // [MSA &rarr; ORCH Payload - Kasus HH/LL]<br>
+                                {<br>
+                                &nbsp;&nbsp;"signal": "HOLD",<br>
+                                &nbsp;&nbsp;"phase": "PENDING_SETUP",<br>
+                                &nbsp;&nbsp;"pending_hh_price": 2648.80,  // Batas harga pemicu BoS masa depan<br>
+                                &nbsp;&nbsp;"confidence": 0.700,  // Base 0.4 + Multi-TF 0.2 + LanceDB boost +0.1<br>
+                                &nbsp;&nbsp;"evidence_snapshot": { "lancedb_similar_patterns": 15, "avg_winrate": 78.5 }<br>
+                                }<br><br>
+                                <span style="color: #00e5ff;">&bull; Tindakan ORCH &rarr; ML:</span> Mengirim sinyal <em>Pre-Warmup</em> ke ML Prediction Agent agar cache 19 fitur teknikal mulai dipanaskan sebelum candle breakout ditutup.
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Skenario 3: BoS (Break of Structure - Konfirmasi Eksekusi &amp; Prediksi Penuh)</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25);">
+                                // [ORCH &rarr; ML analyze() Parameter - Kasus BoS]<br>
+                                {<br>
+                                &nbsp;&nbsp;"structure_signal": "BUY",  // Arah sinyal BoS dari MSA<br>
+                                &nbsp;&nbsp;"current_bar": { "open": 2640.20, "high": 2649.50, "low": 2639.80, "close": 2648.90, "volume": 1420 },<br>
+                                &nbsp;&nbsp;"structure_events": [ { "type": "CHOCH", "dir": "Bullish" }, { "type": "BOS", "price": 2648.80 } ],<br>
+                                &nbsp;&nbsp;"h1_data": { "ema200": 2632.10, "atr14": 8.5 },<br>
+                                &nbsp;&nbsp;"h4_data": { "ema200": 2615.40, "trend": "BULLISH" },<br>
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"spread": 1.2<br>
+                                }<br><br>
+                                <span style="color: #00e676;">&bull; Output Model ML:</span> Prediksi MFE (potensi profit) vs MAE (risiko floating) untuk memvalidasi kelayakan <strong>Expected R:R &ge; 1.26</strong>.
                             </div>
                         </li>
                     </ul>
@@ -2949,6 +3414,43 @@
                                 &bull; potential_profit: <span style="color: #00e676; font-weight: bold;">$28.08</span><br>
                                 &bull; potential_loss: <span style="color: #ff4081;">$14.40</span>
                             </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-msa-to-sent-info">
+                    <h2 class="panel-section-title">Data Transfer: MSA &rarr; Orchestrator &rarr; Sentiment Agent</h2>
+                    <p class="panel-text">Penyaluran terkoordinasi arah sinyal transaksi dari MSA melalui Orchestrator ke Sentiment Agent bersama konteks berita makroekonomi dan kalender rilis fundamental.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">Jalur Distribusi 2 Tahap</span>
+                            <span class="meta-value">
+                                <strong>1. MSA &rarr; Orchestrator:</strong> MSA menyetorkan arah sinyal (<code>signal = "BUY"/"SELL"</code>) dan tingkat keyakinan dasar (<code>base_confidence</code>).<br>
+                                <strong>2. Orchestrator &rarr; Sentiment Agent:</strong> Orchestrator meneruskan arah sinyal dan skor keyakinan bersama data headline berita terkini (<code>news_headlines</code>), jadwal rilis kalender ekonomi (<code>upcoming_events</code>), serta skor jangkar harian (<code>precomputed_sentiment</code>) via pemanggilan <code>self.agents["sentiment"].analyze(...)</code>.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Paket Data yang Diterima Sentiment Agent</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.72rem; line-height: 1.5; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25);">
+                                {<br>
+                                &nbsp;&nbsp;"signal": "BUY",  // Arah sinyal dari MSA/ML<br>
+                                &nbsp;&nbsp;"confidence": 0.850,  // Keyakinan teknikal awal<br>
+                                &nbsp;&nbsp;"current_time": "2026-08-28T14:30:00",<br>
+                                &nbsp;&nbsp;"news_headlines": [<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"Fed cuts interest rates by 25 bps, boosting gold demand",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"US Dollar index softens amid lower treasury yields"<br>
+                                &nbsp;&nbsp;],<br>
+                                &nbsp;&nbsp;"upcoming_events": [ { "event": "Non-Farm Payrolls (NFP)", "impact": "HIGH", "minutes_away": 120 } ],<br>
+                                &nbsp;&nbsp;"precomputed_sentiment": { "score": 0.72, "label": "BULLISH" }<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Mekanisme Evaluasi FinBERT &amp; Filter Berita</span>
+                            <span class="meta-value">
+                                &bull; <strong>Penyesuaian Confidence:</strong> Memberikan <em>boost</em> (+0.05) jika sentimen berita selaras atau degradasi (-0.15) jika bertentangan.<br>
+                                &bull; <strong>High-Impact Event Filter:</strong> Jika terdapat event berlabel *High Impact* (NFP, FOMC, CPI) dalam rentang 30 menit sebelum/sesudah bar, transaksi otomatis di-filter ke <strong>HOLD (News Veto)</strong> demi melindungi modal dari lonjakan spread tak terduga.
+                            </span>
                         </li>
                     </ul>
                 </div>
@@ -3479,7 +3981,6 @@
                     </ul>
                 </div>
             </div>
-        </div>
 
         <script>
             // Default System Connections with Precise Port Assignments (Anti-Overlap & Clean Flow)
@@ -3505,13 +4006,20 @@
                 { from: "node-orchestrator", fromPort: "bottom", to: "node-sentiment-agent", toPort: "top" },
                 { from: "node-orchestrator", fromPort: "bottom", to: "node-risk-agent", toPort: "top" },
 
-                // Market Structure Agent (MSA Column: Top to Bottom)
+                // Market Structure Sub-Steps (MSA Column: Top to Bottom)
                 { from: "node-ms-agent", fromPort: "bottom", to: "node-ms-sub1", toPort: "top" },
                 { from: "node-ms-sub1", fromPort: "bottom", to: "node-ms-sub2", toPort: "top" },
+                { from: "node-ms-sub2", fromPort: "bottom", to: "node-ms-sub3", toPort: "top" },
+                { from: "node-ms-sub3", fromPort: "bottom", to: "node-ms-sub4", toPort: "top" },
+                { from: "node-ms-sub4", fromPort: "bottom", to: "node-ms-sub5", toPort: "top" },
+                { from: "node-ms-sub5", fromPort: "bottom", to: "node-msa-to-orch-info", toPort: "top" },
+                { from: "node-ms-sub5", fromPort: "left", to: "node-llm-msa", toPort: "right" },
 
-                // MSA Data Feed to ML Prediction Agent
-                { from: "node-ms-sub2", fromPort: "right", to: "node-msa-to-ml-info", toPort: "left" },
+                // MSA Data Feed to ML Prediction Agent & Sentiment Agent
+                { from: "node-ms-sub5", fromPort: "right", to: "node-msa-to-ml-info", toPort: "left" },
                 { from: "node-msa-to-ml-info", fromPort: "right", to: "node-ml-agent", toPort: "left" },
+                { from: "node-ms-sub5", fromPort: "right", to: "node-msa-to-sent-info", toPort: "left" },
+                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
 
                 // ML Prediction Sub-Steps (ML Column: Top to Bottom)
                 { from: "node-ml-agent", fromPort: "bottom", to: "node-ml-sub1", toPort: "top" },
@@ -3519,10 +4027,6 @@
                 { from: "node-ml-sub2", fromPort: "bottom", to: "node-ml-sub3", toPort: "top" },
                 { from: "node-ml-sub3", fromPort: "bottom", to: "node-ml-sub4", toPort: "top" },
                 { from: "node-ml-sub4", fromPort: "bottom", to: "node-ml-sub5", toPort: "top" },
-
-                // MSA Data Feed to Sentiment Agent
-                { from: "node-ms-sub2", fromPort: "right", to: "node-msa-to-sent-info", toPort: "left" },
-                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
 
                 // Sentiment Sub-Steps (Sentiment Column: Top to Bottom)
                 { from: "node-sentiment-agent", fromPort: "bottom", to: "node-sent-sub1", toPort: "top" },
@@ -3532,7 +4036,7 @@
                 { from: "node-sent-sub4", fromPort: "bottom", to: "node-sent-sub5", toPort: "top" },
 
                 // Sub-Agents Outputs -> Consensus Summary Inputs
-                { from: "node-ms-sub2", fromPort: "right", to: "node-con-sub1", toPort: "left" },
+                { from: "node-msa-to-orch-info", fromPort: "right", to: "node-con-sub1", toPort: "left" },
                 { from: "node-ml-sub5", fromPort: "right", to: "node-con-sub2", toPort: "left" },
                 { from: "node-sent-sub5", fromPort: "right", to: "node-con-sub3", toPort: "left" },
                 { from: "node-con-sub1", fromPort: "right", to: "node-consensus", toPort: "left" },
@@ -3561,7 +4065,7 @@
             ];
 
             let connections = [...defaultConnections];
-            const LAYOUT_VERSION = 16; // Bump version to include orch-to-msa-info card
+            const LAYOUT_VERSION = 20; // Clean port connections without card-crossing lines
 
             // Selection & Hover Flow State
             let hoveredCardId = null;
@@ -3645,7 +4149,6 @@
                 zoomScale = targetScale;
 
                 updateTransform();
-                saveLayoutState();
             }
 
             function zoomOut() {
@@ -3661,7 +4164,6 @@
                 zoomScale = targetScale;
 
                 updateTransform();
-                saveLayoutState();
             }
 
             function zoomReset() {
@@ -3669,7 +4171,6 @@
                 panX = 0;
                 panY = 0;
                 updateTransform();
-                saveLayoutState();
             }
 
             function fitView() {
@@ -4010,13 +4511,11 @@
                 if (interactionMode === 'card') {
                     if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('.flow-path-hover-bridge')) return;
 
-                    // Clear previous selection if not holding Shift or Ctrl
-                    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                        document.querySelectorAll('.multiselected').forEach(c => c.classList.remove('multiselected'));
-                        if (sourceNodeId) clearConnectionSelection();
-                        closeSidePanel();
-                        hideDeletePopup();
-                    }
+                    // Immediately clear previous multiselection when clicking canvas background
+                    document.querySelectorAll('.multiselected').forEach(c => c.classList.remove('multiselected'));
+                    if (sourceNodeId) clearConnectionSelection();
+                    closeSidePanel();
+                    hideDeletePopup();
 
                     isMarqueeSelecting = true;
                     const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
@@ -4299,12 +4798,12 @@
                     return;
                 }
 
-                // Normal drag flow: determine if dragging a multi-selected group or a single card
+                // Standard multi-selection drag: if clicking a pre-selected card, move the entire group!
                 let dragGroup = [];
                 if (targetCard.classList.contains('multiselected')) {
                     dragGroup = Array.from(document.querySelectorAll('.multiselected'));
                 } else {
-                    // Clear other selections if dragging a non-selected card
+                    // Clicking an unselected card clears previous selections and drags only this card
                     document.querySelectorAll('.multiselected').forEach(el => el.classList.remove('multiselected'));
                     dragGroup = [targetCard];
                 }
@@ -4364,6 +4863,7 @@
                     return;
                 }
 
+                document.body.style.userSelect = 'none';
                 document.addEventListener('mousemove', dragMove);
                 document.addEventListener('mouseup', dragEnd);
                 document.addEventListener('touchmove', dragMove, { passive: false });
@@ -4374,9 +4874,24 @@
                 }
             }
 
+            let dragRafId = null;
+            let lastDragEvent = null;
+
             function dragMove(e) {
                 if (!activeDragCard) return;
+                lastDragEvent = e;
+                if (e.cancelable) e.preventDefault();
 
+                if (!dragRafId) {
+                    dragRafId = requestAnimationFrame(processDragMove);
+                }
+            }
+
+            function processDragMove() {
+                dragRafId = null;
+                if (!activeDragCard || !lastDragEvent) return;
+
+                const e = lastDragEvent;
                 const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
@@ -4400,13 +4915,16 @@
                 });
 
                 drawLines();
-
-                if (e.type === 'touchmove') {
-                    e.preventDefault();
-                }
             }
 
             function dragEnd() {
+                if (dragRafId) {
+                    cancelAnimationFrame(dragRafId);
+                    dragRafId = null;
+                }
+                lastDragEvent = null;
+                document.body.style.userSelect = '';
+
                 if (!activeDragCard) return;
 
                 if (isCardMoved) {
@@ -4414,7 +4932,7 @@
                 }
 
                 dragOffsets.forEach((origOffset, card) => {
-                    card.style.transition = 'transform 0.1s ease, box-shadow 0.4s, border-color 0.4s';
+                    card.style.transition = 'border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease';
                     card.style.cursor = 'pointer';
                     card.style.zIndex = '10';
                 });
@@ -4426,12 +4944,46 @@
                 document.removeEventListener('mouseup', dragEnd);
                 document.removeEventListener('touchmove', dragMove);
                 document.removeEventListener('touchend', dragEnd);
-
-                saveLayoutState();
             }
 
-            // Persistent State Management
-            function saveLayoutState() {
+            // Toast UI helper
+            function showToast(msg) {
+                let toast = document.getElementById('toast-msg');
+                if (!toast) {
+                    toast = document.createElement('div');
+                    toast.id = 'toast-msg';
+                    toast.className = 'toast-notification';
+                    document.body.appendChild(toast);
+                }
+                toast.textContent = msg;
+                toast.classList.add('show');
+                clearTimeout(toast._timeout);
+                toast._timeout = setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2500);
+            }
+
+            // Dropdown Menu Handlers
+            function toggleToolbarMenu(e) {
+                if (e) e.stopPropagation();
+                const menu = document.getElementById('toolbar-dropdown-menu');
+                if (menu) menu.classList.toggle('show');
+            }
+
+            function closeToolbarMenu() {
+                const menu = document.getElementById('toolbar-dropdown-menu');
+                if (menu) menu.classList.remove('show');
+            }
+
+            // Global click listener to dismiss dropdown
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#toolbar-dropdown-container')) {
+                    closeToolbarMenu();
+                }
+            });
+
+            // Manual Persistent State Management
+            function saveManualLayout() {
                 const state = {
                     version: LAYOUT_VERSION,
                     pan: { x: panX, y: panY },
@@ -4451,6 +5003,7 @@
                     state.nodes[card.id] = nodeData;
                 });
                 localStorage.setItem('mt5_diagram_layout', JSON.stringify(state));
+                showToast('💾 Layout berhasil disimpan secara manual!');
             }
 
             function restoreLayoutState() {
@@ -4463,7 +5016,7 @@
                 try {
                     const state = JSON.parse(savedStateStr);
 
-                    // Always preserve user's customized pan and zoom
+                    // Restore pan and zoom
                     if (state.pan && typeof state.pan.x === 'number' && typeof state.pan.y === 'number') {
                         panX = state.pan.x;
                         panY = state.pan.y;
@@ -4473,7 +5026,7 @@
                     }
                     updateTransform();
 
-                    // Always preserve user's customized node positions and custom dimensions
+                    // Restore custom node positions and custom dimensions
                     if (state.nodes) {
                         for (let id in state.nodes) {
                             const card = document.getElementById(id);
@@ -4501,15 +5054,12 @@
                         }
                     }
 
-                    // Preserve user's connection configuration if available
+                    // Restore user connections (filter out any obsolete cross-card lines)
                     if (Array.isArray(state.connections) && state.connections.length > 0) {
-                        connections = state.connections;
+                        connections = state.connections.filter(c => !(c.from === 'node-msa-to-orch-info' && c.to === 'node-llm-msa'));
                     } else {
                         connections = [...defaultConnections];
                     }
-
-                    // Seamlessly persist without wiping coordinates
-                    saveLayoutState();
                 } catch (e) {
                     console.error("Failed to restore layout state", e);
                     connections = [...defaultConnections];
@@ -4540,6 +5090,7 @@
                 closeSidePanel();
                 hideDeletePopup();
                 drawLines();
+                showToast('🔄 Layout di-reset ke bawaan sistem!');
             }
 
             function deleteAllArrows() {
@@ -4750,13 +5301,15 @@
             function getNodeThemeColor(cardId) {
                 if (!cardId) return '#00e5ff';
                 if (cardId.includes('mt5')) return '#ffaa00';
-                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa')) return '#ffaa00';
+                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa') || cardId.includes('msa-to-orch')) return '#ffaa00';
                 if (cardId.includes('watcher')) return '#00e5ff';
                 if (cardId.includes('neon')) return '#00e676';
                 if (cardId.includes('lancedb')) return '#d500f9';
                 if (cardId.includes('orchestrator')) return '#ff1744';
-                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1')) return '#00e5ff';
-                if (cardId.includes('ms-sub2')) return '#d500f9';
+                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1') || cardId.includes('ms-sub2')) return '#00e5ff';
+                if (cardId.includes('ms-sub3')) return '#d500f9';
+                if (cardId.includes('ms-sub4')) return '#00e676';
+                if (cardId.includes('ms-sub5')) return '#ffaa00';
                 if (cardId.includes('msa-to-ml') || cardId.includes('msa-to-sent')) return '#ffaa00';
                 if (cardId.includes('ml-agent') || cardId.includes('ml-sub')) return '#b388ff';
                 if (cardId.includes('sentiment') || cardId.includes('sent-sub')) return '#ff4081';
@@ -4772,13 +5325,15 @@
             function getMarkerType(cardId) {
                 if (!cardId) return 'watcher';
                 if (cardId.includes('mt5')) return 'mt5';
-                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa')) return 'info';
+                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa') || cardId.includes('msa-to-orch')) return 'info';
                 if (cardId.includes('watcher')) return 'watcher';
                 if (cardId.includes('neon')) return 'neon';
                 if (cardId.includes('lancedb')) return 'lancedb';
                 if (cardId.includes('orchestrator')) return 'orchestrator';
-                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1')) return 'watcher';
-                if (cardId.includes('ms-sub2')) return 'lancedb';
+                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1') || cardId.includes('ms-sub2')) return 'watcher';
+                if (cardId.includes('ms-sub3')) return 'lancedb';
+                if (cardId.includes('ms-sub4')) return 'risk';
+                if (cardId.includes('ms-sub5')) return 'info';
                 if (cardId.includes('msa-to-ml') || cardId.includes('msa-to-sent')) return 'info';
                 if (cardId.includes('ml-agent') || cardId.includes('ml-sub')) return 'ml';
                 if (cardId.includes('sentiment') || cardId.includes('sent-sub')) return 'sentiment';
@@ -5050,8 +5605,13 @@
                     'lancedb': { cardId: 'node-lancedb', panelId: 'panel-lancedb', color: '#d500f9' },
                     'orchestrator': { cardId: 'node-orchestrator', panelId: 'panel-orchestrator', color: '#ff1744' },
                     'ms-agent': { cardId: 'node-ms-agent', panelId: 'panel-ms-agent', color: '#00e5ff' },
-                    'ms-sub1': { cardId: 'node-ms-sub1', panelId: 'panel-ms-agent', color: '#00e5ff' },
-                    'ms-sub2': { cardId: 'node-ms-sub2', panelId: 'panel-ms-agent', color: '#d500f9' },
+                    'ms-sub1': { cardId: 'node-ms-sub1', panelId: 'panel-ms-sub1', color: '#00e5ff' },
+                    'ms-sub2': { cardId: 'node-ms-sub2', panelId: 'panel-ms-sub2', color: '#00e5ff' },
+                    'ms-sub3': { cardId: 'node-ms-sub3', panelId: 'panel-ms-sub3', color: '#d500f9' },
+                    'ms-sub4': { cardId: 'node-ms-sub4', panelId: 'panel-ms-sub4', color: '#00e676' },
+                    'ms-sub5': { cardId: 'node-ms-sub5', panelId: 'panel-ms-sub5', color: '#ffaa00' },
+                    'msa-to-orch-info': { cardId: 'node-msa-to-orch-info', panelId: 'panel-msa-to-orch-info', color: '#ffaa00' },
+                    'llm-msa': { cardId: 'node-llm-msa', panelId: 'panel-llm-msa', color: '#b388ff' },
                     'msa-to-ml-info': { cardId: 'node-msa-to-ml-info', panelId: 'panel-msa-to-ml-info', color: '#ffaa00' },
                     'msa-to-sent-info': { cardId: 'node-msa-to-sent-info', panelId: 'panel-msa-to-sent-info', color: '#ffaa00' },
                     'ml-agent': { cardId: 'node-ml-agent', panelId: 'panel-ml-agent', color: '#b388ff' },
