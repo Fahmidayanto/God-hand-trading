@@ -1215,101 +1215,6 @@
             animation: pulsePort 1s infinite alternate;
         }
 
-        /* Card Edge & Corner Resize Handles */
-        .card-resize-handle {
-            position: absolute;
-            z-index: 90;
-            pointer-events: auto;
-            background: transparent;
-            transition: background-color 0.15s ease, opacity 0.15s ease;
-        }
-
-        .card-resize-handle.handle-r {
-            top: 16px;
-            bottom: 16px;
-            right: 0;
-            width: 12px;
-            cursor: ew-resize;
-            border-right: 2px solid transparent;
-        }
-        .card-resize-handle.handle-r:hover {
-            background: rgba(0, 229, 255, 0.2);
-            border-right-color: #00e5ff;
-        }
-
-        .card-resize-handle.handle-l {
-            top: 16px;
-            bottom: 16px;
-            left: 0;
-            width: 12px;
-            cursor: ew-resize;
-            border-left: 2px solid transparent;
-        }
-        .card-resize-handle.handle-l:hover {
-            background: rgba(0, 229, 255, 0.2);
-            border-left-color: #00e5ff;
-        }
-
-        .card-resize-handle.handle-b {
-            left: 16px;
-            right: 16px;
-            bottom: 0;
-            height: 12px;
-            cursor: ns-resize;
-            border-bottom: 2px solid transparent;
-        }
-        .card-resize-handle.handle-b:hover {
-            background: rgba(0, 229, 255, 0.2);
-            border-bottom-color: #00e5ff;
-        }
-
-        .card-resize-handle.handle-t {
-            left: 16px;
-            right: 16px;
-            top: 0;
-            height: 12px;
-            cursor: ns-resize;
-            border-top: 2px solid transparent;
-        }
-        .card-resize-handle.handle-t:hover {
-            background: rgba(0, 229, 255, 0.2);
-            border-top-color: #00e5ff;
-        }
-
-        .card-resize-handle.handle-se {
-            right: 0;
-            bottom: 0;
-            width: 22px;
-            height: 22px;
-            cursor: nwse-resize;
-            z-index: 95;
-            display: flex;
-            align-items: flex-end;
-            justify-content: flex-end;
-            padding: 3px;
-            border-bottom-right-radius: 14px;
-        }
-
-        .card-resize-handle.handle-se::after {
-            content: '';
-            width: 8px;
-            height: 8px;
-            border-right: 2px solid rgba(255, 255, 255, 0.4);
-            border-bottom: 2px solid rgba(255, 255, 255, 0.4);
-            border-bottom-right-radius: 4px;
-            transition: border-color 0.2s;
-        }
-
-        .card-resize-handle.handle-se:hover {
-            background: rgba(0, 229, 255, 0.25);
-        }
-
-        .card-resize-handle.handle-se:hover::after,
-        .node-card:hover .card-resize-handle.handle-se::after,
-        .agent-card:hover .card-resize-handle.handle-se::after {
-            border-color: #00e5ff;
-        }
-
         @keyframes pulsePort {
             from {
                 transform: scale(1);
@@ -1492,6 +1397,56 @@
             height: 1px;
             background: rgba(255, 255, 255, 0.1);
             margin: 0.35rem 0.4rem;
+        }
+
+        /* Single Clean Card Resize Corner Handle (Bottom-Right Only) */
+        .card-resize-handle {
+            display: none;
+        }
+
+        .card-resize-handle.handle-se {
+            display: flex;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            width: 18px;
+            height: 18px;
+            cursor: nwse-resize !important;
+            z-index: 100;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 2px 3px 3px 2px;
+            border-bottom-right-radius: 12px;
+            pointer-events: auto !important;
+            user-select: none;
+            opacity: 0.3;
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+        }
+
+        .card-resize-handle.handle-se::after {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-right: 2px solid #00e5ff;
+            border-bottom: 2px solid #00e5ff;
+            border-bottom-right-radius: 2px;
+            transition: transform 0.2s ease;
+        }
+
+        .node-card:hover .card-resize-handle.handle-se,
+        .agent-card:hover .card-resize-handle.handle-se,
+        .card-resize-handle.handle-se:hover,
+        .card-resize-handle.handle-se.active {
+            opacity: 1;
+        }
+
+        .card-resize-handle.handle-se:hover {
+            background: rgba(0, 229, 255, 0.15);
+        }
+
+        .card-resize-handle.handle-se:hover::after,
+        .card-resize-handle.handle-se.active::after {
+            transform: scale(1.2);
         }
 
         .floating-popup {
@@ -4700,6 +4655,8 @@
                 document.addEventListener('touchend', cardResizeEnd);
             }
 
+            let resizeRafId = null;
+
             function cardResizeMove(e) {
                 if (!isResizing || !activeResizeCard) return;
 
@@ -4709,10 +4666,10 @@
                 const deltaX = (clientX - resizeStartX) / zoomScale;
                 const deltaY = (clientY - resizeStartY) / zoomScale;
 
-                const minW = 160;
+                const minW = activeResizeCard.classList.contains('node-card') ? 250 : 160;
                 const minH = 45;
-                const maxW = 1500;
-                const maxH = 1500;
+                const maxW = 2000;
+                const maxH = 2000;
 
                 let newWidth = resizeStartWidth;
                 let newHeight = resizeStartHeight;
@@ -4744,27 +4701,37 @@
                     }
                 }
 
-                activeResizeCard.style.maxWidth = 'none';
-                activeResizeCard.style.minWidth = '0';
-                activeResizeCard.style.flexShrink = '0';
-                activeResizeCard.style.flex = 'none';
-                activeResizeCard.style.width = `${Math.round(newWidth)}px`;
-                activeResizeCard.style.height = `${Math.round(newHeight)}px`;
-                activeResizeCard.setAttribute('data-w', Math.round(newWidth));
-                activeResizeCard.setAttribute('data-h', Math.round(newHeight));
+                if (resizeRafId) cancelAnimationFrame(resizeRafId);
+                resizeRafId = requestAnimationFrame(() => {
+                    activeResizeCard.style.maxWidth = 'none';
+                    activeResizeCard.style.minWidth = '0';
+                    activeResizeCard.style.flexShrink = '0';
+                    activeResizeCard.style.flex = 'none';
+                    activeResizeCard.style.width = `${Math.round(newWidth)}px`;
+                    activeResizeCard.style.height = `${Math.round(newHeight)}px`;
+                    activeResizeCard.setAttribute('data-w', Math.round(newWidth));
+                    activeResizeCard.setAttribute('data-h', Math.round(newHeight));
 
-                drawLines();
+                    drawLines();
+                });
 
                 if (e.cancelable) e.preventDefault();
             }
 
             function cardResizeEnd(e) {
+                if (resizeRafId) {
+                    cancelAnimationFrame(resizeRafId);
+                    resizeRafId = null;
+                }
                 if (!isResizing || !activeResizeCard) return;
 
                 ignoreCardClickUntil = Date.now() + 200;
                 activeResizeCard.style.transition = 'border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease';
                 document.body.style.userSelect = '';
                 document.body.style.cursor = '';
+
+                const handle = activeResizeCard.querySelector('.card-resize-handle');
+                if (handle) handle.classList.remove('active');
 
                 isResizing = false;
                 activeResizeCard = null;
@@ -4773,8 +4740,6 @@
                 document.removeEventListener('mouseup', cardResizeEnd);
                 document.removeEventListener('touchmove', cardResizeMove);
                 document.removeEventListener('touchend', cardResizeEnd);
-
-                saveLayoutState();
             }
 
             function dragStart(e) {
@@ -5732,6 +5697,33 @@
                     closeHeaderMenu();
                 }
             });
+
+            // Initialize cards: drag & clean resize handle
+            function initCards() {
+                document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                    // Remove any old/duplicate handles first
+                    card.querySelectorAll('.card-resize-handle').forEach(h => h.remove());
+
+                    // Attach card drag
+                    card.removeEventListener('mousedown', dragStart);
+                    card.removeEventListener('touchstart', dragStart);
+                    card.addEventListener('mousedown', dragStart);
+                    card.addEventListener('touchstart', dragStart, { passive: false });
+
+                    // Attach single bottom-right corner resize handle (⌟)
+                    const handle = document.createElement('div');
+                    handle.className = 'card-resize-handle handle-se';
+                    handle.title = 'Tarik sudut untuk mengubah ukuran kartu bebas';
+                    handle.addEventListener('mousedown', (e) => cardResizeStart(e, card, 'se'));
+                    handle.addEventListener('touchstart', (e) => cardResizeStart(e, card, 'se'), { passive: false });
+                    card.appendChild(handle);
+                });
+            }
+
+            // Restore layout and initialize everything on load
+            restoreLayoutState();
+            initCards();
+            drawLines();
 
             // Live Reload Client (Auto-reload via node server.js / npm run dev)
             if (window.location.protocol.startsWith('http')) {
