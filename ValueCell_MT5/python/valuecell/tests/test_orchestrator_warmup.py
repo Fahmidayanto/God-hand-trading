@@ -195,3 +195,98 @@ def test_warmup_results_caching_and_reuse():
     result3 = orchestrator.analyze(market_data, symbol="XAUUSD", timeframe="M15")
     assert orchestrator._latest_warmup_results is None
 
+
+def test_llm_msa_shadow_result_is_reported_but_not_counted_in_consensus():
+    orchestrator = OrchestratorAgent(
+        enable_market_structure=True,
+        enable_ml_prediction=False,
+        enable_risk_management=False,
+        enable_sentiment=False,
+        enable_llm_msa=True,
+    )
+    orchestrator.agents["market_structure"].analyze = MagicMock(return_value={
+        "signal": "HOLD",
+        "confidence": 0.40,
+        "phase": "PENDING_SETUP",
+        "is_new_setup": True,
+        "pre_signal": {
+            "setup_id": "msa-shadow-1",
+            "direction": "Bullish",
+            "initial_confidence": 0.40,
+        },
+        "evidence_snapshot": {
+            "schema_version": "msa-evidence-v1",
+            "setup_id": "msa-shadow-1",
+        },
+    })
+    orchestrator.agents["llm_msa"].analyze = MagicMock(return_value={
+        "status": "pending",
+        "mode": "SHADOW",
+        "setup_id": "msa-shadow-1",
+        "verdict": "PENDING",
+        "can_affect_consensus": False,
+        "can_create_trade_signal": False,
+    })
+
+    result = orchestrator.analyze({
+        "df": None,
+        "current_bar": {"time": 123456789, "close": 2300.0},
+        "session": "London",
+    })
+
+    assert result["final_signal"] == "HOLD"
+    assert result["vote_scores"] == {"BUY": 0.0, "SELL": 0.0, "HOLD": 0.1}
+    assert result["agent_results"]["llm_msa"]["status"] == "pending"
+    orchestrator.agents["llm_msa"].analyze.assert_called_once_with(
+        orchestrator.agents["market_structure"].analyze.return_value["evidence_snapshot"]
+    )
+
+
+def test_llm_msa_completed_cache_is_exposed_on_next_same_setup_analysis():
+    orchestrator = OrchestratorAgent(
+        enable_market_structure=True,
+        enable_ml_prediction=False,
+        enable_risk_management=False,
+        enable_sentiment=False,
+        enable_llm_msa=True,
+        llm_msa={
+            "evaluator": lambda _evidence: {
+                "verdict": "SUPPORT",
+                "confidence": 0.81,
+                "risk_flags": [],
+                "supporting_factors": ["Historical execution edge"],
+                "contradicting_factors": [],
+                "historical_read": "Supportive",
+                "reasoning": "Executed analogs support the pending direction.",
+            }
+        },
+    )
+    msa_result = {
+        "signal": "HOLD",
+        "confidence": 0.40,
+        "phase": "PENDING_SETUP",
+        "is_new_setup": False,
+        "pre_signal": {"setup_id": "msa-cache-1", "direction": "Bullish"},
+        "evidence_snapshot": {
+            "schema_version": "msa-evidence-v1",
+            "setup_id": "msa-cache-1",
+        },
+    }
+    orchestrator.agents["market_structure"].analyze = MagicMock(return_value=msa_result)
+    market_data = {
+        "df": None,
+        "current_bar": {"time": 123456789, "close": 2300.0},
+        "session": "London",
+    }
+
+    first = orchestrator.analyze(market_data)
+    assert first["agent_results"]["llm_msa"]["status"] in {"pending", "completed"}
+
+    completed = orchestrator.agents["llm_msa"].wait_for_result("msa-cache-1", timeout=1)
+    assert completed["status"] == "completed"
+
+    second = orchestrator.analyze(market_data)
+    assert second["agent_results"]["llm_msa"]["status"] == "completed"
+    assert second["agent_results"]["llm_msa"]["verdict"] == "SUPPORT"
+    assert second["final_signal"] == "HOLD"
+

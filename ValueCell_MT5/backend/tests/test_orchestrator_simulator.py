@@ -19,6 +19,9 @@ def test_reconstruct_market_data():
     md = reconstruct_market_data(df, candles[-1]["time"], [])
     assert "df" in md and "current_bar" in md
     assert md["current_bar"]["close"] == candles[-1]["close"]
+    assert md["price_ratio"] == round(candles[-1]["close"] / 4500.0, 6)
+    assert md["base_reference_price"] == 4500.0
+    assert md["current_bar"]["price_ratio"] == round(candles[-1]["close"] / 4500.0, 6)
     assert md["atr"] > 0
     assert md["session"] in ("Asia", "London", "NewYork", "Sydney")
     assert md["news_headlines"] == []

@@ -13,8 +13,8 @@
     <style>
         :root {
             --bg-color: #0b0f19;
-            --card-bg: rgba(17, 25, 40, 0.75);
-            --border-color: rgba(255, 255, 255, 0.08);
+            --card-bg: rgba(17, 25, 40, 0.85);
+            --border-color: rgba(255, 255, 255, 0.12);
             --glow-color: rgba(0, 229, 255, 0.2);
 
             --color-mt5: #ffaa00;
@@ -22,8 +22,11 @@
             --color-neon: #00e676;
             --color-lancedb: #d500f9;
             --color-orchestrator: #ff1744;
-            --color-agent: #2979ff;
+            --color-agent: #00e5ff;
+            --color-ml: #b388ff;
+            --color-sentiment: #ff4081;
             --color-consensus: #ffd700;
+            --color-risk: #00e676;
             --color-execution: #00b0ff;
 
             --text-primary: #f3f4f6;
@@ -128,7 +131,7 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            z-index: 20;
+            z-index: 2;
         }
 
         .edge-group {
@@ -146,12 +149,14 @@
 
         .flow-path {
             fill: none;
-            stroke: rgba(255, 255, 255, 0.18);
+            stroke: var(--line-color, rgba(0, 229, 255, 0.75));
             stroke-width: 3;
             stroke-dasharray: 8 6;
-            animation: flowDash 30s linear infinite;
+            animation: flowDash 24s linear infinite;
             pointer-events: none;
             transition: stroke 0.25s ease, stroke-width 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+            opacity: 0.8;
+            filter: drop-shadow(0 0 5px var(--line-color, rgba(0, 229, 255, 0.5)));
         }
 
         .flow-path.dimmed {
@@ -161,9 +166,9 @@
         }
 
         .edge-group:hover .flow-path {
-            stroke: #ff1744 !important;
+            stroke: #ffffff !important;
             stroke-width: 4.5 !important;
-            filter: drop-shadow(0 0 8px #ff1744) !important;
+            filter: drop-shadow(0 0 12px #00e5ff) drop-shadow(0 0 4px #ffffff) !important;
             opacity: 1 !important;
         }
 
@@ -171,31 +176,38 @@
             stroke: var(--active-color, #00e5ff) !important;
             stroke-width: 4.5px !important;
             stroke-dasharray: 10 6 !important;
-            filter: drop-shadow(0 0 10px var(--active-color, #00e5ff)) drop-shadow(0 0 3px #ffffff) !important;
+            filter: drop-shadow(0 0 14px var(--active-color, #00e5ff)) drop-shadow(0 0 4px #ffffff) !important;
             animation: flowDash 8s linear infinite !important;
             opacity: 1 !important;
         }
 
         .edge-delete-btn {
-            opacity: 0;
+            opacity: 0.6;
             cursor: pointer;
             pointer-events: auto;
-            /* Clickable */
+            /* Always visible so user knows it's clickable */
             transition: opacity 0.2s;
         }
 
-        .edge-group:hover .edge-delete-btn {
+        .edge-group:hover .edge-delete-btn,
+        .edge-delete-btn:hover {
             opacity: 1;
         }
 
-        .edge-delete-btn circle {
+        .edge-delete-btn circle.hit-area {
+            fill: transparent;
+            pointer-events: all;
+        }
+
+        .edge-delete-btn circle.icon-bg {
             fill: #ff1744;
             stroke: #121214;
             stroke-width: 1.5;
+            pointer-events: all;
             transition: fill 0.2s, r 0.2s;
         }
 
-        .edge-delete-btn:hover circle {
+        .edge-delete-btn:hover circle.icon-bg {
             fill: #d50000;
             r: 12;
         }
@@ -219,7 +231,8 @@
         /* Card components styling */
         .node-card {
             background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.12));
+            border-top: 3px solid var(--theme-color, rgba(0, 229, 255, 0.8));
             border-radius: 16px;
             padding: 1.5rem;
             width: 500px;
@@ -227,9 +240,9 @@
             position: relative;
             z-index: 10;
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
             backdrop-filter: blur(8px);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5), 0 0 16px var(--glow-color, transparent);
             pointer-events: auto;
         }
 
@@ -239,7 +252,7 @@
             inset: 0;
             border-radius: 16px;
             padding: 1.5px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.01));
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.01));
             -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
             -webkit-mask-composite: xor;
             mask-composite: exclude;
@@ -249,19 +262,19 @@
         .node-card:hover {
             transform: translateY(-4px) scale(1.02);
             border-color: var(--theme-color);
-            box-shadow: 0 10px 40px var(--glow-color);
+            box-shadow: 0 10px 40px var(--glow-color), 0 0 25px var(--glow-color);
         }
 
         .node-card.selected {
             border-color: var(--theme-color);
-            box-shadow: 0 0 35px var(--glow-color);
-            background: rgba(17, 25, 40, 0.9);
+            box-shadow: 0 0 35px var(--glow-color), 0 0 20px var(--theme-color);
+            background: rgba(17, 25, 40, 0.92);
         }
 
         .node-card.pipeline-active,
         .agent-card.pipeline-active {
-            border-color: rgba(0, 229, 255, 0.45) !important;
-            box-shadow: 0 0 20px rgba(0, 229, 255, 0.2) !important;
+            border-color: rgba(0, 229, 255, 0.5) !important;
+            box-shadow: 0 0 22px rgba(0, 229, 255, 0.25) !important;
             transition: all 0.3s ease;
         }
 
@@ -332,226 +345,291 @@
 
         /* Specific node customization */
         #node-mt5 {
-            --theme-color: var(--color-mt5);
-            --glow-color: rgba(255, 170, 0, 0.15);
+            --theme-color: #ffaa00;
+            --theme-border: rgba(255, 170, 0, 0.45);
+            --glow-color: rgba(255, 170, 0, 0.2);
         }
-
         #node-mt5 .card-icon {
-            color: var(--color-mt5);
-            background: rgba(255, 170, 0, 0.05);
+            color: #ffaa00;
+            background: rgba(255, 170, 0, 0.1);
+            border-color: rgba(255, 170, 0, 0.3);
         }
-
         #node-mt5 .card-badge {
             background: rgba(255, 170, 0, 0.15);
-            color: var(--color-mt5);
+            color: #ffaa00;
+            border: 1px solid rgba(255, 170, 0, 0.3);
         }
 
         #node-watcher-trigger {
             width: auto;
             padding: 0.75rem 1.5rem;
-            --theme-color: var(--color-watcher);
-            --glow-color: rgba(0, 229, 255, 0.2);
+            --theme-color: #00e5ff;
+            --theme-border: rgba(0, 229, 255, 0.45);
+            --glow-color: rgba(0, 229, 255, 0.25);
             border-radius: 30px;
             text-align: center;
         }
-
         #node-watcher-trigger::before {
             border-radius: 30px;
         }
-
         #node-watcher-trigger .card-header {
             margin: 0;
             justify-content: center;
         }
+        #node-watcher-trigger .card-icon {
+            color: #00e5ff;
+            background: rgba(0, 229, 255, 0.1);
+            border-color: rgba(0, 229, 255, 0.3);
+        }
 
         #node-neondb-mapping {
-            --theme-color: var(--color-neon);
-            --glow-color: rgba(0, 230, 118, 0.15);
+            --theme-color: #00e676;
+            --theme-border: rgba(0, 230, 118, 0.45);
+            --glow-color: rgba(0, 230, 118, 0.2);
         }
-
         #node-neondb-mapping .card-icon {
-            color: var(--color-neon);
-            background: rgba(0, 230, 118, 0.05);
+            color: #00e676;
+            background: rgba(0, 230, 118, 0.1);
+            border-color: rgba(0, 230, 118, 0.3);
         }
-
         #node-neondb-mapping .card-badge {
             background: rgba(0, 230, 118, 0.15);
-            color: var(--color-neon);
+            color: #00e676;
+            border: 1px solid rgba(0, 230, 118, 0.3);
         }
 
         #node-lancedb {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
+            --theme-color: #d500f9;
+            --theme-border: rgba(213, 0, 249, 0.45);
+            --glow-color: rgba(213, 0, 249, 0.2);
         }
-
         #node-lancedb .card-icon {
-            color: var(--color-lancedb);
-            background: rgba(213, 0, 249, 0.05);
+            color: #d500f9;
+            background: rgba(213, 0, 249, 0.1);
+            border-color: rgba(213, 0, 249, 0.3);
         }
-
         #node-lancedb .card-badge {
             background: rgba(213, 0, 249, 0.15);
-            color: var(--color-lancedb);
+            color: #d500f9;
+            border: 1px solid rgba(213, 0, 249, 0.3);
         }
 
         #node-orchestrator {
-            --theme-color: var(--color-orchestrator);
-            --glow-color: rgba(255, 23, 68, 0.15);
+            --theme-color: #ff1744;
+            --theme-border: rgba(255, 23, 68, 0.45);
+            --glow-color: rgba(255, 23, 68, 0.25);
         }
-
         #node-orchestrator .card-icon {
-            color: var(--color-orchestrator);
-            background: rgba(255, 23, 68, 0.05);
+            color: #ff1744;
+            background: rgba(255, 23, 68, 0.1);
+            border-color: rgba(255, 23, 68, 0.3);
         }
-
         #node-orchestrator .card-badge {
             background: rgba(255, 23, 68, 0.15);
-            color: var(--color-orchestrator);
+            color: #ff1744;
+            border: 1px solid rgba(255, 23, 68, 0.3);
         }
 
         /* Sub-Agents customization */
         #node-ms-agent {
-            --theme-color: var(--color-watcher);
-            --glow-color: rgba(0, 229, 255, 0.15);
+            --theme-color: #00e5ff;
+            --theme-border: rgba(0, 229, 255, 0.45);
+            --glow-color: rgba(0, 229, 255, 0.2);
         }
-
         #node-ms-agent .card-icon {
-            color: var(--color-watcher);
-            background: rgba(0, 229, 255, 0.05);
+            color: #00e5ff;
+            background: rgba(0, 229, 255, 0.1);
+            border-color: rgba(0, 229, 255, 0.3);
         }
-
         #node-ms-agent .card-badge {
             background: rgba(0, 229, 255, 0.15);
-            color: var(--color-watcher);
+            color: #00e5ff;
+            border: 1px solid rgba(0, 229, 255, 0.3);
         }
 
         #node-ms-sub1 {
-            --theme-color: var(--color-watcher);
+            --theme-color: #00e5ff;
+            --theme-border: rgba(0, 229, 255, 0.35);
             --glow-color: rgba(0, 229, 255, 0.15);
         }
-
         #node-ms-sub1 .card-icon {
-            color: var(--color-watcher);
-            background: rgba(0, 229, 255, 0.05);
+            color: #00e5ff;
+            background: rgba(0, 229, 255, 0.1);
+            border-color: rgba(0, 229, 255, 0.3);
         }
 
         #node-ms-sub2 {
-            --theme-color: var(--color-lancedb);
+            --theme-color: #d500f9;
+            --theme-border: rgba(213, 0, 249, 0.35);
             --glow-color: rgba(213, 0, 249, 0.15);
         }
-
         #node-ms-sub2 .card-icon {
-            color: var(--color-lancedb);
-            background: rgba(213, 0, 249, 0.05);
+            color: #d500f9;
+            background: rgba(213, 0, 249, 0.1);
+            border-color: rgba(213, 0, 249, 0.3);
         }
 
-        #node-msa-to-ml-info {
+        #node-msa-to-ml-info,
+        #node-msa-to-sent-info {
             --theme-color: #ffaa00;
-            --glow-color: rgba(255, 170, 0, 0.1);
-            border: 1.5px dashed rgba(255, 170, 0, 0.3);
-            background: rgba(255, 170, 0, 0.03);
-            width: 240px;
+            --theme-border: rgba(255, 170, 0, 0.45);
+            --glow-color: rgba(255, 170, 0, 0.15);
+            border: 1.5px dashed rgba(255, 170, 0, 0.45) !important;
+            background: rgba(255, 170, 0, 0.04) !important;
         }
 
-        #node-ml-agent {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
-        }
-
-        #node-ml-agent .card-icon {
-            color: var(--color-lancedb);
-            background: rgba(213, 0, 249, 0.05);
-        }
-
-        #node-ml-agent .card-badge {
-            background: rgba(213, 0, 249, 0.15);
-            color: var(--color-lancedb);
-        }
-
-        #node-ml-sub1 {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
-        }
-
-        #node-ml-sub2 {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
-        }
-
-        #node-ml-sub3 {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
-        }
-
-        #node-ml-sub4 {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
-        }
-
+        #node-ml-agent,
+        #node-ml-sub1,
+        #node-ml-sub2,
+        #node-ml-sub3,
+        #node-ml-sub4,
         #node-ml-sub5 {
-            --theme-color: var(--color-lancedb);
-            --glow-color: rgba(213, 0, 249, 0.15);
+            --theme-color: #b388ff;
+            --theme-border: rgba(179, 136, 255, 0.35);
+            --glow-color: rgba(179, 136, 255, 0.18);
+        }
+        #node-ml-agent .card-icon,
+        #node-ml-sub1 .card-icon,
+        #node-ml-sub2 .card-icon,
+        #node-ml-sub3 .card-icon,
+        #node-ml-sub4 .card-icon,
+        #node-ml-sub5 .card-icon {
+            color: #b388ff;
+            background: rgba(179, 136, 255, 0.1);
+            border-color: rgba(179, 136, 255, 0.3);
+        }
+        #node-ml-agent .card-badge {
+            background: rgba(179, 136, 255, 0.15);
+            color: #b388ff;
+            border: 1px solid rgba(179, 136, 255, 0.3);
         }
 
-        #node-risk-agent {
-            --theme-color: var(--color-neon);
-            --glow-color: rgba(0, 230, 118, 0.15);
+        #node-risk-agent,
+        #node-risk-sub1,
+        #node-risk-sub2,
+        #node-risk-sub3,
+        #node-risk-sub4,
+        #node-risk-sub5 {
+            --theme-color: #00e676;
+            --theme-border: rgba(0, 230, 118, 0.35);
+            --glow-color: rgba(0, 230, 118, 0.18);
         }
-
-        #node-risk-agent .card-icon {
-            color: var(--color-neon);
-            background: rgba(0, 230, 118, 0.05);
+        #node-risk-agent .card-icon,
+        #node-risk-sub1 .card-icon,
+        #node-risk-sub2 .card-icon,
+        #node-risk-sub3 .card-icon,
+        #node-risk-sub4 .card-icon,
+        #node-risk-sub5 .card-icon {
+            color: #00e676;
+            background: rgba(0, 230, 118, 0.1);
+            border-color: rgba(0, 230, 118, 0.3);
         }
-
         #node-risk-agent .card-badge {
             background: rgba(0, 230, 118, 0.15);
-            color: var(--color-neon);
+            color: #00e676;
+            border: 1px solid rgba(0, 230, 118, 0.3);
         }
 
-        #node-sentiment-agent {
+        #node-sentiment-agent,
+        #node-sent-sub1,
+        #node-sent-sub2,
+        #node-sent-sub3,
+        #node-sent-sub4,
+        #node-sent-sub5 {
             --theme-color: #ff4081;
-            --glow-color: rgba(255, 64, 129, 0.15);
+            --theme-border: rgba(255, 64, 129, 0.35);
+            --glow-color: rgba(255, 64, 129, 0.18);
         }
-
-        #node-sentiment-agent .card-icon {
+        #node-sentiment-agent .card-icon,
+        #node-sent-sub1 .card-icon,
+        #node-sent-sub2 .card-icon,
+        #node-sent-sub3 .card-icon,
+        #node-sent-sub4 .card-icon,
+        #node-sent-sub5 .card-icon {
             color: #ff4081;
-            background: rgba(255, 64, 129, 0.05);
+            background: rgba(255, 64, 129, 0.1);
+            border-color: rgba(255, 64, 129, 0.3);
         }
-
         #node-sentiment-agent .card-badge {
             background: rgba(255, 64, 129, 0.15);
             color: #ff4081;
+            border: 1px solid rgba(255, 64, 129, 0.3);
         }
 
         /* Consensus and Execution customization */
-        #node-consensus {
-            --theme-color: var(--color-consensus);
-            --glow-color: rgba(255, 215, 0, 0.15);
+        #node-consensus,
+        #node-con-step1,
+        #node-con-step2,
+        #node-con-step3,
+        #node-con-step4,
+        #node-con-step5 {
+            --theme-color: #ffd700;
+            --theme-border: rgba(255, 215, 0, 0.4);
+            --glow-color: rgba(255, 215, 0, 0.2);
         }
-
-        #node-consensus .card-icon {
-            color: var(--color-consensus);
-            background: rgba(255, 215, 0, 0.05);
+        #node-consensus .card-icon,
+        #node-con-step1 .card-icon,
+        #node-con-step2 .card-icon,
+        #node-con-step3 .card-icon,
+        #node-con-step4 .card-icon,
+        #node-con-step5 .card-icon {
+            color: #ffd700;
+            background: rgba(255, 215, 0, 0.1);
+            border-color: rgba(255, 215, 0, 0.3);
         }
-
         #node-consensus .card-badge {
             background: rgba(255, 215, 0, 0.15);
-            color: var(--color-consensus);
+            color: #ffd700;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        #node-con-sub1 {
+            --theme-color: #00e5ff;
+            --theme-border: rgba(0, 229, 255, 0.4);
+            --glow-color: rgba(0, 229, 255, 0.18);
+        }
+        #node-con-sub1 .card-icon {
+            color: #00e5ff;
+            background: rgba(0, 229, 255, 0.1);
+            border-color: rgba(0, 229, 255, 0.3);
+        }
+
+        #node-con-sub2 {
+            --theme-color: #b388ff;
+            --theme-border: rgba(179, 136, 255, 0.4);
+            --glow-color: rgba(179, 136, 255, 0.18);
+        }
+        #node-con-sub2 .card-icon {
+            color: #b388ff;
+            background: rgba(179, 136, 255, 0.1);
+            border-color: rgba(179, 136, 255, 0.3);
+        }
+
+        #node-con-sub3 {
+            --theme-color: #ff4081;
+            --theme-border: rgba(255, 64, 129, 0.4);
+            --glow-color: rgba(255, 64, 129, 0.18);
+        }
+        #node-con-sub3 .card-icon {
+            color: #ff4081;
+            background: rgba(255, 64, 129, 0.1);
+            border-color: rgba(255, 64, 129, 0.3);
         }
 
         #node-execution {
-            --theme-color: var(--color-execution);
-            --glow-color: rgba(0, 176, 255, 0.15);
+            --theme-color: #00b0ff;
+            --theme-border: rgba(0, 176, 255, 0.45);
+            --glow-color: rgba(0, 176, 255, 0.25);
         }
-
         #node-execution .card-icon {
-            color: var(--color-execution);
-            background: rgba(0, 176, 255, 0.05);
+            color: #00b0ff;
+            background: rgba(0, 176, 255, 0.1);
+            border-color: rgba(0, 176, 255, 0.3);
         }
-
         #node-execution .card-badge {
             background: rgba(0, 176, 255, 0.15);
-            color: var(--color-execution);
+            color: #00b0ff;
+            border: 1px solid rgba(0, 176, 255, 0.3);
         }
 
         /* Draggable Sub-Agent Grid Row */
@@ -568,7 +646,8 @@
 
         .agent-card {
             background: var(--card-bg);
-            border: 1px solid var(--border-color);
+            border: 1.5px solid var(--theme-border, rgba(255, 255, 255, 0.12));
+            border-top: 3px solid var(--theme-color, rgba(0, 229, 255, 0.8));
             border-radius: 16px;
             padding: 1.25rem;
             width: 250px;
@@ -576,9 +655,9 @@
             position: relative;
             z-index: 10;
             cursor: pointer;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
             backdrop-filter: blur(8px);
-            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 16px var(--glow-color, transparent);
             pointer-events: auto;
             /* Re-enable pointer events for the cards */
         }
@@ -589,7 +668,7 @@
             inset: 0;
             border-radius: 16px;
             padding: 1.5px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.01));
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.01));
             -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
             -webkit-mask-composite: xor;
             mask-composite: exclude;
@@ -599,13 +678,13 @@
         .agent-card:hover {
             transform: translateY(-4px) scale(1.02);
             border-color: var(--theme-color);
-            box-shadow: 0 10px 40px var(--glow-color);
+            box-shadow: 0 10px 40px var(--glow-color), 0 0 25px var(--glow-color);
         }
 
         .agent-card.selected {
             border-color: var(--theme-color);
-            box-shadow: 0 0 35px var(--glow-color);
-            background: rgba(17, 25, 40, 0.9);
+            box-shadow: 0 0 35px var(--glow-color), 0 0 20px var(--theme-color);
+            background: rgba(17, 25, 40, 0.92);
         }
 
         .agent-card.multiselected, .node-card.multiselected {
@@ -1331,20 +1410,6 @@
                         </div>
                     </div>
 
-                    <!-- Risk Management Agent -->
-                    <div class="agent-card" id="node-risk-agent" onclick="selectNode('risk-agent')">
-                        <div class="card-header">
-                            <div class="card-icon">🛡️</div>
-                            <div>
-                                <div class="card-title" style="font-size: 0.9rem;">Risk Management</div>
-                                <p style="font-size: 0.65rem; color: var(--text-secondary)">Post-Consensus Veto</p>
-                            </div>
-                        </div>
-                        <div class="card-content" style="font-size: 0.75rem;">
-                            Mengontrol besaran lot size, validasi rasio RR, serta memiliki hak veto transaksi.
-                        </div>
-                    </div>
-
                     <!-- Data Transfer: MSA -> Sentiment Agent Info Box -->
                     <div class="agent-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')"
                         style="padding: 1rem; width: 220px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
@@ -1584,8 +1649,22 @@
                     </div>
                 </div>
 
-                <!-- Risk Management Steps Column (New!) -->
+                <!-- Risk Management Column -->
                 <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
+                    <!-- Risk Management Main Card -->
+                    <div class="agent-card" id="node-risk-agent" onclick="selectNode('risk-agent')" style="width: 100%;">
+                        <div class="card-header">
+                            <div class="card-icon">🛡️</div>
+                            <div>
+                                <div class="card-title" style="font-size: 0.9rem;">Risk Management</div>
+                                <p style="font-size: 0.65rem; color: var(--text-secondary)">Post-Consensus Veto</p>
+                            </div>
+                        </div>
+                        <div class="card-content" style="font-size: 0.75rem;">
+                            Mengontrol besaran lot size, validasi rasio RR, serta memiliki hak veto transaksi.
+                        </div>
+                    </div>
+
                     <!-- Risk Step 1 -->
                     <div class="agent-card" id="node-risk-sub1" onclick="selectNode('risk-sub1')" style="width: 100%; padding: 1rem;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
@@ -2857,70 +2936,80 @@
         </div>
 
         <script>
-            // Default System Connections with Specific Port Assignments
+            // Default System Connections with Precise Port Assignments (Anti-Overlap & Clean Flow)
             const defaultConnections = [
-                // Stage 1 Ingestion & Storage Chain
-                { from: "node-mt5", fromPort: "right", to: "node-watcher-trigger", toPort: "left" },
+                // Stage 1 Ingestion & Storage Chain (Vertical Cascade)
+                { from: "node-mt5", fromPort: "bottom", to: "node-watcher-trigger", toPort: "top" },
                 { from: "node-watcher-trigger", fromPort: "bottom", to: "node-neondb-mapping", toPort: "top" },
                 { from: "node-neondb-mapping", fromPort: "bottom", to: "node-lancedb", toPort: "top" },
+                { from: "node-lancedb", fromPort: "bottom", to: "node-orchestrator", toPort: "top" },
 
-                // Stage 1 -> Stage 2 (Orchestrator Coordination)
-                { from: "node-watcher-trigger", fromPort: "right", to: "node-orchestrator", toPort: "left" },
-                { from: "node-neondb-mapping", fromPort: "right", to: "node-orchestrator", toPort: "left" },
-                { from: "node-lancedb", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+                // Stage 1 Ingestion Bypass / Direct Trigger to Orchestrator (Left Bypass Corridor)
+                { from: "node-watcher-trigger", fromPort: "left", to: "node-orchestrator", toPort: "left" },
 
-                // Orchestrator -> Sub-Agents
-                { from: "node-orchestrator", fromPort: "right", to: "node-ms-agent", toPort: "left" },
+                // Stage 2 Orchestrator -> Stage 3 Sub-Agents (Top of each agent column)
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-ms-agent", toPort: "top" },
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-ml-agent", toPort: "top" },
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-sentiment-agent", toPort: "top" },
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-risk-agent", toPort: "top" },
+
+                // Market Structure Agent (MSA Column: Top to Bottom)
                 { from: "node-ms-agent", fromPort: "bottom", to: "node-ms-sub1", toPort: "top" },
                 { from: "node-ms-sub1", fromPort: "bottom", to: "node-ms-sub2", toPort: "top" },
-                { from: "node-orchestrator", fromPort: "right", to: "node-ml-agent", toPort: "left" },
-                { from: "node-orchestrator", fromPort: "right", to: "node-risk-agent", toPort: "left" },
-                { from: "node-orchestrator", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
 
-                // Sub-Agents -> Consensus Engine / Sequential Flow
-                { from: "node-ms-sub2", fromPort: "right", to: "node-con-sub1", toPort: "left" },
+                // MSA Data Feed to ML Prediction Agent
                 { from: "node-ms-sub2", fromPort: "right", to: "node-msa-to-ml-info", toPort: "left" },
                 { from: "node-msa-to-ml-info", fromPort: "right", to: "node-ml-agent", toPort: "left" },
+
+                // ML Prediction Sub-Steps (ML Column: Top to Bottom)
                 { from: "node-ml-agent", fromPort: "bottom", to: "node-ml-sub1", toPort: "top" },
                 { from: "node-ml-sub1", fromPort: "bottom", to: "node-ml-sub2", toPort: "top" },
                 { from: "node-ml-sub2", fromPort: "bottom", to: "node-ml-sub3", toPort: "top" },
                 { from: "node-ml-sub3", fromPort: "bottom", to: "node-ml-sub4", toPort: "top" },
                 { from: "node-ml-sub4", fromPort: "bottom", to: "node-ml-sub5", toPort: "top" },
-                { from: "node-ml-sub5", fromPort: "right", to: "node-con-sub2", toPort: "left" },
+
+                // MSA Data Feed to Sentiment Agent
                 { from: "node-ms-sub2", fromPort: "right", to: "node-msa-to-sent-info", toPort: "left" },
-                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sent-sub3", toPort: "left" },
+                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
+
+                // Sentiment Sub-Steps (Sentiment Column: Top to Bottom)
                 { from: "node-sentiment-agent", fromPort: "bottom", to: "node-sent-sub1", toPort: "top" },
                 { from: "node-sent-sub1", fromPort: "bottom", to: "node-sent-sub2", toPort: "top" },
                 { from: "node-sent-sub2", fromPort: "bottom", to: "node-sent-sub3", toPort: "top" },
                 { from: "node-sent-sub3", fromPort: "bottom", to: "node-sent-sub4", toPort: "top" },
                 { from: "node-sent-sub4", fromPort: "bottom", to: "node-sent-sub5", toPort: "top" },
+
+                // Sub-Agents Outputs -> Consensus Summary Inputs
+                { from: "node-ms-sub2", fromPort: "right", to: "node-con-sub1", toPort: "left" },
+                { from: "node-ml-sub5", fromPort: "right", to: "node-con-sub2", toPort: "left" },
                 { from: "node-sent-sub5", fromPort: "right", to: "node-con-sub3", toPort: "left" },
                 { from: "node-con-sub1", fromPort: "right", to: "node-consensus", toPort: "left" },
                 { from: "node-con-sub2", fromPort: "right", to: "node-consensus", toPort: "left" },
                 { from: "node-con-sub3", fromPort: "right", to: "node-consensus", toPort: "left" },
 
-                // Consensus -> Workflow Steps (Sequential)
+                // Consensus Engine -> Consensus Workflow Steps (Top to Bottom)
                 { from: "node-consensus", fromPort: "right", to: "node-con-step1", toPort: "left" },
                 { from: "node-con-step1", fromPort: "bottom", to: "node-con-step2", toPort: "top" },
                 { from: "node-con-step2", fromPort: "bottom", to: "node-con-step3", toPort: "top" },
                 { from: "node-con-step3", fromPort: "bottom", to: "node-con-step4", toPort: "top" },
                 { from: "node-con-step4", fromPort: "bottom", to: "node-con-step5", toPort: "top" },
 
-                // Consensus Steps -> Risk Management -> Execution
+                // Consensus Steps -> Risk Management Agent
                 { from: "node-con-step5", fromPort: "right", to: "node-risk-agent", toPort: "left" },
-                { from: "node-consensus", fromPort: "right", to: "node-risk-agent", toPort: "left" },
 
-                // Risk Management Internal Workflow
+                // Risk Management Internal Workflow (Risk Column: Top to Bottom)
                 { from: "node-risk-agent", fromPort: "bottom", to: "node-risk-sub1", toPort: "top" },
                 { from: "node-risk-sub1", fromPort: "bottom", to: "node-risk-sub2", toPort: "top" },
                 { from: "node-risk-sub2", fromPort: "bottom", to: "node-risk-sub3", toPort: "top" },
                 { from: "node-risk-sub3", fromPort: "bottom", to: "node-risk-sub4", toPort: "top" },
                 { from: "node-risk-sub4", fromPort: "bottom", to: "node-risk-sub5", toPort: "top" },
+
+                // Risk Management Final Approval -> Order Execution Engine
                 { from: "node-risk-sub5", fromPort: "right", to: "node-execution", toPort: "left" }
             ];
 
             let connections = [...defaultConnections];
-            const LAYOUT_VERSION = 8; // ponytail: bump when defaultConnections change
+            const LAYOUT_VERSION = 12; // Bump version to force clean cache update
 
             // Selection & Hover Flow State
             let hoveredCardId = null;
@@ -3062,11 +3151,37 @@
             let sourceNodeId = null;
             let sourceNodePort = null;
 
-            // Update lines on resize/load
-            window.addEventListener('resize', drawLines);
-            window.addEventListener('load', () => {
+            // Robust lifecycle initialization for page load and reload
+            window.addEventListener('resize', () => {
+                drawLines();
+            });
+
+            function initializeOnReady() {
                 initializeDragAndDrop();
                 restoreLayoutState();
+                drawLines();
+
+                // Re-sync lines once web fonts (Space Grotesk, Outfit) finish rendering
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(() => {
+                        drawLines();
+                    });
+                }
+
+                // Sub-pixel multi-phase draw pass to guarantee 100% attached lines on initial paint
+                requestAnimationFrame(() => {
+                    drawLines();
+                    setTimeout(drawLines, 50);
+                    setTimeout(drawLines, 200);
+                });
+            }
+
+            if (document.readyState === 'loading') {
+                window.addEventListener('DOMContentLoaded', initializeOnReady);
+            } else {
+                initializeOnReady();
+            }
+            window.addEventListener('load', () => {
                 drawLines();
             });
 
@@ -3447,6 +3562,23 @@
                 }
                 try {
                     const state = JSON.parse(savedStateStr);
+                    // If version mismatch, perform clean reset so stale positions do not cause card/line detachment
+                    if (!state.version || state.version !== LAYOUT_VERSION) {
+                        localStorage.removeItem('mt5_diagram_layout');
+                        connections = [...defaultConnections];
+                        panX = 0;
+                        panY = 0;
+                        zoomScale = 1.0;
+                        updateTransform();
+                        document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                            card.setAttribute('data-dx', '0');
+                            card.setAttribute('data-dy', '0');
+                            card.style.transform = 'translate(0px, 0px)';
+                        });
+                        saveLayoutState();
+                        return;
+                    }
+
                     // Always restore pan, zoom, and node positions
                     if (state.pan) {
                         panX = state.pan.x;
@@ -3469,11 +3601,8 @@
                             }
                         }
                     }
-                    // Only reset connections when version changed, keep positions intact
-                    if (!state.version || state.version !== LAYOUT_VERSION) {
-                        connections = [...defaultConnections];
-                        saveLayoutState(); // re-save with new version + preserved positions
-                    } else if (state.connections) {
+
+                    if (state.connections) {
                         connections = state.connections;
                     } else {
                         connections = [...defaultConnections];
@@ -3660,7 +3789,27 @@
                     const leadY = Math.min(sy - 35, (sy + ey) / 2);
                     d = `M ${sx} ${sy} C ${sx} ${leadY}, ${Math.max(sx, ex) + 30} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
                 }
-                // 11. Controlled Safe Default
+                // 11. Left -> Left (Same-side left gutter corridor)
+                else if (sDir === 'left' && eDir === 'left') {
+                    const gutterX = Math.min(sx, ex) - 45;
+                    d = `M ${sx} ${sy} C ${gutterX} ${sy}, ${gutterX} ${ey}, ${ex - 6} ${ey} L ${ex} ${ey}`;
+                }
+                // 12. Right -> Right (Same-side right gutter corridor)
+                else if (sDir === 'right' && eDir === 'right') {
+                    const gutterX = Math.max(sx, ex) + 45;
+                    d = `M ${sx} ${sy} C ${gutterX} ${sy}, ${gutterX} ${ey}, ${ex + 6} ${ey} L ${ex} ${ey}`;
+                }
+                // 13. Down -> Down (Same-side bottom corridor)
+                else if (sDir === 'down' && eDir === 'down') {
+                    const gutterY = Math.max(sy, ey) + 45;
+                    d = `M ${sx} ${sy} C ${sx} ${gutterY}, ${ex} ${gutterY}, ${ex} ${ey + 6} L ${ex} ${ey}`;
+                }
+                // 14. Up -> Up (Same-side top corridor)
+                else if (sDir === 'up' && eDir === 'up') {
+                    const gutterY = Math.min(sy, ey) - 45;
+                    d = `M ${sx} ${sy} C ${sx} ${gutterY}, ${ex} ${gutterY}, ${ex} ${ey - 6} L ${ex} ${ey}`;
+                }
+                // 15. Controlled Safe Default
                 else {
                     const dist = Math.hypot(ex - sx, ey - sy);
                     const leadDist = Math.min(50, Math.max(15, dist * 0.25));
@@ -3689,19 +3838,44 @@
 
             function getNodeThemeColor(cardId) {
                 if (!cardId) return '#00e5ff';
-                if (cardId.includes('mt5')) return '#00f2fe';
-                if (cardId.includes('watcher')) return '#00e676';
-                if (cardId.includes('neon')) return '#00e5ff';
-                if (cardId.includes('lancedb')) return '#e040fb';
-                if (cardId.includes('orchestrator')) return '#ff9100';
-                if (cardId.includes('ms-agent') || cardId.includes('ms-sub')) return '#00e676';
+                if (cardId.includes('mt5')) return '#ffaa00';
+                if (cardId.includes('watcher')) return '#00e5ff';
+                if (cardId.includes('neon')) return '#00e676';
+                if (cardId.includes('lancedb')) return '#d500f9';
+                if (cardId.includes('orchestrator')) return '#ff1744';
+                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1')) return '#00e5ff';
+                if (cardId.includes('ms-sub2')) return '#d500f9';
                 if (cardId.includes('msa-to-ml') || cardId.includes('msa-to-sent')) return '#ffaa00';
                 if (cardId.includes('ml-agent') || cardId.includes('ml-sub')) return '#b388ff';
                 if (cardId.includes('sentiment') || cardId.includes('sent-sub')) return '#ff4081';
-                if (cardId.includes('consensus') || cardId.includes('con-sub') || cardId.includes('con-step')) return '#00e5ff';
-                if (cardId.includes('risk') || cardId.includes('risk-sub')) return '#ffd600';
-                if (cardId.includes('execution')) return '#ff1744';
+                if (cardId.includes('con-sub1')) return '#00e5ff';
+                if (cardId.includes('con-sub2')) return '#b388ff';
+                if (cardId.includes('con-sub3')) return '#ff4081';
+                if (cardId.includes('consensus') || cardId.includes('con-step')) return '#ffd700';
+                if (cardId.includes('risk') || cardId.includes('risk-sub')) return '#00e676';
+                if (cardId.includes('execution')) return '#00b0ff';
                 return '#00e5ff';
+            }
+
+            function getMarkerType(cardId) {
+                if (!cardId) return 'watcher';
+                if (cardId.includes('mt5')) return 'mt5';
+                if (cardId.includes('watcher')) return 'watcher';
+                if (cardId.includes('neon')) return 'neon';
+                if (cardId.includes('lancedb')) return 'lancedb';
+                if (cardId.includes('orchestrator')) return 'orchestrator';
+                if (cardId.includes('ms-agent') || cardId.includes('ms-sub1')) return 'watcher';
+                if (cardId.includes('ms-sub2')) return 'lancedb';
+                if (cardId.includes('msa-to-ml') || cardId.includes('msa-to-sent')) return 'info';
+                if (cardId.includes('ml-agent') || cardId.includes('ml-sub')) return 'ml';
+                if (cardId.includes('sentiment') || cardId.includes('sent-sub')) return 'sentiment';
+                if (cardId.includes('con-sub1')) return 'watcher';
+                if (cardId.includes('con-sub2')) return 'ml';
+                if (cardId.includes('con-sub3')) return 'sentiment';
+                if (cardId.includes('consensus') || cardId.includes('con-step')) return 'consensus';
+                if (cardId.includes('risk') || cardId.includes('risk-sub')) return 'risk';
+                if (cardId.includes('execution')) return 'execution';
+                return 'watcher';
             }
 
             function getConnectedFlowGraph(startNodeId) {
@@ -3753,6 +3927,40 @@
                 const rectCanvas = canvas.getBoundingClientRect();
 
                 canvas.innerHTML = '';
+
+                // Ensure SVG marker definitions exist with color themes
+                const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+                const markerData = [
+                    { id: 'mt5', color: '#ffaa00' },
+                    { id: 'watcher', color: '#00e5ff' },
+                    { id: 'neon', color: '#00e676' },
+                    { id: 'lancedb', color: '#d500f9' },
+                    { id: 'orchestrator', color: '#ff1744' },
+                    { id: 'info', color: '#ffaa00' },
+                    { id: 'ml', color: '#b388ff' },
+                    { id: 'sentiment', color: '#ff4081' },
+                    { id: 'consensus', color: '#ffd700' },
+                    { id: 'risk', color: '#00e676' },
+                    { id: 'execution', color: '#00b0ff' }
+                ];
+                markerData.forEach(m => {
+                    const marker = document.createElementNS("http://www.w3.org/2000/svg", "marker");
+                    marker.setAttribute('id', `marker-arrow-${m.id}`);
+                    marker.setAttribute('viewBox', '0 0 12 12');
+                    marker.setAttribute('refX', '9');
+                    marker.setAttribute('refY', '6');
+                    marker.setAttribute('markerWidth', '9');
+                    marker.setAttribute('markerHeight', '9');
+                    marker.setAttribute('orient', 'auto');
+                    marker.setAttribute('markerUnits', 'userSpaceOnUse');
+
+                    const arrowPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                    arrowPath.setAttribute('d', 'M 1.5 2.2 L 10 6 L 1.5 9.8 L 3.8 6 Z');
+                    arrowPath.setAttribute('fill', m.color);
+                    marker.appendChild(arrowPath);
+                    defs.appendChild(marker);
+                });
+                canvas.appendChild(defs);
                 
                 // Active focus card from either mouse hover or click selection
                 const activeTargetId = hoveredCardId || selectedNodeCardId;
@@ -3816,12 +4024,18 @@
                     visiblePath.setAttribute('id', visibleId);
                     visiblePath.setAttribute('class', 'flow-path');
 
+                    // Color assignment from source node
+                    const color = getNodeThemeColor(conn.from);
+                    const markerType = getMarkerType(conn.from);
+                    visiblePath.style.setProperty('--line-color', color);
+                    visiblePath.style.stroke = color;
+                    visiblePath.setAttribute('marker-end', `url(#marker-arrow-${markerType})`);
+
                     // Check if this connection belongs to the full end-to-end active graph pathway
                     const isPathActive = isFocusActive && activeEdgeIndices.has(index);
 
                     if (isPathActive) {
                         visiblePath.classList.add('active');
-                        const color = getNodeThemeColor(conn.from);
                         visiblePath.style.setProperty('--active-color', color);
                     } else if (isFocusActive) {
                         visiblePath.classList.add('dimmed');
@@ -3832,12 +4046,20 @@
                     delBtnGroup.setAttribute('class', 'edge-delete-btn');
                     delBtnGroup.setAttribute('title', 'Hapus aliran data ini');
 
+                    // Invisible hit area (larger than visible circle) for easier clicking
+                    const hitArea = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    hitArea.setAttribute('class', 'hit-area');
+                    hitArea.setAttribute('r', '16');
+
                     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    circle.setAttribute('class', 'icon-bg');
                     circle.setAttribute('r', '9');
 
                     const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
                     text.textContent = '×';
 
+                    // Order matters: hit-area first (behind), then icon-bg, then text on top
+                    delBtnGroup.appendChild(hitArea);
                     delBtnGroup.appendChild(circle);
                     delBtnGroup.appendChild(text);
 
@@ -3895,46 +4117,46 @@
             function selectNode(type) {
                 const panel = document.getElementById('side-panel');
                 const cardMap = {
-                    'mt5': { cardId: 'node-mt5', panelId: 'panel-mt5', color: 'var(--color-mt5)' },
-                    'watcher': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: 'var(--color-watcher)' },
-                    'watcher-trigger': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: 'var(--color-watcher)' },
-                    'neon': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: 'var(--color-neon)' },
-                    'neondb-mapping': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: 'var(--color-neon)' },
-                    'lancedb': { cardId: 'node-lancedb', panelId: 'panel-lancedb', color: 'var(--color-lancedb)' },
-                    'orchestrator': { cardId: 'node-orchestrator', panelId: 'panel-orchestrator', color: 'var(--color-orchestrator)' },
-                    'ms-agent': { cardId: 'node-ms-agent', panelId: 'panel-ms-agent', color: 'var(--color-watcher)' },
-                    'ms-sub1': { cardId: 'node-ms-sub1', panelId: 'panel-ms-agent', color: 'var(--color-watcher)' },
-                    'ms-sub2': { cardId: 'node-ms-sub2', panelId: 'panel-ms-agent', color: 'var(--color-lancedb)' },
+                    'mt5': { cardId: 'node-mt5', panelId: 'panel-mt5', color: '#ffaa00' },
+                    'watcher': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: '#00e5ff' },
+                    'watcher-trigger': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: '#00e5ff' },
+                    'neon': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: '#00e676' },
+                    'neondb-mapping': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: '#00e676' },
+                    'lancedb': { cardId: 'node-lancedb', panelId: 'panel-lancedb', color: '#d500f9' },
+                    'orchestrator': { cardId: 'node-orchestrator', panelId: 'panel-orchestrator', color: '#ff1744' },
+                    'ms-agent': { cardId: 'node-ms-agent', panelId: 'panel-ms-agent', color: '#00e5ff' },
+                    'ms-sub1': { cardId: 'node-ms-sub1', panelId: 'panel-ms-agent', color: '#00e5ff' },
+                    'ms-sub2': { cardId: 'node-ms-sub2', panelId: 'panel-ms-agent', color: '#d500f9' },
                     'msa-to-ml-info': { cardId: 'node-msa-to-ml-info', panelId: 'panel-msa-to-ml-info', color: '#ffaa00' },
                     'msa-to-sent-info': { cardId: 'node-msa-to-sent-info', panelId: 'panel-msa-to-sent-info', color: '#ffaa00' },
-                    'ml-agent': { cardId: 'node-ml-agent', panelId: 'panel-ml-agent', color: 'var(--color-lancedb)' },
-                    'ml-sub1': { cardId: 'node-ml-sub1', panelId: 'panel-ml-sub1', color: 'var(--color-lancedb)' },
-                    'ml-sub2': { cardId: 'node-ml-sub2', panelId: 'panel-ml-sub2', color: 'var(--color-lancedb)' },
-                    'ml-sub3': { cardId: 'node-ml-sub3', panelId: 'panel-ml-sub3', color: 'var(--color-lancedb)' },
-                    'ml-sub4': { cardId: 'node-ml-sub4', panelId: 'panel-ml-sub4', color: 'var(--color-lancedb)' },
-                    'ml-sub5': { cardId: 'node-ml-sub5', panelId: 'panel-ml-sub5', color: 'var(--color-lancedb)' },
-                    'risk-agent': { cardId: 'node-risk-agent', panelId: 'panel-risk-agent', color: 'var(--color-neon)' },
-                    'risk-sub1': { cardId: 'node-risk-sub1', panelId: 'panel-risk-sub1', color: 'var(--color-neon)' },
-                    'risk-sub2': { cardId: 'node-risk-sub2', panelId: 'panel-risk-sub2', color: 'var(--color-neon)' },
-                    'risk-sub3': { cardId: 'node-risk-sub3', panelId: 'panel-risk-sub3', color: 'var(--color-neon)' },
-                    'risk-sub4': { cardId: 'node-risk-sub4', panelId: 'panel-risk-sub4', color: 'var(--color-neon)' },
-                    'risk-sub5': { cardId: 'node-risk-sub5', panelId: 'panel-risk-sub5', color: 'var(--color-neon)' },
+                    'ml-agent': { cardId: 'node-ml-agent', panelId: 'panel-ml-agent', color: '#b388ff' },
+                    'ml-sub1': { cardId: 'node-ml-sub1', panelId: 'panel-ml-sub1', color: '#b388ff' },
+                    'ml-sub2': { cardId: 'node-ml-sub2', panelId: 'panel-ml-sub2', color: '#b388ff' },
+                    'ml-sub3': { cardId: 'node-ml-sub3', panelId: 'panel-ml-sub3', color: '#b388ff' },
+                    'ml-sub4': { cardId: 'node-ml-sub4', panelId: 'panel-ml-sub4', color: '#b388ff' },
+                    'ml-sub5': { cardId: 'node-ml-sub5', panelId: 'panel-ml-sub5', color: '#b388ff' },
+                    'risk-agent': { cardId: 'node-risk-agent', panelId: 'panel-risk-agent', color: '#00e676' },
+                    'risk-sub1': { cardId: 'node-risk-sub1', panelId: 'panel-risk-sub1', color: '#00e676' },
+                    'risk-sub2': { cardId: 'node-risk-sub2', panelId: 'panel-risk-sub2', color: '#00e676' },
+                    'risk-sub3': { cardId: 'node-risk-sub3', panelId: 'panel-risk-sub3', color: '#00e676' },
+                    'risk-sub4': { cardId: 'node-risk-sub4', panelId: 'panel-risk-sub4', color: '#00e676' },
+                    'risk-sub5': { cardId: 'node-risk-sub5', panelId: 'panel-risk-sub5', color: '#00e676' },
                     'sentiment-agent': { cardId: 'node-sentiment-agent', panelId: 'panel-sentiment-agent', color: '#ff4081' },
                     'sent-sub1': { cardId: 'node-sent-sub1', panelId: 'panel-sent-sub1', color: '#ff4081' },
                     'sent-sub2': { cardId: 'node-sent-sub2', panelId: 'panel-sent-sub2', color: '#ff4081' },
                     'sent-sub3': { cardId: 'node-sent-sub3', panelId: 'panel-sent-sub3', color: '#ff4081' },
                     'sent-sub4': { cardId: 'node-sent-sub4', panelId: 'panel-sent-sub4', color: '#ff4081' },
                     'sent-sub5': { cardId: 'node-sent-sub5', panelId: 'panel-sent-sub5', color: '#ff4081' },
-                    'consensus': { cardId: 'node-consensus', panelId: 'panel-consensus', color: 'var(--color-consensus)' },
-                    'con-sub1': { cardId: 'node-con-sub1', panelId: 'panel-con-sub1', color: 'var(--color-consensus)' },
-                    'con-sub2': { cardId: 'node-con-sub2', panelId: 'panel-con-sub2', color: 'var(--color-consensus)' },
-                    'con-sub3': { cardId: 'node-con-sub3', panelId: 'panel-con-sub3', color: 'var(--color-consensus)' },
-                    'con-step1': { cardId: 'node-con-step1', panelId: 'panel-con-step1', color: 'var(--color-consensus)' },
-                    'con-step2': { cardId: 'node-con-step2', panelId: 'panel-con-step2', color: 'var(--color-consensus)' },
-                    'con-step3': { cardId: 'node-con-step3', panelId: 'panel-con-step3', color: 'var(--color-consensus)' },
-                    'con-step4': { cardId: 'node-con-step4', panelId: 'panel-con-step4', color: 'var(--color-consensus)' },
-                    'con-step5': { cardId: 'node-con-step5', panelId: 'panel-con-step5', color: 'var(--color-consensus)' },
-                    'execution': { cardId: 'node-execution', panelId: 'panel-execution', color: 'var(--color-execution)' }
+                    'consensus': { cardId: 'node-consensus', panelId: 'panel-consensus', color: '#ffd700' },
+                    'con-sub1': { cardId: 'node-con-sub1', panelId: 'panel-con-sub1', color: '#00e5ff' },
+                    'con-sub2': { cardId: 'node-con-sub2', panelId: 'panel-con-sub2', color: '#b388ff' },
+                    'con-sub3': { cardId: 'node-con-sub3', panelId: 'panel-con-sub3', color: '#ff4081' },
+                    'con-step1': { cardId: 'node-con-step1', panelId: 'panel-con-step1', color: '#ffd700' },
+                    'con-step2': { cardId: 'node-con-step2', panelId: 'panel-con-step2', color: '#ffd700' },
+                    'con-step3': { cardId: 'node-con-step3', panelId: 'panel-con-step3', color: '#ffd700' },
+                    'con-step4': { cardId: 'node-con-step4', panelId: 'panel-con-step4', color: '#ffd700' },
+                    'con-step5': { cardId: 'node-con-step5', panelId: 'panel-con-step5', color: '#ffd700' },
+                    'execution': { cardId: 'node-execution', panelId: 'panel-execution', color: '#00b0ff' }
                 };
 
                 const config = cardMap[type];

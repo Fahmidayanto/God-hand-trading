@@ -1,4 +1,4 @@
-import { type FC, useCallback, useEffect, useRef, useState } from "react";
+﻿import { type FC, useCallback, useEffect, useRef, useState } from "react";
 import { 
   MessageSquare, 
   X, 
@@ -241,7 +241,7 @@ export const FloatingChatbot: FC = () => {
           "fixed bottom-6 right-6 z-[9999] p-4 rounded-full flex items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105 shadow-lg border",
           isOpen 
             ? "opacity-0 scale-0 pointer-events-none"
-            : "bg-slate-900/90 hover:bg-slate-955/90 border-cyan-500/40 text-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.35)] hover:shadow-[0_0_25px_rgba(6,182,212,0.5)]"
+            : "bg-white/95 hover:bg-[#F0F6FF] border-blue-500/40 text-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.25)] hover:shadow-[0_0_25px_rgba(29,78,216,0.35)]"
         )}
         title="Tanya AI"
       >
@@ -262,24 +262,24 @@ export const FloatingChatbot: FC = () => {
           display: "none"
         }}
         className={cn(
-          "bg-slate-955/95 backdrop-blur-md border border-slate-800/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-shadow duration-300",
+          "bg-white/95 backdrop-blur-md border border-blue-200/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-shadow duration-300",
           isDragging ? "shadow-cyan-500/10 border-cyan-500/30" : ""
         )}
       >
         {/* Header (Draggable) */}
         <div 
           onMouseDown={handleMouseDown}
-          className="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/40 select-none cursor-grab active:cursor-grabbing flex-shrink-0"
+          className="p-4 border-b border-blue-200/80 flex items-center justify-between bg-white/70 select-none cursor-grab active:cursor-grabbing flex-shrink-0"
         >
           <div className="flex items-center gap-2 select-none">
-            <GripVertical className="size-4 text-slate-500 hover:text-slate-300 cursor-grab active:cursor-grabbing shrink-0" />
+            <GripVertical className="size-4 text-slate-500 hover:text-slate-600 cursor-grab active:cursor-grabbing shrink-0" />
             <div className="relative">
               <button
                 onClick={() => setIsAgentSelectOpen(!isAgentSelectOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-sm text-foreground transition-all cursor-pointer"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#BFDBFE]/70 hover:bg-[#BFDBFE] border border-blue-300 text-sm text-foreground transition-all cursor-pointer"
               >
                 <Bot className="size-4 text-cyan-400" />
-                <span className="font-semibold text-slate-200">
+                <span className="font-semibold text-slate-800">
                   {selectedAgentInfo?.display_name || selectedAgent}
                 </span>
                 {isAgentSelectOpen ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
@@ -287,7 +287,7 @@ export const FloatingChatbot: FC = () => {
 
             {/* Agent Switcher Dropdown */}
             {isAgentSelectOpen && (
-              <div className="absolute top-full left-0 mt-1.5 w-64 bg-slate-900 border border-slate-800 rounded-lg shadow-xl py-1 z-[1000] animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-white border border-blue-200 rounded-lg shadow-xl py-1 z-[1000] animate-in fade-in slide-in-from-top-1 duration-150">
                 {agents.map((agent) => (
                   <button
                     key={agent.agent_name}
@@ -299,7 +299,7 @@ export const FloatingChatbot: FC = () => {
                       "w-full text-left px-4 py-2 text-sm transition-colors flex items-center justify-between cursor-pointer",
                       selectedAgent === agent.agent_name 
                         ? "bg-cyan-500/10 text-cyan-400 font-medium" 
-                        : "text-slate-300 hover:bg-slate-800/50"
+                        : "text-slate-600 hover:bg-[#BFDBFE]/50"
                     )}
                   >
                     <span>{agent.display_name}</span>
@@ -328,7 +328,7 @@ export const FloatingChatbot: FC = () => {
             )}
             <button
               onClick={() => setIsOpen(false)}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-colors cursor-pointer"
               title="Tutup Chat"
             >
               <X className="size-4" />
@@ -337,14 +337,14 @@ export const FloatingChatbot: FC = () => {
         </div>
 
         {/* Message Thread */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-container bg-slate-950/20">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-container bg-[#F0F6FF]/40">
           {chatItems.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
               <div className="p-4 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 animate-bounce">
                 <Bot className="size-8" />
               </div>
               <div className="space-y-1.5">
-                <h3 className="font-semibold text-slate-200">
+                <h3 className="font-semibold text-slate-800">
                   Tanya AI {selectedAgentInfo?.display_name || selectedAgent}
                 </h3>
                 <p className="text-xs text-slate-400 max-w-[280px]">
@@ -369,7 +369,7 @@ export const FloatingChatbot: FC = () => {
                 <div className={cn(
                   "size-8 rounded-full flex items-center justify-center text-xs font-bold border shrink-0",
                   isUser 
-                    ? "bg-slate-800 border-slate-700 text-slate-300"
+                    ? "bg-[#BFDBFE] border-blue-300 text-slate-600"
                     : "bg-cyan-500/15 border-cyan-500/25 text-cyan-400"
                 )}>
                   {isUser ? "U" : <Bot className="size-4" />}
@@ -378,10 +378,10 @@ export const FloatingChatbot: FC = () => {
                 {/* Message Bubble */}
                 <div
                   className={cn(
-                    "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed text-slate-100",
+                    "rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed text-slate-900",
                     isUser 
                       ? "bg-cyan-600/20 border border-cyan-500/30 rounded-tr-none text-cyan-100" 
-                      : "bg-slate-900 border border-slate-800/80 rounded-tl-none"
+                      : "bg-white border border-blue-200/80 rounded-tl-none"
                   )}
                 >
                   {(() => {
@@ -426,7 +426,7 @@ export const FloatingChatbot: FC = () => {
               <div className="size-8 rounded-full bg-cyan-500/15 border border-cyan-500/25 text-cyan-400 flex items-center justify-center shrink-0">
                 <Loader2 className="size-4 animate-spin" />
               </div>
-              <div className="bg-slate-900 border border-slate-800/80 rounded-2xl rounded-tl-none px-4 py-3 flex items-center space-x-1.5">
+              <div className="bg-white border border-blue-200/80 rounded-2xl rounded-tl-none px-4 py-3 flex items-center space-x-1.5">
                 <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                 <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                 <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -443,7 +443,7 @@ export const FloatingChatbot: FC = () => {
             e.preventDefault();
             handleSend();
           }}
-          className="p-4 border-t border-slate-800/80 bg-slate-900/20 flex gap-2"
+          className="p-4 border-t border-blue-200/80 bg-[#F0F6FF]/70 flex gap-2"
         >
           <input
             type="text"
@@ -451,12 +451,12 @@ export const FloatingChatbot: FC = () => {
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={`Tanya ${selectedAgentInfo?.display_name || selectedAgent}...`}
             disabled={isStreaming}
-            className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 disabled:opacity-50"
+            className="flex-1 bg-white border border-blue-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!inputValue.trim() || isStreaming}
-            className="p-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-50 disabled:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer"
+            className="p-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white disabled:opacity-50 disabled:bg-[#BFDBFE] transition-colors flex items-center justify-center cursor-pointer"
           >
             <Send className="size-4" />
           </button>

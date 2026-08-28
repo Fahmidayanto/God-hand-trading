@@ -12,7 +12,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard, ArrowUp, ArrowDown, ArrowUpDown, Ghost, Brain, Newspaper, Shield, Building2, Clock3, AlertTriangle, Bot, Settings, Target, Zap, ClipboardList, Database, FileText } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Clapperboard, ArrowUp, ArrowDown, ArrowUpDown, Ghost, Brain, Newspaper, Shield, Building2, Clock3, AlertTriangle, Bot, Settings, Target, Zap, ClipboardList, Database, FileText, ChevronDown, ArrowRight } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -33,7 +33,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ReplayCandle {
   time: number;
@@ -85,7 +85,7 @@ interface ReplayData {
   };
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SPEED_MAP: Record<string, number> = {
   "1x": 400,
@@ -111,7 +111,7 @@ const STRUCTURE_COLORS: Record<string, string> = {
   BOS: "#facc15",
 };
 
-// ── API helper ───────────────────────────────────────────────────────────────
+// â”€â”€ API helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -126,7 +126,7 @@ async function fetchReplayData(
   return res.json();
 }
 
-// ── Strategy Info Tooltip ───────────────────────────────────────────────────
+// â”€â”€ Strategy Info Tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface StrategyTooltipProps {
   fungsi: string;
@@ -136,12 +136,12 @@ interface StrategyTooltipProps {
 function StrategyTooltip({ fungsi, contoh }: StrategyTooltipProps) {
   return (
     <div className="group relative inline-block ml-1.5 align-middle cursor-help">
-      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-bold border border-slate-700/80 hover:bg-slate-700 hover:text-cyan-400 transition-colors">
+      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#BFDBFE] text-[10px] text-slate-400 font-bold border border-blue-300/75 hover:bg-slate-700 hover:text-cyan-400 transition-colors">
         ?
       </span>
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 hidden group-hover:block bg-slate-950/95 border border-slate-800 rounded-xl text-[11px] text-slate-300 shadow-2xl backdrop-blur-md z-30 transition-all pointer-events-none">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 hidden group-hover:block bg-white/95 border border-blue-200 rounded-xl text-[11px] text-slate-600 shadow-2xl backdrop-blur-md z-30 transition-all pointer-events-none">
         <div className="font-bold text-cyan-400 mb-1">Fungsi:</div>
-        <div className="mb-2 leading-relaxed text-slate-200">{fungsi}</div>
+        <div className="mb-2 leading-relaxed text-slate-800">{fungsi}</div>
         <div className="font-bold text-purple-400 mb-0.5">Contoh:</div>
         <div className="leading-relaxed text-slate-400">{contoh}</div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950/95" />
@@ -150,11 +150,11 @@ function StrategyTooltip({ fungsi, contoh }: StrategyTooltipProps) {
   );
 }
 
-// ── Custom Dropdown Component ────────────────────────────────────────────────
+// â”€â”€ Custom Dropdown Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SELECT_ACCENTS = {
-  blue: { border: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)", text: "#93c5fd", shadow: "rgba(59,130,246,0.25)" },
-  purple: { border: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)", text: "#c4b5fd", shadow: "rgba(139,92,246,0.25)" },
+  blue: { border: "rgba(59, 130, 246, 0.45)", bg: "rgba(239, 246, 255, 0.95)", text: "#1e40af", shadow: "rgba(59, 130, 246, 0.15)" },
+  purple: { border: "rgba(139, 92, 246, 0.45)", bg: "rgba(250, 245, 255, 0.95)", text: "#6b21a8", shadow: "rgba(139, 92, 246, 0.15)" },
 };
 
 interface CustomSelectProps<T> {
@@ -194,22 +194,23 @@ function CustomSelect<T extends string | number>({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap outline-none",
+          "inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer whitespace-nowrap outline-none shadow-sm",
           className ? "w-full justify-between" : ""
         )}
         style={{
           backgroundColor: c.bg,
           borderColor: c.border,
-          boxShadow: `0 0 12px ${c.shadow}`,
+          color: c.text,
+          boxShadow: `0 1px 4px ${c.shadow}`,
         }}
       >
         <span>{getLabel(value)}</span>
-        <span className="ml-0.5 text-[9px] opacity-80">▾</span>
+        <ChevronDown size={12} className={cn("transition-transform duration-200", isOpen && "rotate-180")} style={{ color: c.text }} />
       </button>
 
       {isOpen && (
         <div
-          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110] transition-all origin-top-right animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out transform perspective-1000 rotate-x-4 hover:rotate-x-0 transition-transform duration-200"
+          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-[110] transition-all origin-top-right animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out transform perspective-1000"
         >
           {options.map((opt) => {
             const active = opt === value;
@@ -220,14 +221,17 @@ function CustomSelect<T extends string | number>({
                   onChange(opt);
                   setIsOpen(false);
                 }}
-                className="px-2.5 py-2 rounded-md border border-transparent text-xs transition-all duration-150 active:scale-[0.98] cursor-pointer text-[var(--text-secondary,#cbd5e1)] hover:bg-[var(--bg-elevated,rgba(255,255,255,0.05))] hover:text-white"
+                className={cn(
+                  "px-2.5 py-2 rounded-md border border-transparent text-xs transition-all duration-150 active:scale-[0.98] cursor-pointer",
+                  active ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                )}
                 style={
                   active
                     ? {
                       backgroundColor: c.bg,
                       borderColor: c.border,
                       color: c.text,
-                      boxShadow: `0 0 12px ${c.shadow}`,
+                      boxShadow: `0 1px 4px ${c.shadow}`,
                     }
                     : undefined
                 }
@@ -242,7 +246,7 @@ function CustomSelect<T extends string | number>({
   );
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const getActualLotSize = (t: any): number => {
   const entry = t.entry_price ?? 0;
@@ -260,7 +264,7 @@ const getActualLotSize = (t: any): number => {
   return t.lot_size ?? 0.05;
 };
 
-// ponytail: flat object params with defaults — no class, no registry
+// ponytail: flat object params with defaults â€” no class, no registry
 interface StrategyParams {
   trailing_distance: number;   // USD, default 30.00 (3000 poin)
   tp_trigger: number;          // USD, default 10.00 (1000 poin)
@@ -490,7 +494,7 @@ const simulateTrailingSLTP = (
   };
 };
 
-// ── Agent Panel (cursor-following orchestrator frames) ─────────────────────────
+// â”€â”€ Agent Panel (cursor-following orchestrator frames) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface SimAgentState {
   status: "fired" | "skipped" | "error";
@@ -517,7 +521,7 @@ interface SimFrame {
   approved: boolean | null;
   consensus_level: string;
   consensus_confidence: number;
-  // Trade execution context — populated by backend _build_frame when the
+  // Trade execution context â€” populated by backend _build_frame when the
   // orchestrator approves a BUY/SELL signal. Consumed by TradesOverlayPrimitive
   // (via setAgentTrades) to draw SL/TP zones and entry line on the chart.
   sl_tp?: {
@@ -535,12 +539,12 @@ interface SimFrame {
     multiplier?: number;
   } | null;
   event_price?: number;
-  // Sentiment debug context — only populated by the single-event endpoint
+  // Sentiment debug context â€” only populated by the single-event endpoint
   // (trading.py:simulate-event). Consumed by the modal's News & Calendar block.
   debug_news?: Array<{ headline?: string; timestamp?: string }>;
   debug_events?: Array<{ event?: string; impact?: string; time?: string }>;
   // Counter-swing flag: frontend should NOT update Agent Consensus panel
-  // when true — keeps warm-up values from the setup swing event visible.
+  // when true â€” keeps warm-up values from the setup swing event visible.
   is_counter_swing?: boolean;
 }
 
@@ -594,7 +598,7 @@ const getSignalType = (eventType: string | null | undefined): string => {
 };
 
 // Helper to derive a human-readable reject reason from a simulation frame.
-// Returns { label, detail } — label is the short column text, detail is a
+// Returns { label, detail } â€” label is the short column text, detail is a
 // plain-language explanation shown in a hover popup.
 const getRejectReason = (frame: any): { label: string; detail: string } => {
   if (!frame) return { label: "unknown", detail: "Tidak ada data frame." };
@@ -635,7 +639,7 @@ const getRejectReason = (frame: any): { label: string; detail: string } => {
     };
   }
 
-  // Market structure is the primary signal source — if it's HOLD, no setup
+  // Market structure is the primary signal source â€” if it's HOLD, no setup
   if (ms.signal === "HOLD") {
     return {
       label: "Market structure HOLD",
@@ -685,7 +689,7 @@ const getRejectReason = (frame: any): { label: string; detail: string } => {
   };
 };
 
-// ── Types for simulation helper ──────────────────────────────────────────────
+// â”€â”€ Types for simulation helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function SimulationOfDead() {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -700,7 +704,7 @@ export default function SimulationOfDead() {
   const candleTimeMapRef = useRef<Map<number, ReplayCandle>>(new Map());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Filter state
+  // â”€â”€ Filter state
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [dbMonths, setDbMonths] = useState<{ year: number; month: number }[]>([]);
@@ -727,7 +731,7 @@ export default function SimulationOfDead() {
   }, [isFrameLoading]);
   const [activeFrame, setActiveFrame] = useState<SimFrame | null>(null);
   const activeFrameAbortControllerRef = useRef<AbortController | null>(null);
-  // ponytail: limit concurrent simulate-event fetches — drop excess, not queue
+  // ponytail: limit concurrent simulate-event fetches â€” drop excess, not queue
   const activeSimFetchesRef = useRef<number>(0);
   const pendingSimTimesRef = useRef<Set<string>>(new Set());
   const completedSimTimesRef = useRef<Set<string>>(new Set());
@@ -749,12 +753,12 @@ export default function SimulationOfDead() {
     hoveredPrice: number | null;
   } | null>(null);
 
-  // ── Playback state
+  // â”€â”€ Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [speed, setSpeed] = useState<string>("1x");
 
-  // ── Strategy params state
+  // â”€â”€ Strategy params state
   const [strategyParams, setStrategyParams] = useState({ ...DEFAULT_STRATEGY_PARAMS });
   const [vetoMode, setVetoMode] = useState<'hard' | 'soft' | 'none'>('hard');
   const [allowChochEntry, setAllowChochEntry] = useState(false);
@@ -792,7 +796,7 @@ export default function SimulationOfDead() {
   };
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
 
-  // ── Fetch OHLC window + nearby BOS/CHoCH/HH/LL structures for the pattern-detail popup ──
+  // â”€â”€ Fetch OHLC window + nearby BOS/CHoCH/HH/LL structures for the pattern-detail popup â”€â”€
   useEffect(() => {
     if (!selectedPattern) {
       setPatternCandles([]);
@@ -976,7 +980,7 @@ export default function SimulationOfDead() {
     ? dbMonths.filter(d => d.year === yearTo && (yearTo > yearFrom || d.month >= monthFrom)).map(d => d.month).sort((a, b) => a - b)
     : Array.from({ length: 12 }, (_, i) => i + 1).filter(m => yearTo > yearFrom || m >= monthFrom);
 
-  // ── Init chart ───────────────────────────────────────────────────────────
+  // â”€â”€ Init chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -1103,7 +1107,7 @@ export default function SimulationOfDead() {
     };
   }, []);
 
-  // ── Fetch Available Months ───────────────────────────────────────────────
+  // â”€â”€ Fetch Available Months â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const loadMonths = async () => {
       try {
@@ -1433,7 +1437,7 @@ export default function SimulationOfDead() {
 
 
 
-  // ── Load Data ────────────────────────────────────────────────────────────
+  // â”€â”€ Load Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleLoad = useCallback(async () => {
     if (isPlaying) stopPlayback();
@@ -1596,7 +1600,7 @@ export default function SimulationOfDead() {
     }
   }, []);
 
-  // ── Advance one candle ────────────────────────────────────────────────────
+  // â”€â”€ Advance one candle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const advanceCandle = useCallback((idx: number, data: ReplayData) => {
     if (idx >= data.candles.length) return idx;
@@ -1617,7 +1621,7 @@ export default function SimulationOfDead() {
       emaSeriesRef.current?.update({ time: candle.time as any, value: candle.ema200 });
     }
 
-    // Update structure markers — all events up to this candle
+    // Update structure markers â€” all events up to this candle
     const markers: any[] = [];
     for (const s of data.structures) {
       if (s.time <= candle.time) {
@@ -1625,15 +1629,15 @@ export default function SimulationOfDead() {
         const typeUpper = s.type?.toUpperCase() ?? "";
         const dirLower = s.direction?.toLowerCase() ?? "";
 
-        // HH/LH → at the high (aboveBar), HL/LL → at the low (belowBar)
-        // CHoCH/BOS → bearish = aboveBar, bullish = belowBar
+        // HH/LH â†’ at the high (aboveBar), HL/LL â†’ at the low (belowBar)
+        // CHoCH/BOS â†’ bearish = aboveBar, bullish = belowBar
         let position: "aboveBar" | "belowBar";
         if (typeUpper === "HH" || typeUpper === "LH") {
           position = "aboveBar";
         } else if (typeUpper === "HL" || typeUpper === "LL") {
           position = "belowBar";
         } else {
-          // CHoCH, BOS — use direction field
+          // CHoCH, BOS â€” use direction field
           position = dirLower.includes("bear") ? "aboveBar" : "belowBar";
         }
 
@@ -2081,7 +2085,7 @@ export default function SimulationOfDead() {
     return idx + 1;
   }, [strategyParams, simSignals, agentTrades, replayData, force24hClose]);
 
-  // ── Playback controls (continued) ──
+  // â”€â”€ Playback controls (continued) â”€â”€
 
   const startPlayback = useCallback(() => {
     if (!replayData || currentIndex >= replayData.candles.length) return;
@@ -2127,7 +2131,7 @@ export default function SimulationOfDead() {
   // Cleanup on unmount
   useEffect(() => () => stopPlayback(), [stopPlayback]);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
+  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const totalCandles = replayData?.candles.length ?? 0;
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
@@ -2163,7 +2167,7 @@ export default function SimulationOfDead() {
     const shouldTrigger = isChochOrBos || (isHHorLL && hasPriorChoch);
 
     if (!shouldTrigger) {
-      // No valid trigger — clear frame only if it's stale
+      // No valid trigger â€” clear frame only if it's stale
       if (activeFrame && activeFrame.event_time !== latestEvent.time) setActiveFrame(null);
       return;
     }
@@ -2248,7 +2252,7 @@ export default function SimulationOfDead() {
           completedSimTimesRef.current.add(cacheKey);
           setSimFramesMap(prev => ({ ...prev, [cacheKey]: frame }));
           // Counter-swing events (e.g. LL after Bullish CHoCH+HH, HH after Bearish CHoCH+LL)
-          // should NOT update the Agent Consensus panel — keep warm-up values frozen.
+          // should NOT update the Agent Consensus panel â€” keep warm-up values frozen.
           if (!frame?.is_counter_swing) {
             setActiveFrame(frame);
           }
@@ -2276,7 +2280,7 @@ export default function SimulationOfDead() {
               setSimSignals(prev => {
                 if (prev.some(s => s.time === frame.event_time)) return prev;
                 const next = [...prev, { time: frame.event_time, signal: frame.final_signal }];
-                // ponytail: instant marker render — don't wait for next candle tick
+                // ponytail: instant marker render â€” don't wait for next candle tick
                 if (markersPluginRef.current) {
                   const existingMarkers: any[] = [];
                   for (const sig of next) {
@@ -2388,16 +2392,16 @@ export default function SimulationOfDead() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFrame, isAgentModalOpen, selectedAgent?.key]);
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <div
       className="flex flex-col size-full text-[var(--text-primary)]"
-      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "var(--sidebar-offset, 250px)", overflow: "hidden" }}
+      style={{ background: "var(--bg-page)", paddingLeft: "var(--sidebar-offset, 250px)", transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)", overflow: "hidden" }}
     >
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div
-        className="relative z-30 flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)]"
+        className="relative z-30 flex items-center justify-between px-6 py-4 border-b backdrop-blur-md bg-[rgba(255,255,255,0.65)]"
         style={{ borderColor: "rgba(var(--neon-blue-rgb), 0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
         <div className="flex items-center gap-4">
@@ -2420,7 +2424,7 @@ export default function SimulationOfDead() {
           {replayData && (
             <>
               {/* Playback Control Deck */}
-              <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+              <div className="inline-flex items-center gap-1.5 p-1 bg-[rgba(240,247,255,0.7)] border border-blue-200/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
                 {/* Rewind */}
                 <button
                   onClick={handlePrev}
@@ -2469,7 +2473,7 @@ export default function SimulationOfDead() {
               {/* Speed */}
               <div className="flex items-center gap-1.5 ml-1">
                 <span className="text-xs text-[var(--text-secondary,#94a3b8)]">Speed:</span>
-                <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-lg overflow-hidden">
+                <div className="inline-flex p-0.5 bg-[rgba(240,247,255,0.75)] border border-blue-200/70 rounded-lg overflow-hidden">
                   {(["1x", "2x", "3x", "5x", "10x"] as const).map((s) => (
                     <button
                       key={s}
@@ -2504,7 +2508,7 @@ export default function SimulationOfDead() {
               </div>
 
               {/* Vertical separator */}
-              <div className="w-[1px] h-6 bg-slate-800/60 self-center" />
+              <div className="w-[1px] h-6 bg-[#BFDBFE]/70 self-center" />
             </>
           )}
 
@@ -2512,17 +2516,17 @@ export default function SimulationOfDead() {
             {/* Timeframe selector (tiru 100% dari page trades) */}
             <div className="flex items-center gap-2 mr-2">
               <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary,#94a3b8)]">Timeframe</span>
-              <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-lg overflow-hidden">
+              <div className="inline-flex items-center gap-1 p-0.5 bg-sky-100/40 border border-sky-200/80 rounded-xl shadow-sm">
                 {["M15", "H1", "H4"].map((tf) => (
                   <button
                     key={tf}
                     disabled={isLoading}
                     onClick={() => handleTimeframeChange(tf)}
                     className={cn(
-                      "px-2.5 py-1 rounded-md text-xs font-semibold transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-40",
+                      "px-2.5 py-1 rounded-md text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-40",
                       tf === activeTimeframe
-                        ? "bg-[rgba(6,182,212,0.2)] text-cyan-400 border border-cyan-500/25"
-                        : "text-slate-400 hover:text-white"
+                        ? "bg-sky-600 text-white shadow-sm border border-sky-600"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                     )}
                   >
                     {tf}
@@ -2550,7 +2554,7 @@ export default function SimulationOfDead() {
               className="w-32"
             />
 
-            <span className="text-[var(--text-secondary,#94a3b8)] text-sm font-semibold">→</span>
+            <ArrowRight size={13} className="text-slate-400 mx-0.5" />
 
             {/* To */}
             <CustomSelect
@@ -2600,55 +2604,53 @@ export default function SimulationOfDead() {
             <button
               onClick={handleLoad}
               disabled={isLoading}
-              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 active:scale-95 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white"
-              style={
-                replayData
-                  ? {
-                    backgroundColor: "rgba(6, 182, 212, 0.18)",
-                    borderColor: "var(--neon-cyan, #06b6d4)",
-                    color: "#67e8f9",
-                    boxShadow: "0 0 12px rgba(6, 182, 212, 0.25)",
-                  }
-                  : {
-                    backgroundColor: "rgba(255, 255, 255, 0.04)",
-                    borderColor: "rgba(255, 255, 255, 0.15)",
-                    color: "rgba(255, 255, 255, 0.8)",
-                  }
-              }
+              className={cn(
+                "inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer border transition-all duration-200 active:scale-95 outline-none shrink-0 shadow-sm",
+                isLoading
+                  ? "bg-slate-200 text-slate-500 border-slate-300 cursor-not-allowed opacity-70"
+                  : "bg-sky-600 hover:bg-sky-700 text-white border-sky-600 shadow-[0_2px_8px_rgba(2,132,199,0.25)]"
+              )}
             >
-              Load
+              {isLoading ? (
+                <>
+                  <Loader2 size={12} className="animate-spin mr-1.5" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load</span>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Scrollable Body ── */}
+      {/* â”€â”€ Scrollable Body â”€â”€ */}
       <div className="flex-1 overflow-y-auto elegant-scrollbar px-6 py-4 flex flex-col gap-6">
-        {/* ── Stats Bar ── */}
+        {/* â”€â”€ Stats Bar â”€â”€ */}
         {replayData && (
           <div
-            className="flex items-center justify-between gap-4 px-5 py-2.5 border border-slate-800/80 rounded-xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+            className="flex items-center justify-between gap-4 px-5 py-2.5 border border-blue-200/80 rounded-xl bg-white/70 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
           >
             <div className="flex items-center gap-4 flex-wrap">
               {/* Date Range */}
               <div className="flex flex-col">
                 <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Rentang Tanggal</span>
-                <span className="text-xs font-semibold text-slate-300">
-                  {replayData.meta.date_from} → {replayData.meta.date_to}
+                <span className="text-xs font-semibold text-slate-600">
+                  {replayData.meta.date_from} â†’ {replayData.meta.date_to}
                 </span>
               </div>
 
-              <div className="w-px h-4 bg-slate-800/60 self-center" />
+              <div className="w-px h-4 bg-[#BFDBFE]/70 self-center" />
 
               {/* Candles */}
               <div className="flex flex-col">
                 <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Lilin (Candles)</span>
-                <span className="text-xs font-semibold text-slate-300 font-mono">
+                <span className="text-xs font-semibold text-slate-600 font-mono">
                   <span className="text-cyan-400">{currentIndex}</span>/{totalCandles}
                 </span>
               </div>
 
-              <div className="w-px h-4 bg-slate-800/60 self-center" />
+              <div className="w-px h-4 bg-[#BFDBFE]/70 self-center" />
 
               {/* PnL */}
               <div className="flex flex-col">
@@ -2659,13 +2661,13 @@ export default function SimulationOfDead() {
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                     : runningProfit < 0
                       ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                      : "bg-slate-800/40 text-slate-400 border-slate-800/60"
+                      : "bg-[#BFDBFE]/60 text-slate-400 border-blue-200/70"
                 )}>
                   {runningProfit >= 0 ? "+" : ""}{runningProfit.toFixed(2)}
                 </span>
               </div>
 
-              <div className="w-px h-4 bg-slate-800/60 self-center" />
+              <div className="w-px h-4 bg-[#BFDBFE]/70 self-center" />
 
               {/* Balance */}
               <div className="flex flex-col">
@@ -2678,12 +2680,12 @@ export default function SimulationOfDead() {
                 </span>
               </div>
 
-              <div className="w-px h-4 bg-slate-800/60 self-center" />
+              <div className="w-px h-4 bg-[#BFDBFE]/70 self-center" />
 
               {/* Trades */}
               <div className="flex flex-col">
                 <span className="text-[9px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Transaksi (Trades)</span>
-                <span className="text-xs font-semibold text-slate-200 font-mono">
+                <span className="text-xs font-semibold text-slate-800 font-mono">
                   {tradeStats.total} <span className="text-slate-500 text-[10px] ml-1">({tradeStats.wins}W / {tradeStats.losses}L)</span>
                 </span>
               </div>
@@ -2699,9 +2701,9 @@ export default function SimulationOfDead() {
           </div>
         )}
 
-        {/* ── Orchestrator Simulation ── */}
+        {/* â”€â”€ Orchestrator Simulation â”€â”€ */}
         {simLoading && (
-          <p className="text-sm text-[var(--text-secondary)] mt-2 flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Running Orchestrator Simulation…</p>
+          <p className="text-sm text-[var(--text-secondary)] mt-2 flex items-center gap-1.5"><Loader2 size={14} className="animate-spin" aria-hidden="true" /> Running Orchestrator Simulationâ€¦</p>
         )}
         {simError && (
           <div className="mt-2 px-3 py-2 rounded-lg bg-red-900/30 border border-red-500/30 text-red-400 text-sm flex items-start gap-1.5">
@@ -2725,14 +2727,14 @@ export default function SimulationOfDead() {
           <p className="text-sm text-[var(--text-secondary)] mt-2 flex items-center gap-1.5"><Brain size={14} aria-hidden="true" /> Orchestrator Simulation: No signals.</p>
         )}
 
-        {/* ── Error ── */}
+        {/* â”€â”€ Error â”€â”€ */}
         {loadError && (
           <div className="px-4 py-3 rounded bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
             {loadError}
           </div>
         )}
 
-        {/* ── Empty state ── */}
+        {/* â”€â”€ Empty state â”€â”€ */}
         {!replayData && !loadError && (
           <div
             className="flex items-center justify-center flex-col gap-3 text-[var(--text-secondary,#94a3b8)] flex-shrink-0"
@@ -2743,11 +2745,11 @@ export default function SimulationOfDead() {
           </div>
         )}
 
-        {/* ── Chart ── */}
+        {/* â”€â”€ Chart â”€â”€ */}
         <div className="relative px-4 pt-3 pb-0 flex-shrink-0" style={{ height: "700px", display: replayData ? "block" : "none" }}>
           {/* Floating Tooltip/Legend */}
           {hoveredInfo && (
-            <div className="absolute top-6 left-8 z-10 bg-slate-900/95 border border-slate-800/80 rounded px-3 py-1.5 text-[10px] font-mono flex items-center gap-3 text-slate-300 backdrop-blur-md pointer-events-none shadow-xl">
+            <div className="absolute top-6 left-8 z-10 bg-white/95 border border-blue-200/80 rounded px-3 py-1.5 text-[10px] font-mono flex items-center gap-3 text-slate-600 backdrop-blur-md pointer-events-none shadow-xl">
               {hoveredInfo.time && (
                 <span className="text-slate-400 mr-1">{hoveredInfo.time}</span>
               )}
@@ -2762,13 +2764,13 @@ export default function SimulationOfDead() {
               {hoveredInfo.high !== null && (
                 <span className="flex items-center gap-0.5">
                   <span className="text-slate-500">H</span>
-                  <span className="text-slate-200">{hoveredInfo.high.toFixed(2)}</span>
+                  <span className="text-slate-800">{hoveredInfo.high.toFixed(2)}</span>
                 </span>
               )}
               {hoveredInfo.low !== null && (
                 <span className="flex items-center gap-0.5">
                   <span className="text-slate-500">L</span>
-                  <span className="text-slate-200">{hoveredInfo.low.toFixed(2)}</span>
+                  <span className="text-slate-800">{hoveredInfo.low.toFixed(2)}</span>
                 </span>
               )}
               {hoveredInfo.close !== null && (
@@ -2780,7 +2782,7 @@ export default function SimulationOfDead() {
                 </span>
               )}
               {hoveredInfo.hoveredPrice !== null && (
-                <span className="border-l border-slate-800 pl-3 flex items-center gap-1">
+                <span className="border-l border-blue-200 pl-3 flex items-center gap-1">
                   <span className="text-cyan-400">PRICE</span>
                   <span className="text-cyan-300 font-bold">{hoveredInfo.hoveredPrice.toFixed(2)}</span>
                 </span>
@@ -2791,11 +2793,11 @@ export default function SimulationOfDead() {
           <div
             ref={chartContainerRef}
             className="w-full h-full rounded-lg overflow-hidden"
-            style={{ background: "rgba(15,23,42,0.5)" }}
+            style={{ background: "rgba(224,237,255,0.6)" }}
           />
         </div>
 
-        {/* ── Agent Consensus (100% Copy of Dashboard Layout, bound to activeFrame) ── */}
+        {/* â”€â”€ Agent Consensus (100% Copy of Dashboard Layout, bound to activeFrame) â”€â”€ */}
         <div className="glass-card mt-4">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
             <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: 0 }} className="flex items-center gap-2"><Bot size={18} aria-hidden="true" /> Agent Consensus</h2>
@@ -2821,8 +2823,8 @@ export default function SimulationOfDead() {
                   className={cn(
                     "agent-row rounded-xl p-3 border transition-all duration-300 flex items-center justify-between",
                     isActive 
-                      ? "hover:bg-slate-800/30 cursor-pointer border-slate-800/60 bg-slate-950/20" 
-                      : "opacity-40 border-slate-800/20 bg-slate-950/10 pointer-events-none select-none"
+                      ? "hover:bg-[#BFDBFE]/50 cursor-pointer border-blue-200/70 bg-[#F0F6FF]/40" 
+                      : "opacity-40 border-blue-200/40 bg-[#F0F6FF]/30 pointer-events-none select-none"
                   )}
                   onClick={() => {
                     if (!isActive || !agent) return;
@@ -2848,7 +2850,7 @@ export default function SimulationOfDead() {
                       {def.icon && <def.icon size={16} aria-hidden="true" />}
                     </div>
                     <div className="agent-details">
-                      <div className="agent-name font-semibold text-xs text-slate-200">{def.name}</div>
+                      <div className="agent-name font-semibold text-xs text-slate-800">{def.name}</div>
                       <div className="agent-signal text-[10px] text-slate-500 mt-0.5">
                         Signal: <span className={cn("font-bold", isActive ? "neon-text text-cyan-400" : "text-slate-600")}>{prediction}</span>
                       </div>
@@ -2859,7 +2861,7 @@ export default function SimulationOfDead() {
                     <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
                       Confidence
                     </div>
-                    <div className="progress-bar h-1.5 w-[100px] bg-slate-950 rounded-full overflow-hidden">
+                    <div className="progress-bar h-1.5 w-[100px] bg-[#DBEAFE] rounded-full overflow-hidden">
                       <div 
                         className="progress-fill h-full rounded-full transition-all duration-300" 
                         style={{ 
@@ -2877,12 +2879,12 @@ export default function SimulationOfDead() {
           {/* Consensus Summary */}
           <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(31, 41, 55, 0.3)', borderRadius: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, fontSize: '12px' }} className="text-slate-300">Overall Consensus</span>
+              <span style={{ fontWeight: 600, fontSize: '12px' }} className="text-slate-600">Overall Consensus</span>
               <span className="text-sm font-bold transition-all duration-300" style={{ color: activeFrame ? 'var(--neon-amber)' : '#475569' }}>
                 {activeFrame?.final_signal || 'HOLD'}
               </span>
             </div>
-            <div className="progress-bar h-1.5 bg-slate-950 rounded-full overflow-hidden mt-3">
+            <div className="progress-bar h-1.5 bg-[#DBEAFE] rounded-full overflow-hidden mt-3">
               <div
                 className="progress-fill h-full rounded-full transition-all duration-300"
                 style={{
@@ -2901,7 +2903,7 @@ export default function SimulationOfDead() {
           </div>
         </div>
 
-        {/* ── Strategy Params Panel ── */}
+        {/* â”€â”€ Strategy Params Panel â”€â”€ */}
         {replayData && (
           <div
             className="rounded-xl p-5 border transition-all duration-300 flex-shrink-0"
@@ -2915,7 +2917,7 @@ export default function SimulationOfDead() {
           >
             <button
               onClick={() => setIsStrategyPanelOpen(p => !p)}
-              className="w-full flex items-center justify-between text-base font-bold text-slate-100 hover:text-white transition-colors focus:outline-none cursor-pointer"
+              className="w-full flex items-center justify-between text-base font-bold text-slate-900 hover:text-white transition-colors focus:outline-none cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
                 <span className="flex items-center justify-center w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
@@ -2923,8 +2925,8 @@ export default function SimulationOfDead() {
                 </span>
                 <span>Strategy Settings & Parameters</span>
               </div>
-              <span className="text-slate-400 text-xs font-semibold px-2 py-1 rounded bg-slate-850/50 border border-slate-800/80">
-                {isStrategyPanelOpen ? "Tutup Panel ▲" : "Buka Panel ▼"}
+              <span className="text-slate-400 text-xs font-semibold px-2 py-1 rounded bg-[#DBEAFE]/60 border border-blue-200/80">
+                {isStrategyPanelOpen ? "Tutup Panel â–²" : "Buka Panel â–¼"}
               </span>
             </button>
 
@@ -2948,12 +2950,12 @@ export default function SimulationOfDead() {
                 `}</style>
 
                 {/* Section C & D Consolidated: Strategy Settings Split Layout */}
-                <div className="p-5 rounded-xl bg-slate-900/20 border border-slate-800/40">
+                <div className="p-5 rounded-xl bg-[#F0F6FF]/70 border border-blue-200/60">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     
                     {/* Left Column: Trend & Cycle Schema Map */}
                     <div className="space-y-4">
-                      <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
+                      <div className="flex items-center gap-1.5 border-b border-blue-200/50 pb-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none inline-flex items-center gap-1"><Target size={11} aria-hidden="true" /> Trend &amp; Cycle Schema Map</span>
                       </div>
                       
@@ -2965,19 +2967,19 @@ export default function SimulationOfDead() {
                       />
 
                       {/* Toggle Filters List */}
-                      <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
+                      <div className="flex flex-col divide-y divide-blue-200/50 text-xs border-t border-blue-200/50">
                         {/* CHoCH Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">CHoCH Entries</span>
+                            <span className="font-semibold text-slate-800">CHoCH Entries</span>
                             <span className="text-[10px] text-slate-500">Change of Character patterns</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setAllowChochEntry(p => !p)}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              allowChochEntry ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              allowChochEntry ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3006,15 +3008,15 @@ export default function SimulationOfDead() {
                         {/* Cycle 1 Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">BOS Cycle 1 Entries</span>
+                            <span className="font-semibold text-slate-800">BOS Cycle 1 Entries</span>
                             <span className="text-[10px] text-slate-500">First BOS after CHoCH</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setAllowBosCycle1(p => !p)}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              allowBosCycle1 ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              allowBosCycle1 ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3043,15 +3045,15 @@ export default function SimulationOfDead() {
                         {/* Cycle 2 Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">BOS Cycle 2 Entries</span>
+                            <span className="font-semibold text-slate-800">BOS Cycle 2 Entries</span>
                             <span className="text-[10px] text-slate-500">Second BOS after CHoCH</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setAllowBosCycle2(p => !p)}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              allowBosCycle2 ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              allowBosCycle2 ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3080,15 +3082,15 @@ export default function SimulationOfDead() {
                         {/* Cycle 3+ Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">BOS Cycle 3+ Entries</span>
+                            <span className="font-semibold text-slate-800">BOS Cycle 3+ Entries</span>
                             <span className="text-[10px] text-slate-500">Subsequent BOS cycles</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setAllowBosCycle3Plus(p => !p)}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              allowBosCycle3Plus ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              allowBosCycle3Plus ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3115,17 +3117,17 @@ export default function SimulationOfDead() {
                         </div>
 
                         {/* Force 24h Close Toggle */}
-                        <div className="flex items-center justify-between py-3 filter-card px-1 border-t border-slate-800/30">
+                        <div className="flex items-center justify-between py-3 filter-card px-1 border-t border-blue-200/50">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">Force 24h Close</span>
+                            <span className="font-semibold text-slate-800">Force 24h Close</span>
                             <span className="text-[10px] text-slate-500">Automatically close any open trades after 24 hours</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setForce24hClose(p => !p)}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              force24hClose ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              force24hClose ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3155,7 +3157,7 @@ export default function SimulationOfDead() {
 
                     {/* Right Column: Veto Mode & Consensus Map */}
                     <div className="space-y-4">
-                      <div className="flex items-center gap-1.5 border-b border-slate-800/30 pb-2">
+                      <div className="flex items-center gap-1.5 border-b border-blue-200/50 pb-2">
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none flex items-center gap-1">
                           <Shield size={13} className="inline shrink-0" aria-hidden="true" /> Veto Mode &amp; Consensus Map
                           <StrategyTooltip fungsi="Menentukan tingkat toleransi terhadap Veto dari Market Structure Agent saat H1/H4 EMA tidak selaras." contoh="Hard Veto -> Menolak sepenuhnya (HOLD). Soft Veto -> Meloloskan jika ML Expected R:R &gt;= 1.35. No Veto -> Mengikuti voting demokratis." />
@@ -3165,19 +3167,19 @@ export default function SimulationOfDead() {
                       <VetoConsensus3DVisualizer vetoMode={vetoMode} />
 
                       {/* Veto Radio-Toggles List */}
-                      <div className="flex flex-col divide-y divide-slate-800/30 text-xs border-t border-slate-800/30">
+                      <div className="flex flex-col divide-y divide-blue-200/50 text-xs border-t border-blue-200/50">
                         {/* Hard Veto Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">Hard Veto (Default)</span>
+                            <span className="font-semibold text-slate-800">Hard Veto (Default)</span>
                             <span className="text-[10px] text-slate-500">Menolak sepenuhnya sinyal jika EMA H1/H4 tidak selaras</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setVetoMode("hard")}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              vetoMode === "hard" ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              vetoMode === "hard" ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3206,15 +3208,15 @@ export default function SimulationOfDead() {
                         {/* Soft Veto Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">Soft Veto (Conditional)</span>
+                            <span className="font-semibold text-slate-800">Soft Veto (Conditional)</span>
                             <span className="text-[10px] text-slate-500">Meloloskan jika rasio ML Expected R:R &gt;= 1.35</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setVetoMode("soft")}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              vetoMode === "soft" ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              vetoMode === "soft" ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3243,15 +3245,15 @@ export default function SimulationOfDead() {
                         {/* No Veto Toggle */}
                         <div className="flex items-center justify-between py-3 filter-card px-1">
                           <div className="flex flex-col gap-0.5">
-                            <span className="font-semibold text-slate-200">No Veto (Democratic)</span>
+                            <span className="font-semibold text-slate-800">No Veto (Democratic)</span>
                             <span className="text-[10px] text-slate-500">Mengikuti keputusan voting mayoritas konsensus agen</span>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.94 }}
                             onClick={() => setVetoMode("none")}
                             className={cn(
-                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-slate-950 border transition-colors duration-300",
-                              vetoMode === "none" ? "border-cyan-500/30" : "border-slate-800/60"
+                              "w-11 h-6 rounded-full p-[2.5px] focus:outline-none cursor-pointer premium-switch relative flex items-center bg-[#DBEAFE] border transition-colors duration-300",
+                              vetoMode === "none" ? "border-cyan-500/30" : "border-blue-200/70"
                             )}
                           >
                             <motion.div 
@@ -3286,22 +3288,31 @@ export default function SimulationOfDead() {
           </div>
         )}
 
-        {/* ── Active Positions Panel ── */}
+        {/* â”€â”€ Active Positions Panel â”€â”€ */}
         {replayData && (
           <div className="glass-card flex-shrink-0">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
-              <Zap size={14} className="inline shrink-0" aria-hidden="true" /> Daftar Posisi
+            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block shadow-sm"></span>
+              <Zap size={15} className="inline shrink-0 text-sky-600" aria-hidden="true" /> Daftar Posisi
+              {activePositions.length > 0 && (
+                <span className="ml-auto text-xs font-medium text-slate-600">
+                  <span className="text-sky-700 font-bold">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
+                  {" • "}
+                  <span className="text-slate-700 font-bold">{activePositions.filter(p => p.is_closed).length}</span> closed
+                  {" • "}
+                  <span className="text-rose-700 font-bold">{activePositions.filter(p => p.is_rejected).length}</span> rejected
+                </span>
+              )}
             </h2>
 
             {activePositions.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-sm bg-slate-900/20 rounded-lg border border-slate-800/40">
+              <div className="py-8 text-center text-slate-600 font-medium text-sm bg-sky-50/50 rounded-lg border border-sky-200/80">
                 Tidak ada posisi saat ini
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-800/50">
-                <table className="min-w-full divide-y divide-slate-800/60 bg-slate-900/10">
-                  <thead className="bg-slate-900/40 text-slate-400 text-[11px] font-semibold tracking-wider uppercase">
+              <div className="overflow-x-auto rounded-lg border border-sky-200/80 shadow-sm">
+                <table className="min-w-full divide-y divide-sky-100 bg-white">
+                  <thead className="bg-sky-100/70 text-sky-950 text-[11px] font-bold tracking-wider uppercase border-b border-sky-200">
                     <tr>
                       <th className="py-3 px-4 text-left">Ticket</th>
                       <th className="py-3 px-4 text-left">Signal Type</th>
@@ -3318,101 +3329,114 @@ export default function SimulationOfDead() {
                       <th className="py-3 px-4 text-left">Entry Time</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-200 text-xs font-medium">
+                  <tbody className="divide-y divide-sky-100 text-slate-900 text-xs font-medium">
                     {[...activePositions]
                       .sort((a, b) => (b.entry_time ?? 0) - (a.entry_time ?? 0))
                       .map((pos) => {
                       const isWin = pos.pnl >= 0;
                       const isBuy = pos.type === "BUY";
+                      const isClosed = pos.is_closed === true;
+                      const isRejected = pos.is_rejected === true;
 
                       const hasSLChanged = pos.sl && pos.original_sl && Math.abs(pos.sl - pos.original_sl) > 0.01;
                       const hasTPChanged = pos.tp && pos.original_tp && Math.abs(pos.tp - pos.original_tp) > 0.01;
 
                       // Status Badge Classes
-                      let badgeClass = "bg-slate-800/40 text-slate-400 border border-slate-700/30";
-                      if (pos.status === "BE + TP Expanded") {
-                        badgeClass = "bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30 shadow-[0_0_8px_rgba(217,70,239,0.15)]";
+                      let badgeClass = "bg-slate-100 text-slate-700 border border-slate-300 font-bold";
+                      if (isRejected) {
+                        badgeClass = "bg-rose-100 text-rose-800 border border-rose-300 font-bold";
+                      } else if (isClosed) {
+                        badgeClass = isWin
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold"
+                          : "bg-rose-100 text-rose-800 border border-rose-300 font-bold";
+                      } else if (pos.status === "BE + TP Expanded") {
+                        badgeClass = "bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-300 font-bold shadow-xs";
                       } else if (pos.status === "Break-Even") {
-                        badgeClass = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]";
+                        badgeClass = "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold shadow-xs";
                       } else if (pos.status === "TP Expanded") {
-                        badgeClass = "bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]";
+                        badgeClass = "bg-amber-100 text-amber-900 border border-amber-300 font-bold shadow-xs";
                       } else if (pos.status === "Trailing") {
-                        badgeClass = "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]";
-                      } else if (pos.status === "Closed - Win") {
-                        badgeClass = "bg-green-500/15 text-green-400 border border-green-500/30 shadow-[0_0_8px_rgba(34,197,94,0.15)]";
-                      } else if (pos.status === "Closed - Loss") {
-                        badgeClass = "bg-red-500/15 text-red-400 border border-red-500/30 shadow-[0_0_8px_rgba(239,68,68,0.15)]";
-                      } else if (pos.status === "Rejected") {
-                        badgeClass = "bg-slate-500/15 text-slate-400 border border-slate-500/20";
+                        badgeClass = "bg-sky-100 text-sky-900 border border-sky-300 font-bold shadow-xs";
+                      }
+
+                      let rowBg = "hover:bg-sky-50/70 transition-colors";
+                      if (isRejected) {
+                        rowBg = "bg-slate-50/80 hover:bg-slate-100/80 text-slate-500";
+                      } else if (isClosed) {
+                        rowBg = isWin ? "bg-emerald-50/30 hover:bg-emerald-50/60" : "bg-rose-50/30 hover:bg-rose-50/60";
+                      } else {
+                        rowBg = isBuy ? "bg-emerald-50/40 hover:bg-emerald-50/80" : "bg-rose-50/40 hover:bg-rose-50/80";
                       }
 
                       return (
-                        <tr key={pos.ticket} className="hover:bg-slate-800/20 transition-colors">
-                          <td className="py-3.5 px-4 font-mono text-slate-400">#{pos.ticket}</td>
+                        <tr key={pos.ticket} className={rowBg}>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-700">#{pos.ticket}</td>
                           <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${pos.signal_type === "CHOCH"
-                              ? "bg-purple-500/10 text-purple-400 border border-purple-500/20"
-                              : pos.signal_type === "BOS"
-                              ? "bg-yellow-500/10 text-yellow-400 border border-yellow-500/20"
-                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                              }`}>
+                            <span className={cn(
+                              "inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border",
+                              pos.signal_type === "CHOCH"
+                                ? "bg-purple-100 text-purple-800 border-purple-300"
+                                : pos.signal_type === "BOS"
+                                ? "bg-amber-100 text-amber-900 border-amber-300"
+                                : "bg-slate-100 text-slate-700 border-slate-300"
+                            )}>
                               {pos.signal_type || "-"}
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${pos.type === "BUY"
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                              : pos.type === "SELL"
-                              ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                              : "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                              }`}>
+                            <span className={cn(
+                              "inline-block px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider border shadow-xs",
+                              isBuy
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : "bg-rose-100 text-rose-800 border-rose-300"
+                            )}>
                               {pos.type}
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-right font-mono">{pos.lot_size.toFixed(2)}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${pos.entry_price.toFixed(2)}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${pos.current_price.toFixed(2)}</td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">{pos.lot_size.toFixed(2)}</td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">${pos.entry_price.toFixed(2)}</td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">${pos.current_price.toFixed(2)}</td>
                           <td className="py-3.5 px-4 text-right font-mono">
                             {hasSLChanged ? (
                               <span className="flex items-center justify-end gap-1.5">
                                 <span className="text-slate-500 line-through">${pos.original_sl.toFixed(2)}</span>
-                                <span className="text-slate-400">→</span>
-                                <span className="text-rose-400 font-bold">${pos.sl.toFixed(2)}</span>
+                                <ArrowRight size={10} className="text-slate-400" />
+                                <span className="text-rose-700 font-bold">${pos.sl.toFixed(2)}</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
+                              <span className="text-slate-600 font-medium">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono">
                             {hasTPChanged ? (
                               <span className="flex items-center justify-end gap-1.5">
                                 <span className="text-slate-500 line-through">${pos.original_tp.toFixed(2)}</span>
-                                <span className="text-slate-400">→</span>
-                                <span className="text-emerald-400 font-bold">${pos.tp.toFixed(2)}</span>
+                                <ArrowRight size={10} className="text-slate-400" />
+                                <span className="text-emerald-700 font-bold">${pos.tp.toFixed(2)}</span>
                               </span>
                             ) : (
-                              <span className="text-slate-400">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
+                              <span className="text-slate-600 font-medium">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
                             )}
                           </td>
                           <td className="py-3.5 px-4 text-left font-mono text-[10px] space-y-0.5">
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-500">BE:</span>
+                              <span className="text-slate-500 font-semibold">BE:</span>
                               {pos.be_trigger_price == null ? (
-                                <span className="text-slate-600">-</span>
+                                <span className="text-slate-400">-</span>
                               ) : pos.is_be_active ? (
-                                <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-bold">Active</span>
+                                <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-bold">Active</span>
                               ) : (
-                                <span className="text-slate-300">${pos.be_trigger_price.toFixed(2)}</span>
+                                <span className="text-slate-700 font-medium">${pos.be_trigger_price.toFixed(2)}</span>
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
-                              <span className="text-slate-500">TP-Ex:</span>
+                              <span className="text-slate-500 font-semibold">TP-Ex:</span>
                               {pos.is_tp_maxed ? (
-                                <span className="px-1.5 py-0.2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded font-bold text-[9px]">Maxed</span>
+                                <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 border border-rose-300 rounded font-bold text-[9px]">Maxed</span>
                               ) : pos.tp_trigger_price == null ? (
-                                <span className="text-slate-600">-</span>
+                                <span className="text-slate-400">-</span>
                               ) : (
-                                <span className="text-cyan-400">${pos.tp_trigger_price.toFixed(2)}</span>
+                                <span className="text-sky-800 font-bold">${pos.tp_trigger_price.toFixed(2)}</span>
                               )}
                             </div>
                           </td>
@@ -3421,41 +3445,43 @@ export default function SimulationOfDead() {
                               {pos.status}
                             </span>
                           </td>
-                          <td className={`py-3.5 px-4 text-right font-mono font-bold text-sm ${isWin ? "text-emerald-400" : "text-rose-500"
-                            }`}>
-                            {isWin ? "+" : ""}${pos.pnl.toFixed(2)}
+                          <td className={cn(
+                            "py-3.5 px-4 text-right font-mono font-bold text-sm",
+                            isRejected ? "text-slate-500" : isWin ? "text-emerald-700" : "text-rose-700"
+                          )}>
+                            {isWin && !isRejected ? "+" : ""}${pos.pnl.toFixed(2)}
                           </td>
                           <td className="py-3.5 px-4 text-left">
                             {pos.reject_reason ? (
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20 cursor-help">
+                                  <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300 cursor-help">
                                     {pos.reject_reason}
                                   </span>
                                 </TooltipTrigger>
                                 <TooltipContent
                                   side="top"
                                   sideOffset={8}
-                                  className="max-w-xs border border-rose-500/30 bg-slate-950/95 text-slate-200 shadow-[0_8px_30px_rgba(0,0,0,0.5)] backdrop-blur-md"
+                                  className="max-w-xs border border-rose-300 bg-white text-slate-900 shadow-md backdrop-blur-md"
                                 >
                                   <div className="space-y-1.5">
                                     <div className="flex items-center gap-1.5">
-                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-400 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
-                                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-rose-600 shadow-sm" />
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">
                                         {pos.reject_reason}
                                       </span>
                                     </div>
-                                    <p className="text-[11px] leading-relaxed text-slate-300">
+                                    <p className="text-[11px] leading-relaxed text-slate-700 font-medium">
                                       {pos.reject_detail || pos.reject_reason}
                                     </p>
                                   </div>
                                 </TooltipContent>
                               </Tooltip>
                             ) : (
-                              <span className="text-slate-600">-</span>
+                              <span className="text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-left font-mono text-slate-400 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-left font-mono text-xs text-slate-600 font-medium whitespace-nowrap">
                             {pos.entry_time ? new Date(pos.entry_time * 1000).toLocaleString("en-GB", {
                               day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
                             }) : "-"}
@@ -3470,7 +3496,7 @@ export default function SimulationOfDead() {
           </div>
         )}
 
-        {/* ── Monthly Summary Section (100% Identical to trades.tsx) ── */}
+        {/* â”€â”€ Monthly Summary Section (100% Identical to trades.tsx) â”€â”€ */}
         <div className="glass-card mt-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h2 className="text-xl font-semibold inline-flex items-center gap-2"><ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary</h2>
@@ -3480,13 +3506,13 @@ export default function SimulationOfDead() {
               {/* Year Select Dropdown */}
               <div className="relative">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">Tahun:</span>
+                  <span className="text-xs text-slate-500 font-medium">Tahun:</span>
                   <button
                     onClick={() => setIsYearDropdownOpen((prev) => !prev)}
-                    className="flex items-center justify-between gap-2 bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none hover:bg-cyan-500/15 transition-all cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.1)] min-w-[75px]"
+                    className="flex items-center justify-between gap-2 bg-sky-50 hover:bg-sky-100 border border-sky-300/80 text-sky-950 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none transition-all cursor-pointer shadow-sm min-w-[75px]"
                   >
                     <span>{monthlySummaryYearFilter}</span>
-                    <span className="text-[10px] text-cyan-400">▼</span>
+                    <ChevronDown size={13} className={`text-sky-600 transition-transform duration-200 ${isYearDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                 </div>
 
@@ -3496,7 +3522,7 @@ export default function SimulationOfDead() {
                       className="fixed inset-0 z-40"
                       onClick={() => setIsYearDropdownOpen(false)}
                     />
-                    <div className="absolute right-0 mt-1.5 w-24 bg-slate-900/90 border border-slate-800 rounded-lg shadow-2xl backdrop-blur-xl z-50 overflow-hidden py-1">
+                    <div className="absolute right-0 mt-1.5 w-24 bg-white/95 border border-sky-200 rounded-lg shadow-xl backdrop-blur-xl z-50 overflow-hidden py-1">
                       {availableYears.map((year) => (
                         <button
                           key={year}
@@ -3504,7 +3530,7 @@ export default function SimulationOfDead() {
                             setMonthlySummaryYearFilter(year);
                             setIsYearDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 font-medium cursor-pointer ${monthlySummaryYearFilter === year ? "text-cyan-400 bg-cyan-500/5" : "text-slate-300"
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-sky-50 hover:text-sky-900 font-semibold cursor-pointer ${monthlySummaryYearFilter === year ? "text-sky-700 bg-sky-100/80" : "text-slate-700"
                             }`}
                         >
                           {year}
@@ -3516,14 +3542,14 @@ export default function SimulationOfDead() {
               </div>
 
               {/* Performance Status Tabs */}
-              <div className="flex bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+              <div className="flex bg-sky-100/40 p-1 rounded-lg border border-sky-200/80 backdrop-blur-md shadow-sm gap-1">
                 {(["all", "profit", "loss"] as const).map((perfFilter) => (
                   <button
                     key={perfFilter}
                     onClick={() => setMonthlySummaryPerformanceFilter(perfFilter)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${monthlySummaryPerformanceFilter === perfFilter
-                      ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${monthlySummaryPerformanceFilter === perfFilter
+                      ? "bg-sky-600 text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                       }`}
                   >
                     {perfFilter === "all" ? "Semua" : perfFilter === "profit" ? "Profit Only" : "Loss Only"}
@@ -3535,7 +3561,7 @@ export default function SimulationOfDead() {
 
           <div className="overflow-hidden">
             <table className="w-full border-collapse text-sm">
-              <thead className="bg-slate-900/30 border-b border-slate-800/60">
+              <thead className="bg-white/60 border-b border-blue-200/70">
                 <tr>
                   <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Month</th>
                   <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Trades</th>
@@ -3579,24 +3605,24 @@ export default function SimulationOfDead() {
                       className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
                       title="Klik untuk melihat detail transaksi"
                     >
-                      <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">
+                      <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-800">
                         {month.month_label || `${month.month ?? "N/A"}-${month.year ?? ""}`}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono">{month.executed_trades ?? month.trades ?? 0}</td>
                       <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${(month.win_rate ?? 0) > 50
-                        ? "text-green-400"
+                        ? "text-emerald-600"
                         : (month.win_rate ?? 0) === 50
-                          ? "text-white"
-                          : "text-red-400"
+                          ? "text-slate-700"
+                          : "text-rose-600"
                         }`}>
                         {(month.win_rate ?? 0).toFixed(1)}%
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-green-400">{(month.profit ?? 0).toFixed(2)}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-red-400">{(month.loss ?? 0).toFixed(2)}</td>
-                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-emerald-600">{(month.profit ?? 0).toFixed(2)}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-rose-600">{(month.loss ?? 0).toFixed(2)}</td>
+                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {(month.net_profit ?? 0) >= 0 ? "+" : ""}{(month.net_profit ?? 0).toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {((month.net_profit ?? 0) / 1000 * 100).toFixed(2)}%
                       </td>
                     </tr>
@@ -3613,7 +3639,7 @@ export default function SimulationOfDead() {
       {loadProgress.visible && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-auto">
           {/* Backdrop Blur Saja - UI Ghost Engine Tetap Terlihat */}
-          <div className="absolute inset-0 bg-slate-950/25 backdrop-blur-xl animate-in fade-in duration-700" />
+          <div className="absolute inset-0 bg-[#F0F6FF]/45 backdrop-blur-xl animate-in fade-in duration-700" />
 
           <style>{`
             @keyframes floatGhost {
@@ -3669,21 +3695,21 @@ export default function SimulationOfDead() {
         </div>
       )}
 
-      {/* ── Transaction Detail Pop-up Modal (100% Identical to trades.tsx) ── */}
+      {/* â”€â”€ Transaction Detail Pop-up Modal (100% Identical to trades.tsx) â”€â”€ */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
             {/* Premium Gradient Top Accent Line */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
             {/* Header */}
-            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+            <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
                   <CalendarDays className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     Detail Transaksi - {modalTitle}
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -3693,7 +3719,7 @@ export default function SimulationOfDead() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                 title="Tutup"
               >
                 <X className="size-5" />
@@ -3715,11 +3741,11 @@ export default function SimulationOfDead() {
                 <>
                   {/* Summary Dashboard Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
-                      <span className="text-2xl font-bold text-slate-200 font-mono">{selectedMonthTrades.length}</span>
+                      <span className="text-2xl font-bold text-slate-800 font-mono">{selectedMonthTrades.length}</span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
                       <span className="text-2xl font-bold text-cyan-400 font-mono">
                         {(() => {
@@ -3728,7 +3754,7 @@ export default function SimulationOfDead() {
                         })()}%
                       </span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
                       <span className={`text-2xl font-bold font-mono ${selectedMonthTrades.reduce((sum, t) => sum + (t.net_profit ?? 0), 0) >= 0 ? "text-emerald-400" : "text-rose-500"
                         }`}>
@@ -3739,10 +3765,10 @@ export default function SimulationOfDead() {
                   </div>
 
                   {/* Trades Detail Table */}
-                  <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                  <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-[#F0F6FF]/40">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
+                        <thead className="bg-white/75 border-b border-blue-200 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
                           <tr>
                             <th className="py-3 px-4">Ticket</th>
                             <th className="py-3 px-4">Type</th>
@@ -3756,13 +3782,13 @@ export default function SimulationOfDead() {
                             <th className="py-3 px-4">Exit Time</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                        <tbody className="divide-y divide-blue-200/70 text-slate-800">
                           {[...selectedMonthTrades]
                             .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
                             .map((trade) => {
                               const isWin = (trade.net_profit ?? 0) >= 0;
                               return (
-                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors whitespace-nowrap">
+                                <tr key={trade.ticket} className="hover:bg-[#BFDBFE]/50 transition-colors whitespace-nowrap">
                                   <td className="py-3 px-4 font-mono text-xs text-slate-400">#{trade.ticket}</td>
                                   <td className="py-3 px-4">
                                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${trade.type === "BUY"
@@ -3799,10 +3825,10 @@ export default function SimulationOfDead() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+            <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup
               </button>
@@ -3811,10 +3837,10 @@ export default function SimulationOfDead() {
         </div>
       )}
 
-      {/* ── Agent Detail Pop-up Modal ── */}
+      {/* â”€â”€ Agent Detail Pop-up Modal â”€â”€ */}
       {isAgentModalOpen && selectedAgent && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-[96vw] max-w-[96vw] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[135vh] h-[135vh] animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-[96vw] max-w-[96vw] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[135vh] h-[135vh] animate-in zoom-in-95 duration-200 relative">
             {/* Premium Gradient Top Accent Line */}
             <div
               className="absolute top-0 left-0 w-full h-[3px]"
@@ -3822,7 +3848,7 @@ export default function SimulationOfDead() {
             />
 
             {/* Header */}
-            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+            <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
               <div className="flex items-center gap-3">
                 <div
                   className="p-2.5 rounded-xl text-lg border"
@@ -3831,7 +3857,7 @@ export default function SimulationOfDead() {
                   {selectedAgent.icon && <selectedAgent.icon size={18} aria-hidden="true" />}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     {selectedAgent.name}
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -3841,7 +3867,7 @@ export default function SimulationOfDead() {
               </div>
               <button
                 onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                 title="Tutup"
               >
                 <X className="size-5" />
@@ -3852,10 +3878,10 @@ export default function SimulationOfDead() {
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {/* Agent Status and Confidence Card */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-between">
+                <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col justify-between">
                   <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">Signal & Status</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold text-slate-200">
+                    <span className="text-xl font-bold text-slate-800">
                       {selectedAgent.signal || "HOLD"}
                     </span>
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ${selectedAgent.status === "fired"
@@ -3869,13 +3895,13 @@ export default function SimulationOfDead() {
                   </div>
                 </div>
 
-                <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col justify-between">
+                <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col justify-between">
                   <span className="text-xs text-slate-400 uppercase tracking-wider mb-2">Confidence Level</span>
                   <div className="flex items-center gap-3">
                     <span className="text-xl font-bold font-mono text-cyan-400">
                       {Math.round((selectedAgent.confidence ?? 0) * 100)}%
                     </span>
-                    <div className="flex-1 progress-bar h-2 bg-slate-950/80 rounded-full overflow-hidden">
+                    <div className="flex-1 progress-bar h-2 bg-white/80 rounded-full overflow-hidden">
                       <div
                         className="progress-fill h-full bg-cyan-500"
                         style={{ width: `${Math.min(100, Math.max(0, (selectedAgent.confidence ?? 0) * 100))}%` }}
@@ -3887,12 +3913,12 @@ export default function SimulationOfDead() {
 
               {/* Specific Metadata Panel (e.g. LanceDB Pattern Matching for Market Structure) */}
               {selectedAgent.meta && (selectedAgent.meta.win_rate !== undefined || selectedAgent.meta.pattern_count !== undefined) && (
-                <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-4">
-                  <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><Database size={14} aria-hidden="true" /> Database LanceDB Pattern Matching</h4>
+                <div className="bg-[#F0F6FF]/40 border border-blue-200 rounded-xl p-5 space-y-4">
+                  <h4 className="text-sm font-semibold text-slate-600 flex items-center gap-2"><Database size={14} aria-hidden="true" /> Database LanceDB Pattern Matching</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-xs text-slate-400">Pola Serupa Terdeteksi</div>
-                      <div className="text-lg font-bold font-mono text-slate-200 mt-1">
+                      <div className="text-lg font-bold font-mono text-slate-800 mt-1">
                         {selectedAgent.meta.patterns
                           ? selectedAgent.meta.patterns.length
                           : (selectedAgent.meta.pattern_count ?? 0)} pola
@@ -3913,12 +3939,12 @@ export default function SimulationOfDead() {
 
                   {/* Matching Patterns List */}
                   {selectedAgent.meta.patterns && selectedAgent.meta.patterns.length > 0 && (
-                    <div className="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div className="pt-4 border-t border-blue-200/80 space-y-2">
                       <div className="text-xs font-semibold text-slate-400">Semua Pola Historis Serupa:</div>
-                      <div className="border border-slate-800/80 rounded-lg overflow-hidden bg-slate-950/40 text-xs">
+                      <div className="border border-blue-200/80 rounded-lg overflow-hidden bg-[#F0F6FF]/60 text-xs">
                         <div className="overflow-x-auto max-h-[580px]">
                           <table className="w-full text-left">
-                            <thead className="bg-slate-900/40 border-b border-slate-800/80 text-slate-400 font-semibold sticky top-0 backdrop-blur">
+                            <thead className="bg-white/70 border-b border-blue-200/80 text-slate-400 font-semibold sticky top-0 backdrop-blur">
                               <tr>
                                 {[
                                   { key: "timestamp", label: "Waktu (Timestamp)", align: "left" as const },
@@ -3930,7 +3956,7 @@ export default function SimulationOfDead() {
                                   <th
                                     key={col.key}
                                     onClick={() => togglePatternSort(col.key)}
-                                    className={`py-2 px-3 cursor-pointer select-none hover:text-slate-200 transition-colors ${
+                                    className={`py-2 px-3 cursor-pointer select-none hover:text-slate-800 transition-colors ${
                                       col.align === "right" ? "text-right" : "text-left"
                                     }`}
                                   >
@@ -3950,7 +3976,7 @@ export default function SimulationOfDead() {
                                 ))}
                               </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                            <tbody className="divide-y divide-slate-800/40 text-slate-600">
                               {[...selectedAgent.meta.patterns]
                                 .sort((a: any, b: any) => {
                                   const { key, dir } = patternSort;
@@ -3968,7 +3994,7 @@ export default function SimulationOfDead() {
                                 return (
                                   <tr
                                     key={idx}
-                                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                                    className="hover:bg-[#BFDBFE]/50 transition-colors cursor-pointer"
                                     onClick={() => setSelectedPattern(p)}
                                   >
                                     <td className="py-2 px-3 font-mono text-[11px] text-slate-400">
@@ -4003,7 +4029,7 @@ export default function SimulationOfDead() {
                 </div>
               )}
 
-              {/* ── Nested Pattern Detail Popup ─────────────────────────────── */}
+              {/* â”€â”€ Nested Pattern Detail Popup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
               {selectedPattern && (
                 <div
                   className="fixed inset-0 z-[200] flex items-center justify-center"
@@ -4013,28 +4039,28 @@ export default function SimulationOfDead() {
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-                    className="relative bg-[#0a0f1c] border border-slate-700/60 rounded-2xl p-6 shadow-2xl w-[640px] max-w-[90vw] space-y-4"
+                    className="relative bg-[#0a0f1c] border border-blue-300/65 rounded-2xl p-6 shadow-2xl w-[640px] max-w-[90vw] space-y-4"
                     onClick={e => e.stopPropagation()}
                   >
                     <button
                       onClick={() => setSelectedPattern(null)}
-                      className="absolute top-3 right-3 text-slate-500 hover:text-slate-300 transition-colors"
+                      className="absolute top-3 right-3 text-slate-500 hover:text-slate-600 transition-colors"
                     >
                       <X size={14} />
                     </button>
-                    <div className="text-sm font-semibold text-slate-200">Detail Pola Historis</div>
+                    <div className="text-sm font-semibold text-slate-800">Detail Pola Historis</div>
                     <div className="text-[11px] font-mono text-slate-500">
                       {selectedPattern.timestamp ? selectedPattern.timestamp.replace("T", " ").substring(0, 19) : "-"}
                     </div>
 
                     {patternCandlesLoading ? (
-                      <div className="w-full h-[320px] rounded-xl border border-slate-800/80 bg-slate-950/60 flex items-center justify-center text-[11px] text-slate-500 animate-pulse">
+                      <div className="w-full h-[320px] rounded-xl border border-blue-200/80 bg-[#F0F6FF]/80 flex items-center justify-center text-[11px] text-slate-500 animate-pulse">
                         Memuat candle historis...
                       </div>
                     ) : patternCandles.length > 0 ? (
                       <PatternCandle3DVisualizer candles={patternCandles} structures={patternStructures} />
                     ) : (
-                      <div className="w-full h-[320px] rounded-xl border border-dashed border-slate-800/80 bg-slate-950/40 flex items-center justify-center text-[11px] text-slate-500">
+                      <div className="w-full h-[320px] rounded-xl border border-dashed border-blue-200/80 bg-[#F0F6FF]/60 flex items-center justify-center text-[11px] text-slate-500">
                         Data candle tidak tersedia
                       </div>
                     )}
@@ -4042,7 +4068,7 @@ export default function SimulationOfDead() {
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <div className="text-slate-500 mb-0.5">Entry Price</div>
-                        <div className="font-mono font-semibold text-slate-200">
+                        <div className="font-mono font-semibold text-slate-800">
                           {selectedPattern.price != null ? Number(selectedPattern.price).toFixed(2) : "-"}
                         </div>
                       </div>
@@ -4056,7 +4082,7 @@ export default function SimulationOfDead() {
                       </div>
                       <div>
                         <div className="text-slate-500 mb-0.5">Sesi</div>
-                        <div className="text-slate-200">{selectedPattern.session || "-"}</div>
+                        <div className="text-slate-800">{selectedPattern.session || "-"}</div>
                       </div>
                       <div>
                         <div className="text-slate-500 mb-0.5">Status</div>
@@ -4094,15 +4120,15 @@ export default function SimulationOfDead() {
               {selectedAgent.key === "sentiment" && activeFrame && (
                 <div className="space-y-4">
                   {/* News Headlines */}
-                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
-                    <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <div className="bg-[#F0F6FF]/40 border border-blue-200 rounded-xl p-5 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-600 flex items-center gap-2">
                       <Newspaper size={13} aria-hidden="true" /> Berita Utama Pasar (Generasi LLM)
                     </h4>
                     {activeFrame.debug_news && activeFrame.debug_news.length > 0 ? (
                       <div className="space-y-2.5">
                         {activeFrame.debug_news.map((item: any, idx: number) => (
-                          <div key={idx} className="bg-slate-950/40 border border-slate-800/60 rounded-xl p-3.5 flex flex-col gap-1 hover:border-slate-700/60 transition-colors">
-                            <span className="text-sm text-slate-200 font-medium leading-snug">
+                          <div key={idx} className="bg-[#F0F6FF]/60 border border-blue-200/70 rounded-xl p-3.5 flex flex-col gap-1 hover:border-blue-300/65 transition-colors">
+                            <span className="text-sm text-slate-800 font-medium leading-snug">
                               {item.headline}
                             </span>
                             <span className="text-[10px] font-mono text-slate-500">
@@ -4112,33 +4138,33 @@ export default function SimulationOfDead() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-[#F0F6FF]/60 rounded-xl border border-dashed border-blue-200">
                         Tidak ada data berita historis untuk tanggal ini.
                       </div>
                     )}
                   </div>
 
                   {/* Calendar Events */}
-                  <div className="bg-slate-950/20 border border-slate-800 rounded-xl p-5 space-y-3">
-                    <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                  <div className="bg-[#F0F6FF]/40 border border-blue-200 rounded-xl p-5 space-y-3">
+                    <h4 className="text-sm font-semibold text-slate-600 flex items-center gap-2">
                       <CalendarDays size={14} aria-hidden="true" /> Jadwal Rilis Data Ekonomi (Generasi LLM)
                     </h4>
                     {activeFrame.debug_events && activeFrame.debug_events.length > 0 ? (
-                      <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/40 text-xs">
+                      <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-[#F0F6FF]/60 text-xs">
                         <table className="w-full text-left">
-                          <thead className="bg-slate-900/40 border-b border-slate-800/80 text-slate-400 font-semibold">
+                          <thead className="bg-white/70 border-b border-blue-200/80 text-slate-400 font-semibold">
                             <tr>
                               <th className="py-2.5 px-4">Nama Peristiwa / Data</th>
                               <th className="py-2.5 px-4 text-center">Dampak</th>
                               <th className="py-2.5 px-4 text-right">Waktu Rilis</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/40 text-slate-300">
+                          <tbody className="divide-y divide-slate-800/40 text-slate-600">
                             {activeFrame.debug_events.map((item: any, idx: number) => {
                               const isHigh = item.impact?.toLowerCase() === "high";
                               return (
-                                <tr key={idx} className="hover:bg-slate-800/20 transition-colors">
-                                  <td className="py-2.5 px-4 font-medium text-slate-200">
+                                <tr key={idx} className="hover:bg-[#BFDBFE]/20 transition-colors">
+                                  <td className="py-2.5 px-4 font-medium text-slate-800">
                                     {item.event}
                                   </td>
                                   <td className="py-2.5 px-4 text-center">
@@ -4160,7 +4186,7 @@ export default function SimulationOfDead() {
                         </table>
                       </div>
                     ) : (
-                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800">
+                      <div className="text-xs text-slate-500 py-2.5 italic text-center bg-[#F0F6FF]/60 rounded-xl border border-dashed border-blue-200">
                         Tidak ada peristiwa ekonomi terjadwal untuk tanggal ini.
                       </div>
                     )}
@@ -4170,18 +4196,18 @@ export default function SimulationOfDead() {
 
               {/* Reasoning Block */}
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2"><FileText size={14} aria-hidden="true" /> Analisis & Rationale (Reasoning)</h4>
-                <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 text-sm text-slate-300 leading-relaxed font-sans min-h-[100px] whitespace-pre-wrap">
+                <h4 className="text-sm font-semibold text-slate-600 flex items-center gap-2"><FileText size={14} aria-hidden="true" /> Analisis & Rationale (Reasoning)</h4>
+                <div className="bg-[#F0F6FF]/60 border border-blue-200/80 rounded-xl p-4 text-sm text-slate-600 leading-relaxed font-sans min-h-[100px] whitespace-pre-wrap">
                   {selectedAgent.reasoning || "Tidak ada rincian analisis dari agen."}
                 </div>
               </div>
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+            <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
               <button
                 onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup
               </button>
@@ -4193,7 +4219,7 @@ export default function SimulationOfDead() {
   );
 }
 
-// ── 3D Market Structure Skema Visualizer Component ──────────────────────────
+// â”€â”€ 3D Market Structure Skema Visualizer Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface MarketStructure3DVisualizerProps {
   allowChoch: boolean;
   allowBos1: boolean;
@@ -4392,7 +4418,7 @@ export function MarketStructure3DVisualizer({
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2">
+    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-[#F0F6FF]/80 rounded-xl border border-blue-200/80 mb-2">
       <canvas ref={mountRef} className="w-full h-full block" />
       
       {/* 2D Projected labels */}
@@ -4404,7 +4430,7 @@ export function MarketStructure3DVisualizer({
   );
 }
 
-// ── 3D Veto Consensus Map Visualizer Component ──────────────────────────────
+// â”€â”€ 3D Veto Consensus Map Visualizer Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface VetoConsensus3DVisualizerProps {
   vetoMode: "hard" | "soft" | "none";
 }
@@ -4589,19 +4615,19 @@ export function VetoConsensus3DVisualizer({ vetoMode }: VetoConsensus3DVisualize
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80 mb-2">
+    <div ref={containerRef} className="w-full h-[140px] relative overflow-hidden bg-[#F0F6FF]/80 rounded-xl border border-blue-200/80 mb-2">
       <canvas ref={mountRef} className="w-full h-full block" />
       
       {/* 2D Projected labels */}
       <div id="veto-label-ms" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">Structure</div>
       <div id="veto-label-ml" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">ML Filter</div>
       <div id="veto-label-sr" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-400 select-none">Risk & Sent.</div>
-      <div id="veto-label-core" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-200 select-none">Consensus</div>
+      <div id="veto-label-core" className="absolute left-0 top-0 text-[9px] uppercase font-bold tracking-wider pointer-events-none text-slate-800 select-none">Consensus</div>
     </div>
   );
 }
 
-// ── 3D Pattern Candle Formation Visualizer (MSA "Detail Pola Historis" popup) ──
+// â”€â”€ 3D Pattern Candle Formation Visualizer (MSA "Detail Pola Historis" popup) â”€â”€
 interface PatternCandleData {
   time: number;
   open: number;
@@ -5070,7 +5096,7 @@ export function PatternCandle3DVisualizer({ candles, structures }: PatternCandle
   if (candles.length === 0) return null;
 
   return (
-    <div ref={containerRef} className="w-full h-[320px] relative overflow-hidden bg-slate-950/60 rounded-xl border border-slate-800/80">
+    <div ref={containerRef} className="w-full h-[320px] relative overflow-hidden bg-[#F0F6FF]/80 rounded-xl border border-blue-200/80">
       <canvas ref={mountRef} className="w-full h-full block" />
       <div
         id="pattern-axis-handle"
@@ -5084,7 +5110,7 @@ export function PatternCandle3DVisualizer({ candles, structures }: PatternCandle
           <div
             key={idx}
             id={`pattern-structure-label-${idx}`}
-            className={`absolute left-0 top-0 text-[9px] font-mono font-bold tracking-wide pointer-events-none select-none transition-opacity duration-200 rounded px-1.5 py-0.5 border bg-slate-950/90 whitespace-nowrap ${
+            className={`absolute left-0 top-0 text-[9px] font-mono font-bold tracking-wide pointer-events-none select-none transition-opacity duration-200 rounded px-1.5 py-0.5 border bg-white/90 whitespace-nowrap ${
               isBull ? "text-cyan-400 border-cyan-500/40" : "text-rose-400 border-rose-500/40"
             }`}
             style={{ opacity: 0 }}

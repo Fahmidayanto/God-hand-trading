@@ -53,6 +53,62 @@ from train_ml_prediction_v3 import (  # noqa: E402
 )
 
 
+def completed_rows_at_or_before(
+    frame: pd.DataFrame,
+    when: pd.Timestamp,
+    timeframe: str,
+    count: int,
+) -> pd.DataFrame:
+    """Return only candles whose close time is available at prediction time."""
+    close_cutoff = pd.Timestamp(when) - pd.Timedelta(timeframe)
+    return last_rows_at_or_before(frame, close_cutoff, count)
+
+
+def point_in_time_session_features(
+    sessions: pd.DataFrame,
+    m15: pd.DataFrame,
+    when: pd.Timestamp,
+    entry_price: float,
+    atr: float,
+) -> Dict[str, Any]:
+    """Build session features from M15 candles completed by prediction time."""
+    base = session_features(sessions, when, entry_price, atr)
+    if sessions.empty:
+        return base
+
+    matching = sessions[(sessions["start_time"] <= when) & (when <= sessions["end_time"])]
+    if matching.empty:
+        matching = sessions[sessions["end_time"] <= when].tail(1)
+    if matching.empty:
+        return base
+
+    session = matching.iloc[-1]
+    observed = completed_rows_at_or_before(m15, when, "15min", len(m15))
+    observed = observed[
+        (observed["time"] >= session["start_time"])
+        & (observed["time"] < session["end_time"])
+    ]
+    if observed.empty:
+        base.update({
+            "session_range_points": 0.0,
+            "price_position_session_range": 0.5,
+            "distance_to_session_high_atr": 0.0,
+            "distance_to_session_low_atr": 0.0,
+        })
+        return base
+
+    high = float(observed["high"].max())
+    low = float(observed["low"].min())
+    price_range = max(high - low, 0.0)
+    base.update({
+        "session_range_points": price_range * 100.0,
+        "price_position_session_range": (entry_price - low) / price_range if price_range else 0.5,
+        "distance_to_session_high_atr": (high - entry_price) / atr if atr else 0.0,
+        "distance_to_session_low_atr": (entry_price - low) / atr if atr else 0.0,
+    })
+    return base
+
+
 def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Build unconstrained dataset directly from structure events and raw market data."""
     engineer = FeatureEngineer()
@@ -127,6 +183,7 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
 
         for _, row in events_df.iterrows():
             entry_time = row["time"]
+            prediction_time = entry_time + pd.Timedelta(minutes=15)
             dir_action = str(row.get("Direction/Action", "")).upper()
             
             if "BULL" in dir_action:
@@ -137,7 +194,11 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                 continue
 
             # Find M15 bar at entry
-            current_bar = current_bar_at_or_before(m15, entry_time)
+            m15_history = completed_rows_at_or_before(m15, prediction_time, "15min", 220)
+            if m15_history.empty:
+                skipped["no_m15_bar"] += 1
+                continue
+            current_bar = current_bar_at_or_before(m15_history, entry_time)
             if current_bar is None:
                 skipped["no_m15_bar"] += 1
                 continue
@@ -165,9 +226,8 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                 mae_target = max(0.0, (max_high - entry_price) * 100.0)
 
             # Get historical windows (220 bars)
-            m15_history = last_rows_at_or_before(m15, entry_time, 220)
-            h1_history = last_rows_at_or_before(h1, entry_time, 220)
-            h4_history = last_rows_at_or_before(h4, entry_time, 220)
+            h1_history = completed_rows_at_or_before(h1, prediction_time, "1h", 220)
+            h4_history = completed_rows_at_or_before(h4, prediction_time, "4h", 220)
 
             # Extract base structure features
             recent_structures = structures_df[structures_df["time"] <= entry_time].tail(50)
@@ -320,7 +380,13 @@ def build_dataset_v5_unconstrained(backtest_dir: Path) -> Tuple[pd.DataFrame, Di
                 actual_net_profit = sim_profit_usd
 
             # Compute session features
-            sess_feats = session_features(sessions, entry_time, entry_price, m15_atr)
+            sess_feats = point_in_time_session_features(
+                sessions,
+                m15,
+                prediction_time,
+                entry_price,
+                m15_atr,
+            )
             session_name = sess_feats.get("session_zone_name", "UNKNOWN")
             session_is_dst = sess_feats.get("session_zone_is_dst", "UNKNOWN")
 
@@ -371,7 +437,7 @@ def build_feature_matrix_v5(dataset: pd.DataFrame) -> Tuple[pd.DataFrame, List[s
     ]
     excluded = {
         "source_year", "entry_time", "year", "timeframe", "entry_price", "source", "reject_reason",
-        "mfe_target", "mae_target",
+        "mfe_target", "mae_target", "mfe_target_norm", "mae_target_norm",
         "ea_status", "ea_reject_reason",
         "close_reason", "mfe_points", "mae_points", "mfe_to_rr", "mae_to_rr",
         "final_rr", "final_risk_points", "final_reward_points",

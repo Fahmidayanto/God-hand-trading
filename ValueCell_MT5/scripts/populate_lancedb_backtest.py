@@ -263,14 +263,18 @@ def main():
             # Outcome formatting
             outcome = "PENDING"
             profit_pips = 0.0
-            duration_minutes = 0
+            net_profit = None
+            duration_minutes = None
+            reject_reason_raw = ""
             session = "London"
             
             if trade_match is not None:
                 if str(trade_match.get("Status", "EXECUTED")).upper() == "REJECTED":
-                    trade_match = None
+                    outcome = "REJECTED"
+                    reject_reason_raw = str(trade_match.get("Reject_Reason") or "").strip()
+                    session = normalize_session(trade_match.get("Session"))
             
-            if trade_match is not None:
+            if trade_match is not None and outcome != "REJECTED":
                 net_profit = float(trade_match.get("Net_Profit", 0))
                 outcome = "WIN" if net_profit > 0 else "LOSS"
                 
@@ -329,8 +333,11 @@ def main():
                 "session": session,
                 "outcome": outcome,
                 "profit_pips": profit_pips,
+                "net_profit": net_profit,
                 "duration_minutes": duration_minutes,
-                "prior_choch": prior_choch
+                "prior_choch": prior_choch,
+                "reject_reason_raw": reject_reason_raw,
+                "price_ratio": round(price / 4500.0, 6) if price > 0 else 1.0,
             })
             
         # Add to LanceDB
@@ -338,27 +345,7 @@ def main():
         success_count = 0
         try:
             table = db.db.open_table("historical_structures")
-            data_list = []
-            for pattern in patterns_to_add:
-                vector = db._pattern_to_vector(pattern)
-                data_list.append({
-                    "id": f"{pattern['symbol']}_{pattern['timestamp']}",
-                    "timestamp": pattern["timestamp"],
-                    "symbol": pattern["symbol"],
-                    "timeframe": pattern["timeframe"],
-                    "event_type": pattern["event_type"],
-                    "direction": pattern["direction"],
-                    "price": float(pattern["price"]),
-                    "ema200": float(pattern.get("ema200", 0)),
-                    "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
-                    "session": pattern.get("session", "Unknown"),
-                    "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
-                    "prior_choch": bool(pattern.get("prior_choch", False)),
-                    "outcome": pattern.get("outcome", "PENDING"),
-                    "profit_pips": float(pattern.get("profit_pips", 0)),
-                    "duration_minutes": int(pattern.get("duration_minutes", 0)),
-                    "vector": vector
-                })
+            data_list = [db.prepare_structure_pattern(pattern) for pattern in patterns_to_add]
             
             if data_list:
                 table.add(data_list)

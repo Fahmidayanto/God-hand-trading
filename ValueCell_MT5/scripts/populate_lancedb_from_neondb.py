@@ -150,7 +150,7 @@ def main():
         # but still on its own fresh connection rather than one reused for everything.
         conn = get_neon_conn()
         try:
-            df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, Magic_number as magic_number FROM backtest_results_xauusd", conn)
+            df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, reject_reason, Magic_number as magic_number FROM backtest_results_xauusd", conn)
         finally:
             conn.close()
         logger.info(f"Loaded {len(df_results)} trade outcome rows from backtest_results_xauusd.")
@@ -267,7 +267,10 @@ def main():
             # Outcome formatting
             outcome = "PENDING"
             profit_pips = 0.0
-            duration_minutes = 0
+            net_profit = None
+            duration_minutes = None
+            reject_reason_raw = ""
+            reject_reason_code = "NONE"
             session = "London"
 
             if trade_match is not None and str(trade_match.get("status")) == "REJECTED":
@@ -276,7 +279,17 @@ def main():
                 # all"), but there's no real entry/exit to derive pips or duration from.
                 outcome = "REJECTED"
                 profit_pips = 0.0
-                duration_minutes = 0
+                reject_reason_raw = str(trade_match.get("reject_reason") or "").strip()
+                reject_reason_code = db.prepare_structure_pattern({
+                    "timestamp": struct_time.isoformat(),
+                    "symbol": "XAUUSD",
+                    "timeframe": tf,
+                    "event_type": event_type,
+                    "direction": direction,
+                    "price": price,
+                    "outcome": outcome,
+                    "reject_reason_raw": reject_reason_raw,
+                })["reject_reason_code"]
                 session = normalize_session(trade_match.get("session"))
             elif trade_match is not None:
                 net_profit = float(trade_match.get("net_profit", 0))
@@ -317,21 +330,20 @@ def main():
                 "ema200": ema200,
                 "ema_distance": price - ema200,
                 "session": session,
-                "hour": hour,
                 "prior_choch": prior_choch,
                 "outcome": outcome,
                 "profit_pips": profit_pips,
-                "duration_minutes": duration_minutes
+                "net_profit": net_profit,
+                "duration_minutes": duration_minutes,
+                "reject_reason_raw": reject_reason_raw,
+                "reject_reason_code": reject_reason_code,
+                "price_ratio": round(price / 4500.0, 6) if price > 0 else 1.0,
             })
 
         # Insert to LanceDB
         logger.info(f"Adding {len(patterns_to_add)} patterns to historical_structures...")
         table_struct = db.db.open_table("historical_structures")
-        data_list_struct = []
-        for p in patterns_to_add:
-            vector = db._pattern_to_vector(p)
-            p["vector"] = vector
-            data_list_struct.append(p)
+        data_list_struct = [db.prepare_structure_pattern(pattern) for pattern in patterns_to_add]
             
         if data_list_struct:
             table_struct.add(data_list_struct)

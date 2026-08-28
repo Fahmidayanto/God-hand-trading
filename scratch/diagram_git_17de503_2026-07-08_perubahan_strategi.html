@@ -1,0 +1,1702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MT5 Hybrid Architecture Diagram</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 25, 40, 0.75);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --glow-color: rgba(0, 229, 255, 0.2);
+            
+            --color-mt5: #ffaa00;
+            --color-watcher: #00e5ff;
+            --color-neon: #00e676;
+            --color-lancedb: #d500f9;
+            --color-orchestrator: #ff1744;
+            --color-agent: #2979ff;
+            --color-consensus: #ffd700;
+            --color-execution: #00b0ff;
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(21, 32, 63, 0.5) 0px, transparent 50%),
+                radial-gradient(at 50% 0%, rgba(13, 58, 71, 0.3) 0px, transparent 50%),
+                radial-gradient(at 100% 50%, rgba(57, 18, 74, 0.4) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            position: fixed;
+            top: 2rem;
+            left: 3rem;
+            z-index: 200;
+            pointer-events: none;
+            text-align: left;
+            padding: 0;
+        }
+
+        header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            background: linear-gradient(135deg, #fff 30%, #a5f3fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.25rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        .main-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            padding: 0;
+            margin: 0;
+        }
+
+        @media (max-width: 1100px) {
+            .main-container {
+                display: block;
+            }
+        }
+
+        /* Flow Diagram Section */
+        .diagram-area {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            backdrop-filter: none;
+            cursor: grab;
+        }
+
+        #pan-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3500px;
+            height: 3500px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+            gap: 3.5rem;
+            padding: 80px 0 0 10%;
+            transform-origin: 0 0;
+        }
+
+        .flow-line-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .edge-group {
+            pointer-events: none;
+        }
+
+        .flow-path-hover-bridge {
+            fill: none;
+            stroke: transparent;
+            stroke-width: 18;
+            cursor: pointer;
+            pointer-events: stroke; /* Capture mouse pointers */
+        }
+
+        .flow-path {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.1);
+            stroke-width: 3;
+            stroke-dasharray: 8 6;
+            animation: flowDash 30s linear infinite;
+            pointer-events: none; /* Mouse ignores this, caught by bridge */
+            transition: stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+        }
+
+        .edge-group:hover .flow-path {
+            stroke: #ff1744 !important;
+            stroke-width: 4.5 !important;
+            filter: drop-shadow(0 0 8px #ff1744);
+        }
+
+        .flow-path.active {
+            stroke: var(--active-color, var(--color-watcher));
+            stroke-width: 4;
+            filter: drop-shadow(0 0 8px var(--active-color));
+            animation: flowDash 15s linear infinite;
+        }
+
+        .edge-delete-btn {
+            opacity: 0;
+            cursor: pointer;
+            pointer-events: auto; /* Clickable */
+            transition: opacity 0.2s;
+        }
+
+        .edge-group:hover .edge-delete-btn {
+            opacity: 1;
+        }
+
+        .edge-delete-btn circle {
+            fill: #ff1744;
+            stroke: #121214;
+            stroke-width: 1.5;
+            transition: fill 0.2s, r 0.2s;
+        }
+
+        .edge-delete-btn:hover circle {
+            fill: #d50000;
+            r: 12;
+        }
+
+        .edge-delete-btn text {
+            fill: #fff;
+            font-family: sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            text-anchor: middle;
+            dominant-baseline: central;
+            pointer-events: none;
+        }
+
+        @keyframes flowDash {
+            to {
+                stroke-dashoffset: -1000;
+            }
+        }
+
+        /* Card components styling */
+        .node-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            width: 500px;
+            max-width: 90%;
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .node-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.01));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .node-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: var(--theme-color);
+            box-shadow: 0 10px 40px var(--glow-color);
+        }
+
+        .node-card.selected {
+            border-color: var(--theme-color);
+            box-shadow: 0 0 35px var(--glow-color);
+            background: rgba(17, 25, 40, 0.9);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+        }
+
+        .card-badge {
+            margin-left: auto;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.25rem 0.6rem;
+            border-radius: 20px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+        }
+
+        .card-content {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+        }
+
+        .card-list {
+            margin-top: 0.75rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            list-style: none;
+        }
+
+        .card-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.82rem;
+            color: #d1d5db;
+        }
+
+        .card-list li::before {
+            content: '•';
+            font-weight: bold;
+        }
+
+        /* Specific node customization */
+        #node-mt5 { --theme-color: var(--color-mt5); --glow-color: rgba(255, 170, 0, 0.15); }
+        #node-mt5 .card-icon { color: var(--color-mt5); background: rgba(255, 170, 0, 0.05); }
+        #node-mt5 .card-badge { background: rgba(255, 170, 0, 0.15); color: var(--color-mt5); }
+
+        #node-watcher-trigger { 
+            width: auto; 
+            padding: 0.75rem 1.5rem;
+            --theme-color: var(--color-watcher);
+            --glow-color: rgba(0, 229, 255, 0.2);
+            border-radius: 30px;
+            text-align: center;
+        }
+        #node-watcher-trigger::before { border-radius: 30px; }
+        #node-watcher-trigger .card-header { margin: 0; justify-content: center; }
+
+        #node-neondb-mapping { --theme-color: var(--color-neon); --glow-color: rgba(0, 230, 118, 0.15); }
+        #node-neondb-mapping .card-icon { color: var(--color-neon); background: rgba(0, 230, 118, 0.05); }
+        #node-neondb-mapping .card-badge { background: rgba(0, 230, 118, 0.15); color: var(--color-neon); }
+
+        #node-lancedb { --theme-color: var(--color-lancedb); --glow-color: rgba(213, 0, 249, 0.15); }
+        #node-lancedb .card-icon { color: var(--color-lancedb); background: rgba(213, 0, 249, 0.05); }
+        #node-lancedb .card-badge { background: rgba(213, 0, 249, 0.15); color: var(--color-lancedb); }
+
+        #node-orchestrator { --theme-color: var(--color-orchestrator); --glow-color: rgba(255, 23, 68, 0.15); }
+        #node-orchestrator .card-icon { color: var(--color-orchestrator); background: rgba(255, 23, 68, 0.05); }
+        #node-orchestrator .card-badge { background: rgba(255, 23, 68, 0.15); color: var(--color-orchestrator); }
+
+        /* Sub-Agents customization */
+        #node-ms-agent { --theme-color: var(--color-watcher); --glow-color: rgba(0, 229, 255, 0.15); }
+        #node-ms-agent .card-icon { color: var(--color-watcher); background: rgba(0, 229, 255, 0.05); }
+        #node-ms-agent .card-badge { background: rgba(0, 229, 255, 0.15); color: var(--color-watcher); }
+
+        #node-ml-agent { --theme-color: var(--color-lancedb); --glow-color: rgba(213, 0, 249, 0.15); }
+        #node-ml-agent .card-icon { color: var(--color-lancedb); background: rgba(213, 0, 249, 0.05); }
+        #node-ml-agent .card-badge { background: rgba(213, 0, 249, 0.15); color: var(--color-lancedb); }
+
+        #node-risk-agent { --theme-color: var(--color-neon); --glow-color: rgba(0, 230, 118, 0.15); }
+        #node-risk-agent .card-icon { color: var(--color-neon); background: rgba(0, 230, 118, 0.05); }
+        #node-risk-agent .card-badge { background: rgba(0, 230, 118, 0.15); color: var(--color-neon); }
+
+        #node-sentiment-agent { --theme-color: #ff4081; --glow-color: rgba(255, 64, 129, 0.15); }
+        #node-sentiment-agent .card-icon { color: #ff4081; background: rgba(255, 64, 129, 0.05); }
+        #node-sentiment-agent .card-badge { background: rgba(255, 64, 129, 0.15); color: #ff4081; }
+
+        /* Consensus and Execution customization */
+        #node-consensus { --theme-color: var(--color-consensus); --glow-color: rgba(255, 215, 0, 0.15); }
+        #node-consensus .card-icon { color: var(--color-consensus); background: rgba(255, 215, 0, 0.05); }
+        #node-consensus .card-badge { background: rgba(255, 215, 0, 0.15); color: var(--color-consensus); }
+
+        #node-execution { --theme-color: var(--color-execution); --glow-color: rgba(0, 176, 255, 0.15); }
+        #node-execution .card-icon { color: var(--color-execution); background: rgba(0, 176, 255, 0.05); }
+        #node-execution .card-badge { background: rgba(0, 176, 255, 0.15); color: var(--color-execution); }
+
+        /* Draggable Sub-Agent Grid Row */
+        .agents-row {
+            display: flex;
+            gap: 1.5rem;
+            width: 100%;
+            z-index: 10;
+        }
+
+        .agent-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem;
+            width: 250px;
+            max-width: 90%;
+            position: relative;
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .agent-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 1.5px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.01));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .agent-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: var(--theme-color);
+            box-shadow: 0 10px 40px var(--glow-color);
+        }
+
+        .agent-card.selected {
+            border-color: var(--theme-color);
+            box-shadow: 0 0 35px var(--glow-color);
+            background: rgba(17, 25, 40, 0.9);
+        }
+
+        /* Detail Side Panel */
+        .detail-panel {
+            position: fixed;
+            right: 2rem;
+            top: 2rem;
+            width: 380px;
+            height: calc(100vh - 4rem);
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 2rem;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            z-index: 200;
+            overflow-y: auto;
+        }
+
+        .panel-placeholder {
+            text-align: center;
+            padding: 4rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        .panel-placeholder svg {
+            width: 48px;
+            height: 48px;
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.15);
+            stroke-width: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .panel-content {
+            display: none;
+        }
+
+        .panel-content.active {
+            display: block;
+        }
+
+        .panel-section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: var(--active-theme-color, var(--text-primary));
+        }
+
+        .panel-text {
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: #d1d5db;
+            margin-bottom: 1.25rem;
+        }
+
+        .meta-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .meta-list li {
+            font-size: 0.85rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        .meta-label {
+            font-weight: 600;
+            color: var(--active-theme-color, #fff);
+            margin-bottom: 0.2rem;
+            display: block;
+        }
+
+        .meta-value {
+            color: var(--text-secondary);
+            font-family: monospace;
+            word-break: break-all;
+        }
+
+        /* SVG Line drawing support */
+        #svg-canvas {
+            display: block;
+        }
+
+        #reset-btn {
+            pointer-events: auto; /* Allow clicks since parent has pointer-events: none */
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--text-secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            width: fit-content;
+            margin-top: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        #reset-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #reset-btn:active {
+            transform: translateY(1px);
+        }
+
+        .port-handle {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ffeb3b;
+            border: 2px solid var(--bg-color, #121214);
+            cursor: cell;
+            z-index: 150;
+            opacity: 0;
+            pointer-events: auto;
+            transition: opacity 0.2s, transform 0.2s, background-color 0.2s, border-color 0.2s;
+            box-shadow: 0 0 6px rgba(255, 235, 59, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: #000;
+            font-weight: 800;
+        }
+
+        .node-card:hover .port-handle, .agent-card:hover .port-handle {
+            opacity: 1;
+        }
+
+        .port-handle:hover {
+            background: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
+            border-color: #fff;
+        }
+
+        .port-handle.top { top: -7px; left: calc(50% - 7px); }
+        .port-handle.bottom { bottom: -7px; left: calc(50% - 7px); }
+        .port-handle.left { left: -7px; top: calc(50% - 7px); }
+        .port-handle.right { right: -7px; top: calc(50% - 7px); }
+
+        .port-handle.connecting-source-port {
+            background: #fff;
+            border-color: #ffeb3b;
+            box-shadow: 0 0 12px #ffeb3b;
+            opacity: 1 !important;
+            animation: pulsePort 1s infinite alternate;
+        }
+
+        @keyframes pulsePort {
+            from { transform: scale(1); }
+            to { transform: scale(1.3); }
+        }
+
+        .node-card.connecting-source, .agent-card.connecting-source {
+            border-color: #ffeb3b !important;
+            box-shadow: 0 0 25px rgba(255, 235, 59, 0.3) !important;
+            animation: pulseYellow 1s infinite alternate;
+        }
+
+        @keyframes pulseYellow {
+            from { box-shadow: 0 0 10px rgba(255, 235, 59, 0.2); }
+            to { box-shadow: 0 0 22px rgba(255, 235, 59, 0.6); }
+        }
+
+        .floating-popup {
+            display: none;
+            position: absolute;
+            z-index: 1000;
+            background: rgba(22, 22, 30, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 23, 68, 0.4);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 23, 68, 0.15);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            width: max-content;
+            max-width: 250px;
+            pointer-events: auto;
+            transform: translate(-50%, -100%);
+            animation: popupFadeIn 0.15s ease-out;
+        }
+
+        @keyframes popupFadeIn {
+            from { opacity: 0; transform: translate(-50%, -90%) scale(0.95); }
+            to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
+        }
+
+        .floating-popup p {
+            margin: 0 0 0.5rem 0;
+            font-weight: 500;
+            line-height: 1.3;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 0.4rem;
+            justify-content: flex-end;
+        }
+
+        .popup-btn {
+            border: none;
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .popup-btn.delete {
+            background: #ff1744;
+            color: #fff;
+        }
+
+        .popup-btn.delete:hover {
+            background: #d50000;
+            box-shadow: 0 0 8px rgba(255, 23, 68, 0.4);
+        }
+
+        .popup-btn.cancel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .popup-btn.cancel:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>HYBRID ARSITEKTUR SYSTEM</h1>
+        <p>MT5 Ecosystem & AI-Powered Multi-Agent Decision Flow</p>
+        <button id="reset-btn" onclick="resetLayout()">
+            <span>🔄</span> Reset Layout
+        </button>
+    </header>
+
+    <div class="main-container">
+        <div class="diagram-area" id="diagram-viewport">
+            <div id="pan-container">
+                <!-- Floating Delete Confirmation Popup -->
+                <div id="delete-popup" class="floating-popup">
+                    <p id="delete-popup-text"></p>
+                    <div class="popup-actions">
+                        <button id="popup-delete-btn" class="popup-btn delete">Hapus</button>
+                        <button id="popup-cancel-btn" class="popup-btn cancel">Batal</button>
+                    </div>
+                </div>
+
+                <!-- Dynamic Connecting Lines -->
+                <svg class="flow-line-svg" id="svg-canvas"></svg>
+
+            <!-- Node 1: MT5 Terminal & EA -->
+            <div class="node-card" id="node-mt5" onclick="selectNode('mt5')">
+                <div class="card-header">
+                    <div class="card-icon">📈</div>
+                    <div>
+                        <div class="card-title">MetaTrader 5 & MQL5 EA</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Terminal & Dev_Bot_v11.cs</p>
+                    </div>
+                    <span class="card-badge">Source</span>
+                </div>
+                <div class="card-content">
+                    Deteksi pergerakan swing harga tick XAUUSD (M15/H1/H4). EA secara otomatis mengekspor data transaksi serta struktur market ke file lokal CSV setiap kali candle ditutup.
+                    <ul class="card-list">
+                        <li>HH / LL Detection</li>
+                        <li>CHoCH / BoS Markers</li>
+                        <li>CSV Export Loop</li>
+                        <li>Chart Visual Indicators</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Node 2: Watcher (Line Trigger) -->
+            <div class="node-card" id="node-watcher-trigger" onclick="selectNode('watcher')">
+                <div class="card-header">
+                    <div class="card-icon" style="font-size: 1.1rem; width: 30px; height: 30px;">📁</div>
+                    <div class="card-title" style="font-size: 0.95rem;">CSV Watcher Service (ON)</div>
+                </div>
+            </div>
+
+            <!-- Node 3: NeonDB Mapping -->
+            <div class="node-card" id="node-neondb-mapping" onclick="selectNode('neon')">
+                <div class="card-header">
+                    <div class="card-icon">⚡</div>
+                    <div>
+                        <div class="card-title">Pemetaan File CSV ke NeonDB</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Ingestion & Relational Storage</p>
+                    </div>
+                    <span class="card-badge" style="letter-spacing: 0;">Neon PostgreSQL</span>
+                </div>
+                <div class="card-content">
+                    Membaca baris baru file CSV secara inkremental dan melakukan <em>bulk insert</em> ke database cloud Neon PostgreSQL.
+                    <ul class="card-list">
+                        <li>llhhbosdata_xauusd</li>
+                        <li>backtest_results_xauusd</li>
+                        <li>marketdata_xauusd_m15</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Node 4: LanceDB Vector Database -->
+            <div class="node-card" id="node-lancedb" onclick="selectNode('lancedb')">
+                <div class="card-header">
+                    <div class="card-icon">🔮</div>
+                    <div>
+                        <div class="card-title">KNOWLEDGE BASE (LanceDB)</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Vector & Similarity Search Storage</p>
+                    </div>
+                    <span class="card-badge">LanceDB</span>
+                </div>
+                <div class="card-content">
+                    Menyimpan representasi vektor pola historis. Sinkronisasi data di-trigger oleh Watcher setelah data masuk ke NeonDB (Opsi B).
+                    <ul class="card-list">
+                        <li>historical_structures</li>
+                        <li>market_conditions</li>
+                        <li>session_patterns</li>
+                        <li>trade_outcomes</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Node 5: Orchestrator Agent -->
+            <div class="node-card" id="node-orchestrator" onclick="selectNode('orchestrator')">
+                <div class="card-header">
+                    <div class="card-icon">🧠</div>
+                    <div>
+                        <div class="card-title">ORCHESTRATOR AGENT</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Multi-Agent Coordinator</p>
+                    </div>
+                    <span class="card-badge">Brain</span>
+                </div>
+                <div class="card-content">
+                    Mengoordinasi tugas analisis pasar, mengaktifkan sub-agen, dan mengumpulkan hasil voting ke mesin konsensus.
+                </div>
+            </div>
+
+            <!-- Draggable Row of Draggable Sub-Agents -->
+            <div class="agents-row">
+                <!-- Market Structure Agent -->
+                <div class="agent-card" id="node-ms-agent" onclick="selectNode('ms-agent')">
+                    <div class="card-header">
+                        <div class="card-icon">🌐</div>
+                        <div>
+                            <div class="card-title" style="font-size: 0.9rem;">Market Structure</div>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary)">SMC Analysis (25%)</p>
+                        </div>
+                    </div>
+                    <div class="card-content" style="font-size: 0.75rem;">
+                        Mengevaluasi swing High/Low, BOS, CHoCH, dan validitas area FVG/OB.
+                    </div>
+                </div>
+
+                <!-- ML Prediction Agent -->
+                <div class="agent-card" id="node-ml-agent" onclick="selectNode('ml-agent')">
+                    <div class="card-header">
+                        <div class="card-icon">🔮</div>
+                        <div>
+                            <div class="card-title" style="font-size: 0.9rem;">ML Prediction</div>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary)">XGBoost Validator (40%)</p>
+                        </div>
+                    </div>
+                    <div class="card-content" style="font-size: 0.75rem;">
+                        Memprediksi probabilitas keberhasilan sinyal berbasis model filter XGBoost.
+                    </div>
+                </div>
+
+                <!-- Risk Management Agent -->
+                <div class="agent-card" id="node-risk-agent" onclick="selectNode('risk-agent')">
+                    <div class="card-header">
+                        <div class="card-icon">🛡️</div>
+                        <div>
+                            <div class="card-title" style="font-size: 0.9rem;">Risk Management</div>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary)">Post-Consensus Veto</p>
+                        </div>
+                    </div>
+                    <div class="card-content" style="font-size: 0.75rem;">
+                        Mengontrol besaran lot size, validasi rasio RR, serta memiliki hak veto transaksi.
+                    </div>
+                </div>
+
+                <!-- Sentiment Agent -->
+                <div class="agent-card" id="node-sentiment-agent" onclick="selectNode('sentiment-agent')">
+                    <div class="card-header">
+                        <div class="card-icon">📰</div>
+                        <div>
+                            <div class="card-title" style="font-size: 0.9rem;">Sentiment Agent</div>
+                            <p style="font-size: 0.65rem; color: var(--text-secondary)">News & Calendar (20%)</p>
+                        </div>
+                    </div>
+                    <div class="card-content" style="font-size: 0.75rem;">
+                        Mendeteksi sentimen berita emas & membatasi aktivitas trading saat berita high impact.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Node 6: Consensus Engine -->
+            <div class="node-card" id="node-consensus" onclick="selectNode('consensus')">
+                <div class="card-header">
+                    <div class="card-icon">🗳️</div>
+                    <div>
+                        <div class="card-title">CONSENSUS ENGINE</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Weighted Voting & Threshold Check</p>
+                    </div>
+                    <span class="card-badge" style="background: rgba(255, 215, 0, 0.15); color: var(--color-consensus)">Consensus</span>
+                </div>
+                <div class="card-content">
+                    Menghitung persentase bobot keputusan agen. Memerlukan minimal <strong>60% skor consensus</strong> untuk meneruskan perintah ke Execution Agent.
+                </div>
+            </div>
+
+            <!-- Node 7: Execution Agent -->
+            <div class="node-card" id="node-execution" onclick="selectNode('execution')">
+                <div class="card-header">
+                    <div class="card-icon">🚀</div>
+                    <div>
+                        <div class="card-title">EXECUTION AGENT</div>
+                        <p style="font-size: 0.75rem; color: var(--text-secondary)">Order Sender & Position Management</p>
+                    </div>
+                    <span class="card-badge" style="background: rgba(0, 176, 255, 0.15); color: var(--color-execution)">Execution</span>
+                </div>
+                <div class="card-content">
+                    Mengirimkan perintah transaksi (BUY/SELL) ke MT5 EA, memantau kinerja lot, SL/TP aktual, serta menjaga daily loss limit.
+                </div>
+            </div>
+        </div>
+
+        <!-- Detail Side Panel -->
+        <div class="detail-panel" id="side-panel">
+            <div class="panel-placeholder" id="panel-placeholder">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                </svg>
+                <p>Klik salah satu komponen untuk melihat detail arsitektur, parameter, dan relasi data.</p>
+            </div>
+
+            <!-- Content panels populated dynamically -->
+            <div class="panel-content" id="panel-mt5">
+                <h2 class="panel-section-title">MetaTrader 5 & EA</h2>
+                <p class="panel-text">Expert Advisor <code>Dev_Bot_v11.cs</code> bertindak sebagai terminal utama yang menyentuh pasar live.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Path File Output</span>
+                        <span class="meta-value">MQL5/Files/Backtest_result/</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Cara Kerja</span>
+                        <span class="meta-value">Mendeteksi swing high/low secara real-time pada candle M15. Saat candle ditutup, EA mengekspor file CSV.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-watcher">
+                <h2 class="panel-section-title">CSV Watcher Service</h2>
+                <p class="panel-text">Python background service berbasis <code>watchdog</code> yang memantau perubahan folder direktori CSV secara berkala.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">File targets</span>
+                        <span class="meta-value">LLHHBOSData_*.csv, Backtest_Results_*.csv, MarketData_M15_*.csv</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Hybrid Trigger</span>
+                        <span class="meta-value">Begitu mendeteksi struktur baru, ia langsung meluncurkan sinkronisasi ke LanceDB dan men-trigger keputusan Orchestrator secara instan.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-neon">
+                <h2 class="panel-section-title">Neon PostgreSQL</h2>
+                <p class="panel-text">Relational database sebagai <em>Source of Truth</em> utama sistem. Menyimpan catatan audit log lengkap dari seluruh ekspor MT5.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Koneksi Pool</span>
+                        <span class="meta-value">psycopg2 (min=1, max=5) dengan auto-commit dan pool recycling.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Tabel Utama</span>
+                        <span class="meta-value">llhhbosdata_xauusd<br>marketdata_xauusd_m15<br>backtest_results_xauusd</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-lancedb">
+                <h2 class="panel-section-title">LanceDB Vector Database</h2>
+                <p class="panel-text">Menyimpan data historis terintegrasi dalam bentuk representasi vektor (16-D untuk pola, 12-D untuk transaksi, 8-D untuk market).</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Lokasi Database</span>
+                        <span class="meta-value">python/valuecell/data/lancedb</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Metode Sinkronisasi (Opsi B)</span>
+                        <span class="meta-value">Data dibaca dari NeonDB (relational), divalidasi dan dihitung EMA200/ATR-nya oleh Pandas, kemudian di-insert ke LanceDB secara real-time.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Akses Read</span>
+                        <span class="meta-value">Hanya ditulisi (write-only) oleh Watcher. Saat ini tidak dibaca langsung oleh Orchestrator dalam pengambilan keputusan real-time.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-orchestrator">
+                <h2 class="panel-section-title">Orchestrator Agent</h2>
+                <p class="panel-text">Mengoordinasi aktivitas analisis pasar dan mendistribusikan data ke seluruh sub-agen.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Cara Kerja</span>
+                        <span class="meta-value">Menerima pemicu (hybrid: instan dari Watcher atau polling 1 menit), memanggil modul sub-agen untuk melakukan analisis secara paralel, lalu mengirim hasilnya ke Consensus Engine.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-ms-agent">
+                <h2 class="panel-section-title">Market Structure Agent</h2>
+                <p class="panel-text">Menganalisis pergerakan harga berbasis konsep Smart Money Concepts (SMC) secara obyektif.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Bobot Vote</span>
+                        <span class="meta-value">25% dari total konsensus.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Tugas Utama</span>
+                        <span class="meta-value">Mengidentifikasi titik tertinggi/terendah (HH, LL), perubahan karakter harga (CHoCH), penembusan struktur (BoS), serta area imbalance (FVG) atau Order Block (OB).</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-ml-agent">
+                <h2 class="panel-section-title">ML Prediction Agent</h2>
+                <p class="panel-text">Validator berbasis kecerdasan buatan untuk menguji keandalan sinyal struktur.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Bobot Vote</span>
+                        <span class="meta-value">40% dari total konsensus.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Algoritma</span>
+                        <span class="meta-value">XGBoost Classifier (di-training pada data historis performa backtest). Menilai probabilitas kesuksesan struktur pasar yang terdeteksi sebelum dieksekusi.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-risk-agent">
+                <h2 class="panel-section-title">Risk Management Agent</h2>
+                <p class="panel-text">Penjaga gerbang manajemen modal dan rasio keuntungan-kerugian (Risk/Reward).</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Peran Sizing</span>
+                        <span class="meta-value">Menentukan lot size berdasarkan risk percentage. Tidak masuk dalam penjumlahan voting konsensus.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Hak Istimewa</span>
+                        <span class="meta-value">Memiliki <strong>Hak Veto Mutlak</strong>. Jika rasio RR kurang dari 1:1.5 atau risiko per trade melebihi batas (misal: max 2% balance), sinyal langsung dibatalkan (veto ke HOLD).</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-sentiment-agent">
+                <h2 class="panel-section-title">Sentiment Agent</h2>
+                <p class="panel-text">Mengintegrasikan sentimen makro dan rilis kalender ekonomi ke dalam keputusan trading.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Bobot Vote</span>
+                        <span class="meta-value">20% dari total konsensus.</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Sumber Data</span>
+                        <span class="meta-value">News RSS Feed (sentimen berita Emas) & Kalender Ekonomi. Mematikan eksekusi transaksi secara otomatis 30 menit sebelum dan sesudah berita penting berlabel *High Impact* (P0/Red Folder).</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-consensus">
+                <h2 class="panel-section-title">Consensus Engine</h2>
+                <p class="panel-text">Mesin voting tertimbang untuk menggabungkan hasil keputusan semua agen.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Rumus Konsensus</span>
+                        <span class="meta-value">Skor = (MS * 0.25 + ML * 0.40 + Sent * 0.20) / 0.85</span>
+                    </li>
+                    <li>
+                        <span class="meta-label">Ambang Batas</span>
+                        <span class="meta-value">Diperlukan minimal skor <strong>60%</strong> (0.60) dari bobot total (0.85) untuk menyetujui transaksi (BUY/SELL) dan meneruskannya ke Risk Management Agent. Jika di bawah itu, keputusan akhir adalah HOLD.</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="panel-content" id="panel-execution">
+                <h2 class="panel-section-title">Execution Agent</h2>
+                <p class="panel-text">Mengirimkan sinyal transaksi final dan mengelola lot serta posisi aktif.</p>
+                <ul class="meta-list">
+                    <li>
+                        <span class="meta-label">Fungsi</span>
+                        <span class="meta-value">Mengirimkan sinyal ke file instruksi eksekusi, memantau ticket transaksi, memantau batas maksimum lot harian, dan melacak status drawdown akun secara berkala.</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Default System Connections with Specific Port Assignments
+        const defaultConnections = [
+            { from: "node-mt5", fromPort: "right", to: "node-watcher-trigger", toPort: "left" },
+            { from: "node-watcher-trigger", fromPort: "bottom", to: "node-neondb-mapping", toPort: "top" },
+            { from: "node-neondb-mapping", fromPort: "right", to: "node-lancedb", toPort: "left" },
+            { from: "node-neondb-mapping", fromPort: "bottom", to: "node-orchestrator", toPort: "top" },
+            { from: "node-lancedb", fromPort: "bottom", to: "node-orchestrator", toPort: "left" },
+            { from: "node-watcher-trigger", fromPort: "right", to: "node-orchestrator", toPort: "top" }, // direct trigger
+
+            // Orchestrator -> Sub-Agents
+            { from: "node-orchestrator", fromPort: "right", to: "node-ms-agent", toPort: "left" },
+            { from: "node-orchestrator", fromPort: "right", to: "node-ml-agent", toPort: "left" },
+            { from: "node-orchestrator", fromPort: "right", to: "node-risk-agent", toPort: "left" },
+            { from: "node-orchestrator", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
+
+            // Sub-Agents -> Consensus Engine
+            { from: "node-ms-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
+            { from: "node-ml-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
+            { from: "node-sentiment-agent", fromPort: "right", to: "node-consensus", toPort: "left" },
+
+            // Consensus -> Risk Management (Veto Check) -> Execution
+            { from: "node-consensus", fromPort: "top", to: "node-risk-agent", toPort: "bottom" },
+            { from: "node-risk-agent", fromPort: "right", to: "node-execution", toPort: "left" }
+        ];
+
+        let connections = [...defaultConnections];
+
+        // Drag-and-drop state
+        let activeDragCard = null;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let cardOffsetX = 0;
+        let cardOffsetY = 0;
+
+        // Viewport Pan state
+        let isPanning = false;
+        let panX = 0;
+        let panY = 0;
+        let panStartX = 0;
+        let panStartY = 0;
+
+        // Connection selection state
+        let sourceNodeId = null;
+        let sourceNodePort = null;
+
+        // Update lines on resize/load
+        window.addEventListener('resize', drawLines);
+        window.addEventListener('load', () => {
+            initializeDragAndDrop();
+            restoreLayoutState();
+            drawLines();
+        });
+
+        // Clear connection source selection when pressing Escape key
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                clearConnectionSelection();
+                hideDeletePopup();
+            }
+        });
+
+        function initializeDragAndDrop() {
+            // 1. Initialize card drags and dynamic handles
+            document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                card.setAttribute('data-dx', '0');
+                card.setAttribute('data-dy', '0');
+                card.style.userSelect = 'none';
+                card.style.touchAction = 'none';
+
+                // Add 4 directional handles (top, bottom, left, right)
+                ['top', 'bottom', 'left', 'right'].forEach(port => {
+                    const handle = document.createElement('div');
+                    handle.className = `port-handle ${port}`;
+                    handle.innerHTML = '+';
+                    handle.title = `Tarik aliran baru dari gagang ${port} ini...`;
+                    handle.addEventListener('click', (e) => handlePortClick(e, card.id, port));
+                    card.appendChild(handle);
+                });
+                
+                card.addEventListener('mousedown', dragStart);
+                card.addEventListener('touchstart', dragStart, { passive: false });
+            });
+
+            // 2. Initialize viewport panning
+            const viewport = document.getElementById('diagram-viewport');
+            viewport.addEventListener('mousedown', viewportPanStart);
+            viewport.addEventListener('touchstart', viewportPanStart, { passive: false });
+        }
+
+        // Connection Editor Click Actions
+        function handlePortClick(e, cardId, portName) {
+            e.stopPropagation(); // Avoid selecting or dragging node
+            hideDeletePopup();
+
+            // Click target handle on another card? Connect them!
+            if (sourceNodeId) {
+                if (sourceNodeId === cardId) {
+                    clearConnectionSelection();
+                } else {
+                    connectPorts(sourceNodeId, sourceNodePort, cardId, portName);
+                    clearConnectionSelection();
+                }
+                return;
+            }
+
+            // Otherwise, select source port
+            sourceNodeId = cardId;
+            sourceNodePort = portName;
+            document.getElementById(cardId).classList.add('connecting-source');
+            e.currentTarget.classList.add('connecting-source-port');
+        }
+
+        function clearConnectionSelection() {
+            sourceNodeId = null;
+            sourceNodePort = null;
+            document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                card.classList.remove('connecting-source');
+            });
+            document.querySelectorAll('.port-handle').forEach(handle => {
+                handle.classList.remove('connecting-source-port');
+            });
+        }
+
+        function connectPorts(fromId, fromPort, toId, toPort) {
+            // Check if exact connection already exists
+            const exactIndex = connections.findIndex(conn => 
+                conn.from === fromId && conn.fromPort === fromPort && 
+                conn.to === toId && conn.toPort === toPort
+            );
+            
+            if (exactIndex > -1) {
+                // Exact connection exists: remove it (toggle off)
+                connections.splice(exactIndex, 1);
+            } else {
+                // Mix Option 1 & 2: Re-target if a connection from (fromId, fromPort) already exists
+                const existingIndex = connections.findIndex(conn => 
+                    conn.from === fromId && conn.fromPort === fromPort
+                );
+                
+                if (existingIndex > -1) {
+                    connections[existingIndex].to = toId;
+                    connections[existingIndex].toPort = toPort;
+                } else {
+                    connections.push({ from: fromId, fromPort, to: toId, toPort });
+                }
+            }
+            saveLayoutState();
+            drawLines();
+        }
+
+        function toggleConnection(fromId, toId) {
+            // Internal fallback: remove all connections between these two cards
+            connections = connections.filter(conn => !(conn.from === fromId && conn.to === toId));
+            saveLayoutState();
+            drawLines();
+        }
+
+        function getNameForCard(id) {
+            const card = document.getElementById(id);
+            if (!card) return id;
+            const titleEl = card.querySelector('.card-title');
+            return titleEl ? titleEl.textContent.trim() : id;
+        }
+
+        function showDeletePopup(x, y, fromId, toId) {
+            const popup = document.getElementById('delete-popup');
+            const text = document.getElementById('delete-popup-text');
+            const delBtn = document.getElementById('popup-delete-btn');
+            const cancelBtn = document.getElementById('popup-cancel-btn');
+
+            const nameA = getNameForCard(fromId);
+            const nameB = getNameForCard(toId);
+            text.innerHTML = `Hapus aliran dari <strong>${nameA}</strong> ke <strong>${nameB}</strong>?`;
+
+            popup.style.left = `${x}px`;
+            popup.style.top = `${y}px`;
+            popup.style.display = 'block';
+
+            delBtn.onclick = (e) => {
+                e.stopPropagation();
+                toggleConnection(fromId, toId);
+                hideDeletePopup();
+            };
+
+            cancelBtn.onclick = (e) => {
+                e.stopPropagation();
+                hideDeletePopup();
+            };
+        }
+
+        function hideDeletePopup() {
+            const popup = document.getElementById('delete-popup');
+            if (popup) popup.style.display = 'none';
+        }
+
+        // Viewport Pan handlers
+        function viewportPanStart(e) {
+            if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('a') || e.target.closest('ul') || e.target.closest('button') || e.target.closest('.floating-popup')) return;
+            if (e.type === 'mousedown' && e.button !== 0) return;
+
+            // Clear selection and hide popup when clicking empty space
+            if (sourceNodeId) {
+                clearConnectionSelection();
+            }
+            hideDeletePopup();
+
+            isPanning = true;
+            document.getElementById('diagram-viewport').style.cursor = 'grabbing';
+
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+            panStartX = clientX - panX;
+            panStartY = clientY - panY;
+
+            document.addEventListener('mousemove', viewportPanMove);
+            document.addEventListener('mouseup', viewportPanEnd);
+            document.addEventListener('touchmove', viewportPanMove, { passive: false });
+            document.addEventListener('touchend', viewportPanEnd);
+
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+        }
+
+        function viewportPanMove(e) {
+            if (!isPanning) return;
+
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+            panX = clientX - panStartX;
+            panY = clientY - panStartY;
+
+            const panContainer = document.getElementById('pan-container');
+            panContainer.style.transform = `translate(${panX}px, ${panY}px)`;
+
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+            }
+        }
+
+        function viewportPanEnd() {
+            if (!isPanning) return;
+            isPanning = false;
+
+            document.getElementById('diagram-viewport').style.cursor = 'grab';
+
+            document.removeEventListener('mousemove', viewportPanMove);
+            document.removeEventListener('mouseup', viewportPanEnd);
+            document.removeEventListener('touchmove', viewportPanMove);
+            document.removeEventListener('touchend', viewportPanEnd);
+            
+            saveLayoutState();
+        }
+
+        // Card Drag handlers
+        function dragStart(e) {
+            if (e.type === 'mousedown' && e.button !== 0) return;
+            if (e.target.closest('a') || e.target.closest('ul') || e.target.closest('.port-handle')) return;
+            
+            activeDragCard = e.currentTarget;
+            hideDeletePopup();
+
+            // Highlight node in side panel
+            const nodeId = activeDragCard.id.split('-').slice(1).join('-');
+            selectNode(nodeId);
+
+            // Connect automatically if a connection source is already selected (clicking the card itself)
+            if (sourceNodeId) {
+                e.preventDefault();
+                if (sourceNodeId === activeDragCard.id) {
+                    clearConnectionSelection();
+                } else {
+                    // Find closest port on target card to source port coordinates
+                    const rectA = document.getElementById(sourceNodeId).getBoundingClientRect();
+                    const rectB = activeDragCard.getBoundingClientRect();
+                    const rectCanvas = document.getElementById('svg-canvas').getBoundingClientRect();
+                    const startCoord = getPortCoordinates(rectA, sourceNodePort, rectCanvas);
+                    
+                    const portsB = {
+                        top: { x: rectB.left + rectB.width/2 - rectCanvas.left, y: rectB.top - rectCanvas.top },
+                        bottom: { x: rectB.left + rectB.width/2 - rectCanvas.left, y: rectB.bottom - rectCanvas.top },
+                        left: { x: rectB.left - rectCanvas.left, y: rectB.top + rectB.height/2 - rectCanvas.top },
+                        right: { x: rectB.right - rectCanvas.left, y: rectB.top + rectB.height/2 - rectCanvas.top }
+                    };
+                    
+                    let bestPort = 'left';
+                    let minDist = Infinity;
+                    for (let p in portsB) {
+                        const dist = Math.hypot(startCoord.x - portsB[p].x, startCoord.y - portsB[p].y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestPort = p;
+                        }
+                    }
+
+                    connectPorts(sourceNodeId, sourceNodePort, activeDragCard.id, bestPort);
+                    clearConnectionSelection();
+                }
+                activeDragCard = null;
+                return;
+            }
+            
+            const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+            
+            dragStartX = clientX;
+            dragStartY = clientY;
+            
+            cardOffsetX = parseFloat(activeDragCard.getAttribute('data-dx') || '0');
+            cardOffsetY = parseFloat(activeDragCard.getAttribute('data-dy') || '0');
+            
+            activeDragCard.style.transition = 'none';
+            activeDragCard.style.cursor = 'grabbing';
+            activeDragCard.style.zIndex = '100';
+            
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchmove', dragMove, { passive: false });
+            document.addEventListener('touchend', dragEnd);
+            
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+        }
+
+        function dragMove(e) {
+            if (!activeDragCard) return;
+            
+            const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+            const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+            
+            const dx = clientX - dragStartX;
+            const dy = clientY - dragStartY;
+            
+            const newX = cardOffsetX + dx;
+            const newY = cardOffsetY + dy;
+            
+            activeDragCard.setAttribute('data-dx', newX);
+            activeDragCard.setAttribute('data-dy', newY);
+            activeDragCard.style.transform = `translate(${newX}px, ${newY}px)`;
+            
+            drawLines();
+            
+            if (e.type === 'touchmove') {
+                e.preventDefault();
+            }
+        }
+
+        function dragEnd() {
+            if (!activeDragCard) return;
+            
+            activeDragCard.style.transition = 'transform 0.1s ease, box-shadow 0.4s, border-color 0.4s';
+            activeDragCard.style.cursor = 'pointer';
+            activeDragCard.style.zIndex = '10';
+            
+            activeDragCard = null;
+            
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('touchend', dragEnd);
+            
+            saveLayoutState();
+        }
+
+        // Persistent State Management
+        function saveLayoutState() {
+            const state = {
+                pan: { x: panX, y: panY },
+                nodes: {},
+                connections: connections
+            };
+            document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                state.nodes[card.id] = {
+                    dx: parseFloat(card.getAttribute('data-dx') || '0'),
+                    dy: parseFloat(card.getAttribute('data-dy') || '0')
+                };
+            });
+            localStorage.setItem('mt5_diagram_layout', JSON.stringify(state));
+        }
+
+        function restoreLayoutState() {
+            const savedStateStr = localStorage.getItem('mt5_diagram_layout');
+            if (!savedStateStr) {
+                connections = [...defaultConnections];
+                return;
+            }
+            try {
+                const state = JSON.parse(savedStateStr);
+                if (state.pan) {
+                    panX = state.pan.x;
+                    panY = state.pan.y;
+                    document.getElementById('pan-container').style.transform = `translate(${panX}px, ${panY}px)`;
+                }
+                if (state.nodes) {
+                    for (let id in state.nodes) {
+                        const card = document.getElementById(id);
+                        if (card) {
+                            const dx = state.nodes[id].dx;
+                            const dy = state.nodes[id].dy;
+                            card.setAttribute('data-dx', dx);
+                            card.setAttribute('data-dy', dy);
+                            card.style.transform = `translate(${dx}px, ${dy}px)`;
+                        }
+                    }
+                }
+                if (state.connections) {
+                    connections = state.connections;
+                } else {
+                    connections = [...defaultConnections];
+                }
+            } catch (e) {
+                console.error("Failed to restore layout state", e);
+                connections = [...defaultConnections];
+            }
+        }
+
+        function resetLayout() {
+            localStorage.removeItem('mt5_diagram_layout');
+            panX = 0;
+            panY = 0;
+            document.getElementById('pan-container').style.transform = 'translate(0px, 0px)';
+            document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                card.setAttribute('data-dx', '0');
+                card.setAttribute('data-dy', '0');
+                card.style.transform = 'translate(0px, 0px)';
+            });
+            connections = [...defaultConnections];
+            clearConnectionSelection();
+            hideDeletePopup();
+            drawLines();
+        }
+
+        // SVG Connector Line Math
+        function getBestConnectionPoints(rectA, rectB, rectCanvas) {
+            const pA = {
+                top: { x: rectA.left + rectA.width/2 - rectCanvas.left, y: rectA.top - rectCanvas.top, dir: 'up' },
+                bottom: { x: rectA.left + rectA.width/2 - rectCanvas.left, y: rectA.bottom - rectCanvas.top, dir: 'down' },
+                left: { x: rectA.left - rectCanvas.left, y: rectA.top + rectA.height/2 - rectCanvas.top, dir: 'left' },
+                right: { x: rectA.right - rectCanvas.left, y: rectA.top + rectA.height/2 - rectCanvas.top, dir: 'right' }
+            };
+            const pB = {
+                top: { x: rectB.left + rectB.width/2 - rectCanvas.left, y: rectB.top - rectCanvas.top, dir: 'up' },
+                bottom: { x: rectB.left + rectB.width/2 - rectCanvas.left, y: rectB.bottom - rectCanvas.top, dir: 'down' },
+                left: { x: rectB.left - rectCanvas.left, y: rectB.top + rectB.height/2 - rectCanvas.top, dir: 'left' },
+                right: { x: rectB.right - rectCanvas.left, y: rectB.top + rectB.height/2 - rectCanvas.top, dir: 'right' }
+            };
+
+            let minDistance = Infinity;
+            let bestA = null;
+            let bestB = null;
+
+            for (let keyA in pA) {
+                for (let keyB in pB) {
+                    const dist = Math.hypot(pA[keyA].x - pB[keyB].x, pA[keyA].y - pB[keyB].y);
+                    if (dist < minDistance) {
+                        minDistance = dist;
+                        bestA = pA[keyA];
+                        bestB = pB[keyB];
+                    }
+                }
+            }
+            return { start: bestA, end: bestB };
+        }
+
+        function getPortCoordinates(rect, portName, rectCanvas) {
+            if (!portName) return null;
+            switch (portName) {
+                case 'top':
+                    return { x: rect.left + rect.width/2 - rectCanvas.left, y: rect.top - rectCanvas.top, dir: 'up' };
+                case 'bottom':
+                    return { x: rect.left + rect.width/2 - rectCanvas.left, y: rect.bottom - rectCanvas.top, dir: 'down' };
+                case 'left':
+                    return { x: rect.left - rectCanvas.left, y: rect.top + rect.height/2 - rectCanvas.top, dir: 'left' };
+                case 'right':
+                    return { x: rect.right - rectCanvas.left, y: rect.top + rect.height/2 - rectCanvas.top, dir: 'right' };
+                default:
+                    return null;
+            }
+        }
+
+        function drawCurvedPath(id, ptA, ptB) {
+            const path = document.getElementById(id);
+            if (!path) return null;
+            const start = ptA;
+            const end = ptB;
+            
+            let cp1x = start.x;
+            let cp1y = start.y;
+            let cp2x = end.x;
+            let cp2y = end.y;
+            
+            const offset = Math.min(100, Math.hypot(start.x - end.x, start.y - end.y) * 0.4);
+            
+            if (start.dir === 'up') cp1y -= offset;
+            else if (start.dir === 'down') cp1y += offset;
+            else if (start.dir === 'left') cp1x -= offset;
+            else if (start.dir === 'right') cp1x += offset;
+            
+            if (end.dir === 'up') cp2y -= offset;
+            else if (end.dir === 'down') cp2y += offset;
+            else if (end.dir === 'left') cp2x -= offset;
+            else if (end.dir === 'right') cp2x += offset;
+            
+            const d = `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`;
+            path.setAttribute('d', d);
+
+            // Compute midpoint at t = 0.5
+            const midX = 0.125 * start.x + 0.375 * cp1x + 0.375 * cp2x + 0.125 * end.x;
+            const midY = 0.125 * start.y + 0.375 * cp1y + 0.375 * cp2y + 0.125 * end.y;
+            return { x: midX, y: midY };
+        }
+
+        function drawLines() {
+            const canvas = document.getElementById('svg-canvas');
+            const rectCanvas = canvas.getBoundingClientRect();
+            
+            canvas.innerHTML = '';
+            const selectedType = getSelectedNodeType();
+
+            connections.forEach((conn, index) => {
+                const cardA = document.getElementById(conn.from);
+                const cardB = document.getElementById(conn.to);
+                if (!cardA || !cardB) return;
+
+                const rectA = cardA.getBoundingClientRect();
+                const rectB = cardB.getBoundingClientRect();
+
+                let startPt = getPortCoordinates(rectA, conn.fromPort, rectCanvas);
+                let endPt = getPortCoordinates(rectB, conn.toPort, rectCanvas);
+
+                // Fallback to dynamic closest points if no ports defined (migration compatibility)
+                if (!startPt || !endPt) {
+                    const bestConn = getBestConnectionPoints(rectA, rectB, rectCanvas);
+                    startPt = startPt || bestConn.start;
+                    endPt = endPt || bestConn.end;
+                }
+                
+                // Create SVG Group <g class="edge-group">
+                const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                group.setAttribute('class', 'edge-group');
+                
+                // 1. Create invisible hover bridge path
+                const bridgePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const bridgeId = `path-bridge-${index}`;
+                bridgePath.setAttribute('id', bridgeId);
+                bridgePath.setAttribute('class', 'flow-path-hover-bridge');
+
+                // 2. Create visible path
+                const visiblePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                const visibleId = `path-dynamic-${index}`;
+                visiblePath.setAttribute('id', visibleId);
+                visiblePath.setAttribute('class', 'flow-path');
+
+                // Determine active path highlights
+                if (selectedType && (conn.from.includes(selectedType) || conn.to.includes(selectedType))) {
+                    visiblePath.classList.add('active');
+                    const color = getActiveThemeColorForType(selectedType);
+                    visiblePath.style.setProperty('--active-color', color);
+                }
+
+                // 3. Create delete button group (×)
+                const delBtnGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                delBtnGroup.setAttribute('class', 'edge-delete-btn');
+                delBtnGroup.setAttribute('title', 'Hapus aliran data ini');
+                
+                const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circle.setAttribute('r', '9');
+                
+                const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                text.textContent = '×';
+                
+                delBtnGroup.appendChild(circle);
+                delBtnGroup.appendChild(text);
+
+                // Add elements to group
+                group.appendChild(bridgePath);
+                group.appendChild(visiblePath);
+                group.appendChild(delBtnGroup);
+                
+                // Append group to canvas
+                canvas.appendChild(group);
+
+                // Draw paths and retrieve midpoint
+                drawCurvedPath(visibleId, startPt, endPt);
+                const midPoint = drawCurvedPath(bridgeId, startPt, endPt);
+
+                if (midPoint) {
+                    delBtnGroup.setAttribute('transform', `translate(${midPoint.x}, ${midPoint.y})`);
+                }
+
+                // Click event listener to delete (triggered by both the invisible bridge path AND the delete button!)
+                const handleClick = (e) => {
+                    e.stopPropagation();
+                    const rect = document.getElementById('pan-container').getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    showDeletePopup(x, y, conn.from, conn.to);
+                };
+
+                bridgePath.addEventListener('click', handleClick);
+                delBtnGroup.addEventListener('click', handleClick);
+            });
+        }
+
+        function getSelectedNodeType() {
+            const selectedNode = document.querySelector('.node-card.selected, .agent-card.selected');
+            if (!selectedNode) return null;
+            return selectedNode.id.split('-').slice(1).join('-');
+        }
+
+        function getActiveThemeColorForType(type) {
+            const panel = document.getElementById('side-panel');
+            return panel.style.getPropertyValue('--active-theme-color') || 'var(--text-primary)';
+        }
+
+        // Selection logic
+        let selectedNodeId = null;
+
+        function selectNode(type) {
+            document.querySelectorAll('.node-card, .agent-card').forEach(card => card.classList.remove('selected'));
+            document.querySelectorAll('.panel-content').forEach(p => p.classList.remove('active'));
+            
+            document.getElementById('panel-placeholder').style.display = 'none';
+            const panel = document.getElementById('side-panel');
+            
+            let color = 'var(--text-primary)';
+            const cardMap = {
+                'mt5': { cardId: 'node-mt5', panelId: 'panel-mt5', color: 'var(--color-mt5)' },
+                'watcher': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: 'var(--color-watcher)' },
+                'watcher-trigger': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: 'var(--color-watcher)' },
+                'neon': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: 'var(--color-neon)' },
+                'neondb-mapping': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: 'var(--color-neon)' },
+                'lancedb': { cardId: 'node-lancedb', panelId: 'panel-lancedb', color: 'var(--color-lancedb)' },
+                'orchestrator': { cardId: 'node-orchestrator', panelId: 'panel-orchestrator', color: 'var(--color-orchestrator)' },
+                'ms-agent': { cardId: 'node-ms-agent', panelId: 'panel-ms-agent', color: 'var(--color-watcher)' },
+                'ml-agent': { cardId: 'node-ml-agent', panelId: 'panel-ml-agent', color: 'var(--color-lancedb)' },
+                'risk-agent': { cardId: 'node-risk-agent', panelId: 'panel-risk-agent', color: 'var(--color-neon)' },
+                'sentiment-agent': { cardId: 'node-sentiment-agent', panelId: 'panel-sentiment-agent', color: '#ff4081' },
+                'consensus': { cardId: 'node-consensus', panelId: 'panel-consensus', color: 'var(--color-consensus)' },
+                'execution': { cardId: 'node-execution', panelId: 'panel-execution', color: 'var(--color-execution)' }
+            };
+
+            const config = cardMap[type];
+            if (config) {
+                const card = document.getElementById(config.cardId);
+                const pnl = document.getElementById(config.panelId);
+                if (card) card.classList.add('selected');
+                if (pnl) pnl.classList.add('active');
+                color = config.color;
+            }
+            
+            panel.style.setProperty('--active-theme-color', color);
+            drawLines(); // Automatically updates path highlighting!
+        }
+    </script>
+</body>
+</html>

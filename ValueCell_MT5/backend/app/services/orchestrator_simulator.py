@@ -405,13 +405,17 @@ def reconstruct_market_data(
         df["tick_volume"] = df["volume"]
     atr = float(df["high_low"].tail(14).mean())
     current = df.iloc[-1]
+    BASE_REFERENCE_PRICE = 4500.0
+    close_price = float(current["close"])
+    price_ratio = round(close_price / BASE_REFERENCE_PRICE, 6) if close_price > 0 else 1.0
     current_bar = {
         "time": current["time"],
         "open": float(current["open"]),
         "high": float(current["high"]),
         "low": float(current["low"]),
-        "close": float(current["close"]),
+        "close": close_price,
         "volume": int(current["tick_volume"]) if "tick_volume" in df.columns else int(current["volume"]),
+        "price_ratio": price_ratio,
     }
     # Non-overlapping session partition. Overlaps resolved by preferring the
     # market that is open: London over Asia (7-9), NewYork over London (13-16).
@@ -506,6 +510,8 @@ def reconstruct_market_data(
         "current_bar": current_bar,
         "structure_events": events_up_to,
         "m15_history": df,
+        "price_ratio": price_ratio,
+        "base_reference_price": BASE_REFERENCE_PRICE,
         "atr": atr,
         "session": session_zone.get("session") if session_zone else session,
         "session_zone": session_zone,

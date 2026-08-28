@@ -1,0 +1,12 @@
+{
+  "source_dataset": "dataset_v12_unconstrained.csv",
+  "output": "dataset_v12opencode_unconstrained.csv",
+  "rows": 1942,
+  "cols": 107,
+  "fix": "session_range_exp point-in-time partial range dari M15 [session_start, entry_time]",
+  "rows_running_session_evaluated": 1939,
+  "rows_prev_session_missing": 3,
+  "rows_value_changed_vs_v12": 1939,
+  "sha256_source_v12": "08865a010dd08dfa",
+  "sha256_output": "300d035fd3687cab"
+}

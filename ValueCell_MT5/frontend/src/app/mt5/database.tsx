@@ -360,7 +360,7 @@ export default function Database() {
   });
 
   return (
-    <div style={{ width: "100%", paddingLeft: "240px", minHeight: "100vh", overflowX: "auto" }} className="db-inspector-scroll">
+    <div style={{ width: "100%", paddingLeft: "var(--sidebar-offset, 250px)", transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)", minHeight: "100vh", overflowX: "auto" }} className="db-inspector-scroll">
       <style>{`
         .db-inspector-scroll::-webkit-scrollbar {
           width: 8px;
@@ -379,7 +379,7 @@ export default function Database() {
           background: rgba(var(--neon-blue-rgb), 0.35);
         }
       `}</style>
-      <div className="px-12 py-8 text-slate-200">
+      <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 py-6 text-slate-800 max-w-[1920px] mx-auto">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(var(--neon-blue-rgb),0.15)] select-none">
@@ -424,14 +424,14 @@ export default function Database() {
 
       {/* Tab Selection */}
       <div className="flex mb-6 max-w-fit">
-        <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-xl overflow-hidden shadow-inner">
+        <div className="inline-flex p-0.5 bg-[rgba(240,247,255,0.75)] border border-blue-200/70 rounded-xl overflow-hidden shadow-inner">
           <button
             onClick={() => setActiveTab("neon")}
             className={cn(
               "px-4 py-2.5 font-semibold text-xs rounded-lg transition-all duration-200 cursor-pointer active:scale-95",
               activeTab === "neon"
                 ? "bg-[rgba(59,130,246,0.15)] text-blue-400 border border-blue-500/25 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-slate-400 hover:text-slate-800"
             )}
           >
             NeonDB (PostgreSQL)
@@ -442,7 +442,7 @@ export default function Database() {
               "px-4 py-2.5 font-semibold text-xs rounded-lg transition-all duration-200 cursor-pointer active:scale-95",
               activeTab === "lance"
                 ? "bg-[rgba(139,92,246,0.15)] text-purple-400 border border-purple-500/25 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-slate-400 hover:text-slate-800"
             )}
           >
             LanceDB (Vector Database)
@@ -453,7 +453,7 @@ export default function Database() {
               "px-4 py-2.5 font-semibold text-xs rounded-lg transition-all duration-200 cursor-pointer active:scale-95",
               activeTab === "sync"
                 ? "bg-[rgba(16,185,129,0.15)] text-emerald-400 border border-emerald-500/25 shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
+                : "text-slate-400 hover:text-slate-800"
             )}
           >
             CSV vs NeonDB (Sync Monitor)
@@ -464,38 +464,55 @@ export default function Database() {
       {/* NEON DB CONTENT */}
       {activeTab === "neon" && (
         <div>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">
-                Total Swing Events
-              </span>
-              <h3 className="text-2xl font-bold font-mono text-slate-100 mt-1">
-                {(stats?.neon_stats.llhhbosdata_xauusd ?? 0).toLocaleString()}{" "}
-                <span className="text-xs font-normal text-slate-500">rows</span>
-              </h3>
+          {/* Stats Cards - Theme 09 Sapphire Platinum Sovereign */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Swing Events</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  STRUCTURE
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {(stats?.neon_stats.llhhbosdata_xauusd ?? 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>HH/LL & BoS Market Structure records</span>
+              </div>
             </div>
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">
-                Total Trade Records
-              </span>
-              <h3 className="text-2xl font-bold font-mono text-slate-100 mt-1">
-                {(stats?.neon_stats.backtest_results_xauusd ?? 0).toLocaleString()}{" "}
-                <span className="text-xs font-normal text-slate-500">rows</span>
-              </h3>
-            </div>
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">
-                File Import Watcher Log
-              </span>
-              <h3 className="text-2xl font-bold font-mono text-slate-100 mt-1">
-                {(stats?.neon_stats.csv_load_log ?? 0).toLocaleString()}{" "}
-                <span className="text-xs font-normal text-slate-500">records</span>
-              </h3>
-            </div>
-          </div>
 
-          <div className="flex gap-3 items-center mb-5 bg-slate-900/20 border border-slate-800/60 p-3 rounded-xl max-w-fit backdrop-blur-sm relative z-20">
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Trade Records</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  BACKTEST
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {(stats?.neon_stats.backtest_results_xauusd ?? 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>Closed and evaluated trade entries</span>
+              </div>
+            </div>
+
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Import Watcher Log</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  SYNC LOG
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {(stats?.neon_stats.csv_load_log ?? 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>CSV watcher batch file synchronization events</span>
+              </div>
+            </div>
+          </section>
+
+          <div className="flex gap-3 items-center mb-5 bg-[#F0F6FF]/70 border border-blue-200/70 p-3 rounded-xl max-w-fit backdrop-blur-sm relative z-20">
             <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider ml-1 flex items-center gap-1.5">
               <TableProperties className="w-3.5 h-3.5 text-slate-400" />
               <span>Select Table:</span>
@@ -504,11 +521,11 @@ export default function Database() {
               {/* Dropdown Trigger Button */}
               <button
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all active:scale-95 duration-100 cursor-pointer text-sm font-semibold hover:bg-slate-900 shadow-inner flex items-center min-w-[280px] text-left"
+                className="bg-white/80 border border-blue-300/55 text-slate-800 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all active:scale-95 duration-100 cursor-pointer text-sm font-semibold hover:bg-white shadow-inner flex items-center min-w-[280px] text-left"
               >
                 <span className="truncate">{currentLabel}</span>
                 <span className="absolute right-3 text-slate-500 text-[10px]">
-                  {dropdownOpen ? "▲" : "▼"}
+                  {dropdownOpen ? "â–²" : "â–¼"}
                 </span>
               </button>
 
@@ -516,7 +533,7 @@ export default function Database() {
               {dropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setDropdownOpen(false)} />
-                  <div className="absolute left-0 right-0 mt-2 bg-slate-950/95 border border-blue-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-slate-900/40 py-1 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out origin-top-left">
+                  <div className="absolute left-0 right-0 mt-2 bg-white/95 border border-blue-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-blue-200/60 py-1 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out origin-top-left">
                     {TABLES_METADATA.map((tbl) => {
                       const isSelected = selectedTable === tbl.value;
                       return (
@@ -529,11 +546,11 @@ export default function Database() {
                           className={`w-full text-left px-4 py-2.5 text-sm transition-all flex items-center justify-between cursor-pointer ${
                             isSelected
                               ? "bg-blue-500/15 text-blue-400 font-bold border-l-2 border-blue-500"
-                              : "text-slate-300 hover:bg-slate-900/70 hover:text-white"
+                              : "text-slate-600 hover:bg-white/80 hover:text-white"
                           }`}
                         >
                           <span>{tbl.label}</span>
-                          {isSelected && <span className="text-xs text-blue-400 drop-shadow-[0_0_5px_rgba(59,130,246,0.6)]">●</span>}
+                          {isSelected && <span className="text-xs text-blue-400 drop-shadow-[0_0_5px_rgba(59,130,246,0.6)]">â—</span>}
                         </button>
                       );
                     })}
@@ -544,14 +561,14 @@ export default function Database() {
           </div>
 
           {/* Data Grid */}
-          <div className="bg-[rgba(15,23,42,0.45)] border border-slate-800/80 rounded-xl overflow-hidden backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.03),_0_20px_50px_rgba(0,0,0,0.5)]">
+          <div className="bg-[rgba(255,255,255,0.65)] border border-blue-200/80 rounded-xl overflow-hidden backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.03),_0_20px_50px_rgba(0,0,0,0.5)]">
             {loading && <div className="p-8 text-center text-slate-400">Loading data from NeonDB...</div>}
             {error && <div className="p-8 text-center text-red-400 font-medium inline-flex items-center justify-center gap-1.5 w-full"><AlertTriangle size={14} aria-hidden="true" /> Error: {error}</div>}
             {!loading && !error && previewData && (
               <div className="overflow-auto max-h-[500px] db-inspector-scroll">
                 <table className="w-full border-collapse text-sm text-left">
                   <thead>
-                    <tr className="bg-[rgba(10,15,30,0.65)] border-b border-slate-800/80">
+                    <tr className="bg-[#F8FBFF] border-b border-blue-200/80">
                       {previewData.columns.map((col) => (
                         <th key={col} className="p-3.5 text-slate-500 font-semibold uppercase text-[9px] tracking-wider whitespace-nowrap">
                           {col}
@@ -573,7 +590,7 @@ export default function Database() {
                             <td 
                               key={col} 
                               className={cn(
-                                "p-3 font-mono text-xs text-slate-300 align-middle max-w-[280px] truncate",
+                                "p-3 font-mono text-xs text-slate-600 align-middle max-w-[280px] truncate",
                                 cIdx === 0 && "border-l-2 border-l-transparent group-hover:border-l-blue-500 pl-3 transition-all"
                               )}
                             >
@@ -609,8 +626,8 @@ export default function Database() {
       {activeTab === "lance" && (
         <div>
           {/* Collections Summary (compact, with info button) */}
-          <div className="glass-card p-6 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md mb-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
-            <h3 className="text-lg font-semibold mb-4 text-slate-100 flex items-center gap-2">
+          <div className="glass-card p-6 border border-blue-300/50 rounded-xl bg-white/70 backdrop-blur-md mb-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <h3 className="text-lg font-semibold mb-4 text-slate-900 flex items-center gap-2">
               <Layers className="w-5 h-5 text-purple-400" />
               <span>LanceDB Vector Collections Summary</span>
             </h3>
@@ -618,7 +635,7 @@ export default function Database() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-500">
+                    <tr className="border-b border-blue-200 text-slate-500">
                       <th className="py-2.5 px-3 text-[10px] uppercase tracking-wider font-semibold">Collection Name</th>
                       <th className="py-2.5 px-3 text-[10px] uppercase tracking-wider font-semibold">Total Vector Records</th>
                       <th className="py-2.5 px-3 text-[10px] uppercase tracking-wider font-semibold">Type</th>
@@ -639,7 +656,7 @@ export default function Database() {
                             </button>
                           </span>
                         </td>
-                        <td className="py-3 px-3 font-mono text-slate-300">
+                        <td className="py-3 px-3 font-mono text-slate-600">
                           {col.count.toLocaleString()} vectors
                         </td>
                         <td className="py-3 px-3 text-slate-500">
@@ -653,9 +670,9 @@ export default function Database() {
                 </table>
               </div>
             ) : (
-              <div className="p-8 bg-slate-950/30 rounded-xl border border-dashed border-red-500/30 text-center flex flex-col items-center justify-center gap-2 max-w-xl mx-auto my-4 shadow-[0_0_20px_rgba(239,68,68,0.05)]">
+              <div className="p-8 bg-[#F0F6FF]/55 rounded-xl border border-dashed border-red-500/30 text-center flex flex-col items-center justify-center gap-2 max-w-xl mx-auto my-4 shadow-[0_0_20px_rgba(239,68,68,0.05)]">
                 <AlertTriangle className="w-8 h-8 text-red-500 animate-bounce" />
-                <p className="text-slate-200 font-bold text-sm">LanceDB tidak terdeteksi atau belum aktif</p>
+                <p className="text-slate-800 font-bold text-sm">LanceDB tidak terdeteksi atau belum aktif</p>
                 <p className="text-xs text-slate-500 max-w-sm leading-relaxed">
                   Track 1 saat ini dinonaktifkan di backend, sehingga database vektor tidak diinisialisasi untuk sesi ini.
                 </p>
@@ -677,18 +694,18 @@ export default function Database() {
                 <div className="relative">
                   <button
                     onClick={() => setLanceDropdownOpen(!lanceDropdownOpen)}
-                    className="bg-slate-950/80 border border-slate-700/40 text-slate-200 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all active:scale-95 duration-100 cursor-pointer text-sm font-semibold hover:bg-slate-900 shadow-inner flex items-center min-w-[280px] text-left"
+                    className="bg-white/80 border border-blue-300/55 text-slate-800 pl-4 pr-10 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all active:scale-95 duration-100 cursor-pointer text-sm font-semibold hover:bg-white shadow-inner flex items-center min-w-[280px] text-left"
                   >
                     <span className="truncate">{currentLanceLabel}</span>
                     <span className="absolute right-3 text-slate-500 text-[10px]">
-                      {lanceDropdownOpen ? "▲" : "▼"}
+                      {lanceDropdownOpen ? "â–²" : "â–¼"}
                     </span>
                   </button>
 
                   {lanceDropdownOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setLanceDropdownOpen(false)} />
-                      <div className="absolute left-0 right-0 mt-2 bg-slate-950/95 border border-purple-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-slate-900/40 py-1 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out origin-top-left">
+                      <div className="absolute left-0 right-0 mt-2 bg-white/95 border border-purple-500/30 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.6)] backdrop-blur-xl overflow-hidden z-50 divide-y divide-blue-200/60 py-1 animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-150 ease-out origin-top-left">
                         {LANCE_COLLECTIONS_METADATA.map((c) => {
                           const isSelected = selectedLanceCollection === c.value;
                           return (
@@ -701,11 +718,11 @@ export default function Database() {
                               className={`w-full text-left px-4 py-2.5 text-sm transition-all flex items-center justify-between cursor-pointer ${
                                 isSelected
                                   ? "bg-purple-500/15 text-purple-300 font-bold border-l-2 border-purple-500"
-                                  : "text-slate-300 hover:bg-slate-900/70 hover:text-white"
+                                  : "text-slate-600 hover:bg-white/80 hover:text-white"
                               }`}
                             >
                               <span>{c.label}</span>
-                              {isSelected && <span className="text-xs text-purple-300 drop-shadow-[0_0_5px_rgba(139,92,246,0.6)]">●</span>}
+                              {isSelected && <span className="text-xs text-purple-300 drop-shadow-[0_0_5px_rgba(139,92,246,0.6)]">â—</span>}
                             </button>
                           );
                         })}
@@ -727,7 +744,7 @@ export default function Database() {
                     const v = parseInt(e.target.value, 10);
                     if (!isNaN(v)) setSelectedLanceLimit(Math.min(500, Math.max(1, v)));
                   }}
-                  className="bg-slate-950/80 border border-slate-700/40 text-slate-200 px-3 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all text-sm font-semibold hover:bg-slate-900 shadow-inner w-[100px]"
+                  className="bg-white/80 border border-blue-300/55 text-slate-800 px-3 py-1.5 rounded-lg focus:outline-none focus:border-purple-500/60 transition-all text-sm font-semibold hover:bg-white shadow-inner w-[100px]"
                 />
                 <button
                   onClick={() => {
@@ -742,8 +759,8 @@ export default function Database() {
                 </button>
               </div>
 
-              {/* Data Grid — flat glass surface, no padding (table flows edge-to-edge) */}
-              <div className="bg-[var(--glass-primary)] backdrop-blur-md border border-slate-700/30 rounded-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+              {/* Data Grid â€” flat glass surface, no padding (table flows edge-to-edge) */}
+              <div className="bg-[var(--glass-primary)] backdrop-blur-md border border-blue-300/50 rounded-xl overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
                 {lanceLoading && (
                   <div className="p-8 text-center text-slate-400">Loading data from LanceDB...</div>
                 )}
@@ -776,14 +793,14 @@ export default function Database() {
                           </tr>
                         ) : (
                           lancePreviewData.rows.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-slate-800/20">
+                            <tr key={idx} className="hover:bg-[#BFDBFE]/20">
                               {lancePreviewData.columns.map((col) => {
                                 const val = row[col];
                                 const isArray = Array.isArray(val);
                                 return (
                                   <td
                                     key={col}
-                                    className="p-3 font-mono text-xs text-slate-300 align-top max-w-[280px]"
+                                    className="p-3 font-mono text-xs text-slate-600 align-top max-w-[280px]"
                                   >
                                     {val === null || val === undefined ? (
                                       <span className="text-slate-600">NULL</span>
@@ -825,36 +842,72 @@ export default function Database() {
       {/* SYNC MONITOR CONTENT */}
       {activeTab === "sync" && (
         <div>
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">Total CSV Files</span>
-              <h3 className="text-2xl font-bold font-mono text-slate-100 mt-1">
-                {syncData.length} <span className="text-xs font-normal text-slate-500">files</span>
-              </h3>
+          {/* Stats Cards - Theme 09 Sapphire Platinum Sovereign */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total CSV Files</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  ALL FILES
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {syncData.length}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>Total monitored dataset files</span>
+              </div>
             </div>
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">Synced (Up to date)</span>
-              <h3 className="text-2xl font-bold font-mono text-emerald-400 mt-1">
-                {syncData.filter(d => d.is_up_to_date).length} <span className="text-xs font-normal text-slate-500">files</span>
-              </h3>
+
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Synced (Up to date)</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  SYNCED
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-emerald-600">
+                {syncData.filter(d => d.is_up_to_date).length}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span className="text-emerald-600 font-bold">100% Up to date</span>
+                <span>with database</span>
+              </div>
             </div>
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">Pending updates</span>
-              <h3 className="text-2xl font-bold font-mono text-amber-400 mt-1">
-                {syncData.filter(d => !d.is_up_to_date && d.status !== 'not_synced').length} <span className="text-xs font-normal text-slate-500">files</span>
-              </h3>
+
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pending Updates</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  PENDING
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-amber-600">
+                {syncData.filter(d => !d.is_up_to_date && d.status !== 'not_synced').length}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>Row count changes detected</span>
+              </div>
             </div>
-            <div className="glass-card p-5 border border-slate-700/30 rounded-xl bg-slate-900/40 backdrop-blur-md hover:-translate-y-0.5 hover:shadow-[0_12px_24px_rgba(0,0,0,0.5)] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-300">
-              <span className="text-[9px] uppercase text-slate-500 font-semibold tracking-wider mb-1 block">Not Synced</span>
-              <h3 className="text-2xl font-bold font-mono text-slate-400 mt-1">
-                {syncData.filter(d => d.status === 'not_synced').length} <span className="text-xs font-normal text-slate-500">files</span>
-              </h3>
+
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Not Synced</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  UNSYNCED
+                </span>
+              </div>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {syncData.filter(d => d.status === 'not_synced').length}
+              </div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>Belum diimpor ke tabel Neon</span>
+              </div>
             </div>
-          </div>
+          </section>
 
           {/* Controls: Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-5 bg-slate-900/20 border border-slate-800/60 p-4 rounded-xl backdrop-blur-sm">
+          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-5 bg-[#F0F6FF]/70 border border-blue-200/70 p-4 rounded-xl backdrop-blur-sm">
             <div className="flex items-center gap-3 w-full md:w-auto">
               <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider whitespace-nowrap flex items-center gap-1.5">
                 <Search className="w-3.5 h-3.5 text-slate-400" />
@@ -865,10 +918,10 @@ export default function Database() {
                 placeholder="Search CSV files or tables..."
                 value={syncSearch}
                 onChange={(e) => setSyncSearch(e.target.value)}
-                className="bg-slate-950/80 border border-slate-700/40 text-slate-200 px-4 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all text-sm font-semibold hover:bg-slate-900 shadow-inner w-full md:min-w-[280px]"
+                className="bg-white/80 border border-blue-300/55 text-slate-800 px-4 py-1.5 rounded-lg focus:outline-none focus:border-blue-500/60 transition-all text-sm font-semibold hover:bg-white shadow-inner w-full md:min-w-[280px]"
               />
             </div>
-            <div className="inline-flex p-0.5 bg-[rgba(15,23,42,0.6)] border border-slate-800/60 rounded-xl overflow-hidden shadow-inner">
+            <div className="inline-flex p-0.5 bg-[rgba(240,247,255,0.75)] border border-blue-200/70 rounded-xl overflow-hidden shadow-inner">
               {["all", "synced", "pending", "unsynced"].map((type) => (
                 <button
                   key={type}
@@ -877,7 +930,7 @@ export default function Database() {
                     "px-3 py-1.5 text-xs rounded-lg font-semibold uppercase transition-all whitespace-nowrap cursor-pointer active:scale-95 duration-100",
                     syncFilter === type
                       ? "bg-[rgba(59,130,246,0.15)] text-blue-400 border border-blue-500/25 shadow-sm"
-                      : "text-slate-400 hover:text-slate-200"
+                      : "text-slate-400 hover:text-slate-800"
                   )}
                 >
                   {type === "all" ? "All Files" : type === "synced" ? "Synced" : type === "pending" ? "Pending" : "Not Synced"}
@@ -887,13 +940,13 @@ export default function Database() {
           </div>
 
           {/* Data Comparison Table */}
-          <div className="bg-slate-900/30 border border-slate-700/30 rounded-xl overflow-hidden backdrop-blur-md">
+          <div className="bg-white/60 border border-blue-300/50 rounded-xl overflow-hidden backdrop-blur-md">
             {syncLoading && syncData.length === 0 && <div className="p-8 text-center text-slate-400">Comparing CSV and Database logs...</div>}
             {(!syncLoading || syncData.length > 0) && (
               <div className="overflow-auto max-h-[500px] db-inspector-scroll">
                 <table className="w-full border-collapse text-sm text-left">
                   <thead>
-                    <tr className="bg-slate-950/70 border-b border-slate-700/40">
+                    <tr className="bg-[#F0F6FF]/90 border-b border-blue-300/55">
                       <th className="p-3 text-slate-400 font-semibold uppercase text-xs">CSV Filename</th>
                       <th className="p-3 text-slate-400 font-semibold uppercase text-xs">Target Table</th>
                       <th className="p-3 text-slate-400 font-semibold uppercase text-xs text-right">Local Rows (CSV)</th>
@@ -914,18 +967,18 @@ export default function Database() {
                         <tr
                           key={item.filename}
                           onClick={() => handleOpenDiff(item.filename)}
-                          className="hover:bg-slate-800/30 transition-all cursor-pointer"
+                          className="hover:bg-[#BFDBFE]/50 transition-all cursor-pointer"
                         >
-                          <td className="p-3 font-medium text-slate-200 max-w-[300px] truncate" title={item.filename}>
+                          <td className="p-3 font-medium text-slate-800 max-w-[300px] truncate" title={item.filename}>
                             {item.filename}
                           </td>
                           <td className="p-3 font-mono text-xs text-blue-400">
                             {item.table_name}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-300">
+                          <td className="p-3 text-right font-mono text-slate-600">
                             {item.local_rows.toLocaleString()}
                           </td>
-                          <td className="p-3 text-right font-mono text-slate-300">
+                          <td className="p-3 text-right font-mono text-slate-600">
                             {item.db_rows.toLocaleString()}
                           </td>
                           <td className="p-3 text-center">
@@ -934,7 +987,7 @@ export default function Database() {
                                 Synced
                               </span>
                             ) : item.status === "not_synced" ? (
-                              <span className="inline-block px-2.5 py-1 text-[10px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/30 rounded-full tracking-wider uppercase">
+                              <span className="inline-block px-2.5 py-1 text-[10px] font-bold text-slate-400 bg-[#BFDBFE]/50 border border-blue-300/50 rounded-full tracking-wider uppercase">
                                 Not Synced
                               </span>
                             ) : (
@@ -959,16 +1012,16 @@ export default function Database() {
 
       {/* SYNC DIFF MODAL DIALOG */}
       {selectedDiffFile && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-white/85 backdrop-blur-md animate-in fade-in duration-300">
           <div className="fixed inset-0" onClick={() => setSelectedDiffFile(null)} />
           <div 
-            className="relative bg-slate-900/95 border border-slate-800 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_25px_60px_rgba(0,0,0,0.8)] z-10 transform perspective-1000 rotate-x-4 animate-in zoom-in-95 duration-250 ease-out"
+            className="relative bg-white/95 border border-blue-200 rounded-2xl w-full max-w-5xl max-h-[85vh] flex flex-col overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_25px_60px_rgba(0,0,0,0.8)] z-10 transform perspective-1000 rotate-x-4 animate-in zoom-in-95 duration-250 ease-out"
             style={{ transformStyle: "preserve-3d" }}
           >
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-950/40">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-blue-200 bg-[#F0F6FF]/60">
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <TableProperties className="w-5 h-5 text-blue-400" />
                   <span>Sync Difference Detail</span>
                   {diffData?.type === "csv_extra" && (
@@ -993,7 +1046,7 @@ export default function Database() {
               </div>
               <button
                 onClick={() => setSelectedDiffFile(null)}
-                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-slate-800/40 hover:bg-slate-800 rounded-lg h-8 w-8 flex items-center justify-center cursor-pointer active:scale-95 duration-100"
+                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-[#BFDBFE]/60 hover:bg-[#BFDBFE] rounded-lg h-8 w-8 flex items-center justify-center cursor-pointer active:scale-95 duration-100"
               >
                 &times;
               </button>
@@ -1045,11 +1098,11 @@ export default function Database() {
 
                   {/* Diff Table */}
                   {diffData.count > 0 && (
-                    <div className="border border-slate-700/30 rounded-xl overflow-hidden bg-slate-950/40 flex-1 min-h-[250px] max-h-[400px] flex flex-col">
+                    <div className="border border-blue-300/50 rounded-xl overflow-hidden bg-[#F0F6FF]/60 flex-1 min-h-[250px] max-h-[400px] flex flex-col">
                       <div className="overflow-auto flex-1 db-inspector-scroll">
                         <table className="w-full border-collapse text-left text-xs">
                           <thead>
-                            <tr className="bg-slate-950 sticky top-0 border-b border-slate-800 z-10">
+                            <tr className="bg-[#DBEAFE] sticky top-0 border-b border-blue-200 z-10">
                               <th className="p-2.5 text-slate-500 font-bold uppercase text-[10px] w-12 text-center">Row</th>
                               {diffData.columns.map((col) => (
                                 <th key={col} className="p-2.5 text-slate-400 font-semibold uppercase text-[10px] whitespace-nowrap">
@@ -1058,14 +1111,14 @@ export default function Database() {
                               ))}
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-900/40">
+                          <tbody className="divide-y divide-blue-200/60">
                             {diffData.rows.map((row, idx) => (
-                              <tr key={idx} className="hover:bg-slate-900/60 font-mono">
-                                <td className="p-2 text-center text-slate-600 bg-slate-950/10">{idx + 1}</td>
+                              <tr key={idx} className="hover:bg-white/75 font-mono">
+                                <td className="p-2 text-center text-slate-600 bg-[#F0F6FF]/30">{idx + 1}</td>
                                 {diffData.columns.map((col) => {
                                   const val = row[col];
                                   return (
-                                    <td key={col} className="p-2 text-slate-300 max-w-[200px] truncate" title={String(val)}>
+                                    <td key={col} className="p-2 text-slate-600 max-w-[200px] truncate" title={String(val)}>
                                       {val === null ? "NULL" : String(val)}
                                     </td>
                                   );
@@ -1082,10 +1135,10 @@ export default function Database() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end px-6 py-4 border-t border-slate-800 bg-slate-950/30 gap-3">
+            <div className="flex justify-end px-6 py-4 border-t border-blue-200 bg-[#F0F6FF]/55 gap-3">
               <button
                 onClick={() => setSelectedDiffFile(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
+                className="bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
               >
                 Tutup
               </button>
@@ -1096,16 +1149,16 @@ export default function Database() {
 
       {/* LANCEDB COLLECTION INFO MODAL */}
       {selectedCollectionInfo && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-white/85 backdrop-blur-md animate-in fade-in duration-300">
           <div className="fixed inset-0" onClick={() => setSelectedCollectionInfo(null)} />
           <div 
-            className="relative bg-slate-900/95 border border-purple-500/25 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_25px_60px_rgba(0,0,0,0.8),_0_0_40px_rgba(168,85,247,0.12)] z-10 transform perspective-1000 rotate-x-4 animate-in zoom-in-95 duration-250 ease-out"
+            className="relative bg-white/95 border border-purple-500/25 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_25px_60px_rgba(0,0,0,0.8),_0_0_40px_rgba(168,85,247,0.12)] z-10 transform perspective-1000 rotate-x-4 animate-in zoom-in-95 duration-250 ease-out"
             style={{ transformStyle: "preserve-3d" }}
           >
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-950/40">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-blue-200 bg-[#F0F6FF]/60">
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Layers className="w-5 h-5 text-purple-400" />
                   <span className="font-mono text-blue-400">{selectedCollectionInfo}</span>
                   {LANCE_COLLECTIONS_INFO[selectedCollectionInfo] && (
@@ -1120,7 +1173,7 @@ export default function Database() {
               </div>
               <button
                 onClick={() => setSelectedCollectionInfo(null)}
-                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-slate-800/40 hover:bg-slate-800 rounded-lg h-8 w-8 flex items-center justify-center cursor-pointer active:scale-95 duration-100"
+                className="text-slate-400 hover:text-white transition-all text-xl font-bold bg-[#BFDBFE]/60 hover:bg-[#BFDBFE] rounded-lg h-8 w-8 flex items-center justify-center cursor-pointer active:scale-95 duration-100"
               >
                 &times;
               </button>
@@ -1134,7 +1187,7 @@ export default function Database() {
                   return (
                     <div className="text-slate-400 text-sm">
                       Tidak ada deskripsi untuk koleksi ini. Cek
-                      <code className="mx-1 px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-purple-300 font-mono text-xs">
+                      <code className="mx-1 px-1.5 py-0.5 bg-[#DBEAFE] border border-blue-200 rounded text-purple-300 font-mono text-xs">
                         python/valuecell/knowledge/lance_db.py
                       </code>
                       untuk schema lengkap.
@@ -1145,11 +1198,11 @@ export default function Database() {
                   <>
                     <section>
                       <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Purpose</div>
-                      <p className="text-sm text-slate-200 leading-relaxed">{info.purpose}</p>
+                      <p className="text-sm text-slate-800 leading-relaxed">{info.purpose}</p>
                     </section>
                     <section>
                       <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-1.5">Use Case</div>
-                      <p className="text-sm text-slate-300 leading-relaxed">{info.useCase}</p>
+                      <p className="text-sm text-slate-600 leading-relaxed">{info.useCase}</p>
                     </section>
                     <section>
                       <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">Key Fields</div>
@@ -1164,7 +1217,7 @@ export default function Database() {
                         ))}
                       </div>
                     </section>
-                    <section className="bg-slate-950/50 border border-slate-800 rounded-xl p-3 text-[11px] text-slate-500 font-mono">
+                    <section className="bg-[#DBEAFE]/50 border border-blue-200 rounded-xl p-3 text-[11px] text-slate-500 font-mono">
                       <span className="text-slate-400">source:</span> python/valuecell/knowledge/lance_db.py
                     </section>
                   </>
@@ -1173,10 +1226,10 @@ export default function Database() {
             </div>
 
             {/* Modal Footer */}
-            <div className="flex justify-end px-6 py-4 border-t border-slate-800 bg-slate-950/30">
+            <div className="flex justify-end px-6 py-4 border-t border-blue-200 bg-[#F0F6FF]/55">
               <button
                 onClick={() => setSelectedCollectionInfo(null)}
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
+                className="bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold px-5 py-2 rounded-lg transition-all"
               >
                 Tutup
               </button>
@@ -1187,9 +1240,9 @@ export default function Database() {
 
       {/* Progress popup for Sync Now */}
       {syncProgress.visible && (
-        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-[9999] animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-white/85 backdrop-blur-md flex items-center justify-center z-[9999] animate-in fade-in duration-300">
           <div 
-            className="bg-slate-900/90 border border-emerald-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(16,185,129,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+            className="bg-white/92 border border-emerald-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(16,185,129,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
             style={{ transformStyle: "preserve-3d" }}
           >
             <div className="flex flex-col items-center justify-center text-center mb-5">
@@ -1204,7 +1257,7 @@ export default function Database() {
               </div>
               <div className="text-[10px] font-medium text-slate-400 max-w-[240px] truncate">{syncProgress.step}</div>
             </div>
-            <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
+            <div className="w-full h-3 bg-white/80 border border-blue-200/60 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(16,185,129,0.5)] relative overflow-hidden"
                 style={{ width: `${syncProgress.percent}%` }}

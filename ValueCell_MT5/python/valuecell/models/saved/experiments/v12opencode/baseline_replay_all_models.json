@@ -1,0 +1,841 @@
+{
+  "results": [
+    {
+      "name": "v8_OOS_canonical",
+      "config": {
+        "threshold": 1.05,
+        "news_filter": true,
+        "weekend_filter": true,
+        "stress_spread_points": 0.0,
+        "stress_commission_usd": 0.0
+      },
+      "trades": 429,
+      "wins": 236,
+      "win_rate": 55.011655011655016,
+      "flat_net_pnl": 18393.850000000002,
+      "dynamic_net_pnl": 85341.86000000002,
+      "profit_factor_dynamic": 2.064306586447584,
+      "profit_factor_flat": 1.7832586362910525,
+      "max_drawdown_dynamic": -8357.04,
+      "max_drawdown_flat": -2016.79,
+      "expectancy_flat": 42.87610722610723,
+      "expectancy_dynamic": 198.93207459207463,
+      "win_rate_ci95": [
+        50.349650349650354,
+        59.90675990675991
+      ],
+      "dynamic_net_pnl_ci95": [
+        48813.476500000004,
+        122137.96899999995
+      ],
+      "by_year": {
+        "2020": {
+          "trades": 34,
+          "win_rate": 55.88235294117647,
+          "flat_net_pnl": 25.469999999999942,
+          "dynamic_net_pnl": -2214.6000000000004
+        },
+        "2021": {
+          "trades": 86,
+          "win_rate": 41.86046511627907,
+          "flat_net_pnl": -723.3699999999999,
+          "dynamic_net_pnl": -3499.4300000000007
+        },
+        "2022": {
+          "trades": 62,
+          "win_rate": 53.2258064516129,
+          "flat_net_pnl": 1604.4699999999998,
+          "dynamic_net_pnl": 8882.74
+        },
+        "2023": {
+          "trades": 58,
+          "win_rate": 56.896551724137936,
+          "flat_net_pnl": 1774.9099999999999,
+          "dynamic_net_pnl": 8465.78
+        },
+        "2024": {
+          "trades": 63,
+          "win_rate": 57.14285714285714,
+          "flat_net_pnl": 4139.0999999999985,
+          "dynamic_net_pnl": 20996.62
+        },
+        "2025": {
+          "trades": 61,
+          "win_rate": 65.57377049180327,
+          "flat_net_pnl": 4165.0,
+          "dynamic_net_pnl": 16476.210000000003
+        },
+        "2026": {
+          "trades": 65,
+          "win_rate": 60.0,
+          "flat_net_pnl": 7408.269999999999,
+          "dynamic_net_pnl": 36234.54000000001
+        }
+      },
+      "by_side": {
+        "BUY": {
+          "trades": 261,
+          "win_rate": 61.68582375478927,
+          "flat_net_pnl": 16847.77,
+          "dynamic_net_pnl": 69610.77000000002
+        },
+        "SELL": {
+          "trades": 168,
+          "win_rate": 44.642857142857146,
+          "flat_net_pnl": 1546.08,
+          "dynamic_net_pnl": 15731.089999999998
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 16,
+          "win_rate": 56.25,
+          "flat_net_pnl": 1066.31,
+          "dynamic_net_pnl": 992.3499999999999
+        },
+        "London": {
+          "trades": 65,
+          "win_rate": 53.84615384615385,
+          "flat_net_pnl": 2418.4100000000003,
+          "dynamic_net_pnl": 8529.85
+        },
+        "London_NewYork_Overlap": {
+          "trades": 172,
+          "win_rate": 56.97674418604651,
+          "flat_net_pnl": 7273.69,
+          "dynamic_net_pnl": 41318.850000000006
+        },
+        "NewYork": {
+          "trades": 46,
+          "win_rate": 52.17391304347826,
+          "flat_net_pnl": 2513.5099999999998,
+          "dynamic_net_pnl": 7444.689999999999
+        },
+        "Sydney": {
+          "trades": 3,
+          "win_rate": 33.33333333333333,
+          "flat_net_pnl": -369.98,
+          "dynamic_net_pnl": -1504.8600000000001
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 111,
+          "win_rate": 56.75675675675676,
+          "flat_net_pnl": 5806.279999999999,
+          "dynamic_net_pnl": 29118.55
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 16,
+          "win_rate": 37.5,
+          "flat_net_pnl": -314.37,
+          "dynamic_net_pnl": -557.5700000000002
+        }
+      },
+      "by_structure": {
+        "BoS": {
+          "trades": 4,
+          "win_rate": 100.0,
+          "flat_net_pnl": 574.02,
+          "dynamic_net_pnl": 1856.2500000000002
+        },
+        "BoS_1": {
+          "trades": 154,
+          "win_rate": 57.14285714285714,
+          "flat_net_pnl": 8137.16,
+          "dynamic_net_pnl": 36857.72
+        },
+        "BoS_2": {
+          "trades": 61,
+          "win_rate": 49.18032786885246,
+          "flat_net_pnl": 513.9400000000004,
+          "dynamic_net_pnl": 312.86000000000024
+        },
+        "CHoCH": {
+          "trades": 210,
+          "win_rate": 54.285714285714285,
+          "flat_net_pnl": 9168.73,
+          "dynamic_net_pnl": 46315.030000000006
+        }
+      },
+      "by_news": {},
+      "by_vol_regime": {
+        "low": {
+          "trades": 137,
+          "win_rate": 64.23357664233576,
+          "flat_net_pnl": 7307.08,
+          "dynamic_net_pnl": 27104.090000000004
+        },
+        "mid": {
+          "trades": 137,
+          "win_rate": 48.175182481751825,
+          "flat_net_pnl": 3905.4799999999996,
+          "dynamic_net_pnl": 28834.640000000003
+        },
+        "high": {
+          "trades": 155,
+          "win_rate": 52.903225806451616,
+          "flat_net_pnl": 7181.29,
+          "dynamic_net_pnl": 29403.129999999997
+        }
+      },
+      "by_price_bucket": {
+        "<2000": {
+          "trades": 229,
+          "win_rate": 49.34497816593886,
+          "flat_net_pnl": 1970.639999999999,
+          "dynamic_net_pnl": 9061.310000000001
+        },
+        "2000-3000": {
+          "trades": 90,
+          "win_rate": 61.111111111111114,
+          "flat_net_pnl": 5911.960000000001,
+          "dynamic_net_pnl": 28768.07
+        },
+        "3000-4000": {
+          "trades": 35,
+          "win_rate": 62.857142857142854,
+          "flat_net_pnl": 1744.4400000000003,
+          "dynamic_net_pnl": 6659.050000000001
+        },
+        ">=4000": {
+          "trades": 75,
+          "win_rate": 61.33333333333333,
+          "flat_net_pnl": 8766.81,
+          "dynamic_net_pnl": 40853.430000000015
+        }
+      }
+    },
+    {
+      "name": "v9_OOS_fresh",
+      "config": {
+        "threshold": 1.05,
+        "news_filter": true,
+        "weekend_filter": true,
+        "stress_spread_points": 0.0,
+        "stress_commission_usd": 0.0
+      },
+      "trades": 404,
+      "wins": 226,
+      "win_rate": 55.940594059405946,
+      "flat_net_pnl": 18116.230000000003,
+      "dynamic_net_pnl": 87494.28000000001,
+      "profit_factor_dynamic": 2.205676170863888,
+      "profit_factor_flat": 1.8433425847218952,
+      "max_drawdown_dynamic": -6655.810000000001,
+      "max_drawdown_flat": -1272.2200000000003,
+      "expectancy_flat": 44.84215346534654,
+      "expectancy_dynamic": 216.57000000000002,
+      "win_rate_ci95": [
+        50.99009900990099,
+        60.89108910891089
+      ],
+      "dynamic_net_pnl_ci95": [
+        53561.70225,
+        119496.42924999999
+      ],
+      "by_year": {
+        "2020": {
+          "trades": 30,
+          "win_rate": 60.0,
+          "flat_net_pnl": 557.4499999999998,
+          "dynamic_net_pnl": 657.7499999999998
+        },
+        "2021": {
+          "trades": 84,
+          "win_rate": 42.857142857142854,
+          "flat_net_pnl": -435.8099999999999,
+          "dynamic_net_pnl": -3057.3900000000003
+        },
+        "2022": {
+          "trades": 64,
+          "win_rate": 51.5625,
+          "flat_net_pnl": 533.22,
+          "dynamic_net_pnl": 6791.0
+        },
+        "2023": {
+          "trades": 50,
+          "win_rate": 60.0,
+          "flat_net_pnl": 1854.5300000000002,
+          "dynamic_net_pnl": 9132.72
+        },
+        "2024": {
+          "trades": 51,
+          "win_rate": 64.70588235294117,
+          "flat_net_pnl": 4882.53,
+          "dynamic_net_pnl": 23006.91
+        },
+        "2025": {
+          "trades": 60,
+          "win_rate": 61.66666666666667,
+          "flat_net_pnl": 3522.7300000000005,
+          "dynamic_net_pnl": 16389.37
+        },
+        "2026": {
+          "trades": 65,
+          "win_rate": 60.0,
+          "flat_net_pnl": 7201.579999999999,
+          "dynamic_net_pnl": 34573.920000000006
+        }
+      },
+      "by_side": {
+        "BUY": {
+          "trades": 237,
+          "win_rate": 62.447257383966246,
+          "flat_net_pnl": 14820.699999999999,
+          "dynamic_net_pnl": 70283.27000000002
+        },
+        "SELL": {
+          "trades": 167,
+          "win_rate": 46.706586826347305,
+          "flat_net_pnl": 3295.5300000000007,
+          "dynamic_net_pnl": 17211.01
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 15,
+          "win_rate": 53.333333333333336,
+          "flat_net_pnl": 683.1500000000001,
+          "dynamic_net_pnl": 880.73
+        },
+        "London": {
+          "trades": 57,
+          "win_rate": 54.385964912280706,
+          "flat_net_pnl": 2528.58,
+          "dynamic_net_pnl": 11167.34
+        },
+        "London_NewYork_Overlap": {
+          "trades": 167,
+          "win_rate": 56.287425149700596,
+          "flat_net_pnl": 6534.11,
+          "dynamic_net_pnl": 38956.44000000001
+        },
+        "NewYork": {
+          "trades": 44,
+          "win_rate": 47.72727272727273,
+          "flat_net_pnl": 1565.9899999999998,
+          "dynamic_net_pnl": 6632.640000000001
+        },
+        "Sydney": {
+          "trades": 3,
+          "win_rate": 33.33333333333333,
+          "flat_net_pnl": -369.98,
+          "dynamic_net_pnl": -1504.8600000000001
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 104,
+          "win_rate": 62.5,
+          "flat_net_pnl": 7454.240000000001,
+          "dynamic_net_pnl": 31583.910000000003
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 14,
+          "win_rate": 42.857142857142854,
+          "flat_net_pnl": -279.86,
+          "dynamic_net_pnl": -221.92000000000016
+        }
+      },
+      "by_structure": {
+        "BoS": {
+          "trades": 4,
+          "win_rate": 100.0,
+          "flat_net_pnl": 574.02,
+          "dynamic_net_pnl": 1404.0
+        },
+        "BoS_1": {
+          "trades": 149,
+          "win_rate": 56.375838926174495,
+          "flat_net_pnl": 7120.969999999999,
+          "dynamic_net_pnl": 33047.229999999996
+        },
+        "BoS_2": {
+          "trades": 60,
+          "win_rate": 51.66666666666667,
+          "flat_net_pnl": 1386.3300000000004,
+          "dynamic_net_pnl": 4954.8
+        },
+        "CHoCH": {
+          "trades": 191,
+          "win_rate": 56.02094240837696,
+          "flat_net_pnl": 9034.910000000002,
+          "dynamic_net_pnl": 48088.25
+        }
+      },
+      "by_news": {
+        "0.0": {
+          "trades": 404,
+          "win_rate": 55.940594059405946,
+          "flat_net_pnl": 18116.230000000003,
+          "dynamic_net_pnl": 87494.28000000001
+        }
+      },
+      "by_vol_regime": {
+        "low": {
+          "trades": 125,
+          "win_rate": 65.60000000000001,
+          "flat_net_pnl": 6985.030000000001,
+          "dynamic_net_pnl": 24558.970000000005
+        },
+        "mid": {
+          "trades": 132,
+          "win_rate": 50.0,
+          "flat_net_pnl": 4352.079999999999,
+          "dynamic_net_pnl": 34497.229999999996
+        },
+        "high": {
+          "trades": 147,
+          "win_rate": 53.06122448979592,
+          "flat_net_pnl": 6779.12,
+          "dynamic_net_pnl": 28438.079999999998
+        }
+      },
+      "by_price_bucket": {
+        "<2000": {
+          "trades": 219,
+          "win_rate": 50.68493150684932,
+          "flat_net_pnl": 2095.4800000000005,
+          "dynamic_net_pnl": 11602.220000000003
+        },
+        "2000-3000": {
+          "trades": 76,
+          "win_rate": 64.47368421052632,
+          "flat_net_pnl": 6058.54,
+          "dynamic_net_pnl": 30080.250000000004
+        },
+        "3000-4000": {
+          "trades": 34,
+          "win_rate": 58.82352941176471,
+          "flat_net_pnl": 1402.0900000000001,
+          "dynamic_net_pnl": 6996.950000000002
+        },
+        ">=4000": {
+          "trades": 75,
+          "win_rate": 61.33333333333333,
+          "flat_net_pnl": 8560.119999999999,
+          "dynamic_net_pnl": 38814.86000000001
+        }
+      }
+    },
+    {
+      "name": "v10_OOS_fresh",
+      "config": {
+        "threshold": 1.05,
+        "news_filter": true,
+        "weekend_filter": true,
+        "stress_spread_points": 0.0,
+        "stress_commission_usd": 0.0
+      },
+      "trades": 348,
+      "wins": 205,
+      "win_rate": 58.90804597701149,
+      "flat_net_pnl": 18576.639999999996,
+      "dynamic_net_pnl": 100073.17000000001,
+      "profit_factor_dynamic": 2.847387580971791,
+      "profit_factor_flat": 1.9376065912845362,
+      "max_drawdown_dynamic": -2590.9599999999773,
+      "max_drawdown_flat": -1327.2800000000002,
+      "expectancy_flat": 53.38114942528735,
+      "expectancy_dynamic": 287.56658045977014,
+      "win_rate_ci95": [
+        53.735632183908045,
+        64.08045977011494
+      ],
+      "dynamic_net_pnl_ci95": [
+        68474.5895,
+        135353.94775000002
+      ],
+      "by_year": {
+        "2020": {
+          "trades": 51,
+          "win_rate": 56.86274509803921,
+          "flat_net_pnl": 599.2800000000002,
+          "dynamic_net_pnl": 2741.7499999999995
+        },
+        "2021": {
+          "trades": 46,
+          "win_rate": 52.17391304347826,
+          "flat_net_pnl": 400.29999999999995,
+          "dynamic_net_pnl": 3591.950000000001
+        },
+        "2022": {
+          "trades": 43,
+          "win_rate": 67.44186046511628,
+          "flat_net_pnl": 2286.2999999999997,
+          "dynamic_net_pnl": 6494.0
+        },
+        "2023": {
+          "trades": 49,
+          "win_rate": 51.02040816326531,
+          "flat_net_pnl": 440.88000000000005,
+          "dynamic_net_pnl": 6206.93
+        },
+        "2024": {
+          "trades": 48,
+          "win_rate": 60.416666666666664,
+          "flat_net_pnl": 4288.24,
+          "dynamic_net_pnl": 20000.690000000002
+        },
+        "2025": {
+          "trades": 50,
+          "win_rate": 68.0,
+          "flat_net_pnl": 4131.21,
+          "dynamic_net_pnl": 18582.630000000005
+        },
+        "2026": {
+          "trades": 61,
+          "win_rate": 57.377049180327866,
+          "flat_net_pnl": 6430.4299999999985,
+          "dynamic_net_pnl": 42455.22
+        }
+      },
+      "by_side": {
+        "BUY": {
+          "trades": 222,
+          "win_rate": 63.51351351351351,
+          "flat_net_pnl": 15241.81,
+          "dynamic_net_pnl": 74404.38
+        },
+        "SELL": {
+          "trades": 126,
+          "win_rate": 50.79365079365079,
+          "flat_net_pnl": 3334.8300000000004,
+          "dynamic_net_pnl": 25668.79
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 11,
+          "win_rate": 72.72727272727273,
+          "flat_net_pnl": 1210.9700000000003,
+          "dynamic_net_pnl": 2053.54
+        },
+        "London": {
+          "trades": 47,
+          "win_rate": 63.829787234042556,
+          "flat_net_pnl": 3252.1200000000003,
+          "dynamic_net_pnl": 13062.930000000004
+        },
+        "London_NewYork_Overlap": {
+          "trades": 154,
+          "win_rate": 59.74025974025974,
+          "flat_net_pnl": 6817.699999999999,
+          "dynamic_net_pnl": 43449.91000000001
+        },
+        "NewYork": {
+          "trades": 31,
+          "win_rate": 51.61290322580645,
+          "flat_net_pnl": 1755.54,
+          "dynamic_net_pnl": 7772.76
+        },
+        "Sydney": {
+          "trades": 3,
+          "win_rate": 33.33333333333333,
+          "flat_net_pnl": -369.98,
+          "dynamic_net_pnl": -752.4300000000001
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 97,
+          "win_rate": 58.76288659793815,
+          "flat_net_pnl": 5997.13,
+          "dynamic_net_pnl": 34320.46
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 5,
+          "win_rate": 20.0,
+          "flat_net_pnl": -86.83999999999995,
+          "dynamic_net_pnl": 166.0
+        }
+      },
+      "by_structure": {
+        "BoS": {
+          "trades": 2,
+          "win_rate": 100.0,
+          "flat_net_pnl": 500.4,
+          "dynamic_net_pnl": 2453.8500000000004
+        },
+        "BoS_1": {
+          "trades": 134,
+          "win_rate": 58.2089552238806,
+          "flat_net_pnl": 7389.259999999998,
+          "dynamic_net_pnl": 35114.5
+        },
+        "BoS_2": {
+          "trades": 60,
+          "win_rate": 53.333333333333336,
+          "flat_net_pnl": 944.82,
+          "dynamic_net_pnl": 2619.570000000002
+        },
+        "CHoCH": {
+          "trades": 152,
+          "win_rate": 61.18421052631579,
+          "flat_net_pnl": 9742.16,
+          "dynamic_net_pnl": 59885.25000000001
+        }
+      },
+      "by_news": {
+        "0.0": {
+          "trades": 348,
+          "win_rate": 58.90804597701149,
+          "flat_net_pnl": 18576.639999999996,
+          "dynamic_net_pnl": 100073.17000000001
+        }
+      },
+      "by_vol_regime": {
+        "low": {
+          "trades": 105,
+          "win_rate": 68.57142857142857,
+          "flat_net_pnl": 7118.130000000001,
+          "dynamic_net_pnl": 24743.210000000003
+        },
+        "mid": {
+          "trades": 109,
+          "win_rate": 54.12844036697248,
+          "flat_net_pnl": 5515.55,
+          "dynamic_net_pnl": 42283.57000000001
+        },
+        "high": {
+          "trades": 134,
+          "win_rate": 55.223880597014926,
+          "flat_net_pnl": 5942.959999999999,
+          "dynamic_net_pnl": 33046.39
+        }
+      },
+      "by_price_bucket": {
+        "<2000": {
+          "trades": 177,
+          "win_rate": 56.49717514124294,
+          "flat_net_pnl": 3555.38,
+          "dynamic_net_pnl": 17933.860000000004
+        },
+        "2000-3000": {
+          "trades": 73,
+          "win_rate": 61.64383561643836,
+          "flat_net_pnl": 5370.13,
+          "dynamic_net_pnl": 27322.030000000002
+        },
+        "3000-4000": {
+          "trades": 31,
+          "win_rate": 64.51612903225806,
+          "flat_net_pnl": 2245.4200000000005,
+          "dynamic_net_pnl": 9024.030000000004
+        },
+        ">=4000": {
+          "trades": 67,
+          "win_rate": 59.70149253731343,
+          "flat_net_pnl": 7405.709999999999,
+          "dynamic_net_pnl": 45793.25
+        }
+      }
+    },
+    {
+      "name": "v11_OOS_fresh",
+      "config": {
+        "threshold": 1.05,
+        "news_filter": true,
+        "weekend_filter": true,
+        "stress_spread_points": 0.0,
+        "stress_commission_usd": 0.0
+      },
+      "trades": 338,
+      "wins": 186,
+      "win_rate": 55.02958579881657,
+      "flat_net_pnl": 16791.16,
+      "dynamic_net_pnl": 73347.76,
+      "profit_factor_dynamic": 2.2776352139908376,
+      "profit_factor_flat": 1.9096087923136595,
+      "max_drawdown_dynamic": -5752.25,
+      "max_drawdown_flat": -1620.6699999999964,
+      "expectancy_flat": 49.677988165680475,
+      "expectancy_dynamic": 217.0052071005917,
+      "win_rate_ci95": [
+        49.40828402366864,
+        60.05917159763313
+      ],
+      "dynamic_net_pnl_ci95": [
+        44013.30600000001,
+        103976.93349999998
+      ],
+      "by_year": {
+        "2020": {
+          "trades": 32,
+          "win_rate": 59.375,
+          "flat_net_pnl": 936.55,
+          "dynamic_net_pnl": 1399.2999999999997
+        },
+        "2021": {
+          "trades": 79,
+          "win_rate": 39.24050632911392,
+          "flat_net_pnl": -739.3400000000001,
+          "dynamic_net_pnl": -2863.01
+        },
+        "2022": {
+          "trades": 20,
+          "win_rate": 70.0,
+          "flat_net_pnl": 1453.7999999999997,
+          "dynamic_net_pnl": 3651.33
+        },
+        "2023": {
+          "trades": 39,
+          "win_rate": 46.15384615384615,
+          "flat_net_pnl": 351.60000000000025,
+          "dynamic_net_pnl": 6019.74
+        },
+        "2024": {
+          "trades": 42,
+          "win_rate": 66.66666666666666,
+          "flat_net_pnl": 4080.57,
+          "dynamic_net_pnl": 16056.8
+        },
+        "2025": {
+          "trades": 61,
+          "win_rate": 62.295081967213115,
+          "flat_net_pnl": 3772.0299999999997,
+          "dynamic_net_pnl": 11679.940000000002
+        },
+        "2026": {
+          "trades": 65,
+          "win_rate": 58.46153846153847,
+          "flat_net_pnl": 6935.949999999999,
+          "dynamic_net_pnl": 37403.66
+        }
+      },
+      "by_side": {
+        "BUY": {
+          "trades": 226,
+          "win_rate": 60.61946902654868,
+          "flat_net_pnl": 14842.579999999998,
+          "dynamic_net_pnl": 61719.880000000005
+        },
+        "SELL": {
+          "trades": 112,
+          "win_rate": 43.75,
+          "flat_net_pnl": 1948.5800000000002,
+          "dynamic_net_pnl": 11627.879999999997
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 21,
+          "win_rate": 57.14285714285714,
+          "flat_net_pnl": 1714.55,
+          "dynamic_net_pnl": 1584.5499999999995
+        },
+        "London": {
+          "trades": 46,
+          "win_rate": 54.347826086956516,
+          "flat_net_pnl": 1907.5900000000001,
+          "dynamic_net_pnl": 6417.2
+        },
+        "London_NewYork_Overlap": {
+          "trades": 139,
+          "win_rate": 55.39568345323741,
+          "flat_net_pnl": 6725.779999999999,
+          "dynamic_net_pnl": 35636.14
+        },
+        "NewYork": {
+          "trades": 32,
+          "win_rate": 50.0,
+          "flat_net_pnl": 1755.73,
+          "dynamic_net_pnl": 7256.959999999999
+        },
+        "Sydney": {
+          "trades": 4,
+          "win_rate": 25.0,
+          "flat_net_pnl": -605.78,
+          "dynamic_net_pnl": -1071.02
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 90,
+          "win_rate": 60.0,
+          "flat_net_pnl": 5748.469999999999,
+          "dynamic_net_pnl": 24615.260000000002
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 6,
+          "win_rate": 16.666666666666664,
+          "flat_net_pnl": -455.17999999999995,
+          "dynamic_net_pnl": -1091.33
+        }
+      },
+      "by_structure": {
+        "BoS": {
+          "trades": 2,
+          "win_rate": 100.0,
+          "flat_net_pnl": 500.4,
+          "dynamic_net_pnl": 2001.6
+        },
+        "BoS_1": {
+          "trades": 136,
+          "win_rate": 54.41176470588235,
+          "flat_net_pnl": 5771.8,
+          "dynamic_net_pnl": 23949.76
+        },
+        "BoS_2": {
+          "trades": 55,
+          "win_rate": 47.27272727272727,
+          "flat_net_pnl": 559.7800000000001,
+          "dynamic_net_pnl": 1728.5000000000002
+        },
+        "CHoCH": {
+          "trades": 145,
+          "win_rate": 57.931034482758626,
+          "flat_net_pnl": 9959.180000000002,
+          "dynamic_net_pnl": 45667.90000000001
+        }
+      },
+      "by_news": {
+        "0.0": {
+          "trades": 338,
+          "win_rate": 55.02958579881657,
+          "flat_net_pnl": 16791.16,
+          "dynamic_net_pnl": 73347.76
+        }
+      },
+      "by_vol_regime": {
+        "low": {
+          "trades": 109,
+          "win_rate": 59.63302752293578,
+          "flat_net_pnl": 4069.12,
+          "dynamic_net_pnl": 13260.410000000002
+        },
+        "mid": {
+          "trades": 106,
+          "win_rate": 51.886792452830186,
+          "flat_net_pnl": 5388.33,
+          "dynamic_net_pnl": 29603.640000000003
+        },
+        "high": {
+          "trades": 123,
+          "win_rate": 53.65853658536586,
+          "flat_net_pnl": 7333.709999999998,
+          "dynamic_net_pnl": 30483.709999999995
+        }
+      },
+      "by_price_bucket": {
+        "<2000": {
+          "trades": 162,
+          "win_rate": 48.148148148148145,
+          "flat_net_pnl": 1520.1600000000003,
+          "dynamic_net_pnl": 6530.889999999999
+        },
+        "2000-3000": {
+          "trades": 64,
+          "win_rate": 65.625,
+          "flat_net_pnl": 5299.470000000001,
+          "dynamic_net_pnl": 20933.57
+        },
+        "3000-4000": {
+          "trades": 34,
+          "win_rate": 58.82352941176471,
+          "flat_net_pnl": 1877.1400000000006,
+          "dynamic_net_pnl": 4677.2300000000005
+        },
+        ">=4000": {
+          "trades": 78,
+          "win_rate": 58.97435897435898,
+          "flat_net_pnl": 8094.3899999999985,
+          "dynamic_net_pnl": 41206.07000000001
+        }
+      }
+    }
+  ]
+}

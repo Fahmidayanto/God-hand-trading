@@ -1,0 +1,699 @@
+                // Orchestrator -> Sub-Agents via Data Transfer (Request Downward)
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-orch-to-msa-info", toPort: "top" },
+                { from: "node-orch-to-msa-info", fromPort: "bottom", to: "node-ms-agent", toPort: "top" },
+
+                // MSA -> Orchestrator via Data Transfer (Response Upward)
+                { from: "node-ms-agent", fromPort: "top", to: "node-msa-to-orch-info", toPort: "bottom" },
+                { from: "node-msa-to-orch-info", fromPort: "top", to: "node-orchestrator", toPort: "bottom" },
+
+                // Market Structure Internal Workflow
+                { from: "node-ms-agent", fromPort: "left", to: "node-ms-sub1", toPort: "top" },
+                { from: "node-ms-sub1", fromPort: "bottom", to: "node-ms-sub2", toPort: "top" },
+                { from: "node-ms-sub2", fromPort: "bottom", to: "node-ms-sub3", toPort: "top" },
+                { from: "node-ms-sub3", fromPort: "bottom", to: "node-ms-sub4", toPort: "top" },
+                { from: "node-orchestrator", fromPort: "right", to: "node-ml-agent", toPort: "left" },
+                { from: "node-orchestrator", fromPort: "right", to: "node-sentiment-agent", toPort: "left" },
+
+                // Sub-Agents -> Consensus Engine / Sequential Flow
+                { from: "node-ms-sub4", fromPort: "right", to: "node-con-sub1", toPort: "left" },
+                { from: "node-ms-sub4", fromPort: "right", to: "node-msa-to-ml-info", toPort: "left" },
+                { from: "node-msa-to-ml-info", fromPort: "right", to: "node-ml-agent", toPort: "left" },
+                { from: "node-ml-agent", fromPort: "bottom", to: "node-ml-sub1", toPort: "top" },
+                { from: "node-ml-sub1", fromPort: "bottom", to: "node-ml-sub2", toPort: "top" },
+                { from: "node-ml-sub2", fromPort: "bottom", to: "node-ml-sub3", toPort: "top" },
+                { from: "node-ml-sub3", fromPort: "bottom", to: "node-ml-sub4", toPort: "top" },
+                { from: "node-ml-sub4", fromPort: "bottom", to: "node-ml-sub5", toPort: "top" },
+                { from: "node-ml-sub5", fromPort: "right", to: "node-con-sub2", toPort: "left" },
+                { from: "node-ms-sub4", fromPort: "right", to: "node-msa-to-sent-info", toPort: "left" },
+                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sent-sub3", toPort: "left" },
+                { from: "node-sentiment-agent", fromPort: "bottom", to: "node-sent-sub1", toPort: "top" },
+                { from: "node-sent-sub1", fromPort: "bottom", to: "node-sent-sub2", toPort: "top" },
+                { from: "node-sent-sub2", fromPort: "bottom", to: "node-sent-sub3", toPort: "top" },
+                { from: "node-sent-sub3", fromPort: "bottom", to: "node-sent-sub4", toPort: "top" },
+                { from: "node-sent-sub4", fromPort: "left", to: "node-sent-sub5", toPort: "right" },
+                { from: "node-sent-sub5", fromPort: "right", to: "node-con-sub3", toPort: "left" },
+                { from: "node-con-sub1", fromPort: "right", to: "node-consensus", toPort: "left" },
+                { from: "node-con-sub2", fromPort: "right", to: "node-consensus", toPort: "left" },
+                { from: "node-con-sub3", fromPort: "right", to: "node-consensus", toPort: "left" },
+
+                // Deterministic Sources -> Optional LLM Specialists
+                { from: "node-ms-sub4", fromPort: "right", to: "node-llm-msa", toPort: "left" },
+                { from: "node-ml-sub5", fromPort: "right", to: "node-llm-ml", toPort: "left" },
+                { from: "node-sent-sub5", fromPort: "right", to: "node-llm-sentiment", toPort: "left" },
+
+                // Initial Specialist Assessments -> One Cross-Review Round
+                { from: "node-llm-msa", fromPort: "right", to: "node-cross-review", toPort: "left" },
+                { from: "node-llm-ml", fromPort: "right", to: "node-cross-review", toPort: "left" },
+                { from: "node-llm-sentiment", fromPort: "right", to: "node-cross-review", toPort: "left" },
+
+                // Reviewed Assessments -> Decision Synthesis and Deterministic Gate
+                { from: "node-cross-review", fromPort: "right", to: "node-llm-decision", toPort: "left" },
+                { from: "node-cross-review", fromPort: "bottom", to: "node-council-gate", toPort: "bottom" },
+                { from: "node-llm-decision", fromPort: "right", to: "node-council-gate", toPort: "left" },
+
+                // Consensus -> Workflow Steps (Sequential)
+                { from: "node-consensus", fromPort: "right", to: "node-con-step1", toPort: "left" },
+                { from: "node-con-step1", fromPort: "bottom", to: "node-con-step2", toPort: "top" },
+                { from: "node-con-step2", fromPort: "bottom", to: "node-con-step3", toPort: "top" },
+                { from: "node-con-step3", fromPort: "bottom", to: "node-con-step4", toPort: "top" },
+                { from: "node-con-step4", fromPort: "bottom", to: "node-con-step5", toPort: "top" },
+
+                // Consensus Steps -> Risk Management -> Execution
+                { from: "node-con-step5", fromPort: "right", to: "node-council-gate", toPort: "top" },
+                { from: "node-council-gate", fromPort: "right", to: "node-risk-agent", toPort: "left" },
+
+                // Risk Management Internal Workflow
+                { from: "node-risk-agent", fromPort: "bottom", to: "node-risk-sub1", toPort: "top" },
+                { from: "node-risk-sub1", fromPort: "bottom", to: "node-risk-sub2", toPort: "top" },
+                { from: "node-risk-sub2", fromPort: "bottom", to: "node-risk-sub3", toPort: "top" },
+                { from: "node-risk-sub3", fromPort: "bottom", to: "node-risk-sub4", toPort: "top" },
+                { from: "node-risk-sub4", fromPort: "bottom", to: "node-risk-sub5", toPort: "top" },
+                { from: "node-risk-sub5", fromPort: "right", to: "node-execution", toPort: "left" }
+            ];
+
+            let connections = [...defaultConnections];
+            const LAYOUT_VERSION = 13; // ponytail: bump when defaultConnections change
+
+            // Baked-in Default Layout State (Used when localStorage is empty or on different browser)
+            const defaultLayoutState = {
+    "version": 13,
+    "pan": {
+        "x": -194.83092222889263,
+        "y": -426.47118489548575
+    },
+    "zoom": 0.6363108504756426,
+    "nodes": {
+        "node-mt5": {
+            "dx": 750,
+            "dy": 80,
+            "w": 500,
+            "h": 240
+        },
+        "node-watcher-trigger": {
+            "dx": 860,
+            "dy": 370,
+            "w": 280,
+            "h": 57
+        },
+        "node-neondb-mapping": {
+            "dx": 500,
+            "dy": 470,
+            "w": 480,
+            "h": 220
+        },
+        "node-lancedb": {
+            "dx": 500,
+            "dy": 785,
+            "w": 480,
+            "h": 230
+        },
+        "node-orchestrator": {
+            "dx": 1559,
+            "dy": 697,
+            "w": 360,
+            "h": 185
+        },
+        "node-fe-to-orch-info": {
+            "dx": 1559,
+            "dy": 277,
+            "w": 361,
+            "h": 242
+        },
+        "node-orch-to-msa-info": {
+            "dx": 1820,
+            "dy": 1050,
+            "w": 480,
+            "h": 185
+        },
+        "node-msa-to-orch-info": {
+            "dx": 1180,
+            "dy": 1250,
+            "w": 480,
+            "h": 230
+        },
+        "node-orch-cond1": {
+            "dx": 2548.7183358385787,
+            "dy": 60.72385902095188,
+            "w": 620,
+            "h": 183
+        },
+        "node-orch-cond2": {
+            "dx": 2597.66365025617,
+            "dy": 304.4897287008994,
+            "w": 434,
+            "h": 306
+        },
+        "node-orch-cond3": {
+            "dx": 2635,
+            "dy": 661,
+            "w": 530,
+            "h": 324
+        },
+        "node-ms-agent": {
+            "dx": 1554,
+            "dy": 622,
+            "h": 168
+        },
+        "node-ms-sub1": {
+            "dx": 1183,
+            "dy": 585,
+            "h": 143
+        },
+        "node-ms-sub2": {
+            "dx": 931,
+            "dy": 549,
+            "h": 143
+        },
+        "node-ms-sub3": {
+            "dx": 1200,
+            "dy": 574,
+            "h": 145
+        },
+        "node-ms-sub4": {
+            "dx": 1509,
+            "dy": 291,
+            "h": 145
+        },
+        "node-msa-to-ml-info": {
+            "dx": 3298,
+            "dy": -995,
+            "w": 459,
+            "h": 173
+        },
+        "node-bos-to-ml-info": {
+            "dx": 2961,
+            "dy": -61,
+            "w": 459,
+            "h": 180
+        },
+        "node-ml-agent": {
+            "dx": 3585,
+            "dy": -688,
+            "h": 150
+        },
+        "node-ml-sub1": {
+            "dx": 3929.68577321927,
+            "dy": -1050.2473199414535,
+            "h": 109
+        },
+        "node-ml-sub2": {
+            "dx": 4194.685773219269,
+            "dy": -1337.2473199414535,
+            "h": 139
+        },
+        "node-ml-sub3": {
+            "dx": 3892.68577321927,
+            "dy": -1620.2473199414535,
+            "h": 124
+        },
+        "node-ml-sub4": {
+            "dx": 4211.685773219269,
+            "dy": -1898.2473199414535,
+            "h": 139
+        },
+        "node-ml-sub5": {
+            "dx": 3929.68577321927,
+            "dy": -2192.2473199414535,
+            "h": 124
+        },
+        "node-risk-agent": {
+            "dx": 4993,
+            "dy": -449,
+            "h": 150
+        },
+        "node-msa-to-sent-info": {
+            "dx": 1967,
+            "dy": -688,
+            "w": 424,
+            "h": 200
+        },
+        "node-bos-to-sent-info": {
+            "dx": 1547,
+            "dy": -354,
+            "w": 459,
+            "h": 188
+        },
+        "node-sentiment-agent": {
+            "dx": 1852,
+            "dy": -475,
+            "h": 150
+        },
+        "node-sent-sub1": {
+            "dx": 2427,
+            "dy": -346,
+            "w": 225,
+            "h": 159
+        },
+        "node-sent-sub2": {
+            "dx": 2709,
+            "dy": -346,
+            "h": 139
+        },
+        "node-sent-sub3": {
+            "dx": 2427,
+            "dy": -335,
+            "h": 139
+        },
+        "node-sent-sub4": {
+            "dx": 2735,
+            "dy": -322,
+            "h": 139
+        },
+        "node-sent-sub5": {
+            "dx": 2472,
+            "dy": -50,
+            "h": 139
+        },
+        "node-llm-msa": {
+            "dx": 4330,
+            "dy": 280,
+            "w": 310,
+            "h": 174
+        },
+        "node-llm-ml": {
+            "dx": 4330,
+            "dy": 500,
+            "w": 310,
+            "h": 174
+        },
+        "node-llm-sentiment": {
+            "dx": 4330,
+            "dy": 720,
+            "w": 310,
+            "h": 174
+        },
+        "node-cross-review": {
+            "dx": 4800,
+            "dy": 480,
+            "w": 330,
+            "h": 190
+        },
+        "node-llm-decision": {
+            "dx": 5290,
+            "dy": 480,
+            "w": 330,
+            "h": 190
+        },
+        "node-council-gate": {
+            "dx": 5790,
+            "dy": 460,
+            "w": 390,
+            "h": 230
+        },
+        "node-consensus": {
+            "dx": 5825,
+            "dy": -444,
+            "h": 139
+        },
+        "node-con-sub1": {
+            "dx": -9.177246453298352,
+            "dy": 1208.3374496842832,
+            "h": 113
+        },
+        "node-con-sub2": {
+            "dx": -9.177246453298352,
+            "dy": 1208.3374496842832,
+            "h": 124
+        },
+        "node-con-sub3": {
+            "dx": -9.177246453298352,
+            "dy": 1208.3374496842832,
+            "h": 124
+        },
+        "node-con-step1": {
+            "dx": 3076.3465550200917,
+            "dy": -8.13355773077518,
+            "h": 139
+        },
+        "node-con-step2": {
+            "dx": 3050.454354878851,
+            "dy": 21.242379681784712,
+            "h": 128
+        },
+        "node-con-step3": {
+            "dx": 3050.454354878851,
+            "dy": 21.242379681784712,
+            "h": 124
+        },
+        "node-con-step4": {
+            "dx": 3050.454354878851,
+            "dy": 21.242379681784712,
+            "h": 139
+        },
+        "node-con-step5": {
+            "dx": 3050.454354878851,
+            "dy": 21.242379681784712,
+            "h": 139
+        },
+        "node-risk-sub1": {
+            "dx": 3113.874440863745,
+            "dy": -60.514158523291314,
+            "h": 143
+        },
+        "node-risk-sub2": {
+            "dx": 3113.874440863745,
+            "dy": -60.514158523291314,
+            "h": 109
+        },
+        "node-risk-sub3": {
+            "dx": 3113.874440863745,
+            "dy": -60.514158523291314,
+            "h": 124
+        },
+        "node-risk-sub4": {
+            "dx": 3113.874440863745,
+            "dy": -60.514158523291314,
+            "h": 124
+        },
+        "node-risk-sub5": {
+            "dx": 3113.874440863745,
+            "dy": -60.514158523291314,
+            "h": 124
+        },
+        "node-execution": {
+            "dx": 6961,
+            "dy": -443,
+            "h": 139
+        }
+    },
+    "connections": [
+        {
+            "from": "node-mt5",
+            "fromPort": "bottom",
+            "to": "node-watcher-trigger",
+            "toPort": "top"
+        },
+        {
+            "from": "node-watcher-trigger",
+            "fromPort": "left",
+            "to": "node-neondb-mapping",
+            "toPort": "top"
+        },
+        {
+            "from": "node-neondb-mapping",
+            "fromPort": "bottom",
+            "to": "node-lancedb",
+            "toPort": "top"
+        },
+        {
+            "from": "node-watcher-trigger",
+            "fromPort": "right",
+            "to": "node-fe-to-orch-info",
+            "toPort": "left"
+        },
+        {
+            "from": "node-fe-to-orch-info",
+            "fromPort": "bottom",
+            "to": "node-orchestrator",
+            "toPort": "top"
+        },
+        {
+            "from": "node-orchestrator",
+            "fromPort": "bottom",
+            "to": "node-orch-to-msa-info",
+            "toPort": "top"
+        },
+        {
+            "from": "node-orch-to-msa-info",
+            "fromPort": "bottom",
+            "to": "node-ms-agent",
+            "toPort": "top"
+        },
+        {
+            "from": "node-ms-agent",
+            "fromPort": "top",
+            "to": "node-msa-to-orch-info",
+            "toPort": "bottom"
+        },
+        {
+            "from": "node-msa-to-orch-info",
+            "fromPort": "top",
+            "to": "node-orchestrator",
+            "toPort": "bottom"
+        },
+        {
+            "from": "node-ms-agent",
+            "fromPort": "left",
+            "to": "node-ms-sub1",
+            "toPort": "top"
+        },
+        {
+            "from": "node-ms-sub1",
+            "fromPort": "left",
+            "to": "node-ms-sub2",
+            "toPort": "top"
+        },
+        {
+            "from": "node-ms-sub2",
+            "fromPort": "bottom",
+            "to": "node-ms-sub3",
+            "toPort": "left"
+        },
+        {
+            "from": "node-ms-sub3",
+            "fromPort": "right",
+            "to": "node-ms-sub4",
+            "toPort": "left"
+        },
+        {
+            "from": "node-orchestrator",
+            "fromPort": "right",
+            "to": "node-orch-cond1",
+            "toPort": "left"
+        },
+        {
+            "from": "node-orchestrator",
+            "fromPort": "right",
+            "to": "node-orch-cond2",
+            "toPort": "left"
+        },
+        {
+            "from": "node-orchestrator",
+            "fromPort": "right",
+            "to": "node-orch-cond3",
+            "toPort": "left"
+        },
+        {
+            "from": "node-orch-cond2",
+            "fromPort": "right",
+            "to": "node-msa-to-ml-info",
+            "toPort": "left"
+        },
+        {
+            "from": "node-msa-to-ml-info",
+            "fromPort": "right",
+            "to": "node-ml-agent",
+            "toPort": "top"
+        },
+        {
+            "from": "node-orch-cond2",
+            "fromPort": "right",
+            "to": "node-msa-to-sent-info",
+            "toPort": "left"
+        },
+        {
+            "from": "node-msa-to-sent-info",
+            "fromPort": "right",
+            "to": "node-sentiment-agent",
+            "toPort": "top"
+        },
+        {
+            "from": "node-ml-agent",
+            "fromPort": "right",
+            "to": "node-ml-sub1",
+            "toPort": "left"
+        },
+        {
+            "from": "node-ml-sub1",
+            "fromPort": "top",
+            "to": "node-ml-sub2",
+            "toPort": "left"
+        },
+        {
+            "from": "node-ml-sub2",
+            "fromPort": "top",
+            "to": "node-ml-sub3",
+            "toPort": "right"
+        },
+        {
+            "from": "node-ml-sub3",
+            "fromPort": "top",
+            "to": "node-ml-sub4",
+            "toPort": "left"
+        },
+        {
+            "from": "node-ml-sub4",
+            "fromPort": "top",
+            "to": "node-ml-sub5",
+            "toPort": "right"
+        },
+        {
+            "from": "node-orch-cond3",
+            "fromPort": "right",
+            "to": "node-bos-to-sent-info",
+            "toPort": "left"
+        },
+        {
+            "from": "node-orch-cond3",
+            "fromPort": "right",
+            "to": "node-bos-to-ml-info",
+            "toPort": "left"
+        },
+        {
+            "from": "node-bos-to-sent-info",
+            "fromPort": "right",
+            "to": "node-sentiment-agent",
+            "toPort": "bottom"
+        },
+        {
+            "from": "node-bos-to-ml-info",
+            "fromPort": "right",
+            "to": "node-ml-agent",
+            "toPort": "bottom"
+        },
+        {
+            "from": "node-sentiment-agent",
+            "fromPort": "right",
+            "to": "node-sent-sub1",
+            "toPort": "left"
+        },
+        {
+            "from": "node-sent-sub1",
+            "fromPort": "right",
+            "to": "node-sent-sub2",
+            "toPort": "top"
+        },
+        {
+            "from": "node-sent-sub2",
+            "fromPort": "left",
+            "to": "node-sent-sub3",
+            "toPort": "top"
+        },
+        {
+            "from": "node-sent-sub3",
+            "fromPort": "right",
+            "to": "node-sent-sub4",
+            "toPort": "top"
+        },
+        {
+            "from": "node-sent-sub4",
+            "fromPort": "left",
+            "to": "node-sent-sub5",
+            "toPort": "top"
+        },
+        {
+            "from": "node-ms-sub4",
+            "fromPort": "right",
+            "to": "node-con-sub1",
+            "toPort": "left"
+        },
+        {
+            "from": "node-ml-sub5",
+            "fromPort": "right",
+            "to": "node-con-sub2",
+            "toPort": "left"
+        },
+        {
+            "from": "node-sent-sub5",
+            "fromPort": "right",
+            "to": "node-con-sub3",
+            "toPort": "left"
+        },
+        {
+            "from": "node-con-sub1",
+            "fromPort": "right",
+            "to": "node-consensus",
+            "toPort": "left"
+        },
+        {
+            "from": "node-con-sub2",
+            "fromPort": "right",
+            "to": "node-consensus",
+            "toPort": "left"
+        },
+        {
+            "from": "node-con-sub3",
+            "fromPort": "right",
+            "to": "node-consensus",
+            "toPort": "left"
+        },
+        {
+            "from": "node-consensus",
+            "fromPort": "right",
+            "to": "node-con-step1",
+            "toPort": "left"
+        },
+        {
+            "from": "node-con-step1",
+            "fromPort": "bottom",
+            "to": "node-con-step2",
+            "toPort": "top"
+        },
+        {
+            "from": "node-con-step2",
+            "fromPort": "bottom",
+            "to": "node-con-step3",
+            "toPort": "top"
+        },
+        {
+            "from": "node-con-step3",
+            "fromPort": "bottom",
+            "to": "node-con-step4",
+            "toPort": "top"
+        },
+        {
+            "from": "node-con-step4",
+            "fromPort": "bottom",
+            "to": "node-con-step5",
+            "toPort": "top"
+        },
+        {
+            "from": "node-con-step5",
+            "fromPort": "right",
+            "to": "node-council-gate",
+            "toPort": "top"
+        },
+        {
+            "from": "node-council-gate",
+            "fromPort": "right",
+            "to": "node-risk-agent",
+            "toPort": "left"
+        },
+        {
+            "from": "node-risk-agent",
+            "fromPort": "bottom",
+            "to": "node-risk-sub1",
+            "toPort": "top"
+        },
+        {
+            "from": "node-risk-sub1",
+            "fromPort": "bottom",
+            "to": "node-risk-sub2",
+            "toPort": "top"
+        },
+        {
+            "from": "node-risk-sub2",
+            "fromPort": "bottom",
+            "to": "node-risk-sub3",
+            "toPort": "top"
+        },
+        {
+            "from": "node-risk-sub3",
+            "fromPort": "bottom",
+            "to": "node-risk-sub4",
+            "toPort": "top"
+        },
+        {
+            "from": "node-risk-sub4",
+            "fromPort": "bottom",
+            "to": "node-risk-sub5",
+            "toPort": "top"
+        },
+        {
+            "from": "node-risk-sub5",
+            "fromPort": "right",
+            "to": "node-execution",
+            "toPort": "left"
+        }
+    ]
+};

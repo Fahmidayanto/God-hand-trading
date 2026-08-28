@@ -1,0 +1,59 @@
+{
+  "tag": "m01_session_rf",
+  "families": [
+    "F_SESSION"
+  ],
+  "extra_cols": [],
+  "model_mode": "rf",
+  "seeds": [
+    42
+  ],
+  "embargo_days": 0,
+  "dataset_sha16": "dataset_v12opencode_unconstrained",
+  "scored_csv": "B:\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\saved\\experiments\\v12opencode\\runs\\scored_m01_session_rf.csv",
+  "n_rows_scored": 1713,
+  "winners_sample": [
+    {
+      "fold": 2020,
+      "train_samples": 229,
+      "test_samples": 259,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    },
+    {
+      "fold": 2021,
+      "train_samples": 488,
+      "test_samples": 254,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    },
+    {
+      "fold": 2022,
+      "train_samples": 742,
+      "test_samples": 258,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    },
+    {
+      "fold": 2023,
+      "train_samples": 1000,
+      "test_samples": 274,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    },
+    {
+      "fold": 2024,
+      "train_samples": 1274,
+      "test_samples": 253,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    },
+    {
+      "fold": 2025,
+      "train_samples": 1527,
+      "test_samples": 253,
+      "mfe": "RF_d5_n200_leaf15",
+      "mae": "RF_d5_n200_leaf15"
+    }
+  ]
+}

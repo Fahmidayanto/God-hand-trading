@@ -18,6 +18,7 @@ Tahap 2: Execution Trigger (saat BoS terkonfirmasi)
 
 import os
 import sys
+import hashlib
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
@@ -65,6 +66,7 @@ class MarketStructureAgent:
         self._pending_ll_price: Optional[float] = None
         self._pending_analysis: Optional[Dict] = None
         self._pending_pre_signal: Optional[Dict] = None
+        self._pending_evidence_snapshot: Optional[Dict] = None
         self._last_bos_direction: Optional[str] = None
 
         logger.info(
@@ -189,6 +191,7 @@ class MarketStructureAgent:
         df_h4: Optional[pd.DataFrame] = None,
         structure_events: Optional[List[Dict[str, Any]]] = None,
         veto_mode: str = "hard",
+        price_ratio: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Analisis struktur pasar langsung dari Neon DB atau data historis jika dikirim.
@@ -200,17 +203,22 @@ class MarketStructureAgent:
             df_h1: DataFrame H1 (digunakan jika dalam simulasi)
             df_h4: DataFrame H4 (digunakan jika dalam simulasi)
             structure_events: Daftar event struktur historis jika dalam simulasi
+            veto_mode: Mode veto filter tren makro (hard / soft / none)
+            price_ratio: Skala normalisasi harga terhadap BaseReferencePrice 4500.0
         """
         conn = None
         try:
             # Mode Simulasi / Replay (data historis disediakan)
             if structure_events is not None and df_m15 is not None and len(df_m15) > 0:
                 current_price = float(df_m15["close"].iloc[-1])
+                if price_ratio is None:
+                    price_ratio = round(current_price / 4500.0, 6) if current_price > 0 else 1.0
                 
                 # Baca EMA200 historis
                 ema200_m15 = float(df_m15["ema200"].iloc[-1]) if "ema200" in df_m15.columns and not pd.isna(df_m15["ema200"].iloc[-1]) else current_price
                 ema200_h1 = float(df_h1["ema200"].iloc[-1]) if df_h1 is not None and len(df_h1) > 0 and "ema200" in df_h1.columns and not pd.isna(df_h1["ema200"].iloc[-1]) else ema200_m15
                 ema200_h4 = float(df_h4["ema200"].iloc[-1]) if df_h4 is not None and len(df_h4) > 0 and "ema200" in df_h4.columns and not pd.isna(df_h4["ema200"].iloc[-1]) else ema200_m15
+                latest_candle = df_m15.iloc[-1].to_dict()
                 
                 # Map dan urutkan event struktur historis (time DESC)
                 mapped_events = []
@@ -239,10 +247,13 @@ class MarketStructureAgent:
                 current_price = self._get_neon_current_price(conn)
                 if not current_price:
                     return self._no_signal_response("Gagal mendapatkan data harga close terbaru dari database")
+                if price_ratio is None:
+                    price_ratio = round(current_price / 4500.0, 6) if current_price > 0 else 1.0
 
                 ema200_m15 = self._get_neon_ema200(conn, "M15")
                 ema200_h1  = self._get_neon_ema200(conn, "H1")
                 ema200_h4  = self._get_neon_ema200(conn, "H4")
+                latest_candle = None
 
                 # Ambil event terbaru dari llhhbosdata_xauusd
                 events = self._fetch_neon_events(conn, limit=50)
@@ -289,11 +300,13 @@ class MarketStructureAgent:
                 signal_result = self._on_choch_confirmed(
                     direction="Bullish" if is_bullish else "Bearish",
                     price=e1["price"],
+                    event_timestamp=e1["time"],
                     current_price=current_price,
                     ema200_m15=ema200_m15,
                     ema200_h1=ema200_h1,
                     ema200_h4=ema200_h4,
                     session=session,
+                    price_ratio=price_ratio,
                     veto_mode=veto_mode,
                 )
                 return self._build_response(
@@ -307,6 +320,7 @@ class MarketStructureAgent:
                     current_price=current_price,
                     ema200=ema200_m15,
                     symbol=symbol,
+                    price_ratio=price_ratio,
                 )
 
             # 1. PENDING_SETUP - Bullish (CHoCH anywhere in recent events + HH terbentuk)
@@ -315,10 +329,16 @@ class MarketStructureAgent:
                     event_type="HH",
                     direction="Bullish",
                     price=e1["price"],
+                    event_timestamp=e1["time"],
                     current_price=current_price,
                     ema200=ema200_m15,
+                    ema200_h1=ema200_h1,
+                    ema200_h4=ema200_h4,
                     session=session,
                     symbol=symbol,
+                    price_ratio=price_ratio,
+                    events=events,
+                    latest_candle=latest_candle,
                 )
                 return self._build_response(
                     signal="HOLD",
@@ -332,6 +352,7 @@ class MarketStructureAgent:
                     ema200=ema200_m15,
                     symbol=symbol,
                     is_new_setup=True,
+                    price_ratio=price_ratio,
                 )
 
             # 2. PENDING_SETUP - Bearish (CHoCH anywhere in recent events + LL terbentuk)
@@ -340,10 +361,16 @@ class MarketStructureAgent:
                     event_type="LL",
                     direction="Bearish",
                     price=e1["price"],
+                    event_timestamp=e1["time"],
                     current_price=current_price,
                     ema200=ema200_m15,
+                    ema200_h1=ema200_h1,
+                    ema200_h4=ema200_h4,
                     session=session,
                     symbol=symbol,
+                    price_ratio=price_ratio,
+                    events=events,
+                    latest_candle=latest_candle,
                 )
                 return self._build_response(
                     signal="HOLD",
@@ -357,6 +384,7 @@ class MarketStructureAgent:
                     ema200=ema200_m15,
                     symbol=symbol,
                     is_new_setup=True,
+                    price_ratio=price_ratio,
                 )
 
             # 3. TRIGGER - Bullish BoS (CHoCH -> HH -> BoS), atau BoS lanjutan
@@ -386,6 +414,7 @@ class MarketStructureAgent:
                     current_price=current_price,
                     ema200=ema200_m15,
                     symbol=symbol,
+                    price_ratio=price_ratio,
                 )
 
             # 4. TRIGGER - Bearish BoS (CHoCH -> LL -> BoS), atau BoS lanjutan
@@ -415,6 +444,7 @@ class MarketStructureAgent:
                     current_price=current_price,
                     ema200=ema200_m15,
                     symbol=symbol,
+                    price_ratio=price_ratio,
                 )
 
             # 5. Default Neutral / HOLD
@@ -429,6 +459,7 @@ class MarketStructureAgent:
                 current_price=current_price,
                 ema200=ema200_m15,
                 symbol=symbol,
+                price_ratio=price_ratio,
             )
 
         except Exception as e:
@@ -445,6 +476,7 @@ class MarketStructureAgent:
         self._pending_ll_price = None
         self._pending_analysis = None
         self._pending_pre_signal = None
+        self._pending_evidence_snapshot = None
         self._last_bos_direction = None
         logger.info(f"[RESET] {self.name} state reset -> IDLE")
 
@@ -483,10 +515,16 @@ class MarketStructureAgent:
         event_type: str,
         direction: str,
         price: float,
+        event_timestamp: Any,
         current_price: float,
         ema200: float,
+        ema200_h1: Optional[float],
+        ema200_h4: Optional[float],
         session: str,
         symbol: str,
+        price_ratio: float,
+        events: List[Dict[str, Any]],
+        latest_candle: Optional[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Tahap 1 - Dijalankan saat CHoCH + HH/LL terbentuk."""
         logger.info(f"[PRE-ANALYSIS] Tahap 1: Pre-Analysis | {event_type} @ {price:.2f}")
@@ -508,6 +546,8 @@ class MarketStructureAgent:
                 session=session,
                 timeframe=self.timeframe,
                 prior_choch=True,
+                timestamp=event_timestamp,
+                price_ratio=price_ratio,
             )
         self._pending_analysis = pattern_analysis
 
@@ -526,6 +566,14 @@ class MarketStructureAgent:
         )
 
         pre_signal = {
+            "setup_id": self._build_setup_id(
+                symbol=symbol,
+                timeframe=self.timeframe,
+                event_type=event_type,
+                direction=direction,
+                event_timestamp=event_timestamp,
+                trigger_price=price,
+            ),
             "event_type": event_type,
             "direction": direction,
             "hh_price": self._pending_hh_price,
@@ -536,9 +584,23 @@ class MarketStructureAgent:
             "session": session,
             "symbol": symbol,
             "timestamp": datetime.now().isoformat(),
+            "market_event_timestamp": event_timestamp,
+            "price_ratio": price_ratio,
             "reasoning": reasoning,
             "status": "PENDING_SETUP - menunggu BoS",
         }
+
+        self._pending_evidence_snapshot = self._build_evidence_snapshot(
+            pre_signal=pre_signal,
+            events=events,
+            pattern_analysis=pattern_analysis,
+            current_price=current_price,
+            ema200_m15=ema200,
+            ema200_h1=ema200_h1,
+            ema200_h4=ema200_h4,
+            price_ratio=price_ratio,
+            latest_candle=latest_candle,
+        )
 
         # Pindah state ke PENDING_SETUP
         self._phase = AgentPhase.PENDING_SETUP
@@ -551,11 +613,13 @@ class MarketStructureAgent:
         self,
         direction: str,
         price: float,
+        event_timestamp: Any,
         current_price: float,
         ema200_m15: float,
         ema200_h1: Optional[float],
         ema200_h4: Optional[float],
         session: str,
+        price_ratio: float,
         veto_mode: str = "hard",
     ) -> Dict[str, Any]:
         """Dijalankan saat CHoCH langsung terkonfirmasi untuk entri agresif."""
@@ -591,6 +655,8 @@ class MarketStructureAgent:
                     session=session,
                     timeframe=self.timeframe,
                     prior_choch=False,
+                    timestamp=event_timestamp,
+                    price_ratio=price_ratio,
                 )
             except Exception as e:
                 logger.warning(f"Gagal mencari pola CHoCH di LanceDB: {e}")
@@ -782,6 +848,8 @@ class MarketStructureAgent:
         session: str,
         timeframe: str,
         prior_choch: bool = False,
+        timestamp: Any = None,
+        price_ratio: Optional[float] = None,
     ) -> Optional[Dict[str, Any]]:
         """Query ke database vektor LanceDB untuk melihat kesamaan pola."""
         try:
@@ -795,11 +863,127 @@ class MarketStructureAgent:
                 limit=1000,
                 min_similarity=0.7,
                 prior_choch=prior_choch,
+                timestamp=timestamp,
+                price_ratio=price_ratio,
             )
             return result
         except Exception as e:
             logger.error(f"Pencarian pola di LanceDB gagal: {e}")
             return None
+
+    @staticmethod
+    def _build_setup_id(
+        symbol: str,
+        timeframe: str,
+        event_type: str,
+        direction: str,
+        event_timestamp: Any,
+        trigger_price: float,
+    ) -> str:
+        identity = "|".join([
+            symbol,
+            timeframe,
+            event_type,
+            direction,
+            str(event_timestamp),
+            f"{trigger_price:.5f}",
+        ])
+        return f"msa-{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:16]}"
+
+    def _build_evidence_snapshot(
+        self,
+        pre_signal: Dict[str, Any],
+        events: List[Dict[str, Any]],
+        pattern_analysis: Optional[Dict[str, Any]],
+        current_price: float,
+        ema200_m15: Optional[float],
+        ema200_h1: Optional[float],
+        ema200_h4: Optional[float],
+        price_ratio: float,
+        latest_candle: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        warnings = []
+        atr_value = None
+        candle_quality = {
+            "body_ratio": None,
+            "range": None,
+            "direction": None,
+        }
+
+        if latest_candle:
+            raw_atr = latest_candle.get("atr")
+            if raw_atr is not None and not pd.isna(raw_atr):
+                atr_value = float(raw_atr)
+
+            required = ("open", "high", "low", "close")
+            if all(latest_candle.get(key) is not None and not pd.isna(latest_candle.get(key)) for key in required):
+                open_price = float(latest_candle["open"])
+                high_price = float(latest_candle["high"])
+                low_price = float(latest_candle["low"])
+                close_price = float(latest_candle["close"])
+                candle_range = high_price - low_price
+                candle_quality = {
+                    "body_ratio": abs(close_price - open_price) / candle_range if candle_range > 0 else 0.0,
+                    "range": candle_range,
+                    "direction": "BULLISH" if close_price > open_price else "BEARISH" if close_price < open_price else "DOJI",
+                }
+
+        if atr_value is None:
+            warnings.append("ATR unavailable")
+        if candle_quality["body_ratio"] is None:
+            warnings.append("Candle OHLC quality unavailable")
+        if pattern_analysis is None:
+            warnings.append("Historical pattern evidence unavailable")
+
+        trigger_price = pre_signal["hh_price"] or pre_signal["ll_price"]
+        raw_distance = abs(current_price - trigger_price)
+
+        return {
+            "schema_version": "msa-evidence-v1",
+            "setup_id": pre_signal["setup_id"],
+            "generated_at": datetime.now().isoformat(),
+            "market_event_timestamp": pre_signal["market_event_timestamp"],
+            "setup": {
+                "symbol": pre_signal["symbol"],
+                "timeframe": self.timeframe,
+                "event_type": pre_signal["event_type"],
+                "direction": pre_signal["direction"],
+                "session": pre_signal["session"],
+                "status": pre_signal["status"],
+            },
+            "structure_context": {
+                "trigger_price": trigger_price,
+                "current_price": current_price,
+                "raw_distance_to_trigger": raw_distance,
+                "price_ratio_scaled_distance": raw_distance / price_ratio if price_ratio > 0 else None,
+                "atr_multiple_to_trigger": raw_distance / atr_value if atr_value and atr_value > 0 else None,
+                "recent_events": events[:5],
+            },
+            "market_context": {
+                "price_ratio": price_ratio,
+                "base_reference_price": 4500.0,
+                "ema200": {
+                    "M15": ema200_m15,
+                    "H1": ema200_h1,
+                    "H4": ema200_h4,
+                },
+                "atr": {"value": atr_value, "timeframe": self.timeframe},
+                "candle_quality": candle_quality,
+            },
+            "historical_evidence": pattern_analysis,
+            "data_quality": {
+                "is_complete": not warnings,
+                "warnings": warnings,
+            },
+            "llm_constraints": {
+                "role": "context_critic",
+                "may_create_trade_signal": False,
+                "may_reverse_direction": False,
+                "may_set_lot_sl_tp": False,
+                "may_change_msa_state": False,
+                "may_bypass_risk_management": False,
+            },
+        }
 
     def _build_response(
         self,
@@ -814,6 +998,7 @@ class MarketStructureAgent:
         ema200: Optional[float],
         symbol: str,
         is_new_setup: bool = False,
+        price_ratio: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Hasilkan format response dictionary standar."""
         return {
@@ -835,9 +1020,12 @@ class MarketStructureAgent:
                 "pending_ll": self._pending_ll_price,
             },
             "pattern_analysis": pattern_analysis,
+            "evidence_snapshot": self._pending_evidence_snapshot,
             "metadata": {
                 "total_events_checked": len(events),
                 "current_price": current_price,
+                "price_ratio": price_ratio if price_ratio is not None else (round(current_price / 4500.0, 6) if current_price > 0 else 1.0),
+                "base_reference_price": 4500.0,
                 "ema200_m15": ema200,
                 "price_vs_ema": "ABOVE" if ema200 and current_price > ema200 else "BELOW" if ema200 else "N/A",
             }

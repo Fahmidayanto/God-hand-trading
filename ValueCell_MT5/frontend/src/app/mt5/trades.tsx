@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import { CalendarDays, X, Loader2, BarChart3, Briefcase, ClipboardList, TrendingUp } from "lucide-react";
+import { CalendarDays, X, Loader2, BarChart3, Briefcase, ClipboardList, TrendingUp, ChevronDown } from "lucide-react";
 import {
   createChart,
   type IChartApi,
@@ -178,7 +178,7 @@ export default function TradesPage() {
     const formattedTime = trade.entry_time.replace(/\./g, '-').replace(' ', 'T') + 'Z';
     const tradeTimestamp = Date.parse(formattedTime) / 1000;
 
-    console.log("🎯 handleTradeClick: jumping to", year, month, "for trade timestamp", tradeTimestamp);
+    console.log("ðŸŽ¯ handleTradeClick: jumping to", year, month, "for trade timestamp", tradeTimestamp);
 
     const loadedCandles = await jumpToDate(year, month);
 
@@ -194,7 +194,7 @@ export default function TradesPage() {
     if (candlesToSearch && candlesToSearch.length > 0) {
       const idx = candlesToSearch.findIndex((c) => c.time >= tradeTimestamp);
       if (idx >= 0) {
-        console.log("🎯 Scrolling chart to candle index", idx, "for timestamp", tradeTimestamp);
+        console.log("ðŸŽ¯ Scrolling chart to candle index", idx, "for timestamp", tradeTimestamp);
         requestAnimationFrame(() => {
           timeScale.setVisibleLogicalRange({
             from: (idx - 50) as any,
@@ -303,7 +303,7 @@ export default function TradesPage() {
   // Prevents redundant setData + overlay rebuild on year/month jumps within same timeframe.
   const fullDataDisplayedRef = useRef<{ [key: string]: boolean }>({});
 
-  // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
+  // Debounce timer for scroll label re-render â€” prevents DOM churn at 60fps during pan/zoom
   const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Save center time when switching timeframes to maintain date focus and auto-scale zoom
@@ -311,7 +311,7 @@ export default function TradesPage() {
 
   // Update ref whenever chartTimezone changes
   useEffect(() => {
-    console.log('📍 chartTimezone state changed:', {
+    console.log('ðŸ“ chartTimezone state changed:', {
       oldState: chartTimezoneRef.current,
       newState: chartTimezone
     });
@@ -403,7 +403,7 @@ export default function TradesPage() {
   };
 
   useEffect(() => {
-    console.log('📊 Chart initialization effect triggered');
+    console.log('ðŸ“Š Chart initialization effect triggered');
     console.log('chartContainerRef.current:', !!chartContainerRef.current);
     console.log('chartRef.current:', !!chartRef.current);
 
@@ -413,33 +413,33 @@ export default function TradesPage() {
         const chart = createChart(chartContainerRef.current, {
           autoSize: true, // Auto-fit chart to container size via ResizeObserver
           layout: {
-            background: { color: "rgba(17, 24, 39, 0.3)" },
-            textColor: "#cbd5e1",
+            background: { color: "#ffffff" },
+            textColor: "#0f172a",
           },
           grid: {
-            vertLines: { color: "rgba(100, 116, 139, 0.1)" },
-            horzLines: { color: "rgba(100, 116, 139, 0.1)" },
+            vertLines: { color: "#f1f5f9" },
+            horzLines: { color: "#f1f5f9" },
           },
           crosshair: {
             mode: 0, // Normal crosshair mode (0 = normal, 1 = magnet)
             vertLine: {
               width: 1,
-              color: 'rgba(224, 227, 235, 0.5)',
-              style: 0,
-              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+              color: 'rgba(100, 116, 139, 0.45)',
+              style: 1,
+              labelBackgroundColor: '#2563eb',
             },
             horzLine: {
               width: 1,
-              color: 'rgba(224, 227, 235, 0.5)',
-              style: 0,
-              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+              color: 'rgba(100, 116, 139, 0.45)',
+              style: 1,
+              labelBackgroundColor: '#2563eb',
             },
           },
           rightPriceScale: {
-            borderColor: "rgba(100, 116, 139, 0.3)",
+            borderColor: "#cbd5e1",
           },
           timeScale: {
-            borderColor: "rgba(100, 116, 139, 0.3)",
+            borderColor: "#cbd5e1",
             timeVisible: true,
             secondsVisible: false,
             barSpacing: 8,
@@ -462,15 +462,16 @@ export default function TradesPage() {
 
         // Log timezone info
         const timezoneOffset = new Date().getTimezoneOffset();
-        console.log('🕐 Browser timezone offset (minutes):', timezoneOffset);
-        console.log('🕐 This means browser is:', timezoneOffset > 0 ? `GMT-${timezoneOffset / 60}` : `GMT+${-timezoneOffset / 60}`);
+        console.log('📊 Browser timezone offset (minutes):', timezoneOffset);
+        console.log('📊 This means browser is:', timezoneOffset > 0 ? `GMT-${timezoneOffset / 60}` : `GMT+${-timezoneOffset / 60}`);
 
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
-          upColor: "#10b981",
-          downColor: "#ef4444",
-          borderVisible: false,
-          wickUpColor: "#10b981",
-          wickDownColor: "#ef4444",
+          upColor: "#089981",
+          downColor: "#f23645",
+          borderVisible: true,
+          borderColor: "#065f46",
+          wickUpColor: "#089981",
+          wickDownColor: "#f23645",
         });
 
         chartRef.current = chart;
@@ -478,7 +479,7 @@ export default function TradesPage() {
 
         // Add EMA 200 line series (initially hidden, data loaded via API)
         const ema200Series = chart.addSeries(LineSeries, {
-          color: "#f59e0b",
+          color: "#ea580c",
           lineWidth: 2 as any,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -486,9 +487,9 @@ export default function TradesPage() {
           visible: showEMA200,
         });
         ema200SeriesRef.current = ema200Series;
-        console.log('📉 EMA 200 series created:', {
+        console.log('📈 EMA 200 series created:', {
           visible: showEMA200,
-          color: '#f59e0b',
+          color: '#ea580c',
           seriesRef: !!ema200SeriesRef.current,
         });
 
@@ -510,16 +511,16 @@ export default function TradesPage() {
           console.warn("Could not attach structure lines primitive:", e);
         }
 
-        console.log('✅ Chart initialized successfully');
+        console.log('âœ… Chart initialized successfully');
         console.log('chartRef.current:', !!chartRef.current);
         console.log('candlestickSeriesRef.current:', !!candlestickSeriesRef.current);
 
         loadChartData(false);
       } catch (error) {
-        console.error('❌ Error creating chart:', error);
+        console.error('âŒ Error creating chart:', error);
       }
     } else {
-      console.log('⏭️ Skipping chart init: already initialized or container not ready');
+      console.log('â­ï¸ Skipping chart init: already initialized or container not ready');
       if (chartContainerRef.current) {
         loadChartData(false);
       }
@@ -629,7 +630,7 @@ export default function TradesPage() {
         // Check if chartFromDate is within recent range
         const chartDate = new Date(chartFromDate);
         if (chartDate >= recentThreshold) {
-          console.log('🔄 Auto-refresh chart data (recent mode only)');
+          console.log('ðŸ”„ Auto-refresh chart data (recent mode only)');
           loadChartData(false, 'recent');
         }
       }
@@ -666,7 +667,7 @@ export default function TradesPage() {
 
   const loadChartData = async (forceRefresh = false, loadMode?: 'recent' | 'full', timeframeOverride?: string) => {
     if (isLoadingChartDataRef.current && !forceRefresh) {
-      console.log('⏭️ loadChartData: skipped (already loading)');
+      console.log('â­ï¸ loadChartData: skipped (already loading)');
       return;
     }
     const timeframe = timeframeOverride || activeTimeframe;
@@ -681,7 +682,7 @@ export default function TradesPage() {
       const chartUrl = timeframe === "M1"
         ? `${apiUrl}/trading/chart/data?symbol=XAUUSD&timeframe=M1&count=6000`
         : `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${timeframe}&from_date=${fromDate}&mode=${mode}`;
-      console.log('🔄 Fetching chart data:', { mode, fromDate, url: chartUrl });
+      console.log('ðŸ”„ Fetching chart data:', { mode, fromDate, url: chartUrl });
 
       const response = await fetch(chartUrl);
 
@@ -689,12 +690,12 @@ export default function TradesPage() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('📉 [API ERROR]:', response.status, errorText);
+        console.error('ðŸ“‰ [API ERROR]:', response.status, errorText);
       }
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Chart API data received:', {
+        console.log('âœ… Chart API data received:', {
           mode: data.mode,
           from_date: data.from_date,
           candles: data.candles?.length,
@@ -704,7 +705,7 @@ export default function TradesPage() {
         if (data.candles && candlestickSeriesRef.current) {
           const processedCandles = processCandles(data.candles);
 
-          console.log('✅ Processed candles:', processedCandles.length);
+          console.log('âœ… Processed candles:', processedCandles.length);
 
           const timeScale = chartRef.current?.timeScale();
           const currentVisibleRange = timeScale?.getVisibleRange();
@@ -794,7 +795,7 @@ export default function TradesPage() {
 
           // Store timezone info from API.
           // IMPORTANT: `display_mode` defaults to 'utc' and is NOT overridden by the
-          // backend config on first load — UTC must be the default when the page opens.
+          // backend config on first load â€” UTC must be the default when the page opens.
           // We only pull `broker_offset_hours` (needed when user switches to broker mode).
           // If the user has manually picked a mode, we keep their choice entirely.
           if (data.timezone) {
@@ -804,7 +805,7 @@ export default function TradesPage() {
                 ...prev,
                 broker_offset_hours: data.timezone.broker_offset_hours ?? prev.broker_offset_hours,
               }));
-              console.log('🚫 Skipping display_mode override (user manually changed it); refreshed broker offset only');
+              console.log('ðŸš« Skipping display_mode override (user manually changed it); refreshed broker offset only');
             } else {
               // Default path: force UTC as the display mode, only adopt broker offset from API
               setChartTimezone(prev => ({
@@ -812,14 +813,14 @@ export default function TradesPage() {
                 broker_offset_hours: data.timezone.broker_offset_hours ?? prev.broker_offset_hours,
                 display_mode: 'utc',
               }));
-              console.log('🌍 Defaulting chart display_mode to UTC (broker offset from API:', data.timezone.broker_offset_hours, ')');
+              console.log('ðŸŒ Defaulting chart display_mode to UTC (broker offset from API:', data.timezone.broker_offset_hours, ')');
             }
           }
-          console.log(`✅ Chart data loaded successfully (${data.mode} mode)`);
+          console.log(`âœ… Chart data loaded successfully (${data.mode} mode)`);
 
           // Trigger structure overlay with fresh candle data
           if (showStructure && structureLines) {
-            console.log('🔄 Triggering structure overlay');
+            console.log('ðŸ”„ Triggering structure overlay');
             await overlayMarketStructure(processedCandles, forceRefresh);
           }
 
@@ -828,7 +829,7 @@ export default function TradesPage() {
       }
     } catch (error) {
       console.error("API error:", error);
-      console.warn("⚠️ Unable to load chart data");
+      console.warn("âš ï¸ Unable to load chart data");
       setDataMode('recent'); // Reset to recent on error
     } finally {
       isLoadingChartDataRef.current = false;
@@ -961,18 +962,18 @@ export default function TradesPage() {
   // Jump to specific year/month function (refactored to use cache)
   const jumpToDate = async (year: string, month: string) => {
     const centerDate = `${year}-${month}-01`;
-    console.log('🎯 jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
+    console.log('ðŸŽ¯ jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
 
     setIsJumping(true);
 
     const cacheKey = activeTimeframe;
     const cachedData = candleCacheRef.current[cacheKey];
-    console.log('🎯 cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
+    console.log('ðŸŽ¯ cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
 
     // Check if we have cached full history for this timeframe
     if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
-      console.log('🎯 CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
-      console.log('💾 Cache info:', {
+      console.log('ðŸŽ¯ CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
+      console.log('ðŸ’¾ Cache info:', {
         totalCandles: cachedData.totalCount,
         dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
       });
@@ -981,7 +982,7 @@ export default function TradesPage() {
         if (candlestickSeriesRef.current && chartRef.current && cachedData.candles.length > 0) {
           if (!fullDataDisplayedRef.current[cacheKey]) {
             // First time displaying this cached data for this timeframe
-            console.log('📊 Displaying cached data for', cacheKey, ':', {
+            console.log('ðŸ“Š Displaying cached data for', cacheKey, ':', {
               totalCandles: cachedData.totalCount,
               dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
             });
@@ -989,20 +990,20 @@ export default function TradesPage() {
             setChartFromDate(cachedData.fromDate);
             setDataMode('full');
             fullDataDisplayedRef.current[cacheKey] = true;
-            // Scroll first, overlay draws in next frame — prevents 1.5s freeze before scroll
+            // Scroll first, overlay draws in next frame â€” prevents 1.5s freeze before scroll
             focusChartOnDate(centerDate, 50, cachedData.candles);
             if (showStructure && structureLines) {
               await overlayMarketStructure(cachedData.candles, true);
             }
           } else {
-            // Data & overlay already on chart — instant scroll
+            // Data & overlay already on chart â€” instant scroll
             updateLoadedCandles(cachedData.candles);
             focusChartOnDate(centerDate, 0, cachedData.candles);
           }
-          console.log('🎯 jumpToDate COMPLETE (cached)');
+          console.log('ðŸŽ¯ jumpToDate COMPLETE (cached)');
         }
       } catch (error) {
-        console.error('❌ Error using cache:', error);
+        console.error('âŒ Error using cache:', error);
       } finally {
         setIsJumping(false);
       }
@@ -1010,19 +1011,19 @@ export default function TradesPage() {
     }
 
     // No cache available - fetch from API (fallback to original behavior)
-    console.log('⚠️ No cache available, fetching from API...');
+    console.log('âš ï¸ No cache available, fetching from API...');
     setDataMode('loading');
 
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
       const chartUrl = `${apiUrl}/trading/chart/backtest-data?symbol=XAUUSD&timeframe=${activeTimeframe}&center_date=${centerDate}`;
 
-      console.log('🔄 Fetching windowed data:', chartUrl);
+      console.log('ðŸ”„ Fetching windowed data:', chartUrl);
       const response = await fetch(chartUrl);
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Windowed data received:', {
+        console.log('âœ… Windowed data received:', {
           mode: data.mode,
           center_date: data.center_date,
           candles: data.candles?.length,
@@ -1048,12 +1049,12 @@ export default function TradesPage() {
           if (showStructure && structureLines) {
             await overlayMarketStructure(processedCandles, true);
           }
-          console.log(`✅ Jumped to ${centerDate} successfully`);
+          console.log(`âœ… Jumped to ${centerDate} successfully`);
           return processedCandles;
         }
       }
     } catch (error) {
-      console.error('❌ Jump to date error:', error);
+      console.error('âŒ Jump to date error:', error);
       setDataMode('recent');
     } finally {
       setIsJumping(false);
@@ -1070,7 +1071,7 @@ export default function TradesPage() {
       if (visibleRange) {
         const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
         timeframeSwitchCenterTimeRef.current = centerTime;
-        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+        console.log("â±ï¸ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
       }
     }
     setActiveTimeframe(newTimeframe);
@@ -1090,24 +1091,24 @@ export default function TradesPage() {
 
   // Handle timezone change - extracted so it can be reused by the toolbar
   const handleTimezoneChange = (newMode: "utc" | "broker" | "local") => {
-    console.log("🔄 TIMEZONE CHANGE TRIGGERED");
+    console.log("ðŸ”„ TIMEZONE CHANGE TRIGGERED");
     console.log("  Previous mode:", chartTimezone.display_mode);
     console.log("  New mode:", newMode);
     console.log("  Previous state:", chartTimezone);
 
     // Mark that user manually changed timezone
     userChangedTimezone.current = true;
-    console.log("  🔒 User changed timezone flag set to TRUE");
+    console.log("  ðŸ”’ User changed timezone flag set to TRUE");
 
     const newTimezone = { ...chartTimezone, display_mode: newMode };
     console.log("  New state to set:", newTimezone);
 
     setChartTimezone(newTimezone);
-    console.log("  ✅ setChartTimezone called");
+    console.log("  âœ… setChartTimezone called");
 
     // Update chart localization in real-time
     if (chartRef.current) {
-      console.log("  📊 Chart ref exists, updating options...");
+      console.log("  ðŸ“Š Chart ref exists, updating options...");
 
       chartRef.current.applyOptions({
         localization: {
@@ -1117,7 +1118,7 @@ export default function TradesPage() {
           },
         },
       });
-      console.log("  ✅ applyOptions called with new formatter");
+      console.log("  âœ… applyOptions called with new formatter");
 
       const timeScale = chartRef.current.timeScale();
       const visibleRange = timeScale.getVisibleRange();
@@ -1135,17 +1136,17 @@ export default function TradesPage() {
           if (chartRef.current) {
             console.log("  Restoring original range:", visibleRange);
             chartRef.current.timeScale().setVisibleRange(visibleRange);
-            console.log("  ✅ Force redraw complete");
+            console.log("  âœ… Force redraw complete");
           }
         }, 10);
       } else {
-        console.warn("  ⚠️ No visible range available");
+        console.warn("  âš ï¸ No visible range available");
       }
     } else {
-      console.warn("  ⚠️ Chart ref not available");
+      console.warn("  âš ï¸ Chart ref not available");
     }
 
-    console.log("🔄 TIMEZONE CHANGE HANDLER COMPLETE\n");
+    console.log("ðŸ”„ TIMEZONE CHANGE HANDLER COMPLETE\n");
   };
 
   // Zoom controls
@@ -1292,7 +1293,7 @@ export default function TradesPage() {
       return;
     }
 
-    console.log('💼 Trades overlay activated. Loaded trades:', trades.length);
+    console.log('ðŸ’¼ Trades overlay activated. Loaded trades:', trades.length);
     const lastCandle = chartCandles.length > 0 ? chartCandles[chartCandles.length - 1]?.time : null;
 
     // ponytail: all lines drawn via canvas primitive, no series needed
@@ -1314,7 +1315,7 @@ export default function TradesPage() {
 
     // Prevent concurrent executions
     if (overlayGuardRef.current) {
-      console.log('⏸️ overlayMarketStructure already running, skipping');
+      console.log('â¸ï¸ overlayMarketStructure already running, skipping');
       return;
     }
     overlayGuardRef.current = true;
@@ -1344,7 +1345,7 @@ export default function TradesPage() {
     const filteredHhPoints = filterByDateRange(filterByTimeframe(structureLines.hh_points));
     const filteredLlPoints = filterByDateRange(filterByTimeframe(structureLines.ll_points));
 
-    // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
+    // Build O(1) lookup map once â€” eliminates O(n) candle scans per line (n=200k)
     const candleTimeMap = new Map<number, ChartCandle>();
     const candleTimeArray: number[] = [];
     for (let i = 0; i < candlesToUse.length; i++) {
@@ -1472,7 +1473,7 @@ export default function TradesPage() {
           endTimeSeconds = lastCandleTime ?? eventTimeSeconds;
         }
         
-        // Find the breaking candle for HH/LL lines — cap at 20 candles after formation
+        // Find the breaking candle for HH/LL lines â€” cap at 20 candles after formation
         if (lineType === 'HH' || lineType === 'LL') {
           const hhStart = lowerBound(startTimeSeconds + 1);
           const endIdx = Math.min(hhStart + 20, candleTimeArray.length);
@@ -1646,7 +1647,7 @@ export default function TradesPage() {
     // Hide progress popup
     setDrawLineProgress({ visible: false, percent: 100, current: totalLines, total: totalLines });
 
-    console.log('\n✅ ===== OVERLAY COMPLETE =====');
+    console.log('\nâœ… ===== OVERLAY COMPLETE =====');
     console.log('Total structure lines parsed:', totalLines);
     
     overlayGuardRef.current = false;
@@ -1694,7 +1695,7 @@ export default function TradesPage() {
   useEffect(() => {
     const primitive = sessionZonesPrimitiveRef.current;
     if (!primitive) {
-      console.warn('⚠️ Session zones primitive not initialized');
+      console.warn('âš ï¸ Session zones primitive not initialized');
       return;
     }
 
@@ -1711,23 +1712,23 @@ export default function TradesPage() {
       }));
 
     primitive.setBoxes(boxes);
-    console.log('✅ Session zones updated successfully');
+    console.log('âœ… Session zones updated successfully');
   }, [sessionZonesData, showSessions]);
 
   // Toggle EMA 200 visibility
   useEffect(() => {
-    console.log('📉 [EMA DEBUG] showEMA200 toggled:', showEMA200);
+    console.log('ðŸ“‰ [EMA DEBUG] showEMA200 toggled:', showEMA200);
     if (ema200SeriesRef.current) {
       ema200SeriesRef.current.applyOptions({ visible: showEMA200 });
-      console.log('📉 [EMA DEBUG] EMA 200 visibility set to:', showEMA200);
+      console.log('ðŸ“‰ [EMA DEBUG] EMA 200 visibility set to:', showEMA200);
     } else {
-      console.warn('📉 [EMA DEBUG] ⚠️ Cannot toggle EMA 200 — series ref is NULL');
+      console.warn('ðŸ“‰ [EMA DEBUG] âš ï¸ Cannot toggle EMA 200 â€” series ref is NULL');
     }
   }, [showEMA200]);
 
-  // On first chart data load — mark as loaded (zoom range is handled by loadChartData)
+  // On first chart data load â€” mark as loaded (zoom range is handled by loadChartData)
   useEffect(() => {
-    console.log('📏 ChartCandles effect: trigger', {
+    console.log('ðŸ“ ChartCandles effect: trigger', {
       chartRef: !!chartRef.current,
       len: chartCandles.length,
       loaded: chartDataLoadedRef.current,
@@ -1749,7 +1750,7 @@ export default function TradesPage() {
     overlayTradeEntries();
   }, [showTrades, backtestTradesData]);
 
-  // Sync progress ref → state at 60fps during loading (avoids React batching swallows)
+  // Sync progress ref â†’ state at 60fps during loading (avoids React batching swallows)
   useEffect(() => {
     if (!loadProgress.visible) return;
     let rafId: number;
@@ -1819,7 +1820,7 @@ export default function TradesPage() {
       }
     } catch (error) {
       console.error("Error loading trades:", error);
-      console.warn('⚠️ Unable to load trades data from MT5');
+      console.warn('âš ï¸ Unable to load trades data from MT5');
     }
   };
 
@@ -1828,7 +1829,7 @@ export default function TradesPage() {
   };
 
   const changeTimeframe = (tf: string) => {
-    console.log('🔄 Changing timeframe to:', tf);
+    console.log('ðŸ”„ Changing timeframe to:', tf);
 
     if (chartRef.current) {
       const timeScale = chartRef.current.timeScale();
@@ -1836,7 +1837,7 @@ export default function TradesPage() {
       if (visibleRange) {
         const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
         timeframeSwitchCenterTimeRef.current = centerTime;
-        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+        console.log("â±ï¸ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
       }
     }
 
@@ -1846,10 +1847,10 @@ export default function TradesPage() {
     if (previousTimeframe !== tf) {
       // Timeframe changed - check if new timeframe has cached data
       if (hasCachedData) {
-        console.log(`✅ Timeframe ${tf} has cached data - will use cache`);
+        console.log(`âœ… Timeframe ${tf} has cached data - will use cache`);
         setDataMode('full'); // Mark as full since we have cached data
       } else {
-        console.log(`⚠️ Timeframe ${tf} has no cache - need to load data`);
+        console.log(`âš ï¸ Timeframe ${tf} has no cache - need to load data`);
         setDataMode('recent'); // Reset to recent mode for new timeframe
         // Note: Don't clear cache for old timeframe - keep it for when user switches back
       }
@@ -1862,7 +1863,7 @@ export default function TradesPage() {
       // If we have cache for this timeframe, use it instead of API call
       const cacheKey = tf;
       if (hasCachedData) {
-        console.log('⚡ Using cached data for timeframe change');
+        console.log('âš¡ Using cached data for timeframe change');
         const cachedData = candleCacheRef.current[cacheKey];
 
         // Display cached data immediately
@@ -2012,12 +2013,13 @@ export default function TradesPage() {
         }}
       />
 
-      {/* Sidebar */}
+      {/* Main Content Container */}
       <div
         className="relative z-10"
         style={{
           width: "100%",
-          paddingLeft: "240px", // Space for sidebar (exact sidebar width)
+          paddingLeft: "var(--sidebar-offset, 250px)",
+          transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           minHeight: "calc(100vh - 0px)" // Full height minus any top offset
         }}
       >
@@ -2038,62 +2040,79 @@ export default function TradesPage() {
             </div>
           </div>
 
-          {/* Stats Grid - Responsive Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Total Trades
+          {/* Stats Grid - Theme 09 Sapphire Platinum Sovereign Cards */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Card 1: Total Trades */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Trades</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  {activeTimeframe === "M1" ? "LIVE M1" : `${selectedYear} BACKTEST`}
+                </span>
               </div>
-              <div className="text-2xl font-semibold mono mb-1">
-                {stats.total_trades}
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {stats.total_trades.toLocaleString()}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">
-                {activeTimeframe === "M1"
-                  ? "Last 30 days"
-                  : `Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear}`}
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>{activeTimeframe === "M1" ? "Last 30 days history" : `Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear}`}</span>
               </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Win Rate
+            {/* Card 2: Win Rate */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Win Rate</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  {stats.win_rate >= 50 ? "PROFITABLE" : "DRAWDOWN"}
+                </span>
               </div>
-              <div className={`text-2xl font-semibold mono mb-1 ${stats.win_rate >= 50 ? 'positive' : 'negative'}`}>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
                 {stats.win_rate.toFixed(1)}%
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">
-                {activeTimeframe === "M1"
-                  ? "Win rate (30 days)"
-                  : `Win rate (Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear})`}
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span className={stats.win_rate >= 50 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                  {stats.win_rate >= 50 ? "Target tercapai" : "Di bawah target"}
+                </span>
+                <span>•</span>
+                <span>{activeTimeframe === "M1" ? "Live session" : "Cumulative period"}</span>
               </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Total P&L
+            {/* Card 3: Total P&L */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Net P&L</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  REALTIME
+                </span>
               </div>
-              <div className={`text-2xl font-semibold mono mb-1 ${stats.total_pnl >= 0 ? 'positive' : 'negative'}`}>
-                {stats.total_pnl >= 0 ? '+' : ''}${stats.total_pnl.toFixed(2)}
+              <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", stats.total_pnl >= 0 ? "text-slate-900" : "text-rose-600")}>
+                {stats.total_pnl >= 0 ? `+$${stats.total_pnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(stats.total_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">
-                {activeTimeframe === "M1"
-                  ? "PnL (30 days)"
-                  : `Net PnL (Jan - ${availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} ${selectedYear})`}
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span className={stats.total_pnl >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                  Net PnL
+                </span>
+                <span>Jan - {availableMonths.find((m) => m.value === selectedMonth)?.label ?? selectedMonth} {selectedYear}</span>
               </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Open Positions
+            {/* Card 4: Open Positions */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Positions</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  ACTIVE
+                </span>
               </div>
-              <div className="text-2xl font-semibold neutral mono mb-1">
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
                 {stats.open_positions}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">
-                {stats.open_positions === 0 ? 'No active trades' : `${stats.open_positions} active trade${stats.open_positions > 1 ? 's' : ''}`}
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>{stats.open_positions === 0 ? "No active trades" : `${stats.open_positions} active trade${stats.open_positions > 1 ? "s" : ""}`}</span>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Chart Section */}
           <div className="glass-card mb-8">
@@ -2135,7 +2154,7 @@ export default function TradesPage() {
             <div
               ref={chartContainerRef}
               id="chart-container"
-              className="w-full rounded-xl overflow-hidden relative bg-slate-950/20"
+              className="w-full rounded-xl overflow-hidden relative bg-[#F0F6FF]/40"
               style={{ height: "700px" }}
             >
               <div
@@ -2157,7 +2176,7 @@ export default function TradesPage() {
               onClick={() => setActiveBottomTab('recent-trades')}
               className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${activeBottomTab === 'recent-trades'
                 ? "bg-[var(--neon-blue)] text-white shadow-[0_4px_20px_rgba(59,130,246,0.2)]"
-                : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+                : "bg-white/75 text-slate-400 hover:text-slate-800 border border-blue-200"
                 }`}
             >
               <Briefcase size={16} aria-hidden="true" /> Recent Trades
@@ -2166,7 +2185,7 @@ export default function TradesPage() {
               onClick={() => setActiveBottomTab('monthly-summary')}
               className={`px-5 py-3 rounded-xl font-semibold text-sm transition-all flex items-center gap-2 cursor-pointer ${activeBottomTab === 'monthly-summary'
                 ? "bg-[var(--neon-blue)] text-white shadow-[0_4px_20px_rgba(59,130,246,0.2)]"
-                : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
+                : "bg-white/75 text-slate-400 hover:text-slate-800 border border-blue-200"
                 }`}
             >
               <ClipboardList size={16} aria-hidden="true" /> Monthly Summary
@@ -2243,7 +2262,7 @@ export default function TradesPage() {
                             <span className="text-sm font-medium text-slate-400">Belum ada riwayat transaksi</span>
                             <button 
                               onClick={() => loadChartData(true, 'full')} 
-                              className="mt-2 px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg border border-slate-700/50 transition-all cursor-pointer"
+                              className="mt-2 px-4 py-1.5 bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-xs font-semibold rounded-lg border border-blue-300/60 transition-all cursor-pointer"
                             >
                               Muat Semua Riwayat
                             </button>
@@ -2321,13 +2340,13 @@ export default function TradesPage() {
                   {/* Year Select Dropdown (Custom Glassmorphism) */}
                   <div className="relative">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400 font-medium">Tahun:</span>
+                      <span className="text-xs text-slate-500 font-medium">Tahun:</span>
                       <button
                         onClick={() => setIsYearDropdownOpen((prev) => !prev)}
-                        className="flex items-center justify-between gap-2 bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none hover:bg-cyan-500/15 transition-all cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.1)] min-w-[75px]"
+                        className="flex items-center justify-between gap-2 bg-sky-50 hover:bg-sky-100 border border-sky-300/80 text-sky-950 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none transition-all cursor-pointer shadow-sm min-w-[75px]"
                       >
                         <span>{monthlySummaryYearFilter}</span>
-                        <span className="text-[10px] text-cyan-400">▼</span>
+                        <ChevronDown size={13} className={`text-sky-600 transition-transform duration-200 ${isYearDropdownOpen ? "rotate-180" : ""}`} />
                       </button>
                     </div>
 
@@ -2338,7 +2357,7 @@ export default function TradesPage() {
                           className="fixed inset-0 z-40"
                           onClick={() => setIsYearDropdownOpen(false)}
                         />
-                        <div className="absolute right-0 mt-1.5 w-24 bg-slate-900/90 border border-slate-800 rounded-lg shadow-2xl backdrop-blur-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                        <div className="absolute right-0 mt-1.5 w-24 bg-white/95 border border-sky-200 rounded-lg shadow-xl backdrop-blur-xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-top-1 duration-150">
                           {availableYears.map((year) => (
                             <button
                               key={year}
@@ -2346,7 +2365,7 @@ export default function TradesPage() {
                                 setMonthlySummaryYearFilter(year);
                                 setIsYearDropdownOpen(false);
                               }}
-                              className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 font-medium cursor-pointer ${monthlySummaryYearFilter === year ? "text-cyan-400 bg-cyan-500/5" : "text-slate-300"
+                              className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-sky-50 hover:text-sky-900 font-semibold cursor-pointer ${monthlySummaryYearFilter === year ? "text-sky-700 bg-sky-100/80" : "text-slate-700"
                                 }`}
                             >
                               {year}
@@ -2358,14 +2377,14 @@ export default function TradesPage() {
                   </div>
 
                   {/* Performance Status Tabs */}
-                  <div className="flex bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+                  <div className="flex bg-sky-100/40 p-1 rounded-lg border border-sky-200/80 backdrop-blur-md shadow-sm gap-1">
                     {(['all', 'profit', 'loss'] as const).map((perfFilter) => (
                       <button
                         key={perfFilter}
                         onClick={() => setMonthlySummaryPerformanceFilter(perfFilter)}
-                        className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${monthlySummaryPerformanceFilter === perfFilter
-                          ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${monthlySummaryPerformanceFilter === perfFilter
+                          ? "bg-sky-600 text-white shadow-sm"
+                          : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                           }`}
                       >
                         {perfFilter === 'all' ? 'Semua' : perfFilter === 'profit' ? 'Profit Only' : 'Loss Only'}
@@ -2377,7 +2396,7 @@ export default function TradesPage() {
 
               <div className="overflow-hidden">
                 <table className="w-full border-collapse text-sm">
-                  <thead className="bg-slate-900/30 border-b border-slate-800/60">
+                  <thead className="bg-white/60 border-b border-blue-200/70">
                     <tr>
                       <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Month</th>
                       <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Trades</th>
@@ -2418,26 +2437,26 @@ export default function TradesPage() {
                         <tr
                           key={idx}
                           onClick={() => handleMonthRowClick(month.year, month.month_num, month.month_label || `${month.month} ${month.year}`)}
-                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-white/5 cursor-pointer transition-all duration-200"
+                          className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-all duration-200"
                           title="Klik untuk melihat detail transaksi"
                         >
-                          <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-800">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
                           <td className="px-4 py-3.5 whitespace-nowrap mono font-light">{month.executed_trades ?? month.trades ?? 0}</td>
                           <td className={`px-4 py-3.5 whitespace-nowrap font-medium ${
                             (month.win_rate ?? 0) > 50
-                              ? "positive"
+                              ? "text-emerald-600"
                               : (month.win_rate ?? 0) === 50
-                              ? "text-white"
-                              : "negative"
+                              ? "text-slate-700"
+                              : "text-rose-600"
                           }`}>
                             {(month.win_rate ?? 0).toFixed(1)}%
                           </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light positive">{(month.profit ?? 0).toFixed(2)}</td>
-                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light negative">{(month.loss ?? 0).toFixed(2)}</td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${(month.net_profit ?? 0) >= 0 ? "positive" : "negative"}`}>
+                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light text-emerald-600">{(month.profit ?? 0).toFixed(2)}</td>
+                          <td className="px-4 py-3.5 whitespace-nowrap mono font-light text-rose-600">{(month.loss ?? 0).toFixed(2)}</td>
+                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${(month.net_profit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                             {(month.net_profit ?? 0) >= 0 ? "+" : ""}{(month.net_profit ?? 0).toFixed(2)}
                           </td>
-                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "positive" : "negative"}`}>
+                          <td className={`px-4 py-3.5 whitespace-nowrap mono font-medium ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                             {((month.net_profit ?? 0) / 1000 * 100).toFixed(2)}%
                           </td>
                         </tr>
@@ -2452,9 +2471,9 @@ export default function TradesPage() {
 
         {/* Progress popup for Load Full History */}
         {loadProgress.visible && (
-          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="fixed inset-0 bg-white/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
             <div 
-              className="bg-slate-900/90 border border-purple-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(168,85,247,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+              className="bg-white/92 border border-purple-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(168,85,247,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
               style={{ transformStyle: "preserve-3d" }}
             >
               <div className="flex flex-col items-center justify-center text-center mb-5">
@@ -2472,7 +2491,7 @@ export default function TradesPage() {
                   {loadProgress.total.toLocaleString()} total rows
                 </div>
               </div>
-              <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div className="w-full h-3 bg-white/80 border border-blue-200/60 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(168,85,247,0.5)] relative overflow-hidden"
                   style={{ width: `${loadProgress.percent}%` }}
@@ -2487,9 +2506,9 @@ export default function TradesPage() {
 
         {/* Progress popup for Drawing Lines */}
         {drawLineProgress.visible && (
-          <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="fixed inset-0 bg-white/85 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
             <div 
-              className="bg-slate-900/90 border border-cyan-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(6,182,212,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
+              className="bg-white/92 border border-cyan-500/25 rounded-2xl p-6 w-96 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),_0_25px_60px_rgba(0,0,0,0.8),_0_0_45px_rgba(6,182,212,0.18)] transform perspective-1000 rotate-x-6 animate-in zoom-in-90 duration-350 ease-out"
               style={{ transformStyle: "preserve-3d" }}
             >
               <div className="flex flex-col items-center justify-center text-center mb-5">
@@ -2506,7 +2525,7 @@ export default function TradesPage() {
                   Drawing line {drawLineProgress.current} of {drawLineProgress.total}
                 </div>
               </div>
-              <div className="w-full h-3 bg-slate-950/80 border border-slate-800/40 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
+              <div className="w-full h-3 bg-white/80 border border-blue-200/60 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.8)] relative overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 rounded-full transition-all duration-150 shadow-[0_0_12px_rgba(6,182,212,0.5)] relative overflow-hidden"
                   style={{ width: `${drawLineProgress.percent}%` }}
@@ -2521,19 +2540,19 @@ export default function TradesPage() {
 
         {/* Monthly Trades Detail Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-300 ease-out">
-            <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-12 duration-300 ease-out relative">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-300 ease-out">
+            <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in slide-in-from-bottom-12 duration-300 ease-out relative">
               {/* Premium Gradient Top Accent Line */}
               <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
               {/* Header */}
-              <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+              <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
                     <CalendarDays className="size-5" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                    <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                       Detail Transaksi - {modalTitle}
                     </h3>
                     <p className="text-xs text-slate-400">
@@ -2543,7 +2562,7 @@ export default function TradesPage() {
                 </div>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                  className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                   title="Tutup"
                 >
                   <X className="size-5" />
@@ -2565,11 +2584,11 @@ export default function TradesPage() {
                   <>
                     {/* Summary Dashboard Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                         <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
-                        <span className="text-2xl font-bold text-slate-200 mono">{selectedMonthTrades.length}</span>
+                        <span className="text-2xl font-bold text-slate-800 mono">{selectedMonthTrades.length}</span>
                       </div>
-                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                         <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
                         <span className="text-2xl font-bold text-cyan-400 mono">
                           {(() => {
@@ -2578,7 +2597,7 @@ export default function TradesPage() {
                           })()}%
                         </span>
                       </div>
-                      <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                      <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                         <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
                         <span className={`text-2xl font-semibold mono ${selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-[var(--neon-emerald)]" : "text-[var(--neon-ruby)]"
                           }`}>
@@ -2589,10 +2608,10 @@ export default function TradesPage() {
                     </div>
 
                     {/* Trades Detail Table */}
-                    <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                    <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-[#F0F6FF]/40">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
+                          <thead className="bg-white/75 border-b border-blue-200 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
                             <tr>
                               <th className="py-3 px-4">Ticket</th>
                               <th className="py-3 px-4">Type</th>
@@ -2604,7 +2623,7 @@ export default function TradesPage() {
                               <th className="py-3 px-4">Exit Time</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                          <tbody className="divide-y divide-blue-200/70 text-slate-800">
                             {[...selectedMonthTrades]
                               .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
                               .map((trade) => {
@@ -2646,10 +2665,10 @@ export default function TradesPage() {
               </div>
 
               {/* Footer */}
-              <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+              <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
                 >
                   Tutup
                 </button>

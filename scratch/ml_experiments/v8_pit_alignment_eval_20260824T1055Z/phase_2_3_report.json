@@ -1,0 +1,51 @@
+{
+  "experiment": "v8_point_in_time_alignment_ablation",
+  "decision": "REJECT_DO_NOT_PROMOTE",
+  "reason": "Candidate fails strict total and yearly promotion gates against canonical v8 OOS.",
+  "data_contract": {
+    "prediction_time": "structure_event_time + 15 minutes",
+    "market_candle_rule": "candle_open_time + timeframe <= prediction_time",
+    "session_rule": "active session high, low, range, and position use completed M15 candles only",
+    "forbidden_features": [
+      "mfe_target",
+      "mae_target",
+      "mfe_target_norm",
+      "mae_target_norm",
+      "actual_net_profit"
+    ]
+  },
+  "dataset_comparison": {
+    "same_shape": true,
+    "same_trade_keys": true,
+    "rows": 1942,
+    "columns": 71,
+    "materially_changed_feature_families": [
+      "H1 completed-candle features",
+      "H4 completed-candle features",
+      "session point-in-time range features"
+    ]
+  },
+  "canonical_v8_oos": {
+    "trades": 435,
+    "win_rate_pct": 55.172413793103445,
+    "flat_net_pnl": 18884.57,
+    "dynamic_net_pnl": 86960.60000000002,
+    "profit_factor_dynamic": 2.081752616228516,
+    "maximum_drawdown_dynamic": -8560.250000000002
+  },
+  "candidate": {
+    "trades": 435,
+    "win_rate_pct": 54.252873563218394,
+    "flat_net_pnl": 14557.98,
+    "dynamic_net_pnl": 16716.12,
+    "profit_factor_dynamic": 1.2236670889942693,
+    "maximum_drawdown_dynamic": -10014.53
+  },
+  "promotion_gate": {
+    "failed": 36,
+    "evaluated": 48,
+    "removed_trade_keys": 103,
+    "added_trade_keys": 103
+  },
+  "interpretation": "The historical v8 score is inflated by feature values unavailable at prediction time. The corrected candidate is more honest but cannot be promoted because it underperforms the frozen canonical gate. Future tuning must use the corrected point-in-time contract while canonical v8 remains the promotion benchmark."
+}

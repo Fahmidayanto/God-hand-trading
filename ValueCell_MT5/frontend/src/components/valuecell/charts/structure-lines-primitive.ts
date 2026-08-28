@@ -107,8 +107,8 @@ class StructureLinesPaneRenderer implements IPrimitivePaneRenderer {
           const offsetY = line.isResistance ? -8 * vpr : 8 * vpr;
           const labelY = ly + offsetY;
 
-          // Draw dark background rectangle
-          ctx.fillStyle = "rgba(17, 24, 39, 0.85)";
+          // Draw solid dark background rectangle (100% opaque so EMA 200 and candles never show through)
+          ctx.fillStyle = "#0f172a";
           ctx.fillRect(
             midX - textWidth / 2 - 4 * hpr,
             labelY - textHeight / 2 - 2 * vpr,
@@ -141,6 +141,11 @@ class StructureLinesPaneView implements IPrimitivePaneView {
 
   constructor(private readonly source: StructureLinesPrimitive) {
     this._renderer = new StructureLinesPaneRenderer(source);
+  }
+
+  // Draw on top of all series (including EMA 200 line series and candles)
+  zOrder(): "bottom" | "normal" | "top" {
+    return "top";
   }
 
   renderer(): IPrimitivePaneRenderer {

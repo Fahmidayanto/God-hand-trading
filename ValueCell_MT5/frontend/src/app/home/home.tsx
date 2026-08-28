@@ -1,14 +1,10 @@
-import { useTheme } from "next-themes";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { useAllPollTaskList } from "@/api/conversation";
 import {
-  IconGroupDarkPng,
   IconGroupPng,
-  MessageGroupDarkPng,
   MessageGroupPng,
-  TrendDarkPng,
   TrendPng,
 } from "@/assets/png";
 import { AutoTrade, NewsPush, ResearchReport } from "@/assets/svg";
@@ -29,7 +25,6 @@ const INDEX_SYMBOLS = [
 
 function Home() {
   const { t, i18n } = useTranslation();
-  const { resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const [inputValue, setInputValue] = useState<string>("");
 
@@ -39,19 +34,15 @@ function Home() {
     navigate(`/agent/${agentId}`);
   };
 
-  const isDark = resolvedTheme === "dark";
-
   const suggestions = [
     {
       id: "ResearchAgent",
       title: t("home.suggestions.research.title"),
       icon: <SvgIcon name={ResearchReport} />,
       description: t("home.suggestions.research.description"),
-      bgColor: isDark
-        ? "bg-gradient-to-r from-[#111827]/80 from-[5.05%] to-[#1D4ED8]/35 to-[100%]"
-        : "bg-gradient-to-r from-[#FFFFFF]/70 from-[5.05%] to-[#E7EFFF]/70 to-[100%]",
+      bgColor: "bg-gradient-to-r from-[#FFFFFF]/80 from-[5.05%] to-[#DBEAFE]/70 to-[100%]",
       decorativeGraphics: (
-        <img src={isDark ? IconGroupDarkPng : IconGroupPng} alt="IconGroup" />
+        <img src={IconGroupPng} alt="IconGroup" />
       ),
     },
     {
@@ -59,11 +50,9 @@ function Home() {
       title: t("home.suggestions.strategy.title"),
       icon: <SvgIcon name={AutoTrade} />,
       description: t("home.suggestions.strategy.description"),
-      bgColor: isDark
-        ? "bg-gradient-to-r from-[#111827]/80 from-[5.05%] to-[#7C3AED]/30 to-[100%]"
-        : "bg-gradient-to-r from-[#FFFFFF]/70 from-[5.05%] to-[#EAE8FF]/70 to-[100%]",
+      bgColor: "bg-gradient-to-r from-[#FFFFFF]/80 from-[5.05%] to-[#BFDBFE]/60 to-[100%]",
       decorativeGraphics: (
-        <img src={isDark ? TrendDarkPng : TrendPng} alt="Trend" />
+        <img src={TrendPng} alt="Trend" />
       ),
     },
     {
@@ -71,12 +60,10 @@ function Home() {
       title: t("home.suggestions.news.title"),
       icon: <SvgIcon name={NewsPush} />,
       description: t("home.suggestions.news.description"),
-      bgColor: isDark
-        ? "bg-gradient-to-r from-[#111827]/80 from-[5.05%] to-[#DB2777]/25 to-[100%]"
-        : "bg-gradient-to-r from-[#FFFFFF]/70 from-[5.05%] to-[#FFE7FD]/70 to-[100%]",
+      bgColor: "bg-gradient-to-r from-[#FFFFFF]/80 from-[5.05%] to-[#E0EDFF]/70 to-[100%]",
       decorativeGraphics: (
         <img
-          src={isDark ? MessageGroupDarkPng : MessageGroupPng}
+          src={MessageGroupPng}
           alt="MessageGroup"
         />
       ),

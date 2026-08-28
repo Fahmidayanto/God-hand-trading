@@ -73,34 +73,37 @@
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 
-  /* ValueCell Trading Dashboard - Theme 07: Brilliant Solitaire Diamond (Dominant Crystal White) */
-  --bg-page: linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 30%, #F0F9FF 60%, #EEF2FF 85%, #FAF5FF 100%);
+  /* ValueCell Trading Dashboard - Theme 09: Sapphire Platinum Sovereign (Dominant Ice Platinum White) */
+  --bg-page: linear-gradient(180deg, #FFFFFF 0%, #F0F6FF 40%, #E0EDFF 100%);
   --bg-deepspace: #FFFFFF;
-  --bg-void: #F8FAFC;
+  --bg-void: #F0F6FF;
   --bg-surface: #FFFFFF;
-  --bg-elevated: #F0F9FF;
-  --bg-interactive: #EEF2FF;
-  --glass-primary: rgba(255, 255, 255, 0.92);
-  --glass-secondary: rgba(240, 249, 255, 0.85);
-  --glass-border: rgba(186, 230, 253, 0.85);
-  --neon-blue-rgb: 2, 132, 199;
-  --neon-cyan-rgb: 56, 189, 248;
-  --neon-purple-rgb: 147, 51, 234;
-  --neon-blue: #0284C7;
-  --neon-cyan: #38BDF8;
+  --bg-elevated: #F0F6FF;
+  --bg-interactive: #DBEAFE;
+  --glass-primary: rgba(255, 255, 255, 0.95);
+  --glass-secondary: rgba(240, 247, 255, 0.88);
+  --glass-border: rgba(59, 130, 246, 0.35);
+  --neon-blue-rgb: 29, 78, 216;
+  --neon-cyan-rgb: 37, 99, 235;
+  --neon-purple-rgb: 30, 64, 175;
+  --neon-blue: #1D4ED8;
+  --neon-cyan: #2563EB;
   --neon-emerald: #059669;
-  --neon-ruby: #E11D48;
+  --neon-ruby: #DC2626;
   --neon-amber: #D97706;
-  --neon-purple: #9333EA;
+  --neon-purple: #1E40AF;
   --text-primary: #0F172A;
-  --text-secondary: #334155;
-  --text-tertiary: #64748B;
-  --text-muted: #94A3B8;
+  --text-secondary: #1E3A8A;
+  --text-tertiary: #3B82F6;
+  --text-muted: #2563EB;
 
-  /* Diamond Prismatic Gradient Utilities */
-  --white-gradient-card: linear-gradient(135deg, #FFFFFF 0%, #F0F9FF 35%, #EEF2FF 70%, #FAF5FF 100%);
-  --white-gradient-pill: linear-gradient(135deg, #FFFFFF 0%, #E0F2FE 50%, #F3E8FF 100%);
-  --white-gradient-btn: linear-gradient(135deg, #0284C7 0%, #4F46E5 50%, #9333EA 100%);
+  --sidebar-w: 240px;
+  --sidebar-offset: 250px;
+
+  /* Sapphire Platinum Gradient Utilities */
+  --white-gradient-card: linear-gradient(135deg, #FFFFFF 0%, #F0F7FF 50%, #DBEAFE 100%);
+  --white-gradient-pill: linear-gradient(135deg, #FFFFFF 0%, #BFDBFE 100%);
+  --white-gradient-btn: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 50%, #172554 100%);
 }
 
 .dark {
@@ -325,26 +328,26 @@
     }
   }
 
-  /* ValueCell Trading Dashboard Glassmorphism — Brilliant Solitaire Diamond */
+  /* ValueCell Trading Dashboard Glassmorphism — Sapphire Platinum Sovereign */
   .glass-card {
     background: var(--glass-primary);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(186, 230, 253, 0.85);
+    border: 1px solid rgba(59, 130, 246, 0.35);
     border-radius: 16px;
     box-shadow:
-      0 20px 45px -15px rgba(56, 189, 248, 0.12),
-      0 0 1px rgba(99, 102, 241, 0.18),
+      0 20px 45px -15px rgba(37, 99, 235, 0.12),
+      0 0 1px rgba(37, 99, 235, 0.18),
       inset 0 1px 1px rgba(255, 255, 255, 0.95);
     transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .glass-card:hover {
-    border-color: rgba(147, 197, 253, 1);
+    border-color: rgba(29, 78, 216, 0.85);
     box-shadow:
-      0 30px 60px -15px rgba(168, 85, 247, 0.18),
+      0 30px 60px -15px rgba(37, 99, 235, 0.25),
       0 0 35px rgba(255, 255, 255, 1),
-      0 0 20px rgba(56, 189, 248, 0.35);
+      0 0 20px rgba(147, 197, 253, 0.45);
   }
 
   /* Compact glass — for inline control bars, chips, sub-panels. */
@@ -352,38 +355,38 @@
     background: var(--glass-secondary);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border: 1px solid rgba(186, 230, 253, 0.75);
+    border: 1px solid rgba(59, 130, 246, 0.35);
     border-radius: 12px;
     box-shadow:
-      0 4px 16px rgba(56, 189, 248, 0.08),
+      0 4px 16px rgba(37, 99, 235, 0.08),
       inset 0 1px 1px rgba(255, 255, 255, 0.9);
     transition: all 0.25s ease;
   }
 
   .glass-chip:hover {
-    border-color: rgba(99, 102, 241, 0.5);
+    border-color: rgba(29, 78, 216, 0.6);
   }
 
   /* Glass table header — translucent header above the row data. */
   .glass-header {
-    background: rgba(240, 249, 255, 0.92);
+    background: rgba(240, 247, 255, 0.92);
     backdrop-filter: blur(14px) saturate(150%);
     -webkit-backdrop-filter: blur(14px) saturate(150%);
-    border-bottom: 1px solid rgba(186, 230, 253, 0.85);
+    border-bottom: 1px solid rgba(59, 130, 246, 0.35);
   }
 
-  /* Neon glow used by primary action (e.g. Apply button) — purple to match accent token. */
+  /* Neon glow used by primary action (e.g. Apply button) — sapphire to match accent token. */
   .neon-glow-purple {
     box-shadow:
-      0 0 12px rgba(139, 92, 246, 0.35),
-      0 0 4px rgba(139, 92, 246, 0.25),
+      0 0 12px rgba(29, 78, 216, 0.35),
+      0 0 4px rgba(29, 78, 216, 0.25),
       inset 0 1px 1px rgba(255, 255, 255, 0.08);
   }
 
   .neon-glow-purple:hover {
     box-shadow:
-      0 0 18px rgba(139, 92, 246, 0.55),
-      0 0 6px rgba(139, 92, 246, 0.35),
+      0 0 18px rgba(29, 78, 216, 0.55),
+      0 0 6px rgba(29, 78, 216, 0.35),
       inset 0 1px 1px rgba(255, 255, 255, 0.12);
   }
 
@@ -477,16 +480,13 @@
 }
 
 .bg-animated {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
   z-index: 1;
   background: 
-    radial-gradient(circle at 15% 20%, rgba(56, 189, 248, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 85% 30%, rgba(168, 85, 247, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 50% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 85% 30%, rgba(29, 78, 216, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 50% 80%, rgba(147, 197, 253, 0.10) 0%, transparent 50%),
     var(--bg-page);
   pointer-events: none;
 }
@@ -494,9 +494,10 @@
 .container {
   position: relative;
   z-index: 2;
-  max-width: 1400px;
+  width: 100%;
+  max-width: 1920px;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0;
 }
 
 /* Navbar */
@@ -741,7 +742,7 @@
 }
 
 .activity-log::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.3);
+  background: rgba(59, 130, 246, 0.08);
   border-radius: 10px;
   margin: 8px 0;
 }
@@ -755,7 +756,7 @@
 
 .activity-log::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--neon-cyan), var(--neon-purple));
-  box-shadow: 0 0 14px rgba(6, 182, 212, 0.7);
+  box-shadow: 0 0 14px rgba(29, 78, 216, 0.7);
 }
 
 .log-entry {
@@ -886,18 +887,18 @@
 }
 
 .elegant-scrollbar::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.2);
+  background: rgba(59, 130, 246, 0.08);
   border-radius: 10px;
 }
 
 .elegant-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--neon-blue, #3b82f6), var(--neon-cyan, #06b6d4));
+  background: linear-gradient(180deg, var(--neon-blue, #1D4ED8), var(--neon-cyan, #2563EB));
   border-radius: 10px;
-  box-shadow: 0 0 6px rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.3);
   transition: all 0.3s ease;
 }
 
 .elegant-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, var(--neon-cyan, #06b6d4), var(--neon-purple, #a855f7));
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.6);
+  background: linear-gradient(180deg, var(--neon-cyan, #2563EB), var(--neon-purple, #1E40AF));
+  box-shadow: 0 0 10px rgba(29, 78, 216, 0.6);
 }

@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5 Rekomendasi Layout Baru Dashboard MT5 | God Hand Trading</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              300: '#7cc7fb',
+              400: '#38a9f8',
+              500: '#0e8ce9',
+              600: '#026fc7',
+              700: '#0358a1',
+              800: '#074b84',
+              900: '#0c3f6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-page: #f4f8fc;
+      --card-border: rgba(186, 224, 253, 0.75);
+      --card-bg: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(240,247,255,0.85) 50%, rgba(224,239,254,0.7) 100%);
+      --glass-shadow: 0 12px 30px -10px rgba(14, 140, 233, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+      --neon-blue: #0284c7;
+      --neon-emerald: #059669;
+      --neon-amber: #d97706;
+      --neon-ruby: #e11d48;
+      --neon-purple: #9333ea;
+    }
+
+    body {
+      background-color: var(--bg-page);
+      background-image: 
+        radial-gradient(at 10% 15%, rgba(14, 140, 233, 0.08) 0px, transparent 50%),
+        radial-gradient(at 90% 85%, rgba(147, 51, 234, 0.06) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: #0f172a;
+      overflow-x: hidden;
+    }
+
+    /* Theme 09 Sapphire Platinum Sovereign Cards */
+    .card-theme-09 {
+      border: 1px solid var(--card-border);
+      background: var(--card-bg);
+      border-radius: 20px;
+      box-shadow: var(--glass-shadow);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .card-theme-09:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 18px 40px -12px rgba(14, 140, 233, 0.2), 0 6px 16px -3px rgba(0,0,0,0.06);
+    }
+
+    /* Glass Container */
+    .glass-box {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(186, 224, 253, 0.8);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px -10px rgba(14, 140, 233, 0.08);
+    }
+
+    /* Status Bar Live Dot */
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 10px #10b981;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.3); opacity: 1; box-shadow: 0 0 14px #10b981; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+
+    /* Progress Fill */
+    .progress-bar-bg {
+      background: #e2e8f0;
+      border-radius: 9999px;
+      overflow: hidden;
+      height: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.6s ease;
+    }
+
+    /* Active Tab Pill */
+    .preset-pill-active {
+      background: #0284c7 !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+      border-color: #0284c7 !important;
+    }
+
+    /* Smooth Transition Container */
+    #layout-viewport {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ======================================================== -->
+  <!-- Top Showcase Header & 5 Preset Switcher Nav              -->
+  <!-- ======================================================== -->
+  <header class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-blue-200/80 px-4 lg:px-8 py-3.5 shadow-sm">
+    <div class="max-w-[1920px] mx-auto flex flex-col xl:flex-row items-center justify-between gap-4">
+      
+      <!-- Brand & Title -->
+      <div class="flex items-center gap-3 w-full xl:w-auto justify-between xl:justify-start">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white shadow-md shadow-blue-500/25 font-black text-lg">
+            GH
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-black text-slate-900 tracking-tight">5 Rekomendasi Tata Letak (Layout) Dashboard MT5</h1>
+              <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-blue-100 border border-blue-300 text-blue-800 uppercase">Live UI Real</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">Berdasarkan seluruh komponen real dashboard saat ini dengan 5 strategi posisi berbeda.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preset Switcher Buttons -->
+      <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-slate-100/90 border border-blue-200/80 w-full xl:w-auto justify-center text-xs">
+        <button onclick="switchLayout(1)" id="btn-layout-1" class="preset-btn px-3 py-2 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+          <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+          01. Command Center (3-Col Asymmetric)
+        </button>
+        <button onclick="switchLayout(2)" id="btn-layout-2" class="preset-btn px-3 py-2 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+          <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
+          02. SMC Dominance (2-Col Studio)
+        </button>
+        <button onclick="switchLayout(3)" id="btn-layout-3" class="preset-btn px-3 py-2 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+          <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+          03. Quant Cockpit (Multi-Deck)
+        </button>
+        <button onclick="switchLayout(4)" id="btn-layout-4" class="preset-btn px-3 py-2 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          04. Institutional Split (Side Telemetry)
+        </button>
+        <button onclick="switchLayout(5)" id="btn-layout-5" class="preset-btn px-3 py-2 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+          <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+          05. Matrix High-Density (4-Quadrant)
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- Preset Briefing / Info Banner                            -->
+  <!-- ======================================================== -->
+  <section class="bg-gradient-to-r from-blue-50 via-sky-50/70 to-indigo-50/50 border-b border-blue-200/60 px-4 lg:px-8 py-3">
+    <div class="max-w-[1920px] mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2">
+        <span class="px-2.5 py-1 rounded-lg bg-blue-600 text-white font-bold font-mono text-[11px]" id="preset-badge">PRESET 01</span>
+        <span class="font-bold text-slate-800 text-sm" id="preset-title">Command Center / Signal-First Priority (Asymmetrical 3-Column Ergonomics)</span>
+      </div>
+      <div class="text-slate-600 flex items-center gap-4">
+        <span id="preset-desc">Mengutamakan kecepatan eksekusi sinyal trading & konsensus 4 AI Agent di posisi hero tengah.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================== -->
+  <!-- Dynamic Dashboard Container Viewport                     -->
+  <!-- ======================================================== -->
+  <main class="flex-1 w-full px-4 sm:px-6 md:px-8 xl:px-12 py-6 max-w-[1920px] mx-auto" id="layout-viewport">
+    <!-- Konten di-render secara dinamis oleh JavaScript switchLayout() -->
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- Footer                                                   -->
+  <!-- ======================================================== -->
+  <footer class="mt-auto border-t border-blue-200/60 bg-white/70 backdrop-blur-sm py-4 px-4 text-center text-xs text-slate-500">
+    <div class="max-w-[1920px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <div class="flex items-center gap-4">
+        <a href="#" class="hover:text-blue-600 transition-colors">Documentation</a>
+        <span>•</span>
+        <a href="#" class="hover:text-blue-600 transition-colors">API</a>
+        <span>•</span>
+        <a href="#" class="hover:text-blue-600 transition-colors">GitHub</a>
+        <span>•</span>
+        <a href="#" class="hover:text-blue-600 transition-colors">Support</a>
+      </div>
+      <div>&copy; 2026 God Hand Trading System &bull; Version 1.0.0 &bull; Built for High-Performance MT5</div>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- REUSABLE COMPONENT TEMPLATES JAVASCRIPT ENGINE           -->
+  <!-- ======================================================== -->
+  <script>
+    // ==========================================
+    // 1. Data Mock Real Telemetry
+    // ==========================================
+    const mockData = {
+      status: {
+        mt5_connected: true,
+        uptime: "1h 45m",
+        last_update: "16:35:00",
+        account_number: "26091054",
+        cpu_usage: 14.2,
+        memory_usage: 248,
+        memory_percent: 32.5,
+      },
+      stats: {
+        balance: 1135.92,
+        equity: 1135.92,
+        open_positions: 0,
+        today_profit: 0.00,
+        health: 100,
+      },
+      signal: {
+        symbol: "XAUUSD",
+        timeframe: "M15",
+        signal: "HOLD",
+        entry_price: 2645.80,
+        confidence: 0.78,
+        stop_loss: 2638.00,
+        take_profit: 2662.50,
+      },
+      consensus: {
+        consensus: "BUY ACCUMULATE",
+        confidence: 0.82,
+        agents: [
+          { name: "Price Action Agent", signal: "BUY", conf: 0.85, color: "text-blue-600", bg: "bg-blue-100", border: "border-blue-300" },
+          { name: "Market Structure Agent", signal: "BUY", conf: 0.88, color: "text-purple-600", bg: "bg-purple-100", border: "border-purple-300" },
+          { name: "ML Filter / LLM News", signal: "NEUTRAL", conf: 0.65, color: "text-emerald-600", bg: "bg-emerald-100", border: "border-emerald-300", badge: "LLM News" },
+          { name: "Risk Manager Agent", signal: "SAFE TO ENTER", conf: 0.90, color: "text-amber-600", bg: "bg-amber-100", border: "border-amber-300" }
+        ]
+      },
+      performance: {
+        win_rate: 68.4,
+        profit_factor: 2.14,
+        sharpe_ratio: 1.89,
+        max_drawdown: 8.2,
+      },
+      structure: {
+        phase: 1,
+        phase_name: "Accumulation & Liquidity Sweep",
+        direction: "BULLISH",
+        is_entry_valid: true,
+        bos_price: 2642.50,
+        bos_direction: "BULLISH",
+        bars_since_bos: 4,
+        bos_chain: 3,
+        choch_price: 2635.10,
+        choch_direction: "BULLISH",
+        h1_above_ema200: true,
+        h1_trend_aligned: true
+      },
+      activityLogs: [
+        { time: "16:34:12", type: "EXEC", title: "Market Structure BoS Confirmed", desc: "M15 XAUUSD broke structural high at 2642.50 with volume spike.", severity: "success" },
+        { time: "16:32:05", type: "AI", title: "Multi-Agent Consensus Reached", desc: "3 of 4 sub-agents voted BUY. Overall confidence elevated to 82%.", severity: "info" },
+        { time: "16:28:40", type: "RISK", title: "H1 Trend Filter Verified", desc: "Price maintains above 200 EMA (2638.20). Trend alignment confirmed.", severity: "info" },
+        { time: "16:15:22", type: "SYSTEM", title: "Tick Telemetry Synchronized", desc: "Zero slippage bridge latency stable at 1.8ms.", severity: "info" }
+      ]
+    };
+
+    // ==========================================
+    // 2. Reusable Visual Components (Theme 09)
+    // ==========================================
+
+    // Status Bar Telemetri
+    function renderStatusBar() {
+      return `
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 rounded-2xl bg-white/90 border border-blue-200/80 shadow-sm text-xs text-slate-600 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
+              <span class="pulse-dot"></span>
+              <span>${mockData.status.mt5_connected ? 'LIVE BRIDGE CONNECTED' : 'OFFLINE'}</span>
+            </div>
+            <span>&bull;</span>
+            <span>Uptime: <strong class="text-slate-800">${mockData.status.uptime}</strong></span>
+            <span>&bull;</span>
+            <span>Last Tick: <strong class="text-slate-800">${mockData.status.last_update}</strong></span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span>Account MT5: <strong class="font-mono text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">#${mockData.status.account_number}</strong></span>
+            <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">HEDGING</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // 4 Kartu Metrik Utama Tema 09
+    function renderMetricCards(isCompact = false) {
+      if (isCompact) {
+        return `
+          <section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div class="p-3.5 rounded-2xl card-theme-09 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase"><span>Balance</span><span class="font-mono text-blue-600">USD</span></div>
+              <div class="text-xl font-black text-slate-900 mt-1">$1,135.92</div>
+              <div class="text-[10px] text-emerald-600 font-semibold mt-0.5">Equity: $1,135.92</div>
+            </div>
+            <div class="p-3.5 rounded-2xl card-theme-09 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase"><span>Positions</span><span class="font-mono text-slate-500">LIVE</span></div>
+              <div class="text-xl font-black text-slate-900 mt-1">0</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">Margin 0%</div>
+            </div>
+            <div class="p-3.5 rounded-2xl card-theme-09 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase"><span>Today P&L</span><span class="font-mono text-emerald-600">+0.00%</span></div>
+              <div class="text-xl font-black text-emerald-600 mt-1">+$0.00</div>
+              <div class="text-[10px] text-slate-500 mt-0.5">Net Realized</div>
+            </div>
+            <div class="p-3.5 rounded-2xl card-theme-09 flex flex-col justify-between">
+              <div class="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase"><span>Health</span><span class="font-mono text-emerald-600">100%</span></div>
+              <div class="text-xl font-black text-slate-900 mt-1">100%</div>
+              <div class="text-[10px] text-emerald-600 font-semibold mt-0.5">Operational</div>
+            </div>
+          </section>
+        `;
+      }
+
+      return `
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Card 1: Balance -->
+          <div class="relative flex flex-col justify-between gap-2 p-4 sm:p-5 card-theme-09">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Account Balance</span>
+              <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase flex items-center gap-1">
+                <i data-lucide="wallet" class="w-3 h-3 text-blue-500"></i> USD
+              </span>
+            </div>
+            <div class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              $1,135.92
+            </div>
+            <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>Equity:</span>
+              <strong class="text-emerald-600 font-bold">$1,135.92</strong>
+              <span>(100%)</span>
+            </div>
+          </div>
+
+          <!-- Card 2: Positions -->
+          <div class="relative flex flex-col justify-between gap-2 p-4 sm:p-5 card-theme-09">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Positions</span>
+              <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase flex items-center gap-1">
+                <i data-lucide="bar-chart-3" class="w-3 h-3 text-sky-500"></i> LIVE
+              </span>
+            </div>
+            <div class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              0
+            </div>
+            <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>No active orders</span>
+              <span>&bull;</span>
+              <span>Margin 0%</span>
+            </div>
+          </div>
+
+          <!-- Card 3: Today P&L -->
+          <div class="relative flex flex-col justify-between gap-2 p-4 sm:p-5 card-theme-09">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Today P&L</span>
+              <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase flex items-center gap-1">
+                <i data-lucide="trending-up" class="w-3 h-3 text-emerald-500"></i> REALTIME
+              </span>
+            </div>
+            <div class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              +$0.00
+            </div>
+            <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span class="text-emerald-600 font-bold">+0.00%</span>
+              <span>dari deposit awal</span>
+            </div>
+          </div>
+
+          <!-- Card 4: Health -->
+          <div class="relative flex flex-col justify-between gap-2 p-4 sm:p-5 card-theme-09">
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">System Health</span>
+              <span class="font-mono text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase flex items-center gap-1">
+                <i data-lucide="zap" class="w-3 h-3 text-emerald-500"></i> CONNECTED
+              </span>
+            </div>
+            <div class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              100%
+            </div>
+            <div class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span class="text-emerald-600 font-bold">All systems operational</span>
+            </div>
+          </div>
+        </section>
+      `;
+    }
+
+    // Card: Current Market Signal
+    function renderSignalCard(compact = false) {
+      return `
+        <div class="p-5 sm:p-6 glass-box flex flex-col justify-between relative overflow-hidden h-full">
+          <div class="absolute -top-12 -right-12 w-32 h-32 bg-blue-400/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                  <i data-lucide="target" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-slate-900">Current Market Signal</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">XAUUSD &bull; Timeframe M15</p>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-xl bg-amber-100 border border-amber-300 text-amber-800 font-bold text-xs font-mono">
+                HOLD / WAIT BoS
+              </span>
+            </div>
+
+            <!-- Signal Key Metrics -->
+            <div class="grid grid-cols-3 gap-2.5 p-3.5 rounded-2xl bg-blue-50/60 border border-blue-200/70 mb-4 text-center">
+              <div>
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Signal Type</span>
+                <div class="font-bold text-sm text-slate-800 mt-0.5">HOLD</div>
+              </div>
+              <div class="border-x border-blue-200/80 px-2">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Target Price</span>
+                <div class="font-mono font-bold text-sm text-blue-700 mt-0.5">2,645.80</div>
+              </div>
+              <div>
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Confidence</span>
+                <div class="font-bold text-sm text-emerald-600 mt-0.5">78%</div>
+              </div>
+            </div>
+
+            <!-- Confidence Bar -->
+            <div class="space-y-1.5 mb-4">
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-700">
+                <span>Signal Confidence Barometer</span>
+                <span class="text-blue-600 font-mono">78%</span>
+              </div>
+              <div class="progress-bar-bg">
+                <div class="progress-fill bg-gradient-to-r from-blue-500 to-emerald-500" style="width: 78%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SL & TP Footnote -->
+          <div class="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] text-slate-600 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-blue-500"></i>
+              <span>SL: <strong class="font-mono text-slate-800">2,638.00</strong> | TP: <strong class="font-mono text-slate-800">2,662.50</strong></span>
+            </span>
+            <span class="text-emerald-700 font-bold text-[10px]">RR 1:3.1</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Card: Agent Consensus Matrix
+    function renderAgentConsensus() {
+      return `
+        <div class="p-5 sm:p-6 glass-box flex flex-col justify-between h-full">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold">
+                  <i data-lucide="bot" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-slate-900">Multi-Agent Consensus</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">4 AI Sub-Agents Realtime Voting</p>
+                </div>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-lg bg-purple-50 text-purple-700 border border-purple-200 font-mono text-[11px] font-bold">
+                4/4 ONLINE
+              </span>
+            </div>
+
+            <!-- 4 Agents Rows -->
+            <div class="space-y-3 mb-4">
+              <!-- Agent 1 -->
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i data-lucide="activity" class="w-3.5 h-3.5"></i></div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">Price Action Agent</div>
+                    <div class="text-[10px] text-slate-500">Candle momentum + Wick rejection</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] font-bold text-emerald-600 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">BUY (85%)</span>
+                </div>
+              </div>
+
+              <!-- Agent 2 -->
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i data-lucide="git-merge" class="w-3.5 h-3.5"></i></div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">Market Structure Agent</div>
+                    <div class="text-[10px] text-slate-500">BoS Chain & CHoCH Alignment</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] font-bold text-emerald-600 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">BUY (88%)</span>
+                </div>
+              </div>
+
+              <!-- Agent 3 -->
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center"><i data-lucide="brain" class="w-3.5 h-3.5"></i></div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>ML / LLM News Filter</span>
+                      <span class="text-[9px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">LLM News</span>
+                    </div>
+                    <div class="text-[10px] text-slate-500">Sentiment Fed & US CPI Data</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] font-bold text-slate-600 px-2 py-0.5 rounded bg-slate-100 border border-slate-200">NEUTRAL (65%)</span>
+                </div>
+              </div>
+
+              <!-- Agent 4 -->
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200/80 flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center"><i data-lucide="shield" class="w-3.5 h-3.5"></i></div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">Risk Manager Agent</div>
+                    <div class="text-[10px] text-slate-500">Max DD constraint & margin check</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <span class="text-[11px] font-bold text-blue-600 px-2 py-0.5 rounded bg-blue-50 border border-blue-200">SAFE (90%)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Overall Consensus Gauge -->
+          <div class="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="text-xs font-bold text-slate-800">Overall AI Consensus:</span>
+              <span class="text-xs font-black text-blue-700 uppercase font-mono">BUY ACCUMULATE (82%)</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-fill bg-gradient-to-r from-blue-600 to-indigo-600" style="width: 82%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Card: Performance Overview & System Resources
+    function renderPerformanceCard() {
+      return `
+        <div class="p-5 sm:p-6 glass-box flex flex-col justify-between h-full">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                  <i data-lucide="trending-up" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-slate-900">Performance & Health</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">Historical KPIs & Server Telemetry</p>
+                </div>
+              </div>
+              <span class="text-xs font-mono font-bold text-emerald-700">PROFITABLE</span>
+            </div>
+
+            <!-- 4 Performance Metric Badges -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200 text-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Win Rate</span>
+                <div class="text-base font-black text-emerald-600 mt-0.5">68.4%</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200 text-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Profit Factor</span>
+                <div class="text-base font-black text-blue-600 mt-0.5">2.14</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200 text-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Sharpe Ratio</span>
+                <div class="text-base font-black text-slate-800 mt-0.5">1.89</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-white/90 border border-slate-200 text-center">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Max DD</span>
+                <div class="text-base font-black text-slate-700 mt-0.5">8.2%</div>
+              </div>
+            </div>
+
+            <!-- Mini SVG Equity Curve -->
+            <div class="p-3 rounded-2xl bg-blue-50/50 border border-blue-200/60 mb-4">
+              <div class="flex items-center justify-between text-xs font-bold text-slate-700 mb-2">
+                <span>Equity Growth Curve</span>
+                <span class="text-emerald-600 font-mono">+$4,892.40 Net</span>
+              </div>
+              <svg viewBox="0 0 400 80" class="w-full h-16 stroke-blue-600 fill-blue-500/10">
+                <path d="M 0 65 Q 40 60, 80 50 T 160 40 T 240 25 T 320 20 T 400 8 L 400 80 L 0 80 Z" stroke-width="2" />
+                <path d="M 0 65 Q 40 60, 80 50 T 160 40 T 240 25 T 320 20 T 400 8" fill="none" stroke-width="2.5" stroke="#0284c7" />
+              </svg>
+            </div>
+          </div>
+
+          <!-- Server Resources Meter -->
+          <div class="space-y-2 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+            <div class="flex items-center justify-between text-[11px]">
+              <span class="text-slate-600">CPU Load (Python Server):</span>
+              <span class="font-mono font-bold text-slate-800">14.2%</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-fill bg-blue-500" style="width: 14.2%"></div></div>
+            <div class="flex items-center justify-between text-[11px] pt-1">
+              <span class="text-slate-600">Memory RAM:</span>
+              <span class="font-mono font-bold text-slate-800">248 MB (32.5%)</span>
+            </div>
+            <div class="progress-bar-bg"><div class="progress-fill bg-emerald-500" style="width: 32.5%"></div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Card: Market Structure State (SMC Analytics)
+    function renderMarketStructureCard(compact = false) {
+      return `
+        <div class="p-5 sm:p-6 glass-box flex flex-col justify-between h-full">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                  <i data-lucide="layers" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-slate-900">Market Structure State</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">Smart Money Concepts (SMC) Telemetry</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span class="px-2.5 py-1 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-800 font-bold text-xs flex items-center gap-1">
+                  <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> ENTRY ZONE ACTIVE
+                </span>
+              </div>
+            </div>
+
+            <!-- Phase & Direction Status -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div class="p-3.5 rounded-2xl bg-white/90 border border-blue-200 shadow-xs">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Current Phase</span>
+                <div class="text-base font-black text-blue-700 mt-0.5">Accumulation Phase</div>
+                <div class="text-[11px] text-slate-500">Liquidity sweep confirmed</div>
+              </div>
+              <div class="p-3.5 rounded-2xl bg-white/90 border border-blue-200 shadow-xs">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">Structure Direction</span>
+                <div class="text-base font-black text-emerald-600 mt-0.5 flex items-center gap-1.5">
+                  <i data-lucide="trending-up" class="w-4 h-4"></i> BULLISH
+                </div>
+                <div class="text-[11px] text-slate-500">Higher High sequence intact</div>
+              </div>
+            </div>
+
+            <!-- BoS & CHoCH Analytics Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-4">
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">BoS Price</span>
+                <div class="font-mono font-bold text-xs text-slate-900 mt-0.5">2,642.50</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">BoS Direction</span>
+                <div class="font-bold text-xs text-emerald-600 mt-0.5">BULLISH</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">CHoCH Price</span>
+                <div class="font-mono font-bold text-xs text-slate-900 mt-0.5">2,635.10</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span class="text-[10px] text-slate-500 font-bold uppercase">BoS Chain</span>
+                <div class="font-bold text-xs text-blue-700 mt-0.5">3 Consecutive</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- H1 Trend Alignment Bar -->
+          <div class="p-3 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-center justify-between text-xs">
+            <span class="flex items-center gap-2 text-slate-700 font-medium">
+              <i data-lucide="compass" class="w-4 h-4 text-blue-600"></i>
+              <span>H1 Context: <strong>Above EMA 200 (2,638.20)</strong></span>
+            </span>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+              TREND ALIGNED
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Card: Live Activity Stream
+    function renderActivityStream(maxHeight = "max-h-72") {
+      return `
+        <div class="p-5 sm:p-6 glass-box flex flex-col justify-between h-full">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center font-bold">
+                  <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <h3 class="text-sm sm:text-base font-bold text-slate-900">Live Activity Stream</h3>
+                  <p class="text-[11px] text-slate-500 font-medium">Realtime Transaction & Telemetry Events</p>
+                </div>
+              </div>
+              <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-mono text-[10px] font-bold">
+                4 EVENTS
+              </span>
+            </div>
+
+            <!-- Activity Logs Scroll Container -->
+            <div class="space-y-2.5 overflow-y-auto ${maxHeight} pr-1">
+              ${mockData.activityLogs.map(log => `
+                <div class="p-3 rounded-xl bg-white/90 border border-slate-200/80 flex items-start gap-3 shadow-xs hover:border-blue-300 transition-colors">
+                  <div class="text-[10px] font-mono font-bold text-slate-400 mt-0.5 w-14 shrink-0">${log.time}</div>
+                  <div class="w-2 h-2 rounded-full mt-1.5 shrink-0 ${log.severity === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}"></div>
+                  <div class="flex-1">
+                    <div class="text-xs font-bold text-slate-800 leading-tight">${log.title}</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5 leading-snug">${log.desc}</div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 3. THE 5 LAYOUT PRESET BUILDERS
+    // ==========================================
+
+    const layoutConfigs = {
+      1: {
+        badge: "PRESET 01",
+        title: "Command Center (3-Column Asymmetric Ergonomics)",
+        desc: "Mengutamakan kecepatan eksekusi. Sinyal trading & AI Consensus berada di Hero Center (44%), diapit Analisis SMC (28%) di kiri dan Performa (28%) di kanan.",
+        render: () => `
+          ${renderStatusBar()}
+          ${renderMetricCards()}
+          
+          <!-- 3-Column Grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+            <!-- Left Column: SMC & Server Health (4/12 = 33%) -->
+            <div class="lg:col-span-4 flex flex-col gap-5">
+              ${renderMarketStructureCard()}
+            </div>
+
+            <!-- Center Column: Signal & Multi-Agent Consensus (4/12 = 33%) -->
+            <div class="lg:col-span-4 flex flex-col gap-5">
+              ${renderSignalCard()}
+              ${renderAgentConsensus()}
+            </div>
+
+            <!-- Right Column: Performance & Live Logs (4/12 = 33%) -->
+            <div class="lg:col-span-4 flex flex-col gap-5">
+              ${renderPerformanceCard()}
+              ${renderActivityStream("max-h-64")}
+            </div>
+          </div>
+        `
+      },
+
+      2: {
+        badge: "PRESET 02",
+        title: "SMC Dominance (2-Column Studio Grid)",
+        desc: "Dirancang untuk trader SMC murni. Market Structure State dan Live Signal ditaruh bersisian di baris atas, diikuti AI Consensus dan Performa di baris kedua.",
+        render: () => `
+          ${renderStatusBar()}
+          ${renderMetricCards()}
+
+          <!-- Row 1: Tactical Zone (50:50) -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+            ${renderMarketStructureCard()}
+            ${renderSignalCard()}
+          </div>
+
+          <!-- Row 2: Analytical & Stream Zone (60:40) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+            <div class="lg:col-span-7 flex flex-col gap-5">
+              ${renderAgentConsensus()}
+            </div>
+            <div class="lg:col-span-5 flex flex-col gap-5">
+              ${renderPerformanceCard()}
+            </div>
+          </div>
+
+          <!-- Row 3: Activity Stream Full Width -->
+          <div class="mb-6">
+            ${renderActivityStream("max-h-48")}
+          </div>
+        `
+      },
+
+      3: {
+        badge: "PRESET 03",
+        title: "Quant Cockpit (Multi-Deck Panoramic Hub)",
+        desc: "Struktur multi-deck modular. Sinyal menjadi Headline Banner di atas, dilanjutkan 3 deck seimbang (AI Voting, SMC State, Performance KPIs), dan log di bawah.",
+        render: () => `
+          ${renderStatusBar()}
+          ${renderMetricCards()}
+
+          <!-- Deck 1: Signal Panoramic Banner -->
+          <div class="mb-5">
+            ${renderSignalCard()}
+          </div>
+
+          <!-- Deck 2: 3-Deck Modular Grid (Equal 1:1:1) -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-5">
+            ${renderAgentConsensus()}
+            ${renderMarketStructureCard()}
+            ${renderPerformanceCard()}
+          </div>
+
+          <!-- Deck 3: Live Stream Full Width -->
+          <div class="mb-6">
+            ${renderActivityStream("max-h-52")}
+          </div>
+        `
+      },
+
+      4: {
+        badge: "PRESET 04",
+        title: "Institutional Split (Side Telemetry + Canvas)",
+        desc: "Tata letak ala Bloomberg Pro. Kolom kiri (33%) berfungsi sebagai live ticker & voting panel, sedangkan kolom kanan (67%) menjadi canvas analitis SMC & grafik.",
+        render: () => `
+          ${renderStatusBar()}
+
+          <!-- Main Split (33% : 67%) -->
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-6">
+            <!-- Left Side Telemetry (4/12 = 33%) -->
+            <div class="lg:col-span-4 flex flex-col gap-5">
+              ${renderMetricCards(true)}
+              ${renderSignalCard()}
+              ${renderAgentConsensus()}
+            </div>
+
+            <!-- Right Main Canvas (8/12 = 67%) -->
+            <div class="lg:col-span-8 flex flex-col gap-5">
+              ${renderMarketStructureCard()}
+              ${renderPerformanceCard()}
+              ${renderActivityStream("max-h-56")}
+            </div>
+          </div>
+        `
+      },
+
+      5: {
+        badge: "PRESET 05",
+        title: "Matrix High-Density (4-Quadrant Zero-Scroll)",
+        desc: "Dirancang untuk monitoring satu layar tanpa banyak scroll. 4 modul inti dibagi ke dalam 4 kuadran simetris dengan top metrics bar yang ringkas.",
+        render: () => `
+          ${renderStatusBar()}
+          ${renderMetricCards(true)}
+
+          <!-- 4-Quadrant 2x2 Matrix -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+            <!-- Quadrant 1: Signal -->
+            ${renderSignalCard()}
+            <!-- Quadrant 2: Market Structure -->
+            ${renderMarketStructureCard()}
+            <!-- Quadrant 3: Agent Consensus -->
+            ${renderAgentConsensus()}
+            <!-- Quadrant 4: Performance & Health -->
+            ${renderPerformanceCard()}
+          </div>
+
+          <!-- Activity Drawer -->
+          <div class="mb-6">
+            ${renderActivityStream("max-h-40")}
+          </div>
+        `
+      }
+    };
+
+    // ==========================================
+    // 4. Layout Switch Handler
+    // ==========================================
+    function switchLayout(presetId) {
+      // Update Button Styles
+      document.querySelectorAll('.preset-btn').forEach((btn, idx) => {
+        if (idx + 1 === presetId) {
+          btn.classList.add('preset-pill-active');
+        } else {
+          btn.classList.remove('preset-pill-active');
+        }
+      });
+
+      const cfg = layoutConfigs[presetId];
+      document.getElementById('preset-badge').textContent = cfg.badge;
+      document.getElementById('preset-title').textContent = cfg.title;
+      document.getElementById('preset-desc').textContent = cfg.desc;
+
+      // Animate Viewport
+      const viewport = document.getElementById('layout-viewport');
+      viewport.style.opacity = '0';
+      viewport.style.transform = 'translateY(8px)';
+
+      setTimeout(() => {
+        viewport.innerHTML = cfg.render();
+        lucide.createIcons();
+        viewport.style.opacity = '1';
+        viewport.style.transform = 'translateY(0)';
+      }, 150);
+    }
+
+    // Initialize on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      switchLayout(1);
+    });
+  </script>
+</body>
+</html>

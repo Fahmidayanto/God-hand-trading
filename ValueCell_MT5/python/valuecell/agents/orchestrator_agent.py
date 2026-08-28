@@ -20,6 +20,9 @@ from enum import Enum
 from loguru import logger
 
 from .market_structure_agent import MarketStructureAgent
+from .llm_council_coordinator import LLMCouncilCoordinator
+from .llm_msa_agent import LLMMSAAgent
+from .llm_specialist_agents import LLMDecisionAgent, LLMMLAgent, LLMSentimentAgent
 from .ml_prediction_agent import MLPredictionAgent
 from .risk_management_agent import RiskManagementAgent
 from .sentiment_agent import SentimentAgent
@@ -68,6 +71,8 @@ class OrchestratorAgent:
         enable_ml_prediction: bool = True,
         enable_risk_management: bool = True,
         enable_sentiment: bool = True,
+        enable_llm_msa: bool = False,
+        enable_llm_council: bool = False,
         consensus_threshold: float = 0.60,
         **agent_configs
     ):
@@ -102,6 +107,26 @@ class OrchestratorAgent:
         if enable_sentiment:
             sentiment_config = agent_configs.get("sentiment", {})
             self.agents["sentiment"] = SentimentAgent(**sentiment_config)
+
+        if enable_llm_msa:
+            llm_msa_config = agent_configs.get("llm_msa", {})
+            self.agents["llm_msa"] = LLMMSAAgent(**llm_msa_config)
+
+        self.llm_council = None
+        if enable_llm_council:
+            council_config = agent_configs.get("llm_council", {})
+            self.llm_council = LLMCouncilCoordinator(
+                msa_agent=LLMMSAAgent(**agent_configs.get("llm_msa", {})),
+                ml_agent=LLMMLAgent(**agent_configs.get("llm_ml", {})),
+                sentiment_agent=LLMSentimentAgent(
+                    **agent_configs.get("llm_sentiment", {})
+                ),
+                decision_agent=LLMDecisionAgent(
+                    **agent_configs.get("llm_decision", {})
+                ),
+                approval_threshold=council_config.get("approval_threshold", 0.60),
+                wait_timeout_seconds=council_config.get("wait_timeout_seconds", 8.0),
+            )
         
         self._latest_warmup_results = None
         
@@ -153,9 +178,16 @@ class OrchestratorAgent:
                     df_h4=market_data.get("h4_data"),   # Multi-TF EMA scoring H4
                     structure_events=market_data.get("structure_events"),
                     veto_mode=veto_mode,
+                    price_ratio=market_data.get("price_ratio"),
                 )
                 agent_results["market_structure"] = ms_result
                 logger.debug(f"   → Signal: {ms_result['signal']} | Confidence: {ms_result['confidence']:.3f}")
+
+                evidence_snapshot = ms_result.get("evidence_snapshot")
+                if "llm_msa" in self.agents and evidence_snapshot:
+                    agent_results["llm_msa"] = self.agents["llm_msa"].analyze(
+                        evidence_snapshot
+                    )
                 # === STEP 2 & 3: ML Validation & Sentiment Analysis ===
             ms_result = agent_results.get("market_structure")
             if ms_result:
@@ -360,6 +392,32 @@ class OrchestratorAgent:
             # === STEP 4: Calculate Consensus ===
             logger.debug(f"⚖️ Step 4: Calculating Consensus (Veto Mode: {veto_mode})...")
             consensus = self._calculate_consensus(agent_results, market_data, veto_mode=veto_mode)
+
+            if self.llm_council is not None and ms_result:
+                deterministic_consensus = dict(consensus)
+                evidence_snapshot = ms_result.get("evidence_snapshot") or {}
+                setup_id = str(
+                    evidence_snapshot.get("setup_id")
+                    or ms_result.get("setup_id")
+                    or f"{symbol}:{timeframe}:{market_data['current_bar']['time']}"
+                )
+                council_result = self.llm_council.evaluate(
+                    setup_id=setup_id,
+                    msa_result=ms_result,
+                    ml_result=agent_results.get("ml_prediction"),
+                    sentiment_result=agent_results.get("sentiment"),
+                )
+                agent_results["llm_council"] = council_result
+                consensus["deterministic_consensus"] = deterministic_consensus
+                consensus["approved"] = council_result["approved"]
+                consensus["final_signal"] = council_result["final_signal"]
+                consensus["final_confidence"] = round(
+                    council_result["scores"].get(council_result["final_signal"], 0.0),
+                    3,
+                )
+                consensus["reasoning"] += (
+                    f" [LLM Council] {council_result['gate_reason']}."
+                )
             
             # === STEP 5: Risk Management (if consensus approved) ===
             if "risk_management" in self.agents and consensus["approved"] and consensus["final_signal"] in ["BUY", "SELL"]:
@@ -702,6 +760,7 @@ class OrchestratorAgent:
             "type": "orchestrator",
             "description": "Multi-agent consensus engine with weighted voting",
             "active_agents": list(self.agents.keys()),
+            "llm_council_enabled": self.llm_council is not None,
             "agent_count": len(self.agents),
             "voting_weights": {
                 "market_structure": VoteWeight.MARKET_STRUCTURE.value,
@@ -724,6 +783,8 @@ class OrchestratorAgent:
         """Reset state machine for all sub-agents and clear the warmup cache."""
         if "market_structure" in self.agents:
             self.agents["market_structure"].reset_state()
+        if "llm_msa" in self.agents:
+            self.agents["llm_msa"].reset_state()
         self._latest_warmup_results = None
         logger.info("[RESET] OrchestratorAgent state and warmup cache reset -> IDLE")
 

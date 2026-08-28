@@ -1,0 +1,1264 @@
+{
+  "created_utc": "2026-08-24T10:02:41.453781+00:00",
+  "status": "CANONICAL_V8_OOS",
+  "dataset": {
+    "path": "ValueCell_MT5\\python\\valuecell\\models\\saved\\filter_latest\\dataset_v5_unconstrained.csv",
+    "size_bytes": 1514446,
+    "sha256": "6145bddba76366df9eb84523eaa94bae0804e67b90a0fd00dc912fcd77c78a5d",
+    "rows": 1942
+  },
+  "raw_files": [
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2019-12-30.csv",
+      "size_bytes": 54149,
+      "sha256": "cb1ec2c23b9806ffa3793ab3293272fad426d63fa461492ab57e12e857a3a983"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2020-12-30.csv",
+      "size_bytes": 63568,
+      "sha256": "d01bbffa3576ac4647f8fe42c842f6ffa828f10d1fd4f3fb44f4f0722d4bd29e"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2021-12-30.csv",
+      "size_bytes": 62174,
+      "sha256": "7aa9793b4f2d61e4540016f140b8f40e2b67215d2718ff135ad0cc6e71fddd19"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2022-12-30.csv",
+      "size_bytes": 63918,
+      "sha256": "19c7cdf268eb234147105a619e017bdbadc33bb9412ebaca87514e4a5946bb71"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2023-12-29.csv",
+      "size_bytes": 65414,
+      "sha256": "4c94f059c4c98d81399c58558360e1971e0e800a2693677b1c31ce781bfdfe9f"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2024-12-30.csv",
+      "size_bytes": 63113,
+      "sha256": "26d3c53ac53fe89c2cfbe80caa4b152923fa41dca1ba7a4169bdc4fe4743876c"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2025-12-30.csv",
+      "size_bytes": 62500,
+      "sha256": "e1a3324b8645106ec9fd7243ff7ad37352b46cd848862906881e56c373b8fa28"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Results_XAUUSD_2026-08-21.csv",
+      "size_bytes": 35415,
+      "sha256": "b31c73cee039f940bbcbdcf6092bd15f9328029c10bd243818b043f5f286f4b7"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2019-12-30.csv",
+      "size_bytes": 192,
+      "sha256": "d70db1e4b04c07505b34ba858cbfd548bc1530a697aa39c1ce6f8916352c6bf3"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2020-12-30.csv",
+      "size_bytes": 194,
+      "sha256": "1a15a3662af09face52207f76166b1a7ebaef17018746133dc68bc4699f3ab1d"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2021-12-30.csv",
+      "size_bytes": 195,
+      "sha256": "236c2ac45ecd762312d7b4bab21755cd0b0564a0ec4b2739821e4e68a71a5bfa"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2022-12-30.csv",
+      "size_bytes": 195,
+      "sha256": "863c5ff60ff8354600701a68c0545bd366de47209432db79dcdc98cf4f73e213"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2023-12-29.csv",
+      "size_bytes": 195,
+      "sha256": "433f040bda82f4201e38bc4f11e7b16d41c0eb3202381cddaa9e482ad9782f77"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2024-12-30.csv",
+      "size_bytes": 195,
+      "sha256": "ba2d70ff8d5dd0c7a37716bd2bb880a6358b71ea48580a401d5c9490b2046735"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2025-12-30.csv",
+      "size_bytes": 195,
+      "sha256": "e184b528a127a02b9a3447ab05d313755c67d9189a62615137b76cdbb9e704a2"
+    },
+    {
+      "path": "Backtest_result\\Backtest_Summary_XAUUSD_2026-08-21.csv",
+      "size_bytes": 188,
+      "sha256": "42f9674776894ee12177176c734a9c6ac8975b1be7c463f4583af4cd63c07ebc"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2019-12-30.csv",
+      "size_bytes": 1595116,
+      "sha256": "3ce06b16fcfb8d67554586ca798d9eea264076d4e0543b8e0e51a68f05176e93"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2020-12-30.csv",
+      "size_bytes": 1613667,
+      "sha256": "0ec7995aab54e089c8f737d9418fbb70dcd953f4b8e4e650874b23160424ee9c"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2021-12-30.csv",
+      "size_bytes": 1600665,
+      "sha256": "8eaf45dfb5099b7eafb97e46a712e922438d3a0be35d30ad8a97c24e006bc6d4"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2022-12-30.csv",
+      "size_bytes": 1605712,
+      "sha256": "279b5658d617346921b595c6d6133f77873c1f9147af173c4165b44b793a463d"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2023-12-29.csv",
+      "size_bytes": 1599786,
+      "sha256": "db56c2bd289696d64fca4ca5e5c85064e9a5d45391a8e64030565ee8b9b5d022"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2024-12-30.csv",
+      "size_bytes": 1619429,
+      "sha256": "dcd7407feabc4b56d7eb47c20faea47edcdadb4949de64cadce9cbe02bfc16ae"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2025-12-30.csv",
+      "size_bytes": 1608543,
+      "sha256": "19a88fa85ce123a6a7c204124e17a6870fdb4a4da44ea7ca6f06643708593744"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_M15_2026-08-21.csv",
+      "size_bytes": 1000418,
+      "sha256": "dbfc10ba84a324167dce048e02b3c9ded81bc03b7cc0cbe171e1deadb177050b"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2019-12-30.csv",
+      "size_bytes": 402757,
+      "sha256": "6357aaae17715ad81bc20cedcaf5badf209027c1f542137d444508ce5eac10ad"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2020-12-30.csv",
+      "size_bytes": 402016,
+      "sha256": "3417084eabf962e86043c700ee8a5999efdbeda8b99e7fc6f3cbf1732459a274"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2021-12-30.csv",
+      "size_bytes": 400079,
+      "sha256": "aa8d2963d82cb98bcc9836a636d88687ed53434a6250daf9df04151508b7fbf2"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2022-12-30.csv",
+      "size_bytes": 403485,
+      "sha256": "73cb4124c5ca2b4370ddc6c75b7d0d1e2bbcc551ac055dfe7f377f7dbc35693a"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2023-12-29.csv",
+      "size_bytes": 401993,
+      "sha256": "554737059957ec7db8690777373286f0aaf5e019ba8bb09dd9c4301e3da06910"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2024-12-30.csv",
+      "size_bytes": 405123,
+      "sha256": "fa6e9d3bf882dc9946cb121f3b1f374a90c07636393e64365a64960d5e6d6ced"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2025-12-30.csv",
+      "size_bytes": 401172,
+      "sha256": "0118dc96e7b0a12d49da23fa48fdd6aa781fffa2e0a7cf9f42be5e250c5173d7"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H1_2026-08-21.csv",
+      "size_bytes": 253536,
+      "sha256": "e13f8ed547dc932c851550239212923e34bb3612e7cf570dabfeb2d42f967be4"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2019-12-30.csv",
+      "size_bytes": 106472,
+      "sha256": "fb0531b228141fe39399f6f18ed1d3774d899ef6f221bc2f8e5499d94a9341f7"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2020-12-30.csv",
+      "size_bytes": 106273,
+      "sha256": "ef30278e7c424b29f556bf28b1b15b49299589a0b020ca93add907fa405450cf"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2021-12-30.csv",
+      "size_bytes": 105629,
+      "sha256": "328586680c414b6042f8de9ac20ec052f5b3d53da2a5add4e25f6f887e8f0f58"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2022-12-30.csv",
+      "size_bytes": 106608,
+      "sha256": "6f612cefb4fa60f4fb33253a3fba2b83cf7fe975d159bd3c8177ae8f66a99505"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2023-12-29.csv",
+      "size_bytes": 106210,
+      "sha256": "7c4325af0bae4d124f8b0bf23ebf7038c0777bcb1e94198e3b6a9ec50bc80363"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2024-12-30.csv",
+      "size_bytes": 106834,
+      "sha256": "4d3c5c1cac4b8694292e276aa4a4a404e6e3bf3e0867a7f890320a6a53af1b6c"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2025-12-30.csv",
+      "size_bytes": 106185,
+      "sha256": "cd1b0138be04588926ab56e1bbb516b75e2d0afd61142aaf27ed9ff7a8758257"
+    },
+    {
+      "path": "Backtest_result\\MarketData_XAUUSD_H4_2026-08-21.csv",
+      "size_bytes": 68602,
+      "sha256": "4683e14a09d789b85fb2038247b58a9183d5def8c5cdbe5e22666319e59ef64a"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2019-12-30.csv",
+      "size_bytes": 60465,
+      "sha256": "3828e1a87792261978e7262b4351a218c61594591055066b6cd10446bf5b4354"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2020-12-30.csv",
+      "size_bytes": 66837,
+      "sha256": "5410178e45326509726c1388d4f05ef3ed5e64c8f590e92f41814ff711bcccb2"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2021-12-30.csv",
+      "size_bytes": 64202,
+      "sha256": "985e877c8a24c4095282c593e3bc6036a0b9f4dba73879cc3f2a78d547bc306d"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2022-12-30.csv",
+      "size_bytes": 63980,
+      "sha256": "705ddd57479530dcd9c75b2154b00f244283afdb0a61e26d06b2d4feb583c02a"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2023-12-29.csv",
+      "size_bytes": 68367,
+      "sha256": "d7626253436b748d0389e575285b4694e3317c1ebb7542abcd85583c1b2d776a"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2024-12-30.csv",
+      "size_bytes": 64215,
+      "sha256": "dae9df4b93eb171605cf947031035c9f2334017fbd7161d72c834475723cd5c7"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2025-12-30.csv",
+      "size_bytes": 64885,
+      "sha256": "239fb7709b2daac238a9ad09018a59c4f86d01c34f96c51aef55da3c541887d2"
+    },
+    {
+      "path": "Backtest_result\\LLHHBOSData_XAUUSD_2026-08-21.csv",
+      "size_bytes": 41746,
+      "sha256": "a90e1fd2ca06d91bbba3782d60f8024597823ca6fcd1d5751bd51805f998c58c"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2019-12-30.csv",
+      "size_bytes": 183194,
+      "sha256": "8cd4e7c56d249736eac31d08317a22f7611055d755130a07b716dc5c169786db"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2020-12-30.csv",
+      "size_bytes": 184951,
+      "sha256": "930079c7eb3a09d4fd6ecfe3d8f76b0d90c1f32fdd8c2de214e1284dd8b0f693"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2021-12-30.csv",
+      "size_bytes": 185434,
+      "sha256": "4b04c3418a243ed57ba01899f52fa69daaeaee4fe0c6d9f03e876fdc4de675ee"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2022-12-30.csv",
+      "size_bytes": 186270,
+      "sha256": "f9841323cfc17caacc30eb4a10ff03c682d03a12ebb4af76002f4b13fbc05120"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2023-12-29.csv",
+      "size_bytes": 185438,
+      "sha256": "9f6ef6cdeba949a94746c30028ecd94d6159a87583c720434a30bad6206f2914"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2024-12-30.csv",
+      "size_bytes": 186390,
+      "sha256": "540877cea61b309f536ccbc3c975fa1fb5d46dc4f0797b48ceb1563d16bdb779"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2025-12-30.csv",
+      "size_bytes": 186080,
+      "sha256": "4d2e2bdef93ddca6e86dc35b4c810e91123b2dce05953aa4c4151c425fa0f3e0"
+    },
+    {
+      "path": "Backtest_result\\SessionZone_XAUUSD_2026-08-21.csv",
+      "size_bytes": 119993,
+      "sha256": "9a0fcbca4a957b7379348954756daf08b7823e43c58d8f2a6dc944e62a381f9b"
+    }
+  ],
+  "raw_manifest_sha256": "dcc29034c5b9f332b2d1417ee576a1ae238ee7cc464624d68e30ba70494785bb",
+  "reports": {
+    "v8_walk_forward": {
+      "artifact": "scratch\\ml_experiments\\v8_walk_forward_fresh_20260824T0956Z\\scored_v8_walk_forward.csv",
+      "sha256": "d5430cea9944e5e1e47dace8502dd106dcd5603c966b7cdfaeb8ed48c4051560",
+      "metric_contract": {
+        "win": "actual_net_profit > 0",
+        "loss": "actual_net_profit <= 0",
+        "flat_net_pnl": "sum(actual_net_profit) at 0.01 lot",
+        "dynamic_net_pnl": "actual_net_profit * dynamic_lot / 0.01",
+        "rr_threshold": 1.05,
+        "dynamic_lot_tiers": {
+          "1.05": 0.01,
+          "1.20": 0.02,
+          "1.50": 0.04,
+          "2.00": 0.07
+        }
+      },
+      "scope_years": [
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "total": {
+        "trades": 435,
+        "wins": 240,
+        "losses": 195,
+        "win_rate_pct": 55.172413793103445,
+        "flat_net_pnl": 18884.57,
+        "dynamic_net_pnl": 86960.60000000002,
+        "profit_factor_dynamic": 2.081752616228516,
+        "maximum_drawdown_dynamic": -8560.250000000002,
+        "expectancy_flat": 43.41280459770115,
+        "expectancy_dynamic": 199.90942528735636
+      },
+      "by_year": {
+        "2020": {
+          "trades": 35,
+          "wins": 19,
+          "losses": 16,
+          "win_rate_pct": 54.285714285714285,
+          "flat_net_pnl": -1.4800000000000466,
+          "dynamic_net_pnl": -2241.5500000000006,
+          "profit_factor_dynamic": 0.7554969687317976,
+          "maximum_drawdown_dynamic": -5565.290000000001,
+          "expectancy_flat": -0.04228571428571562,
+          "expectancy_dynamic": -64.04428571428573
+        },
+        "2021": {
+          "trades": 87,
+          "wins": 36,
+          "losses": 51,
+          "win_rate_pct": 41.37931034482759,
+          "flat_net_pnl": -748.55,
+          "dynamic_net_pnl": -3675.690000000001,
+          "profit_factor_dynamic": 0.8259925439375112,
+          "maximum_drawdown_dynamic": -6812.300000000001,
+          "expectancy_flat": -8.604022988505747,
+          "expectancy_dynamic": -42.2493103448276
+        },
+        "2022": {
+          "trades": 63,
+          "wins": 34,
+          "losses": 29,
+          "win_rate_pct": 53.96825396825397,
+          "flat_net_pnl": 1671.12,
+          "dynamic_net_pnl": 9016.04,
+          "profit_factor_dynamic": 1.9239042775471553,
+          "maximum_drawdown_dynamic": -2106.119999999999,
+          "expectancy_flat": 26.525714285714283,
+          "expectancy_dynamic": 143.11174603174604
+        },
+        "2023": {
+          "trades": 60,
+          "wins": 35,
+          "losses": 25,
+          "win_rate_pct": 58.333333333333336,
+          "flat_net_pnl": 2067.5899999999997,
+          "dynamic_net_pnl": 9970.91,
+          "profit_factor_dynamic": 2.5726193630605403,
+          "maximum_drawdown_dynamic": -2143.16,
+          "expectancy_flat": 34.45983333333333,
+          "expectancy_dynamic": 166.18183333333334
+        },
+        "2024": {
+          "trades": 63,
+          "wins": 36,
+          "losses": 27,
+          "win_rate_pct": 57.14285714285714,
+          "flat_net_pnl": 4139.0999999999985,
+          "dynamic_net_pnl": 20996.62,
+          "profit_factor_dynamic": 3.527152608020066,
+          "maximum_drawdown_dynamic": -2347.92,
+          "expectancy_flat": 65.69999999999997,
+          "expectancy_dynamic": 333.27968253968254
+        },
+        "2025": {
+          "trades": 61,
+          "wins": 40,
+          "losses": 21,
+          "win_rate_pct": 65.57377049180327,
+          "flat_net_pnl": 4165.0,
+          "dynamic_net_pnl": 16476.210000000003,
+          "profit_factor_dynamic": 2.4838312546211534,
+          "maximum_drawdown_dynamic": -3152.33,
+          "expectancy_flat": 68.27868852459017,
+          "expectancy_dynamic": 270.1018032786886
+        },
+        "2026": {
+          "trades": 66,
+          "wins": 40,
+          "losses": 26,
+          "win_rate_pct": 60.60606060606061,
+          "flat_net_pnl": 7591.789999999999,
+          "dynamic_net_pnl": 36418.06000000001,
+          "profit_factor_dynamic": 3.4967989633824446,
+          "maximum_drawdown_dynamic": -3292.5200000000004,
+          "expectancy_flat": 115.0271212121212,
+          "expectancy_dynamic": 551.7887878787881
+        }
+      },
+      "by_signal": {
+        "BUY": {
+          "trades": 266,
+          "wins": 165,
+          "losses": 101,
+          "win_rate_pct": 62.03007518796993,
+          "flat_net_pnl": 17363.67,
+          "dynamic_net_pnl": 71405.77,
+          "profit_factor_dynamic": 2.7729019190236617,
+          "maximum_drawdown_dynamic": -4536.2300000000005,
+          "expectancy_flat": 65.27695488721804,
+          "expectancy_dynamic": 268.4427443609023
+        },
+        "SELL": {
+          "trades": 169,
+          "wins": 75,
+          "losses": 94,
+          "win_rate_pct": 44.37869822485207,
+          "flat_net_pnl": 1520.9,
+          "dynamic_net_pnl": 15554.83,
+          "profit_factor_dynamic": 1.387780988477132,
+          "maximum_drawdown_dynamic": -6299.210000000001,
+          "expectancy_flat": 8.99940828402367,
+          "expectancy_dynamic": 92.04041420118344
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 16,
+          "wins": 9,
+          "losses": 7,
+          "win_rate_pct": 56.25,
+          "flat_net_pnl": 1066.31,
+          "dynamic_net_pnl": 992.3499999999999,
+          "profit_factor_dynamic": 1.569439024950077,
+          "maximum_drawdown_dynamic": -1057.2200000000003,
+          "expectancy_flat": 66.644375,
+          "expectancy_dynamic": 62.021874999999994
+        },
+        "London": {
+          "trades": 65,
+          "wins": 35,
+          "losses": 30,
+          "win_rate_pct": 53.84615384615385,
+          "flat_net_pnl": 2418.4100000000003,
+          "dynamic_net_pnl": 8529.85,
+          "profit_factor_dynamic": 1.8915946131268444,
+          "maximum_drawdown_dynamic": -3582.86,
+          "expectancy_flat": 37.206307692307696,
+          "expectancy_dynamic": 131.22846153846154
+        },
+        "London_NewYork_Overlap": {
+          "trades": 173,
+          "wins": 98,
+          "losses": 75,
+          "win_rate_pct": 56.64739884393064,
+          "flat_net_pnl": 7246.74,
+          "dynamic_net_pnl": 41291.9,
+          "profit_factor_dynamic": 2.2423791564305726,
+          "maximum_drawdown_dynamic": -5032.460000000001,
+          "expectancy_flat": 41.888670520231216,
+          "expectancy_dynamic": 238.68150289017342
+        },
+        "NewYork": {
+          "trades": 51,
+          "wins": 28,
+          "losses": 23,
+          "win_rate_pct": 54.90196078431373,
+          "flat_net_pnl": 3031.18,
+          "dynamic_net_pnl": 9090.38,
+          "profit_factor_dynamic": 1.8220324422476266,
+          "maximum_drawdown_dynamic": -2929.74,
+          "expectancy_flat": 59.43490196078431,
+          "expectancy_dynamic": 178.2427450980392
+        },
+        "Sydney": {
+          "trades": 3,
+          "wins": 1,
+          "losses": 2,
+          "win_rate_pct": 33.33333333333333,
+          "flat_net_pnl": -369.98,
+          "dynamic_net_pnl": -1504.8600000000001,
+          "profit_factor_dynamic": 0.01630278467773565,
+          "maximum_drawdown_dynamic": -1529.8000000000002,
+          "expectancy_flat": -123.32666666666667,
+          "expectancy_dynamic": -501.62000000000006
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 111,
+          "wins": 63,
+          "losses": 48,
+          "win_rate_pct": 56.75675675675676,
+          "flat_net_pnl": 5806.279999999999,
+          "dynamic_net_pnl": 29118.55,
+          "profit_factor_dynamic": 2.3702737436924033,
+          "maximum_drawdown_dynamic": -4460.720000000001,
+          "expectancy_flat": 52.308828828828815,
+          "expectancy_dynamic": 262.32927927927926
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 16,
+          "wins": 6,
+          "losses": 10,
+          "win_rate_pct": 37.5,
+          "flat_net_pnl": -314.37,
+          "dynamic_net_pnl": -557.5700000000002,
+          "profit_factor_dynamic": 0.7218325317794495,
+          "maximum_drawdown_dynamic": -1219.9,
+          "expectancy_flat": -19.648125,
+          "expectancy_dynamic": -34.84812500000001
+        }
+      },
+      "by_price_regime": {
+        "<1500": {
+          "trades": 1,
+          "wins": 0,
+          "losses": 1,
+          "win_rate_pct": 0.0,
+          "flat_net_pnl": -218.85,
+          "dynamic_net_pnl": -437.7,
+          "profit_factor_dynamic": 0.0,
+          "maximum_drawdown_dynamic": 0.0,
+          "expectancy_flat": -218.85,
+          "expectancy_dynamic": -437.7
+        },
+        "1500-1999": {
+          "trades": 232,
+          "wins": 115,
+          "losses": 117,
+          "win_rate_pct": 49.56896551724138,
+          "flat_net_pnl": 2315.4800000000005,
+          "dynamic_net_pnl": 10209.390000000001,
+          "profit_factor_dynamic": 1.2248764812503263,
+          "maximum_drawdown_dynamic": -8122.550000000002,
+          "expectancy_flat": 9.980517241379312,
+          "expectancy_dynamic": 44.00599137931035
+        },
+        "2000-2499": {
+          "trades": 48,
+          "wins": 31,
+          "losses": 17,
+          "win_rate_pct": 64.58333333333334,
+          "flat_net_pnl": 4081.24,
+          "dynamic_net_pnl": 18412.38,
+          "profit_factor_dynamic": 4.845293413723897,
+          "maximum_drawdown_dynamic": -2347.92,
+          "expectancy_flat": 85.02583333333332,
+          "expectancy_dynamic": 383.59125
+        },
+        "2500-2999": {
+          "trades": 43,
+          "wins": 25,
+          "losses": 18,
+          "win_rate_pct": 58.139534883720934,
+          "flat_net_pnl": 2011.9300000000005,
+          "dynamic_net_pnl": 11080.53,
+          "profit_factor_dynamic": 2.679122594332474,
+          "maximum_drawdown_dynamic": -2258.6899999999996,
+          "expectancy_flat": 46.78906976744187,
+          "expectancy_dynamic": 257.68674418604655
+        },
+        "3000-3999": {
+          "trades": 35,
+          "wins": 22,
+          "losses": 13,
+          "win_rate_pct": 62.857142857142854,
+          "flat_net_pnl": 1744.4400000000003,
+          "dynamic_net_pnl": 6659.050000000001,
+          "profit_factor_dynamic": 1.776491344267953,
+          "maximum_drawdown_dynamic": -3152.33,
+          "expectancy_flat": 49.84114285714286,
+          "expectancy_dynamic": 190.25857142857146
+        },
+        ">=4000": {
+          "trades": 76,
+          "wins": 47,
+          "losses": 29,
+          "win_rate_pct": 61.8421052631579,
+          "flat_net_pnl": 8950.33,
+          "dynamic_net_pnl": 41036.95000000001,
+          "profit_factor_dynamic": 3.813096816385177,
+          "maximum_drawdown_dynamic": -3292.5200000000004,
+          "expectancy_flat": 117.7675,
+          "expectancy_dynamic": 539.9598684210528
+        }
+      }
+    },
+    "v8_final_existing": {
+      "artifact": "ValueCell_MT5\\python\\valuecell\\models\\saved\\filter_latest\\scored_v8_final.csv",
+      "sha256": "d0dddaca8e80e6a5012e36cf9ea49265e990440186d084782b7cb975af17e1a5",
+      "metric_contract": {
+        "win": "actual_net_profit > 0",
+        "loss": "actual_net_profit <= 0",
+        "flat_net_pnl": "sum(actual_net_profit) at 0.01 lot",
+        "dynamic_net_pnl": "actual_net_profit * dynamic_lot / 0.01",
+        "rr_threshold": 1.05,
+        "dynamic_lot_tiers": {
+          "1.05": 0.01,
+          "1.20": 0.02,
+          "1.50": 0.04,
+          "2.00": 0.07
+        }
+      },
+      "scope_years": [
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "total": {
+        "trades": 1138,
+        "wins": 778,
+        "losses": 360,
+        "win_rate_pct": 68.36555360281194,
+        "flat_net_pnl": 69214.09999999995,
+        "dynamic_net_pnl": 310365.59999999986,
+        "profit_factor_dynamic": 4.234868746078429,
+        "maximum_drawdown_dynamic": -3313.399999999994,
+        "expectancy_flat": 60.82082601054477,
+        "expectancy_dynamic": 272.7289982425306
+      },
+      "by_year": {
+        "2017": {
+          "trades": 122,
+          "wins": 78,
+          "losses": 44,
+          "win_rate_pct": 63.934426229508205,
+          "flat_net_pnl": 3055.1000000000045,
+          "dynamic_net_pnl": 12425.999999999995,
+          "profit_factor_dynamic": 2.844851904090266,
+          "maximum_drawdown_dynamic": -1084.3999999999905,
+          "expectancy_flat": 25.041803278688562,
+          "expectancy_dynamic": 101.8524590163934
+        },
+        "2018": {
+          "trades": 103,
+          "wins": 63,
+          "losses": 40,
+          "win_rate_pct": 61.165048543689316,
+          "flat_net_pnl": 3362.100000000005,
+          "dynamic_net_pnl": 10146.500000000013,
+          "profit_factor_dynamic": 4.623232395372095,
+          "maximum_drawdown_dynamic": -462.79999999999563,
+          "expectancy_flat": 32.64174757281558,
+          "expectancy_dynamic": 98.5097087378642
+        },
+        "2019": {
+          "trades": 106,
+          "wins": 69,
+          "losses": 37,
+          "win_rate_pct": 65.09433962264151,
+          "flat_net_pnl": 4273.299999999982,
+          "dynamic_net_pnl": 19598.799999999963,
+          "profit_factor_dynamic": 4.780778579420485,
+          "maximum_drawdown_dynamic": -879.0999999999985,
+          "expectancy_flat": 40.31415094339606,
+          "expectancy_dynamic": 184.89433962264116
+        },
+        "2020": {
+          "trades": 128,
+          "wins": 78,
+          "losses": 50,
+          "win_rate_pct": 60.9375,
+          "flat_net_pnl": 4950.799999999992,
+          "dynamic_net_pnl": 29698.099999999973,
+          "profit_factor_dynamic": 2.842565362518452,
+          "maximum_drawdown_dynamic": -2256.0000000000036,
+          "expectancy_flat": 38.67812499999994,
+          "expectancy_dynamic": 232.0164062499998
+        },
+        "2021": {
+          "trades": 111,
+          "wins": 73,
+          "losses": 38,
+          "win_rate_pct": 65.76576576576578,
+          "flat_net_pnl": 4786.100000000003,
+          "dynamic_net_pnl": 21865.00000000002,
+          "profit_factor_dynamic": 2.6380363042484833,
+          "maximum_drawdown_dynamic": -3313.3999999999974,
+          "expectancy_flat": 43.11801801801805,
+          "expectancy_dynamic": 196.98198198198216
+        },
+        "2022": {
+          "trades": 107,
+          "wins": 73,
+          "losses": 34,
+          "win_rate_pct": 68.22429906542055,
+          "flat_net_pnl": 5548.79999999999,
+          "dynamic_net_pnl": 26607.399999999943,
+          "profit_factor_dynamic": 3.9199754175720365,
+          "maximum_drawdown_dynamic": -1600.0,
+          "expectancy_flat": 51.857943925233556,
+          "expectancy_dynamic": 248.66728971962564
+        },
+        "2023": {
+          "trades": 127,
+          "wins": 85,
+          "losses": 42,
+          "win_rate_pct": 66.92913385826772,
+          "flat_net_pnl": 6837.700000000002,
+          "dynamic_net_pnl": 31242.39999999999,
+          "profit_factor_dynamic": 3.252191464821221,
+          "maximum_drawdown_dynamic": -3025.7999999999956,
+          "expectancy_flat": 53.84015748031497,
+          "expectancy_dynamic": 246.00314960629913
+        },
+        "2024": {
+          "trades": 128,
+          "wins": 88,
+          "losses": 40,
+          "win_rate_pct": 68.75,
+          "flat_net_pnl": 9994.79999999998,
+          "dynamic_net_pnl": 48454.59999999995,
+          "profit_factor_dynamic": 4.507492073603281,
+          "maximum_drawdown_dynamic": -1800.0,
+          "expectancy_flat": 78.08437499999984,
+          "expectancy_dynamic": 378.5515624999996
+        },
+        "2025": {
+          "trades": 126,
+          "wins": 96,
+          "losses": 30,
+          "win_rate_pct": 76.19047619047619,
+          "flat_net_pnl": 12586.399999999994,
+          "dynamic_net_pnl": 57488.79999999998,
+          "profit_factor_dynamic": 5.436138033211925,
+          "maximum_drawdown_dynamic": -2442.399999999994,
+          "expectancy_flat": 99.89206349206344,
+          "expectancy_dynamic": 456.2603174603173
+        },
+        "2026": {
+          "trades": 80,
+          "wins": 75,
+          "losses": 5,
+          "win_rate_pct": 93.75,
+          "flat_net_pnl": 13819.0,
+          "dynamic_net_pnl": 52838.0,
+          "profit_factor_dynamic": 27.419,
+          "maximum_drawdown_dynamic": -800.0,
+          "expectancy_flat": 172.7375,
+          "expectancy_dynamic": 660.475
+        }
+      },
+      "by_signal": {
+        "BUY": {
+          "trades": 662,
+          "wins": 461,
+          "losses": 201,
+          "win_rate_pct": 69.63746223564955,
+          "flat_net_pnl": 41739.09999999995,
+          "dynamic_net_pnl": 174310.19999999984,
+          "profit_factor_dynamic": 4.280731769289397,
+          "maximum_drawdown_dynamic": -3782.0999999999913,
+          "expectancy_flat": 63.04999999999992,
+          "expectancy_dynamic": 263.3084592145013
+        },
+        "SELL": {
+          "trades": 476,
+          "wins": 317,
+          "losses": 159,
+          "win_rate_pct": 66.59663865546219,
+          "flat_net_pnl": 27475.0,
+          "dynamic_net_pnl": 136055.4,
+          "profit_factor_dynamic": 4.177951196268361,
+          "maximum_drawdown_dynamic": -3389.5999999999985,
+          "expectancy_flat": 57.720588235294116,
+          "expectancy_dynamic": 285.83067226890756
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 41,
+          "wins": 34,
+          "losses": 7,
+          "win_rate_pct": 82.92682926829268,
+          "flat_net_pnl": 3214.2000000000007,
+          "dynamic_net_pnl": 7849.699999999997,
+          "profit_factor_dynamic": 7.765233129363095,
+          "maximum_drawdown_dynamic": -400.0,
+          "expectancy_flat": 78.39512195121954,
+          "expectancy_dynamic": 191.45609756097554
+        },
+        "London": {
+          "trades": 211,
+          "wins": 140,
+          "losses": 71,
+          "win_rate_pct": 66.35071090047393,
+          "flat_net_pnl": 11179.699999999968,
+          "dynamic_net_pnl": 45181.59999999993,
+          "profit_factor_dynamic": 4.071175610916614,
+          "maximum_drawdown_dynamic": -1963.2000000000044,
+          "expectancy_flat": 52.98436018957331,
+          "expectancy_dynamic": 214.13080568720346
+        },
+        "London_NewYork_Overlap": {
+          "trades": 446,
+          "wins": 311,
+          "losses": 135,
+          "win_rate_pct": 69.73094170403587,
+          "flat_net_pnl": 29838.399999999983,
+          "dynamic_net_pnl": 148345.8999999999,
+          "profit_factor_dynamic": 4.346422375969155,
+          "maximum_drawdown_dynamic": -2800.0,
+          "expectancy_flat": 66.90224215246633,
+          "expectancy_dynamic": 332.6141255605379
+        },
+        "NewYork": {
+          "trades": 138,
+          "wins": 87,
+          "losses": 51,
+          "win_rate_pct": 63.04347826086957,
+          "flat_net_pnl": 6776.700000000003,
+          "dynamic_net_pnl": 35485.00000000001,
+          "profit_factor_dynamic": 3.765761763353365,
+          "maximum_drawdown_dynamic": -1992.400000000007,
+          "expectancy_flat": 49.10652173913045,
+          "expectancy_dynamic": 257.13768115942037
+        },
+        "Sydney": {
+          "trades": 4,
+          "wins": 3,
+          "losses": 1,
+          "win_rate_pct": 75.0,
+          "flat_net_pnl": 400.0,
+          "dynamic_net_pnl": 1000.0,
+          "profit_factor_dynamic": 6.0,
+          "maximum_drawdown_dynamic": -200.0,
+          "expectancy_flat": 100.0,
+          "expectancy_dynamic": 250.0
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 273,
+          "wins": 187,
+          "losses": 86,
+          "win_rate_pct": 68.4981684981685,
+          "flat_net_pnl": 16821.6,
+          "dynamic_net_pnl": 69958.09999999998,
+          "profit_factor_dynamic": 4.273904457048726,
+          "maximum_drawdown_dynamic": -2000.0,
+          "expectancy_flat": 61.61758241758241,
+          "expectancy_dynamic": 256.25677655677646
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 25,
+          "wins": 16,
+          "losses": 9,
+          "win_rate_pct": 64.0,
+          "flat_net_pnl": 983.4999999999991,
+          "dynamic_net_pnl": 2545.300000000002,
+          "profit_factor_dynamic": 2.8941062658133556,
+          "maximum_drawdown_dynamic": -805.900000000006,
+          "expectancy_flat": 39.33999999999996,
+          "expectancy_dynamic": 101.81200000000008
+        }
+      },
+      "by_price_regime": {
+        "<1500": {
+          "trades": 312,
+          "wins": 197,
+          "losses": 115,
+          "win_rate_pct": 63.141025641025635,
+          "flat_net_pnl": 9397.19999999999,
+          "dynamic_net_pnl": 34477.69999999997,
+          "profit_factor_dynamic": 3.601501546819583,
+          "maximum_drawdown_dynamic": -1084.3999999999905,
+          "expectancy_flat": 30.119230769230736,
+          "expectancy_dynamic": 110.50544871794861
+        },
+        "1500-1999": {
+          "trades": 469,
+          "wins": 305,
+          "losses": 164,
+          "win_rate_pct": 65.0319829424307,
+          "flat_net_pnl": 21351.099999999984,
+          "dynamic_net_pnl": 105669.99999999994,
+          "profit_factor_dynamic": 3.0249773394936663,
+          "maximum_drawdown_dynamic": -3670.100000000006,
+          "expectancy_flat": 45.52473347547971,
+          "expectancy_dynamic": 225.30916844349667
+        },
+        "2000-2499": {
+          "trades": 104,
+          "wins": 70,
+          "losses": 34,
+          "win_rate_pct": 67.3076923076923,
+          "flat_net_pnl": 7491.399999999994,
+          "dynamic_net_pnl": 39406.600000000006,
+          "profit_factor_dynamic": 4.893932806324118,
+          "maximum_drawdown_dynamic": -1703.4000000000087,
+          "expectancy_flat": 72.03269230769226,
+          "expectancy_dynamic": 378.90961538461545
+        },
+        "2500-2999": {
+          "trades": 76,
+          "wins": 57,
+          "losses": 19,
+          "win_rate_pct": 75.0,
+          "flat_net_pnl": 7239.4999999999845,
+          "dynamic_net_pnl": 32690.69999999993,
+          "profit_factor_dynamic": 4.943437194658537,
+          "maximum_drawdown_dynamic": -1800.0000000000002,
+          "expectancy_flat": 95.25657894736821,
+          "expectancy_dynamic": 430.1407894736833
+        },
+        "3000-3999": {
+          "trades": 77,
+          "wins": 58,
+          "losses": 19,
+          "win_rate_pct": 75.32467532467533,
+          "flat_net_pnl": 7515.899999999997,
+          "dynamic_net_pnl": 36082.59999999999,
+          "profit_factor_dynamic": 5.568805713128037,
+          "maximum_drawdown_dynamic": -2442.399999999998,
+          "expectancy_flat": 97.60909090909087,
+          "expectancy_dynamic": 468.6051948051947
+        },
+        ">=4000": {
+          "trades": 100,
+          "wins": 91,
+          "losses": 9,
+          "win_rate_pct": 91.0,
+          "flat_net_pnl": 16219.0,
+          "dynamic_net_pnl": 62038.0,
+          "profit_factor_dynamic": 15.77095238095238,
+          "maximum_drawdown_dynamic": -1000.0,
+          "expectancy_flat": 162.19,
+          "expectancy_dynamic": 620.38
+        }
+      }
+    },
+    "v8_final_existing_common_years": {
+      "artifact": "ValueCell_MT5\\python\\valuecell\\models\\saved\\filter_latest\\scored_v8_final.csv",
+      "sha256": "d0dddaca8e80e6a5012e36cf9ea49265e990440186d084782b7cb975af17e1a5",
+      "metric_contract": {
+        "win": "actual_net_profit > 0",
+        "loss": "actual_net_profit <= 0",
+        "flat_net_pnl": "sum(actual_net_profit) at 0.01 lot",
+        "dynamic_net_pnl": "actual_net_profit * dynamic_lot / 0.01",
+        "rr_threshold": 1.05,
+        "dynamic_lot_tiers": {
+          "1.05": 0.01,
+          "1.20": 0.02,
+          "1.50": 0.04,
+          "2.00": 0.07
+        }
+      },
+      "scope_years": [
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ],
+      "total": {
+        "trades": 807,
+        "wins": 568,
+        "losses": 239,
+        "win_rate_pct": 70.38413878562577,
+        "flat_net_pnl": 58523.59999999996,
+        "dynamic_net_pnl": 268194.2999999999,
+        "profit_factor_dynamic": 4.3019054689433265,
+        "maximum_drawdown_dynamic": -3313.399999999998,
+        "expectancy_flat": 72.51995043370503,
+        "expectancy_dynamic": 332.3349442379181
+      },
+      "by_year": {
+        "2020": {
+          "trades": 128,
+          "wins": 78,
+          "losses": 50,
+          "win_rate_pct": 60.9375,
+          "flat_net_pnl": 4950.799999999992,
+          "dynamic_net_pnl": 29698.099999999973,
+          "profit_factor_dynamic": 2.842565362518452,
+          "maximum_drawdown_dynamic": -2256.0000000000036,
+          "expectancy_flat": 38.67812499999994,
+          "expectancy_dynamic": 232.0164062499998
+        },
+        "2021": {
+          "trades": 111,
+          "wins": 73,
+          "losses": 38,
+          "win_rate_pct": 65.76576576576578,
+          "flat_net_pnl": 4786.100000000003,
+          "dynamic_net_pnl": 21865.00000000002,
+          "profit_factor_dynamic": 2.6380363042484833,
+          "maximum_drawdown_dynamic": -3313.3999999999974,
+          "expectancy_flat": 43.11801801801805,
+          "expectancy_dynamic": 196.98198198198216
+        },
+        "2022": {
+          "trades": 107,
+          "wins": 73,
+          "losses": 34,
+          "win_rate_pct": 68.22429906542055,
+          "flat_net_pnl": 5548.79999999999,
+          "dynamic_net_pnl": 26607.399999999943,
+          "profit_factor_dynamic": 3.9199754175720365,
+          "maximum_drawdown_dynamic": -1600.0,
+          "expectancy_flat": 51.857943925233556,
+          "expectancy_dynamic": 248.66728971962564
+        },
+        "2023": {
+          "trades": 127,
+          "wins": 85,
+          "losses": 42,
+          "win_rate_pct": 66.92913385826772,
+          "flat_net_pnl": 6837.700000000002,
+          "dynamic_net_pnl": 31242.39999999999,
+          "profit_factor_dynamic": 3.252191464821221,
+          "maximum_drawdown_dynamic": -3025.7999999999956,
+          "expectancy_flat": 53.84015748031497,
+          "expectancy_dynamic": 246.00314960629913
+        },
+        "2024": {
+          "trades": 128,
+          "wins": 88,
+          "losses": 40,
+          "win_rate_pct": 68.75,
+          "flat_net_pnl": 9994.79999999998,
+          "dynamic_net_pnl": 48454.59999999995,
+          "profit_factor_dynamic": 4.507492073603281,
+          "maximum_drawdown_dynamic": -1800.0,
+          "expectancy_flat": 78.08437499999984,
+          "expectancy_dynamic": 378.5515624999996
+        },
+        "2025": {
+          "trades": 126,
+          "wins": 96,
+          "losses": 30,
+          "win_rate_pct": 76.19047619047619,
+          "flat_net_pnl": 12586.399999999994,
+          "dynamic_net_pnl": 57488.79999999998,
+          "profit_factor_dynamic": 5.436138033211925,
+          "maximum_drawdown_dynamic": -2442.399999999994,
+          "expectancy_flat": 99.89206349206344,
+          "expectancy_dynamic": 456.2603174603173
+        },
+        "2026": {
+          "trades": 80,
+          "wins": 75,
+          "losses": 5,
+          "win_rate_pct": 93.75,
+          "flat_net_pnl": 13819.0,
+          "dynamic_net_pnl": 52838.0,
+          "profit_factor_dynamic": 27.419,
+          "maximum_drawdown_dynamic": -800.0,
+          "expectancy_flat": 172.7375,
+          "expectancy_dynamic": 660.475
+        }
+      },
+      "by_signal": {
+        "BUY": {
+          "trades": 473,
+          "wins": 337,
+          "losses": 136,
+          "win_rate_pct": 71.24735729386892,
+          "flat_net_pnl": 35150.899999999965,
+          "dynamic_net_pnl": 149841.69999999987,
+          "profit_factor_dynamic": 4.342233810959824,
+          "maximum_drawdown_dynamic": -3782.0999999999985,
+          "expectancy_flat": 74.31479915433397,
+          "expectancy_dynamic": 316.7900634249469
+        },
+        "SELL": {
+          "trades": 334,
+          "wins": 231,
+          "losses": 103,
+          "win_rate_pct": 69.16167664670658,
+          "flat_net_pnl": 23372.7,
+          "dynamic_net_pnl": 118352.59999999999,
+          "profit_factor_dynamic": 4.25222237183063,
+          "maximum_drawdown_dynamic": -3389.5999999999985,
+          "expectancy_flat": 69.97814371257485,
+          "expectancy_dynamic": 354.3491017964072
+        }
+      },
+      "by_session": {
+        "Asia": {
+          "trades": 21,
+          "wins": 17,
+          "losses": 4,
+          "win_rate_pct": 80.95238095238095,
+          "flat_net_pnl": 2270.4999999999995,
+          "dynamic_net_pnl": 5914.5999999999985,
+          "profit_factor_dynamic": 6.318884892086339,
+          "maximum_drawdown_dynamic": -400.0,
+          "expectancy_flat": 108.11904761904759,
+          "expectancy_dynamic": 281.647619047619
+        },
+        "London": {
+          "trades": 144,
+          "wins": 99,
+          "losses": 45,
+          "win_rate_pct": 68.75,
+          "flat_net_pnl": 8932.09999999998,
+          "dynamic_net_pnl": 38223.79999999995,
+          "profit_factor_dynamic": 3.9566219581998934,
+          "maximum_drawdown_dynamic": -1963.2000000000116,
+          "expectancy_flat": 62.028472222222085,
+          "expectancy_dynamic": 265.44305555555525
+        },
+        "London_NewYork_Overlap": {
+          "trades": 328,
+          "wins": 240,
+          "losses": 88,
+          "win_rate_pct": 73.17073170731707,
+          "flat_net_pnl": 26623.299999999974,
+          "dynamic_net_pnl": 131344.8999999999,
+          "profit_factor_dynamic": 4.644369528724624,
+          "maximum_drawdown_dynamic": -2800.0,
+          "expectancy_flat": 81.16859756097553,
+          "expectancy_dynamic": 400.44176829268264
+        },
+        "NewYork": {
+          "trades": 93,
+          "wins": 60,
+          "losses": 33,
+          "win_rate_pct": 64.51612903225806,
+          "flat_net_pnl": 5475.700000000006,
+          "dynamic_net_pnl": 27824.500000000022,
+          "profit_factor_dynamic": 3.679942210450278,
+          "maximum_drawdown_dynamic": -1992.400000000007,
+          "expectancy_flat": 58.87849462365598,
+          "expectancy_dynamic": 299.188172043011
+        },
+        "Sydney": {
+          "trades": 4,
+          "wins": 3,
+          "losses": 1,
+          "win_rate_pct": 75.0,
+          "flat_net_pnl": 400.0,
+          "dynamic_net_pnl": 1000.0,
+          "profit_factor_dynamic": 6.0,
+          "maximum_drawdown_dynamic": -200.0,
+          "expectancy_flat": 100.0,
+          "expectancy_dynamic": 250.0
+        },
+        "Sydney_Tokyo_Overlap": {
+          "trades": 201,
+          "wins": 140,
+          "losses": 61,
+          "win_rate_pct": 69.65174129353234,
+          "flat_net_pnl": 14388.700000000006,
+          "dynamic_net_pnl": 63153.099999999984,
+          "profit_factor_dynamic": 4.258388067094217,
+          "maximum_drawdown_dynamic": -2000.0,
+          "expectancy_flat": 71.58557213930351,
+          "expectancy_dynamic": 314.194527363184
+        },
+        "Tokyo_London_Overlap": {
+          "trades": 16,
+          "wins": 9,
+          "losses": 7,
+          "win_rate_pct": 56.25,
+          "flat_net_pnl": 433.299999999997,
+          "dynamic_net_pnl": 733.3999999999946,
+          "profit_factor_dynamic": 1.6219470827679698,
+          "maximum_drawdown_dynamic": -466.60000000000537,
+          "expectancy_flat": 27.081249999999812,
+          "expectancy_dynamic": 45.837499999999665
+        }
+      },
+      "by_price_regime": {
+        "<1500": {
+          "trades": 1,
+          "wins": 0,
+          "losses": 1,
+          "win_rate_pct": 0.0,
+          "flat_net_pnl": -200.0,
+          "dynamic_net_pnl": -400.0,
+          "profit_factor_dynamic": 0.0,
+          "maximum_drawdown_dynamic": 0.0,
+          "expectancy_flat": -200.0,
+          "expectancy_dynamic": -400.0
+        },
+        "1500-1999": {
+          "trades": 449,
+          "wins": 292,
+          "losses": 157,
+          "win_rate_pct": 65.03340757238307,
+          "flat_net_pnl": 20257.79999999999,
+          "dynamic_net_pnl": 98376.39999999994,
+          "profit_factor_dynamic": 2.955148002845976,
+          "maximum_drawdown_dynamic": -3670.100000000006,
+          "expectancy_flat": 45.11759465478839,
+          "expectancy_dynamic": 219.10111358574596
+        },
+        "2000-2499": {
+          "trades": 104,
+          "wins": 70,
+          "losses": 34,
+          "win_rate_pct": 67.3076923076923,
+          "flat_net_pnl": 7491.399999999994,
+          "dynamic_net_pnl": 39406.600000000006,
+          "profit_factor_dynamic": 4.893932806324118,
+          "maximum_drawdown_dynamic": -1703.4000000000087,
+          "expectancy_flat": 72.03269230769226,
+          "expectancy_dynamic": 378.90961538461545
+        },
+        "2500-2999": {
+          "trades": 76,
+          "wins": 57,
+          "losses": 19,
+          "win_rate_pct": 75.0,
+          "flat_net_pnl": 7239.4999999999845,
+          "dynamic_net_pnl": 32690.69999999993,
+          "profit_factor_dynamic": 4.943437194658537,
+          "maximum_drawdown_dynamic": -1800.0000000000002,
+          "expectancy_flat": 95.25657894736821,
+          "expectancy_dynamic": 430.1407894736833
+        },
+        "3000-3999": {
+          "trades": 77,
+          "wins": 58,
+          "losses": 19,
+          "win_rate_pct": 75.32467532467533,
+          "flat_net_pnl": 7515.899999999997,
+          "dynamic_net_pnl": 36082.59999999999,
+          "profit_factor_dynamic": 5.568805713128037,
+          "maximum_drawdown_dynamic": -2442.399999999998,
+          "expectancy_flat": 97.60909090909087,
+          "expectancy_dynamic": 468.6051948051947
+        },
+        ">=4000": {
+          "trades": 100,
+          "wins": 91,
+          "losses": 9,
+          "win_rate_pct": 91.0,
+          "flat_net_pnl": 16219.0,
+          "dynamic_net_pnl": 62038.0,
+          "profit_factor_dynamic": 15.77095238095238,
+          "maximum_drawdown_dynamic": -1000.0,
+          "expectancy_flat": 162.19,
+          "expectancy_dynamic": 620.38
+        }
+      }
+    }
+  }
+}

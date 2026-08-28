@@ -1,0 +1,111 @@
+        <script>
+            // Default System Connections with Specific Port Assignments
+            const defaultConnections = [
+                // Stage 1 Ingestion & Storage Chain
+                { from: "node-mt5", fromPort: "right", to: "node-watcher-trigger", toPort: "left" },
+                { from: "node-watcher-trigger", fromPort: "bottom", to: "node-neondb-mapping", toPort: "top" },
+                { from: "node-neondb-mapping", fromPort: "bottom", to: "node-lancedb", toPort: "top" },
+
+                // Stage 1 -> Stage 2 (Orchestrator Coordination)
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+                { from: "node-neondb-mapping", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+                { from: "node-lancedb", fromPort: "right", to: "node-orchestrator", toPort: "left" },
+
+                // Stage 1 Trigger -> Ghost Engine info -> Orchestrator
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-fe-to-orch-info", toPort: "left" },
+                { from: "node-fe-to-orch-info", fromPort: "bottom", to: "node-orchestrator", toPort: "top" },
+
+                // Orchestrator -> Sub-Agents via Data Transfer (Request Downward)
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-orch-to-msa-info", toPort: "top" },
+                { from: "node-orch-to-msa-info", fromPort: "bottom", to: "node-ms-agent", toPort: "top" },
+
+                // MSA -> Orchestrator via Data Transfer (Response Upward)
+                { from: "node-ms-agent", fromPort: "top", to: "node-msa-to-orch-info", toPort: "bottom" },
+                { from: "node-msa-to-orch-info", fromPort: "top", to: "node-orchestrator", toPort: "bottom" },
+
+                // Market Structure Internal Workflow
+                { from: "node-ms-agent", fromPort: "left", to: "node-ms-sub1", toPort: "top" },
+                { from: "node-ms-sub1", fromPort: "bottom", to: "node-ms-sub2", toPort: "top" },
+                { from: "node-ms-sub2", fromPort: "bottom", to: "node-ms-sub3", toPort: "top" },
+                { from: "node-ms-sub3", fromPort: "bottom", to: "node-ms-sub4", toPort: "top" },
+
+                // Orchestrator Evaluation Branches (3 Conditions)
+                { from: "node-orchestrator", fromPort: "right", to: "node-orch-cond1", toPort: "left" },
+                { from: "node-orchestrator", fromPort: "right", to: "node-orch-cond2", toPort: "left" },
+                { from: "node-orchestrator", fromPort: "right", to: "node-orch-cond3", toPort: "left" },
+
+                // Kondisi 2: Warm-Up Mode (CHoCH Terdeteksi) -> ML & Sentiment Cache Prep
+                { from: "node-orch-cond2", fromPort: "right", to: "node-msa-to-ml-info", toPort: "left" },
+                { from: "node-msa-to-ml-info", fromPort: "right", to: "node-ml-agent", toPort: "top" },
+                { from: "node-orch-cond2", fromPort: "right", to: "node-msa-to-sent-info", toPort: "left" },
+                { from: "node-msa-to-sent-info", fromPort: "right", to: "node-sentiment-agent", toPort: "top" },
+
+                // Kondisi 3: Execution Mode (BoS Terkonfirmasi) -> ML & Sentiment Execution
+                { from: "node-orch-cond3", fromPort: "right", to: "node-bos-to-sent-info", toPort: "left" },
+                { from: "node-orch-cond3", fromPort: "right", to: "node-bos-to-ml-info", toPort: "left" },
+                { from: "node-bos-to-sent-info", fromPort: "right", to: "node-sentiment-agent", toPort: "bottom" },
+                { from: "node-bos-to-ml-info", fromPort: "right", to: "node-ml-agent", toPort: "bottom" },
+
+                // ML Prediction Internal Workflow
+                { from: "node-ml-agent", fromPort: "right", to: "node-ml-sub1", toPort: "left" },
+                { from: "node-ml-sub1", fromPort: "top", to: "node-ml-sub2", toPort: "left" },
+                { from: "node-ml-sub2", fromPort: "top", to: "node-ml-sub3", toPort: "right" },
+                { from: "node-ml-sub3", fromPort: "top", to: "node-ml-sub4", toPort: "left" },
+                { from: "node-ml-sub4", fromPort: "top", to: "node-ml-sub5", toPort: "right" },
+
+                // Sentiment News Internal Workflow
+                { from: "node-sentiment-agent", fromPort: "right", to: "node-sent-sub1", toPort: "left" },
+                { from: "node-sent-sub1", fromPort: "right", to: "node-sent-sub2", toPort: "top" },
+                { from: "node-sent-sub2", fromPort: "left", to: "node-sent-sub3", toPort: "top" },
+                { from: "node-sent-sub3", fromPort: "right", to: "node-sent-sub4", toPort: "top" },
+                { from: "node-sent-sub4", fromPort: "left", to: "node-sent-sub5", toPort: "top" },
+
+                // Sub-Agents Outputs -> Consensus Engine
+                { from: "node-ms-sub4", fromPort: "right", to: "node-con-sub1", toPort: "left" },
+                { from: "node-ml-sub5", fromPort: "right", to: "node-con-sub2", toPort: "left" },
+                { from: "node-sent-sub5", fromPort: "right", to: "node-con-sub3", toPort: "left" },
+                { from: "node-con-sub1", fromPort: "right", to: "node-consensus", toPort: "left" },
+                { from: "node-con-sub2", fromPort: "right", to: "node-consensus", toPort: "left" },
+                { from: "node-con-sub3", fromPort: "right", to: "node-consensus", toPort: "left" },
+
+                // Deterministic Sources -> Optional LLM Specialists
+                { from: "node-ms-sub4", fromPort: "right", to: "node-llm-msa", toPort: "left" },
+                { from: "node-ml-sub5", fromPort: "right", to: "node-llm-ml", toPort: "left" },
+                { from: "node-sent-sub5", fromPort: "right", to: "node-llm-sentiment", toPort: "left" },
+
+                // Initial Specialist Assessments -> One Cross-Review Round
+                { from: "node-llm-msa", fromPort: "right", to: "node-cross-review", toPort: "left" },
+                { from: "node-llm-ml", fromPort: "right", to: "node-cross-review", toPort: "left" },
+                { from: "node-llm-sentiment", fromPort: "right", to: "node-cross-review", toPort: "left" },
+
+                // Reviewed Assessments -> Decision Synthesis and Deterministic Gate
+                { from: "node-cross-review", fromPort: "right", to: "node-llm-decision", toPort: "left" },
+                { from: "node-cross-review", fromPort: "bottom", to: "node-council-gate", toPort: "bottom" },
+                { from: "node-llm-decision", fromPort: "right", to: "node-council-gate", toPort: "left" },
+
+                // Consensus -> Workflow Steps (Sequential)
+                { from: "node-consensus", fromPort: "right", to: "node-con-step1", toPort: "left" },
+                { from: "node-con-step1", fromPort: "bottom", to: "node-con-step2", toPort: "top" },
+                { from: "node-con-step2", fromPort: "bottom", to: "node-con-step3", toPort: "top" },
+                { from: "node-con-step3", fromPort: "bottom", to: "node-con-step4", toPort: "top" },
+                { from: "node-con-step4", fromPort: "bottom", to: "node-con-step5", toPort: "top" },
+
+                // Consensus Steps -> Risk Management -> Execution
+                { from: "node-con-step5", fromPort: "right", to: "node-council-gate", toPort: "top" },
+                { from: "node-council-gate", fromPort: "right", to: "node-risk-agent", toPort: "left" },
+
+                // Risk Management Internal Workflow
+                { from: "node-risk-agent", fromPort: "bottom", to: "node-risk-sub1", toPort: "top" },
+                { from: "node-risk-sub1", fromPort: "bottom", to: "node-risk-sub2", toPort: "top" },
+                { from: "node-risk-sub2", fromPort: "bottom", to: "node-risk-sub3", toPort: "top" },
+                { from: "node-risk-sub3", fromPort: "bottom", to: "node-risk-sub4", toPort: "top" },
+                { from: "node-risk-sub4", fromPort: "bottom", to: "node-risk-sub5", toPort: "top" },
+                { from: "node-risk-sub5", fromPort: "right", to: "node-execution", toPort: "left" }
+            ];
+
+            let connections = [...defaultConnections];
+            const LAYOUT_VERSION = 14; // ponytail: bump when defaultConnections change
+
+            // Baked-in Default Layout State (Used when localStorage is empty or on different browser)
+            const defaultLayoutState = {
+    "version": 14,

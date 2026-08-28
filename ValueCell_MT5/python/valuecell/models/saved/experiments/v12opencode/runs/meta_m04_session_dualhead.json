@@ -1,0 +1,59 @@
+{
+  "tag": "m04_session_dualhead",
+  "families": [
+    "F_SESSION"
+  ],
+  "extra_cols": [],
+  "model_mode": "dualhead",
+  "seeds": [
+    42
+  ],
+  "embargo_days": 0,
+  "dataset_sha16": "dataset_v12opencode_unconstrained",
+  "scored_csv": "B:\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\saved\\experiments\\v12opencode\\runs\\scored_m04_session_dualhead.csv",
+  "n_rows_scored": 1713,
+  "winners_sample": [
+    {
+      "fold": 2020,
+      "train_samples": 229,
+      "test_samples": 259,
+      "mfe": "XGBoost_d3_n120_lr002_f15",
+      "mae": "RandomForest_d4_n150_leaf12_f20"
+    },
+    {
+      "fold": 2021,
+      "train_samples": 488,
+      "test_samples": 254,
+      "mfe": "XGBoost_d3_n120_lr002_f10",
+      "mae": "RandomForest_d5_n200_leaf15_f20"
+    },
+    {
+      "fold": 2022,
+      "train_samples": 742,
+      "test_samples": 258,
+      "mfe": "Ridge_alpha10.0_f30",
+      "mae": "Ridge_alpha10.0_f10"
+    },
+    {
+      "fold": 2023,
+      "train_samples": 1000,
+      "test_samples": 274,
+      "mfe": "RandomForest_d5_n200_leaf15_f20",
+      "mae": "Ridge_alpha10.0_f10"
+    },
+    {
+      "fold": 2024,
+      "train_samples": 1274,
+      "test_samples": 253,
+      "mfe": "RandomForest_d5_n200_leaf15_f10",
+      "mae": "RandomForest_d5_n200_leaf15_f10"
+    },
+    {
+      "fold": 2025,
+      "train_samples": 1527,
+      "test_samples": 253,
+      "mfe": "RandomForest_d5_n200_leaf15_f20",
+      "mae": "RandomForest_d5_n200_leaf15_f25"
+    }
+  ]
+}

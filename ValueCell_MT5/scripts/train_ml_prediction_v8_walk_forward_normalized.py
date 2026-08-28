@@ -28,6 +28,7 @@ until the columns were excluded).
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -53,8 +54,21 @@ BASE_REFERENCE_PRICE = 4500.0
 
 
 def main() -> int:
-    output_dir = PYTHON_DIR / "valuecell" / "models" / "saved" / "filter_latest"
-    dataset_path = output_dir / "dataset_v5_unconstrained.csv"
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dataset-path",
+        type=Path,
+        default=PYTHON_DIR / "valuecell" / "models" / "saved" / "filter_latest" / "dataset_v5_unconstrained.csv",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=PYTHON_DIR / "valuecell" / "models" / "saved" / "filter_latest",
+    )
+    args = parser.parse_args()
+    output_dir = args.output_dir
+    dataset_path = args.dataset_path
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("=== ML Prediction v8 Walk-Forward (Price-Ratio Normalized Targets) ===")
     dataset = pd.read_csv(dataset_path)

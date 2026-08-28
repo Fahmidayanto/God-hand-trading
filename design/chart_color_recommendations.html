@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XAUUSD Session Zones & Chart Clarity Pro — God Hand Trading</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(130% 90% at 50% -10%, #dbeafe 0%, #eff6ff 35%, #f8fafc 100%);
+      min-height: 100vh;
+      color: #0f172a;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(191, 219, 254, 0.85);
+      box-shadow: 0 20px 45px -15px rgba(37, 99, 235, 0.12), 0 0 1px rgba(37, 99, 235, 0.15);
+    }
+    .session-btn.active {
+      background: #2563eb;
+      color: #ffffff;
+      border-color: #1d4ed8;
+      box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+    }
+    .session-badge-pill {
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+  </style>
+</head>
+<body class="p-4 sm:p-8">
+
+  <div class="max-w-[1700px] mx-auto space-y-6">
+
+    <!-- Header & Info -->
+    <header class="glass-panel rounded-3xl p-6 sm:p-8 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-100/90 border border-blue-200 text-blue-800 text-xs font-bold font-mono uppercase tracking-wider mb-2">
+          <span>⚡ High-Definition Session Zones Engine</span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          5 Rekomendasi Format Sesi Pasar (Session Zones) Super Jelas & Tegas
+        </h1>
+        <p class="text-sm text-slate-600 mt-1 max-w-3xl">
+          Mengatasi masalah <strong class="text-rose-600">sesi zona yang terlalu kabur/samar</strong> dengan menghadirkan visualisasi terstruktur: *Header Pill Badges*, *ICT Killzone High-Low Boxes*, dan *Vivid Contrast Pillars*.
+        </p>
+      </div>
+
+      <!-- Quick Reset or Live Mode Indicator -->
+      <div class="flex items-center gap-3 bg-slate-100/90 p-2 rounded-2xl border border-slate-200">
+        <span class="text-xs font-bold text-slate-600 px-2">Visual Mode:</span>
+        <span class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white font-mono text-xs font-bold shadow-xs flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+          <span>100% CRYSTAL CLEAR</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- Session Style Selector Bar -->
+    <nav class="glass-panel rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider px-2">Pilih Format Sesi:</span>
+        
+        <button onclick="applySessionStyle('pill_pillars')" class="session-btn active px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 transition-all flex items-center gap-1.5" id="btn-s1">
+          <span>01. Header Pill Badges + Tiang Batas</span>
+          <span class="bg-amber-400 text-slate-900 text-[10px] px-1.5 py-0.2 rounded font-black">POPULER</span>
+        </button>
+
+        <button onclick="applySessionStyle('killzone_boxes')" class="session-btn px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1.5" id="btn-s2">
+          <span>02. ICT Killzone Range Boxes (Kotak High-Low)</span>
+          <span class="bg-blue-100 text-blue-800 text-[10px] px-1.5 py-0.2 rounded font-bold">PRO SMC</span>
+        </button>
+
+        <button onclick="applySessionStyle('vivid_ribbons')" class="session-btn px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all" id="btn-s3">
+          03. Vivid HD Pastel Ribbons (Warna Tegas & Jelas)
+        </button>
+
+        <button onclick="applySessionStyle('dual_flags')" class="session-btn px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all" id="btn-s4">
+          04. Boundary Open/Close Flags (Garis Tegas)
+        </button>
+
+        <button onclick="applySessionStyle('timeline_bar')" class="session-btn px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all" id="btn-s5">
+          05. Dedicated Timeline Tape Bar (Pita Bawah)
+        </button>
+      </div>
+
+      <!-- Controls -->
+      <div class="flex items-center gap-2 text-xs font-semibold text-slate-600">
+        <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <input type="checkbox" id="toggle-ema" checked onchange="toggleLayers()" class="rounded text-blue-600">
+          <span>EMA 200</span>
+        </label>
+        <label class="flex items-center gap-1.5 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+          <input type="checkbox" id="toggle-smc" checked onchange="toggleLayers()" class="rounded text-blue-600">
+          <span>BoS / CHoCH</span>
+        </label>
+      </div>
+    </nav>
+
+    <!-- Session Style Info Banner -->
+    <div id="style-banner" class="p-4 rounded-2xl bg-blue-50/80 border border-blue-200 flex items-start sm:items-center justify-between gap-4 text-xs">
+      <div>
+        <strong class="text-blue-950 text-sm font-bold block" id="banner-title">Format 01: Header Pill Badges + Tiang Batas Sesi (LuxAlgo Pro Standard)</strong>
+        <p class="text-blue-800 mt-0.5" id="banner-desc">Setiap sesi pasar memiliki badge warna pekat di bagian atas chart yang sangat jelas terbaca, dipadukan dengan garis batas vertikal putus-putus dan latar soft tint 5% yang tidak menenggelamkan candle.</p>
+      </div>
+      <div class="shrink-0 flex items-center gap-2" id="banner-tags">
+        <span class="px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">Teks 100% Terbaca</span>
+        <span class="px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-bold border border-blue-300">Batas Sesi Presisi</span>
+      </div>
+    </div>
+
+    <!-- MAIN CHART CONTAINER -->
+    <div class="glass-panel rounded-3xl p-5 sm:p-7 shadow-xl border border-blue-200/80">
+      
+      <!-- Chart Controls Header -->
+      <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-200/80 mb-4">
+        <div class="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+          <span class="px-2 text-[10px] text-slate-400 uppercase tracking-wider">Timeframe</span>
+          <button class="px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">M1</button>
+          <button class="px-2.5 py-1 rounded-lg bg-blue-600 text-white shadow-xs">M15</button>
+          <button class="px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">M30</button>
+          <button class="px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">H1</button>
+          <button class="px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">H4</button>
+          <button class="px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900">D1</button>
+        </div>
+
+        <div class="flex items-center gap-2 text-base font-black text-slate-900">
+          <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+          <span>XAUUSD M15 Chart</span>
+          <span class="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 ml-2">4636.98 LIVE</span>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs">
+          <span class="font-bold text-slate-400 uppercase text-[10px]">Data</span>
+          <span class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 font-bold text-slate-700 shadow-xs">2026 ▼</span>
+          <span class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 font-bold text-slate-700 shadow-xs">August ▼</span>
+          <span class="px-3 py-1.5 rounded-xl bg-blue-50 border border-blue-200 font-bold text-blue-700">UTC ▼</span>
+        </div>
+      </div>
+
+      <!-- THE CHART VIEWPORT -->
+      <div id="chart-viewport" class="w-full h-[640px] rounded-2xl relative overflow-hidden bg-white border border-slate-300">
+        
+        <!-- Grid Lines Layer -->
+        <svg class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+          <line x1="0" y1="70" x2="100%" y2="70" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="140" x2="100%" y2="140" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="210" x2="100%" y2="210" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="280" x2="100%" y2="280" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="350" x2="100%" y2="350" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="420" x2="100%" y2="420" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="490" x2="100%" y2="490" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="0" y1="560" x2="100%" y2="560" stroke="#f1f5f9" stroke-width="1" />
+          
+          <line x1="12%" y1="0" x2="12%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="25%" y1="0" x2="25%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="38%" y1="0" x2="38%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="50%" y1="0" x2="50%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="63%" y1="0" x2="63%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="76%" y1="0" x2="76%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+          <line x1="88%" y1="0" x2="88%" y2="100%" stroke="#f1f5f9" stroke-width="1" />
+        </svg>
+
+        <!-- DYNAMIC SESSION ZONES CONTAINER -->
+        <div id="session-zones-container" class="absolute inset-0 w-full h-full pointer-events-none">
+          <!-- Will be rendered dynamically based on selected style -->
+        </div>
+
+        <!-- CANDLESTICKS & STRUCTURE LAYER (SVG Vector) -->
+        <svg id="candle-svg" class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 1000 640">
+          
+          <!-- EMA 200 LINE -->
+          <path id="ema-line" d="M 0 490 Q 150 460, 300 400 T 600 300 T 850 220 T 1000 200" fill="none" stroke="#ea580c" stroke-width="3" />
+          
+          <!-- EMA 200 Badge -->
+          <g id="ema-badge" transform="translate(910, 190)">
+            <rect width="65" height="20" rx="4" fill="#ea580c" />
+            <text x="32" y="14" fill="#ffffff" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">EMA 200</text>
+          </g>
+
+          <!-- SMC STRUCTURE LINES & BADGES -->
+          <g id="smc-layer">
+            <!-- CHoCH Line at 4406.56 -->
+            <line x1="20" y1="450" x2="280" y2="450" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,4" />
+            <rect x="25" y="440" width="82" height="20" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
+            <text x="66" y="454" fill="#10b981" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">CHoCH 4406.56</text>
+
+            <!-- BoS Line 1 at 4526.05 -->
+            <line x1="220" y1="330" x2="480" y2="330" stroke="#10b981" stroke-width="2" />
+            <rect x="280" y="320" width="74" height="20" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
+            <text x="317" y="334" fill="#10b981" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">BoS 4526.05</text>
+
+            <!-- BoS Line 2 at 4560.91 -->
+            <line x1="410" y1="300" x2="620" y2="300" stroke="#10b981" stroke-width="2" />
+            <rect x="440" y="290" width="74" height="20" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1.5" />
+            <text x="477" y="304" fill="#10b981" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">BoS 4560.91</text>
+
+            <!-- LL & HH Badges -->
+            <rect x="20" y="530" width="70" height="20" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="55" y="544" fill="#f59e0b" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">LL 4314.80</text>
+
+            <rect x="350" y="410" width="70" height="20" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="385" y="424" fill="#f59e0b" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">LL 4450.54</text>
+
+            <rect x="420" y="360" width="70" height="20" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="455" y="374" fill="#f59e0b" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">LL 4502.63</text>
+
+            <rect x="650" y="270" width="70" height="20" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1.5" />
+            <text x="685" y="284" fill="#f59e0b" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">LL 4594.42</text>
+
+            <rect x="770" y="170" width="70" height="20" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="805" y="184" fill="#38bdf8" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">HH 4680.90</text>
+
+            <rect x="850" y="155" width="70" height="20" rx="4" fill="#0f172a" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="885" y="169" fill="#38bdf8" font-size="9.5" font-weight="bold" font-family="monospace" text-anchor="middle">HH 4696.73</text>
+          </g>
+
+          <!-- CANDLESTICKS BARS GROUP -->
+          <g id="candles-group"></g>
+
+          <!-- Current Live Price Dotted Line -->
+          <line x1="0" y1="225" x2="1000" y2="225" stroke="#089981" stroke-width="1.5" stroke-dasharray="3,3" />
+        </svg>
+
+        <!-- RIGHT PRICE SCALE -->
+        <div class="absolute right-0 top-0 bottom-0 w-16 bg-white/95 border-l border-slate-300 flex flex-col justify-between py-4 text-right pr-2 text-[11px] font-mono font-bold text-slate-900 select-none shadow-xs">
+          <span>4800.00</span>
+          <span>4750.00</span>
+          <span>4700.00</span>
+          <span>4650.00</span>
+          <span class="bg-emerald-600 text-white px-1.5 py-0.5 rounded text-[11px] font-bold inline-block self-end shadow-xs">4636.98</span>
+          <span>4600.00</span>
+          <span>4550.00</span>
+          <span>4500.00</span>
+          <span>4450.00</span>
+          <span>4400.00</span>
+          <span>4350.00</span>
+          <span>4300.00</span>
+        </div>
+
+        <!-- BOTTOM TIME SCALE -->
+        <div class="absolute left-0 right-16 bottom-0 h-7 bg-white/95 border-t border-slate-300 flex items-center justify-between px-6 text-[10px] font-mono font-bold text-slate-800 select-none">
+          <span>19 Aug 06:00</span>
+          <span>19 Aug 18:00</span>
+          <span>20 Aug 06:00</span>
+          <span>20 Aug 18:00</span>
+          <span>21 Aug 06:00</span>
+          <span>24 Aug 06:00</span>
+          <span>24 Aug 18:00</span>
+          <span>25 Aug 06:00</span>
+          <span>25 Aug 12:00</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Interactive Comparison Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Card 1 -->
+      <div class="glass-panel rounded-2xl p-5 border border-blue-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Format 01</span>
+            <span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">Rekomendasi Utama</span>
+          </div>
+          <h4 class="text-base font-bold text-slate-900 mb-1">Header Pill Badges + Tiang</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Menampilkan badge solid dengan ikon bendera sesi di atap chart. Batas sesi ditandai garis putus-putus presisi. Tulisan tidak akan pernah kabur karena berlatar solid dengan kontras 100%.
+          </p>
+        </div>
+        <button onclick="applySessionStyle('pill_pillars')" class="mt-4 w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold text-xs transition-all border border-blue-200">
+          Uji Format Ini
+        </button>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="glass-panel rounded-2xl p-5 border border-blue-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Format 02</span>
+            <span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">ICT SMC Pro</span>
+          </div>
+          <h4 class="text-base font-bold text-slate-900 mb-1">ICT Killzone Range Boxes</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Hanya membuat kotak pembatas pada rentang High dan Low yang terbentuk selama sesi tersebut (Asian Range, London Open, NY Session). Sangat berguna bagi trader SMC / ICT.
+          </p>
+        </div>
+        <button onclick="applySessionStyle('killzone_boxes')" class="mt-4 w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold text-xs transition-all border border-blue-200">
+          Uji Format Ini
+        </button>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="glass-panel rounded-2xl p-5 border border-blue-200 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Format 03</span>
+            <span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold">Vivid HD</span>
+          </div>
+          <h4 class="text-base font-bold text-slate-900 mb-1">Vivid HD Pastel Ribbons</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Warna pita sesi dinaikkan ketegasannya (8-10% opacity) dengan warna terkalibrasi tajam (Indigo, Fuchsia, Amber, Emerald, Azure) dan teks berlatar kontras.
+          </p>
+        </div>
+        <button onclick="applySessionStyle('vivid_ribbons')" class="mt-4 w-full py-2 rounded-xl bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 font-bold text-xs transition-all border border-blue-200">
+          Uji Format Ini
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Candlestick Sample Data
+    const candleData = [
+      { x: 30, o: 4320, h: 4330, l: 4310, c: 4325 },
+      { x: 50, o: 4325, h: 4340, l: 4315, c: 4335 },
+      { x: 70, o: 4335, h: 4345, l: 4320, c: 4318 },
+      { x: 90, o: 4318, h: 4330, l: 4305, c: 4312 },
+      { x: 110, o: 4312, h: 4340, l: 4310, c: 4338 },
+      { x: 130, o: 4338, h: 4360, l: 4330, c: 4355 },
+      { x: 150, o: 4355, h: 4420, l: 4350, c: 4410 },
+      { x: 170, o: 4410, h: 4450, l: 4400, c: 4445 },
+      { x: 190, o: 4445, h: 4465, l: 4435, c: 4458 },
+      { x: 210, o: 4458, h: 4470, l: 4440, c: 4445 },
+      { x: 230, o: 4445, h: 4490, l: 4440, c: 4485 },
+      { x: 250, o: 4485, h: 4530, l: 4480, c: 4526 },
+      { x: 270, o: 4526, h: 4535, l: 4510, c: 4515 },
+      { x: 290, o: 4515, h: 4520, l: 4490, c: 4495 },
+      { x: 310, o: 4495, h: 4505, l: 4470, c: 4475 },
+      { x: 330, o: 4475, h: 4485, l: 4450, c: 4452 },
+      { x: 350, o: 4452, h: 4490, l: 4450, c: 4485 },
+      { x: 370, o: 4485, h: 4520, l: 4480, c: 4515 },
+      { x: 390, o: 4515, h: 4550, l: 4510, c: 4545 },
+      { x: 410, o: 4545, h: 4570, l: 4535, c: 4560 },
+      { x: 430, o: 4560, h: 4565, l: 4500, c: 4505 },
+      { x: 450, o: 4505, h: 4540, l: 4500, c: 4535 },
+      { x: 470, o: 4535, h: 4575, l: 4530, c: 4570 },
+      { x: 490, o: 4570, h: 4600, l: 4565, c: 4595 },
+      { x: 510, o: 4595, h: 4615, l: 4585, c: 4605 },
+      { x: 530, o: 4605, h: 4625, l: 4595, c: 4610 },
+      { x: 550, o: 4610, h: 4640, l: 4605, c: 4635 },
+      { x: 570, o: 4635, h: 4650, l: 4620, c: 4645 },
+      { x: 590, o: 4645, h: 4655, l: 4630, c: 4635 },
+      { x: 610, o: 4635, h: 4645, l: 4590, c: 4595 },
+      { x: 630, o: 4595, h: 4630, l: 4590, c: 4625 },
+      { x: 650, o: 4625, h: 4660, l: 4620, c: 4655 },
+      { x: 670, o: 4655, h: 4680, l: 4650, c: 4675 },
+      { x: 690, o: 4675, h: 4690, l: 4670, c: 4680 },
+      { x: 710, o: 4680, h: 4685, l: 4650, c: 4655 },
+      { x: 730, o: 4655, h: 4670, l: 4640, c: 4660 },
+      { x: 750, o: 4660, h: 4700, l: 4655, c: 4696 },
+      { x: 770, o: 4696, h: 4698, l: 4660, c: 4665 },
+      { x: 790, o: 4665, h: 4670, l: 4620, c: 4625 },
+      { x: 810, o: 4625, h: 4650, l: 4615, c: 4645 },
+      { x: 830, o: 4645, h: 4655, l: 4610, c: 4615 },
+      { x: 850, o: 4615, h: 4640, l: 4605, c: 4636 },
+    ];
+
+    function priceToY(p) {
+      const minP = 4275;
+      const maxP = 4800;
+      const pct = (p - minP) / (maxP - minP);
+      return 600 - (pct * 560);
+    }
+
+    function renderCandles() {
+      const g = document.getElementById("candles-group");
+      g.innerHTML = "";
+
+      candleData.forEach(c => {
+        const isUp = c.c >= c.o;
+        const color = isUp ? "#089981" : "#f23645";
+
+        const yO = priceToY(c.o);
+        const yC = priceToY(c.c);
+        const yH = priceToY(c.h);
+        const yL = priceToY(c.l);
+
+        const bodyY = Math.min(yO, yC);
+        const bodyH = Math.max(Math.abs(yO - yC), 2.5);
+
+        // Wick
+        const wick = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        wick.setAttribute("x1", c.x);
+        wick.setAttribute("y1", yH);
+        wick.setAttribute("x2", c.x);
+        wick.setAttribute("y2", yL);
+        wick.setAttribute("stroke", color);
+        wick.setAttribute("stroke-width", "1.5");
+        g.appendChild(wick);
+
+        // Body
+        const body = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+        body.setAttribute("x", c.x - 5.5);
+        body.setAttribute("y", bodyY);
+        body.setAttribute("width", 11);
+        body.setAttribute("height", bodyH);
+        body.setAttribute("fill", color);
+        body.setAttribute("stroke", isUp ? "#065f46" : "#991b1b");
+        body.setAttribute("stroke-width", "0.75");
+        body.setAttribute("rx", 1);
+        g.appendChild(body);
+      });
+    }
+
+    // Sessions Timeline Definition (Left %, Width %)
+    const sessionList = [
+      { name: "Sydney", code: "SYD", left: "0%", width: "8%", color: "#6366f1", bg: "rgba(99, 102, 241, 0.05)", border: "#818cf8", minP: 4305, maxP: 4345 },
+      { name: "Asia (Tokyo)", code: "TYO", left: "8%", width: "12%", color: "#ec4899", bg: "rgba(236, 72, 153, 0.05)", border: "#f472b6", minP: 4310, maxP: 4360 },
+      { name: "Tokyo / London", code: "T/L", left: "20%", width: "8%", color: "#f59e0b", bg: "rgba(245, 158, 11, 0.05)", border: "#fbbf24", minP: 4350, maxP: 4450 },
+      { name: "London", code: "LDN", left: "28%", width: "14%", color: "#eab308", bg: "rgba(234, 179, 8, 0.05)", border: "#facc15", minP: 4440, maxP: 4530 },
+      { name: "London / NY (Prime)", code: "PRIME", left: "42%", width: "18%", color: "#10b981", bg: "rgba(16, 185, 129, 0.07)", border: "#34d399", minP: 4450, maxP: 4570 },
+      { name: "New York", code: "NYC", left: "60%", width: "14%", color: "#3b82f6", bg: "rgba(59, 130, 246, 0.05)", border: "#60a5fa", minP: 4585, maxP: 4655 },
+      { name: "Asia (Tokyo)", code: "TYO", left: "74%", width: "12%", color: "#ec4899", bg: "rgba(236, 72, 153, 0.05)", border: "#f472b6", minP: 4640, maxP: 4700 },
+      { name: "London / NY", code: "PRIME", left: "86%", width: "14%", color: "#10b981", bg: "rgba(16, 185, 129, 0.07)", border: "#34d399", minP: 4605, maxP: 4698 }
+    ];
+
+    const styleConfigs = {
+      pill_pillars: {
+        title: "Format 01: Header Pill Badges + Tiang Batas Sesi (LuxAlgo Pro)",
+        desc: "Setiap sesi pasar memiliki badge warna solid di atap grafik yang sangat jelas terbaca, dipadukan dengan garis batas vertikal putus-putus dan background 4% tint yang bersih.",
+        tags: ['<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">Teks 100% Terbaca</span>', '<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold border border-blue-300">Paling Rapi</span>'],
+        render: () => {
+          let html = '';
+          sessionList.forEach(s => {
+            html += `
+              <div class="absolute top-0 bottom-0 border-r border-dashed" style="left: ${s.left}; width: ${s.width}; background: ${s.bg}; border-color: ${s.border};">
+                <div class="absolute top-3 left-2.5">
+                  <span class="session-badge-pill px-2.5 py-1 rounded-md text-[10px] font-black font-mono tracking-tight flex items-center gap-1.5 border" style="background: #ffffff; color: ${s.color}; border-color: ${s.border};">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: ${s.color};"></span>
+                    <span>${s.name}</span>
+                  </span>
+                </div>
+              </div>
+            `;
+          });
+          return html;
+        }
+      },
+      killzone_boxes: {
+        title: "Format 02: ICT Killzone Range Boxes (Kotak High-Low Sesi)",
+        desc: "Menggambar kotak presisi hanya pada rentang harga tertinggi (High) dan terendah (Low) yang terjadi di setiap sesi. Area di luar High-Low tetap putih bersih tanpa tutupan warna!",
+        tags: ['<span class="px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold border border-purple-300">SMC / ICT Standard</span>', '<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold border border-amber-300">Highlight High-Low</span>'],
+        render: () => {
+          let html = '';
+          sessionList.forEach(s => {
+            const topY = priceToY(s.maxP);
+            const botY = priceToY(s.minP);
+            const boxH = Math.max(botY - topY, 40);
+
+            html += `
+              <div class="absolute" style="left: ${s.left}; width: ${s.width}; top: ${topY}px; height: ${boxH}px;">
+                <div class="w-full h-full rounded-xl border-2 shadow-sm relative overflow-hidden" style="background: ${s.color}15; border-color: ${s.color};">
+                  <div class="absolute top-1.5 left-2 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-md border" style="border-color: ${s.border}; color: ${s.color};">
+                    <span class="w-1.5 h-1.5 rounded-full" style="background: ${s.color};"></span>
+                    <span class="text-[10px] font-bold font-mono">${s.name} Range</span>
+                  </div>
+                  <div class="absolute bottom-1 right-2 text-[9px] font-mono font-bold text-slate-700 bg-white/80 px-1.5 rounded">
+                    ${s.minP} - ${s.maxP}
+                  </div>
+                </div>
+              </div>
+              <div class="absolute top-0 bottom-0 border-r border-slate-200 border-dashed" style="left: ${s.left}; width: ${s.width};"></div>
+            `;
+          });
+          return html;
+        }
+      },
+      vivid_ribbons: {
+        title: "Format 03: Vivid HD Pastel Ribbons (Warna Tegas & Jelas)",
+        desc: "Ketebalan warna sesi dinaikkan menjadi 9% - 11% dengan border vertikal tebal dan header bar terintegrasi 24px di bagian atas canvas.",
+        tags: ['<span class="px-2 py-0.5 rounded bg-sky-100 text-sky-800 font-bold border border-sky-300">Warna Kontras</span>', '<span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold border border-indigo-300">Vivid HD</span>'],
+        render: () => {
+          let html = '';
+          sessionList.forEach(s => {
+            html += `
+              <div class="absolute top-0 bottom-0 border-r-2" style="left: ${s.left}; width: ${s.width}; background: ${s.color}18; border-color: ${s.color};">
+                <div class="w-full py-1 px-2 border-b flex items-center justify-between" style="background: ${s.color}; color: #ffffff; border-color: ${s.border};">
+                  <span class="text-[10px] font-black font-mono tracking-tight truncate">${s.name}</span>
+                </div>
+              </div>
+            `;
+          });
+          return html;
+        }
+      },
+      dual_flags: {
+        title: "Format 04: Boundary Open/Close Flags (Garis Batas Tegas)",
+        desc: "Latar chart 100% putih bersih tanpa warna fill. Batas sesi ditandai dengan tiang garis berwarna + bendera penanda OPEN & CLOSE di bagian atas.",
+        tags: ['<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300">100% White Canvas</span>', '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold border border-slate-300">Open/Close Flags</span>'],
+        render: () => {
+          let html = '';
+          sessionList.forEach(s => {
+            html += `
+              <div class="absolute top-0 bottom-0 border-l-2" style="left: ${s.left}; border-color: ${s.color};">
+                <div class="absolute top-2 left-1.5">
+                  <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold text-white shadow-xs" style="background: ${s.color};">
+                    ${s.code} OPEN
+                  </span>
+                </div>
+              </div>
+            `;
+          });
+          return html;
+        }
+      },
+      timeline_bar: {
+        title: "Format 05: Dedicated Timeline Tape Bar (Pita Sesi Khusus)",
+        desc: "Pita sesi pasar diletakkan di baris khusus selebar 28px tepat di atas skala waktu, sehingga area grafik candlestick bersih total tanpa ada garis vertikal yang menutupi.",
+        tags: ['<span class="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold border border-blue-300">Pita Terpisah</span>', '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold border border-slate-300">Zero Clutter</span>'],
+        render: () => {
+          let html = `
+            <div class="absolute left-0 right-16 bottom-7 h-7 bg-slate-100/90 border-t border-b border-slate-300 flex items-center overflow-hidden">
+          `;
+          sessionList.forEach(s => {
+            html += `
+              <div class="h-full flex items-center justify-center border-r px-1 text-[10px] font-mono font-bold truncate transition-transform hover:scale-105" style="width: ${s.width}; background: ${s.color}25; color: ${s.color}; border-color: ${s.color};">
+                <span>${s.name}</span>
+              </div>
+            `;
+          });
+          html += `</div>`;
+          return html;
+        }
+      }
+    };
+
+    function applySessionStyle(key) {
+      const cfg = styleConfigs[key];
+      if (!cfg) return;
+
+      // Update Nav Buttons
+      const keys = ['pill_pillars', 'killzone_boxes', 'vivid_ribbons', 'dual_flags', 'timeline_bar'];
+      keys.forEach((k, idx) => {
+        const btn = document.getElementById(`btn-s${idx + 1}`);
+        if (k === key) {
+          btn.className = "session-btn active px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5";
+        } else {
+          btn.className = "session-btn px-4 py-2.5 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1.5";
+        }
+      });
+
+      // Update Banner
+      document.getElementById("banner-title").innerText = cfg.title;
+      document.getElementById("banner-desc").innerText = cfg.desc;
+      document.getElementById("banner-tags").innerHTML = cfg.tags.join(" ");
+
+      // Render Session Container
+      document.getElementById("session-zones-container").innerHTML = cfg.render();
+    }
+
+    function toggleLayers() {
+      const eOn = document.getElementById("toggle-ema").checked;
+      const mOn = document.getElementById("toggle-smc").checked;
+
+      document.getElementById("ema-line").style.display = eOn ? "block" : "none";
+      document.getElementById("ema-badge").style.display = eOn ? "block" : "none";
+      document.getElementById("smc-layer").style.display = mOn ? "block" : "none";
+    }
+
+    // Init
+    window.addEventListener("DOMContentLoaded", () => {
+      renderCandles();
+      applySessionStyle('pill_pillars');
+    });
+  </script>
+</body>
+</html>

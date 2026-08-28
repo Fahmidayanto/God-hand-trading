@@ -2,9 +2,10 @@
   "name": "diagram-arsitektur",
   "version": "1.0.0",
   "description": "Auto-reloading dev server for architecture diagram",
-  "main": "diagram_arsitektur.html",
+  "main": "server.js",
   "scripts": {
-    "dev": "live-server --entry-file=diagram_arsitektur.html"
+    "dev": "node server.js",
+    "serve": "node server.js"
   },
   "dependencies": {
     "live-server": "^1.2.2"

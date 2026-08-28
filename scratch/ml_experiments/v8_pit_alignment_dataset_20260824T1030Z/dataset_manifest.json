@@ -1,0 +1,26 @@
+{
+  "created_utc": "2026-08-24T10:11:33.719643+00:00",
+  "backtest_dir": "B:\\Project MT5\\Backtest_result",
+  "dataset_path": "scratch\\ml_experiments\\v8_pit_alignment_dataset_20260824T1030Z\\dataset_v5_unconstrained_rebuilt.csv",
+  "dataset_sha256": "b3a40d4f2fa4dc54412f94a6e700c543f43e5ab3fa1bbb3549884d52b95464b9",
+  "rows": 1942,
+  "columns": 71,
+  "years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "build_info": {
+    "skipped": {
+      "missing_files": 0,
+      "no_m15_bar": 1,
+      "insufficient_forward_data": 0,
+      "total_structures": 1943
+    }
+  }
+}

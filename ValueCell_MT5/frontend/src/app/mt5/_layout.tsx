@@ -1,5 +1,6 @@
 import { useLocation } from "react-router";
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import MT5Sidebar from "./components/MT5Sidebar";
 import Dashboard from "./dashboard";
 import Trades from "./trades";
@@ -25,6 +26,12 @@ const pages = [
   { path: "/mt5/simulation", Component: SimulationOfDead },
 ];
 
+// Ultra-Smooth Micro-Fade Transition (Performance Optimized)
+const pageTransition = {
+  duration: 0.2,
+  ease: [0.22, 1, 0.36, 1] as const,
+};
+
 export default function MT5Layout() {
   const location = useLocation();
   const [mounted, setMounted] = useState(new Set(["/mt5"]));
@@ -44,7 +51,25 @@ export default function MT5Layout() {
               className="size-full overflow-auto"
               style={{ display: location.pathname === path ? "" : "none" }}
             >
-              <Component />
+              {location.pathname === path ? (
+                <motion.div
+                  key={location.pathname}
+                  initial={{
+                    opacity: 0,
+                    y: 4,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                  }}
+                  transition={pageTransition}
+                  className="size-full"
+                >
+                  <Component />
+                </motion.div>
+              ) : (
+                <Component />
+              )}
             </div>
           ) : null
         )}

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Building2, Clock3, TrendingUp, BarChart3, CalendarDays, RefreshCw, Globe, Landmark, Monitor } from "lucide-react";
+import { Building2, Clock3, TrendingUp, BarChart3, CalendarDays, RefreshCw, Globe, Landmark, Monitor, ChevronDown } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -54,12 +54,12 @@ export interface ChartToolbarProps {
 type AccentKey = "blue" | "purple" | "cyan" | "amber" | "emerald" | "ruby";
 
 const ACCENTS: Record<AccentKey, { border: string; bg: string; text: string; shadow: string }> = {
-  blue: { border: "var(--neon-blue)", bg: "rgba(59,130,246,0.2)", text: "#93c5fd", shadow: "rgba(59,130,246,0.25)" },
-  purple: { border: "var(--neon-purple)", bg: "rgba(139,92,246,0.2)", text: "#c4b5fd", shadow: "rgba(139,92,246,0.25)" },
-  cyan: { border: "var(--neon-cyan)", bg: "rgba(6,182,212,0.15)", text: "#67e8f9", shadow: "rgba(6,182,212,0.2)" },
-  amber: { border: "var(--neon-amber)", bg: "rgba(251,191,36,0.15)", text: "#fcd34d", shadow: "rgba(251,191,36,0.2)" },
-  emerald: { border: "var(--neon-emerald)", bg: "rgba(16,185,129,0.15)", text: "#6ee7b7", shadow: "rgba(16,185,129,0.2)" },
-  ruby: { border: "var(--neon-ruby)", bg: "rgba(239,68,68,0.15)", text: "#fca5a5", shadow: "rgba(239,68,68,0.2)" },
+  blue: { border: "rgba(59, 130, 246, 0.45)", bg: "rgba(239, 246, 255, 0.95)", text: "#1e40af", shadow: "rgba(59, 130, 246, 0.15)" },
+  purple: { border: "rgba(139, 92, 246, 0.45)", bg: "rgba(250, 245, 255, 0.95)", text: "#6b21a8", shadow: "rgba(139, 92, 246, 0.15)" },
+  cyan: { border: "rgba(6, 182, 212, 0.45)", bg: "rgba(236, 254, 255, 0.95)", text: "#0e7490", shadow: "rgba(6, 182, 212, 0.15)" },
+  amber: { border: "rgba(245, 158, 11, 0.45)", bg: "rgba(254, 252, 232, 0.95)", text: "#b45309", shadow: "rgba(245, 158, 11, 0.15)" },
+  emerald: { border: "rgba(16, 185, 129, 0.45)", bg: "rgba(236, 253, 245, 0.95)", text: "#047857", shadow: "rgba(16, 185, 129, 0.15)" },
+  ruby: { border: "rgba(239, 68, 68, 0.45)", bg: "rgba(254, 242, 242, 0.95)", text: "#b91c1c", shadow: "rgba(239, 68, 68, 0.15)" },
 };
 
 const ACCENT_CYCLE: AccentKey[] = ["purple", "cyan", "blue", "amber", "emerald", "ruby"];
@@ -77,8 +77,9 @@ function activeButtonStyle(accent: AccentKey) {
   return {
     backgroundColor: c.bg,
     borderColor: c.border,
-    color: "#fff",
-    boxShadow: `0 0 12px ${c.shadow}`,
+    color: c.text,
+    fontWeight: 700,
+    boxShadow: `0 1px 4px ${c.shadow}`,
   };
 }
 
@@ -88,7 +89,8 @@ function activeItemStyle(accent: AccentKey) {
     backgroundColor: c.bg,
     borderColor: c.border,
     color: c.text,
-    boxShadow: `0 0 12px ${c.shadow}`,
+    fontWeight: 700,
+    boxShadow: `0 1px 4px ${c.shadow}`,
   };
 }
 
@@ -129,7 +131,7 @@ export default function ChartToolbar({
   const activeTimezoneLabel = timezoneOptions.find((t) => t.value === chartTimezone.display_mode) ?? timezoneOptions[0];
 
   const baseBtn =
-    "inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs font-medium text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap";
+    "inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg text-xs font-bold text-[var(--text-secondary)] transition-all hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap shadow-sm";
 
   const SectionLabel = ({ children }: { children: ReactNode }) => (
     <span className="text-[10px] uppercase tracking-wider text-[var(--text-tertiary)] mr-1">{children}</span>
@@ -142,16 +144,16 @@ export default function ChartToolbar({
       {/* Left: timeframe + zoom */}
       <div className="flex flex-wrap items-center gap-2 justify-between md:justify-start md:flex-shrink-0">
         <SectionLabel>Timeframe</SectionLabel>
-        <div className="inline-flex bg-[var(--glass-secondary)] border border-[var(--glass-border)] rounded-lg overflow-hidden">
+        <div className="inline-flex items-center p-0.5 sm:p-1 bg-sky-100/40 border border-sky-200/80 rounded-xl shadow-sm gap-1">
           {timeframes.map((tf) => (
             <button
               key={tf}
               onClick={() => onTimeframeChange(tf)}
               className={cn(
-                "bg-transparent border-0 border-r border-[var(--glass-border)] last:border-r-0 px-3 py-1.5 text-xs font-medium transition-all hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]",
+                "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer",
                 tf === activeTimeframe
-                  ? "!bg-[var(--neon-blue)] !text-white"
-                  : "text-[var(--text-secondary)]"
+                  ? "bg-sky-600 text-white shadow-sm border border-sky-600"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
               )}
             >
               {tf}
@@ -161,15 +163,29 @@ export default function ChartToolbar({
 
         <Divider />
 
-        <button onClick={onZoomIn} className={baseBtn} title="Zoom in">
-          +
-        </button>
-        <button onClick={onResetZoom} className={baseBtn} title="Reset zoom">
-          ⟲
-        </button>
-        <button onClick={onZoomOut} className={baseBtn} title="Zoom out">
-          −
-        </button>
+        <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-sky-100/40 border border-sky-200/80 rounded-xl shadow-sm">
+          <button
+            onClick={onZoomIn}
+            title="Zoom in"
+            className="flex items-center justify-center min-w-[28px] px-2 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-white/80"
+          >
+            +
+          </button>
+          <button
+            onClick={onResetZoom}
+            title="Reset zoom"
+            className="flex items-center justify-center min-w-[28px] px-2 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-white/80"
+          >
+            ⟲
+          </button>
+          <button
+            onClick={onZoomOut}
+            title="Zoom out"
+            className="flex items-center justify-center min-w-[28px] px-2 py-1 rounded-lg font-bold text-xs transition-all duration-150 active:scale-95 cursor-pointer text-slate-600 hover:text-slate-900 hover:bg-white/80"
+          >
+            −
+          </button>
+        </div>
       </div>
 
       {/* Center: chart title */}
@@ -190,9 +206,9 @@ export default function ChartToolbar({
             style={activeButtonStyle("blue")}
             data-accent="blue"
           >
-            {selectedYear} <span className="ml-0.5">▾</span>
+            {selectedYear} <ChevronDown size={12} className="ml-0.5 opacity-80" />
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {availableYears.map((year, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = year === selectedYear;
@@ -202,7 +218,7 @@ export default function ChartToolbar({
                   onClick={() => onYearChange(year)}
                   className={cn(
                     "px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                    active ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                    active ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   )}
                   style={active ? activeItemStyle(accent) : undefined}
                   data-accent={accent}
@@ -221,9 +237,9 @@ export default function ChartToolbar({
             style={activeButtonStyle("purple")}
             data-accent="purple"
           >
-            {selectedMonthLabel} <span className="ml-0.5">▾</span>
+            {selectedMonthLabel} <ChevronDown size={12} className="ml-0.5 opacity-80" />
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {availableMonths.map((month, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = month.value === selectedMonth;
@@ -233,7 +249,7 @@ export default function ChartToolbar({
                   onClick={() => onMonthChange(month.value)}
                   className={cn(
                     "px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                    active ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                    active ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   )}
                   style={active ? activeItemStyle(accent) : undefined}
                   data-accent={accent}
@@ -254,9 +270,9 @@ export default function ChartToolbar({
           >
             <activeTimezoneLabel.icon size={13} aria-hidden="true" />
             <span>{activeTimezoneLabel.label}</span>
-            <span className="ml-0.5">▾</span>
+            <ChevronDown size={12} className="ml-0.5 opacity-80" />
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[180px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {timezoneOptions.map((tz, idx) => {
               const accent = ACCENT_CYCLE[idx % ACCENT_CYCLE.length];
               const active = tz.value === chartTimezone.display_mode;
@@ -266,7 +282,7 @@ export default function ChartToolbar({
                   onClick={() => onTimezoneChange(tz.value)}
                   className={cn(
                     "flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                    active ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                    active ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   )}
                   style={active ? activeItemStyle(accent) : undefined}
                   data-accent={accent}
@@ -290,13 +306,13 @@ export default function ChartToolbar({
           >
             Actions <span className="ml-0.5">▾</span>
           </button>
-          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[220px] bg-[var(--bg-surface)] border border-[var(--glass-border)] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
+          <div className="hidden group-hover:block absolute top-[calc(100%+6px)] right-0 min-w-[220px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-50 before:content-[''] before:absolute before:-top-[6px] before:left-0 before:right-0 before:h-[6px]">
             {/* Toggle items */}
             <div
               onClick={onToggleStructure}
               className={cn(
                 "flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                showStructure ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                showStructure ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
               style={showStructure ? activeItemStyle("purple") : undefined}
               data-accent="purple"
@@ -304,7 +320,7 @@ export default function ChartToolbar({
               <Building2 size={13} aria-hidden="true" />
               <span>Structure</span>
               {structureLines?.total_points != null && (
-                <span className={cn("text-[10px] font-semibold ml-auto", showStructure ? "text-white/70" : "text-[var(--text-tertiary)]")}>
+                <span className={cn("text-[10px] font-semibold ml-auto", showStructure ? "text-purple-600" : "text-slate-400")}>
                   ({structureLines.total_points})
                 </span>
               )}
@@ -314,7 +330,7 @@ export default function ChartToolbar({
               onClick={onToggleSessions}
               className={cn(
                 "flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                showSessions ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                showSessions ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
               style={showSessions ? activeItemStyle("cyan") : undefined}
               data-accent="cyan"
@@ -322,7 +338,7 @@ export default function ChartToolbar({
               <Clock3 size={13} aria-hidden="true" />
               <span>Sessions</span>
               {sessionZonesData?.total_zones != null && (
-                <span className={cn("text-[10px] font-semibold ml-auto", showSessions ? "text-white/70" : "text-[var(--text-tertiary)]")}>
+                <span className={cn("text-[10px] font-semibold ml-auto", showSessions ? "text-cyan-700" : "text-slate-400")}>
                   ({sessionZonesData.total_zones})
                 </span>
               )}
@@ -332,7 +348,7 @@ export default function ChartToolbar({
               onClick={onToggleEMA200}
               className={cn(
                 "flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                showEMA200 ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                showEMA200 ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
               style={showEMA200 ? activeItemStyle("amber") : undefined}
               data-accent="amber"
@@ -345,7 +361,7 @@ export default function ChartToolbar({
               onClick={onToggleTrades}
               className={cn(
                 "flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs transition-all cursor-pointer",
-                showTrades ? "text-white" : "text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                showTrades ? "font-semibold" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
               style={showTrades ? activeItemStyle("blue") : undefined}
               data-accent="blue"
@@ -353,18 +369,18 @@ export default function ChartToolbar({
               <BarChart3 size={13} aria-hidden="true" />
               <span>Trades</span>
               {backtestTradesData?.total_trades != null && (
-                <span className={cn("text-[10px] font-semibold ml-auto", showTrades ? "text-white/70" : "text-[var(--text-tertiary)]")}>
+                <span className={cn("text-[10px] font-semibold ml-auto", showTrades ? "text-blue-600" : "text-slate-400")}>
                   ({backtestTradesData.total_trades})
                 </span>
               )}
             </div>
 
-            <div className="h-px bg-slate-400/20 my-1.5" />
+            <div className="h-px bg-slate-200 my-1.5" />
 
             {/* Refresh data */}
             <div
               onClick={onRefresh}
-              className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs text-[var(--text-secondary)] transition-all cursor-pointer hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+              className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-transparent text-xs text-slate-600 transition-all cursor-pointer hover:bg-slate-100 hover:text-slate-900"
               data-accent="emerald"
             >
               <RefreshCw size={13} aria-hidden="true" />
@@ -377,21 +393,19 @@ export default function ChartToolbar({
               className={cn(
                 "flex items-center gap-2 px-2.5 py-2 rounded-md border text-xs transition-all cursor-pointer",
                 isFullHistoryLoaded
-                  ? "text-cyan-300 border-cyan-500/30 bg-cyan-500/15 shadow-[0_0_10px_rgba(6,182,212,0.15)]"
-                  : "border-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                  ? "text-cyan-700 border-cyan-300 bg-cyan-50 font-semibold shadow-sm"
+                  : "border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
               )}
               data-accent="ruby"
             >
               <CalendarDays size={13} aria-hidden="true" />
               <span>Load full history</span>
               {isFullHistoryLoaded && (
-                <span className="ml-auto text-[10px] font-semibold text-cyan-400/80 uppercase tracking-wider">Aktif</span>
+                <span className="ml-auto text-[10px] font-semibold text-cyan-600 uppercase tracking-wider">Aktif</span>
               )}
             </div>
           </div>
         </div>
-
-
       </div>
     </div>
   );

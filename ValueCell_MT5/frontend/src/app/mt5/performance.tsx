@@ -21,6 +21,7 @@ import {
   CircleDollarSign,
   ClipboardList,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import MT5Footer from "./components/MT5Footer";
 import {
   Chart as ChartJS,
@@ -176,7 +177,7 @@ export default function PerformancePage() {
     }
   };
 
-  // ponytail: all derived from monthlyPNL — no dead /backtest/* endpoints needed
+  // ponytail: all derived from monthlyPNL â€” no dead /backtest/* endpoints needed
 
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -394,11 +395,12 @@ export default function PerformancePage() {
         className="relative z-10" 
         style={{ 
           width: "100%",
-          paddingLeft: "240px", // Space for sidebar (exact sidebar width)
+          paddingLeft: "var(--sidebar-offset, 250px)",
+          transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           minHeight: "100vh"
         }}
       >
-        <div className="px-12 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 py-6 max-w-[1920px] mx-auto">
 
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -447,7 +449,7 @@ export default function PerformancePage() {
                       setIsYearOpen(!isYearOpen);
                       setIsMonthOpen(false);
                     }}
-                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.4)] backdrop-blur-md border border-[rgba(6,182,212,0.2)] hover:border-[var(--neon-cyan)] hover:shadow-[0_0_12px_rgba(6,182,212,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
+                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(255,255,255,0.7)] backdrop-blur-md border border-[rgba(6,182,212,0.2)] hover:border-[var(--neon-cyan)] hover:shadow-[0_0_12px_rgba(6,182,212,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
                   >
                     <span>{selectedYear ? selectedYear : "All Years"}</span>
                   </button>
@@ -463,14 +465,14 @@ export default function PerformancePage() {
                   </div>
                   
                   {isYearOpen && (
-                    <div className="absolute z-[100] w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(6,182,212,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(6,182,212,0.15)] transition-all overflow-visible">
+                    <div className="absolute z-[100] w-full mt-2 bg-white/95 backdrop-blur-xl border border-[rgba(6,182,212,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(6,182,212,0.15)] transition-all overflow-visible">
                       <div
                         onClick={() => {
                           setSelectedYear(null);
                           setIsYearOpen(false);
                         }}
                         className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between rounded-t-xl ${
-                          selectedYear === null ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
+                          selectedYear === null ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-600"
                         }`}
                       >
                         <span>All Years</span>
@@ -486,7 +488,7 @@ export default function PerformancePage() {
                           className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(6,182,212,0.15)] transition-all flex items-center justify-between ${
                             idx === availableYears.length - 1 ? "rounded-b-xl" : ""
                           } ${
-                            selectedYear === year ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-300"
+                            selectedYear === year ? "text-[var(--neon-cyan)] bg-[rgba(6,182,212,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(6,182,212,0.2)]" : "text-slate-600"
                           }`}
                         >
                           <span>{year}</span>
@@ -510,7 +512,7 @@ export default function PerformancePage() {
                       setIsMonthOpen(!isMonthOpen);
                       setIsYearOpen(false);
                     }}
-                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(15,23,42,0.4)] backdrop-blur-md border border-[rgba(168,85,247,0.2)] hover:border-[var(--neon-purple)] hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
+                    className="w-full text-left pl-11 pr-10 py-2.5 bg-[rgba(255,255,255,0.7)] backdrop-blur-md border border-[rgba(168,85,247,0.2)] hover:border-[var(--neon-purple)] hover:shadow-[0_0_12px_rgba(168,85,247,0.2)] focus:outline-none rounded-xl text-[var(--text-primary)] text-sm font-medium transition-all duration-300 cursor-pointer flex justify-between items-center"
                   >
                     <span>
                       {selectedMonth
@@ -530,14 +532,14 @@ export default function PerformancePage() {
                   </div>
                   
                   {isMonthOpen && (
-                    <div className="absolute z-[100] w-full mt-2 bg-[rgba(15,23,42,0.9)] backdrop-blur-xl border border-[rgba(168,85,247,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.15)] transition-all overflow-visible">
+                    <div className="absolute z-[100] w-full mt-2 bg-white/95 backdrop-blur-xl border border-[rgba(168,85,247,0.25)] rounded-xl shadow-[0_4px_30px_rgba(0,0,0,0.4),0_0_20px_rgba(168,85,247,0.15)] transition-all overflow-visible">
                       <div
                         onClick={() => {
                           setSelectedMonth(null);
                           setIsMonthOpen(false);
                         }}
                         className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between rounded-t-xl ${
-                          selectedMonth === null ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
+                          selectedMonth === null ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-600"
                         }`}
                       >
                         <span>All Months</span>
@@ -566,7 +568,7 @@ export default function PerformancePage() {
                           className={`px-4 py-2.5 text-sm cursor-pointer hover:bg-[rgba(168,85,247,0.15)] transition-all flex items-center justify-between ${
                             idx === arr.length - 1 ? "rounded-b-xl" : ""
                           } ${
-                            selectedMonth === month.val ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-300"
+                            selectedMonth === month.val ? "text-[var(--neon-purple)] bg-[rgba(168,85,247,0.1)] font-semibold shadow-[inset_0_0_8px_rgba(168,85,247,0.2)]" : "text-slate-600"
                           }`}
                         >
                           <span>{month.label}</span>
@@ -589,7 +591,7 @@ export default function PerformancePage() {
                     type="number"
                     value={initialBalance}
                     onChange={(e) => setInitialBalance(Math.max(1, parseInt(e.target.value) || 1000))}
-                    className="w-full appearance-none pl-11 pr-12 py-2.5 bg-[rgba(15,23,42,0.6)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 mono"
+                    className="w-full appearance-none pl-11 pr-12 py-2.5 bg-[rgba(240,247,255,0.75)] border border-[rgba(100,116,139,0.25)] rounded-xl text-[var(--text-primary)] text-sm font-semibold focus:outline-none focus:border-[var(--neon-blue)] focus:ring-2 focus:ring-[rgba(59,130,246,0.25)] hover:border-[rgba(59,130,246,0.45)] transition-all duration-200 mono"
                     min="1"
                   />
                   <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
@@ -635,110 +637,139 @@ export default function PerformancePage() {
           </div>
         </div>
 
-        {/* Equity Summary */}
-        <div className="grid grid-cols-3 gap-5 mb-6">
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-cyan)] before:to-[var(--neon-blue)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(6,182,212,0.15)] to-[rgba(59,130,246,0.15)] border border-[rgba(6,182,212,0.25)]">
-              <Wallet className="w-5 h-5 text-[var(--neon-cyan)]" />
+        {/* Equity Summary - Theme 09 Sapphire Platinum Sovereign Cards */}
+        <section className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          {/* Card 1: Starting Balance */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Starting Balance</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider flex items-center gap-1">
+                <Wallet size={11} className="text-blue-500" />
+                <span>INITIAL</span>
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Starting Balance
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              ${initialBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="text-[24px] font-bold text-white mono mb-1">
-              ${initialBalance.toLocaleString()}
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>Modal awal alokasi backtest</span>
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">Initial Capital</div>
           </div>
 
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-green)] before:to-[var(--neon-cyan)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(16,185,129,0.15)] to-[rgba(6,182,212,0.15)] border border-[rgba(16,185,129,0.25)]">
-              <TrendingUp className="w-5 h-5 text-[var(--neon-emerald)]" />
+          {/* Card 2: Final Equity */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Final Equity</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider flex items-center gap-1">
+                <TrendingUp size={11} className="text-emerald-500" />
+                <span>PORTFOLIO</span>
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Final Equity
+            <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", finalEquity >= initialBalance ? "text-slate-900" : "text-rose-600")}>
+              ${finalEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div className="text-[24px] font-bold text-[#10b981] mono mb-1">
-              ${finalEquity.toLocaleString(undefined, {maximumFractionDigits: 2})}
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>Total saldo akhir portofolio</span>
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">Current Portfolio Value</div>
           </div>
 
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-purple)] before:to-[var(--neon-green)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-[rgba(139,92,246,0.15)] to-[rgba(16,185,129,0.15)] border border-[rgba(139,92,246,0.25)]">
-              {finalEquity >= initialBalance ? (
-                <Trophy className="w-5 h-5 text-[var(--neon-purple)]" />
-              ) : (
-                <ArrowDownRight className="w-5 h-5 text-[var(--neon-ruby)]" />
-              )}
+          {/* Card 3: Total Gain */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Net Gain</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider flex items-center gap-1">
+                <Trophy size={11} className={finalEquity >= initialBalance ? "text-emerald-500" : "text-rose-500"} />
+                <span>REALIZED</span>
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Total Gain
+            <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", (finalEquity - initialBalance) >= 0 ? "text-slate-900" : "text-rose-600")}>
+              {(finalEquity - initialBalance) >= 0 ? `+$${(finalEquity - initialBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(finalEquity - initialBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
-            <div className={`text-[24px] font-bold mono mb-1 ${finalEquity > initialBalance ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-              ${(finalEquity - initialBalance).toLocaleString(undefined, {maximumFractionDigits: 2})}
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className={(finalEquity - initialBalance) >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                {initialBalance > 0 ? (((finalEquity - initialBalance) / initialBalance) * 100).toFixed(2) : "0.00"}%
+              </span>
+              <span>Akumulasi Net Profit</span>
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">Profit/Loss</div>
           </div>
-        </div>
+        </section>
 
-        {/* Performance Stats */}
-        <div className="grid grid-cols-4 gap-5 mb-6">
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
-              <TrendingUp className="w-5 h-5 text-[var(--neon-blue)]" />
+        {/* Performance Stats - Theme 09 Sapphire Platinum Sovereign Cards */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {/* Card 1: Total Return */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Return</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                ALL TIME
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Total Return
-            </div>
-            <div className="text-[28px] font-bold positive mono mb-1">
+            <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", (stats.total_return ?? 0) >= 0 ? "text-slate-900" : "text-rose-600")}>
               {(stats.total_return ?? 0) > 0 ? '+' : ''}{(stats.total_return ?? 0).toFixed(2)}%
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">Total gain</div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className="text-emerald-600 font-bold">Total Gain</span>
+              <span>across historical dataset</span>
+            </div>
           </div>
 
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
-              <Target className="w-5 h-5 text-[var(--neon-blue)]" />
+          {/* Card 2: Win Rate */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Win Rate</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                {(stats.win_rate ?? 0) >= 50 ? "PROFITABLE" : "SUB-50%"}
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Win Rate
-            </div>
-            <div className={`text-[28px] font-bold mono mb-1 ${(stats.win_rate ?? 0) >= 50 ? 'positive' : 'negative'}`}>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
               {(stats.win_rate ?? 0).toFixed(1)}%
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">Success rate</div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className={(stats.win_rate ?? 0) >= 50 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                {(stats.win_rate ?? 0) >= 50 ? "Target tercapai" : "Perlu optimasi"}
+              </span>
+              <span>• Success rate</span>
+            </div>
           </div>
 
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
-              <Scale className="w-5 h-5 text-[var(--neon-blue)]" />
+          {/* Card 3: Profit Factor */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Profit Factor</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                RATIO
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Profit Factor
-            </div>
-            <div className={`text-[28px] font-bold mono mb-1 ${(stats.profit_factor ?? 0) >= 1.5 ? 'positive' : (stats.profit_factor ?? 0) >= 1.0 ? 'neutral' : 'negative'}`}>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
               {(stats.profit_factor ?? 0).toFixed(2)}
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">
-              {(stats.profit_factor ?? 0) >= 2 ? 'Excellent' : (stats.profit_factor ?? 0) >= 1.5 ? 'Good' : (stats.profit_factor ?? 0) >= 1.0 ? 'Fair' : 'Poor'}
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className="text-sky-600 font-bold">
+                {(stats.profit_factor ?? 0) >= 2 ? 'Excellent' : (stats.profit_factor ?? 0) >= 1.5 ? 'Good' : (stats.profit_factor ?? 0) >= 1.0 ? 'Fair' : 'Poor'}
+              </span>
+              <span>• Risk/reward rating</span>
             </div>
           </div>
 
-          <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1 relative overflow-hidden before:absolute before:top-0 before:left-0 before:w-full before:h-[3px] before:bg-gradient-to-r before:from-[var(--neon-blue)] before:to-[var(--neon-purple)]">
-            <div className="absolute top-4 right-4 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-[rgba(59,130,246,0.15)] to-[rgba(139,92,246,0.15)] border border-[rgba(59,130,246,0.25)]">
-              <Gauge className="w-5 h-5 text-[var(--neon-blue)]" />
+          {/* Card 4: Sharpe Ratio */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Sharpe Ratio</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                VOLATILITY
+              </span>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-              Sharpe Ratio
-            </div>
-            <div className={`text-[28px] font-bold mono mb-1 ${(stats.sharpe_ratio ?? 0) >= 1.5 ? 'positive' : (stats.sharpe_ratio ?? 0) >= 1.0 ? 'neutral' : 'negative'}`}>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
               {(stats.sharpe_ratio ?? 0).toFixed(2)}
             </div>
-            <div className="text-sm text-[var(--text-tertiary)]">
-              {(stats.sharpe_ratio ?? 0) >= 2 ? 'Excellent' : (stats.sharpe_ratio ?? 0) >= 1.5 ? 'Above average' : (stats.sharpe_ratio ?? 0) >= 1.0 ? 'Average' : 'Below average'}
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className="text-blue-600 font-bold">
+                {(stats.sharpe_ratio ?? 0) >= 2 ? 'Excellent' : (stats.sharpe_ratio ?? 0) >= 1.5 ? 'Above avg' : (stats.sharpe_ratio ?? 0) >= 1.0 ? 'Average' : 'Below avg'}
+              </span>
+              <span>• Risk-adjusted return</span>
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Charts Grid */}
         <div className="grid grid-cols-[2fr_1fr] gap-5 mb-6">
@@ -910,7 +941,7 @@ export default function PerformancePage() {
                       className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
                       title="Klik untuk melihat detail transaksi"
                     >
-                      <td className="px-3 py-2 whitespace-nowrap font-medium text-slate-200">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
+                      <td className="px-3 py-2 whitespace-nowrap font-medium text-slate-800">{month.month_label || `${month.month ?? 'N/A'}-${month.year ?? ''}`}</td>
                       <td className="px-3 py-2 whitespace-nowrap mono">{month.executed_trades ?? month.trades ?? 0}</td>
                       <td
                         className={`px-3 py-2 whitespace-nowrap ${
@@ -954,19 +985,19 @@ export default function PerformancePage() {
 
       {/* Monthly Trades Detail Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
             {/* Premium Gradient Top Accent Line */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
             
             {/* Header */}
-            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+            <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
                   <CalendarDays className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     Detail Transaksi - {modalTitle}
                   </h3>
                   <p className="text-xs text-slate-400">
@@ -976,7 +1007,7 @@ export default function PerformancePage() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                 title="Tutup"
               >
                 <X className="size-5" />
@@ -998,11 +1029,11 @@ export default function PerformancePage() {
                 <>
                   {/* Summary Dashboard Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
-                      <span className="text-2xl font-bold text-slate-200 mono">{selectedMonthTrades.length}</span>
+                      <span className="text-2xl font-bold text-slate-800 mono">{selectedMonthTrades.length}</span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
                       <span className="text-2xl font-bold text-cyan-400 mono">
                         {(() => {
@@ -1011,7 +1042,7 @@ export default function PerformancePage() {
                         })()}%
                       </span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
+                    <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col">
                       <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
                       <span className={`text-2xl font-bold mono ${
                         selectedMonthTrades.reduce((sum, t) => sum + t.net_profit, 0) >= 0 ? "text-emerald-400" : "text-rose-500"
@@ -1023,10 +1054,10 @@ export default function PerformancePage() {
                   </div>
 
                   {/* Trades Detail Table */}
-                  <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                  <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-[#F0F6FF]/40">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
+                        <thead className="bg-white/75 border-b border-blue-200 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
                           <tr>
                             <th className="py-3 px-4">Ticket</th>
                             <th className="py-3 px-4">Type</th>
@@ -1038,13 +1069,13 @@ export default function PerformancePage() {
                             <th className="py-3 px-4">Exit Time</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                        <tbody className="divide-y divide-blue-200/70 text-slate-800">
                           {[...selectedMonthTrades]
                             .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
                             .map((trade) => {
                               const isWin = trade.net_profit >= 0;
                               return (
-                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors whitespace-nowrap">
+                                <tr key={trade.ticket} className="hover:bg-[#BFDBFE]/50 transition-colors whitespace-nowrap">
                                   <td className="py-3 px-4 mono text-xs text-slate-400">#{trade.ticket}</td>
                                   <td className="py-3 px-4">
                                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
@@ -1077,10 +1108,10 @@ export default function PerformancePage() {
             </div>
             
             {/* Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+            <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup
               </button>

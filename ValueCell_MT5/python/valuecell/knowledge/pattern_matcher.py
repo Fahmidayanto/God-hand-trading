@@ -4,7 +4,8 @@ Pattern Matcher - High-level interface for pattern similarity search
 Provides easy-to-use methods for agents to query historical patterns.
 """
 
-from typing import List, Dict, Any, Optional
+from collections import defaultdict
+from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timedelta
 
 from loguru import logger
@@ -42,6 +43,8 @@ class PatternMatcher:
         limit: int = 1000,
         min_similarity: float = 0.7,
         prior_choch: bool = False,
+        timestamp: Optional[Union[datetime, str]] = None,
+        price_ratio: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Find similar historical patterns and calculate statistics.
@@ -66,8 +69,12 @@ class PatternMatcher:
         """
         try:
             # Build current pattern
+            market_timestamp = timestamp or datetime.now()
+            if isinstance(market_timestamp, datetime):
+                market_timestamp = market_timestamp.isoformat()
+
             current_pattern = {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": market_timestamp,
                 "event_type": event_type,
                 "direction": direction,
                 "price": price,
@@ -76,6 +83,7 @@ class PatternMatcher:
                 "timeframe": timeframe,
                 "symbol": "XAUUSD",
                 "prior_choch": prior_choch,
+                "price_ratio": price_ratio,
             }
             
             # Search similar patterns
@@ -86,20 +94,14 @@ class PatternMatcher:
             )
             
             if not similar_patterns:
-                return {
-                    "patterns": [],
-                    "win_rate": 0.0,
-                    "avg_profit": 0.0,
-                    "total_count": 0,
-                    "recommendation": "NEUTRAL",
-                    "confidence": 0.0,
-                    "reasoning": "No similar historical patterns found"
-                }
+                return self._empty_evidence("No similar historical patterns found")
             
-            # Calculate statistics (exclude PENDING from win rate calculation)
+            # Calculate statistics. Win rate only represents executed outcomes.
             total = len(similar_patterns)
-            wins = sum(1 for p in similar_patterns if p.get("outcome") == "WIN")
-            losses = sum(1 for p in similar_patterns if p.get("outcome") == "LOSS")
+            wins = sum(1 for p in similar_patterns if str(p.get("outcome", "")).upper() == "WIN")
+            losses = sum(1 for p in similar_patterns if str(p.get("outcome", "")).upper() == "LOSS")
+            rejected = sum(1 for p in similar_patterns if str(p.get("outcome", "")).upper() == "REJECTED")
+            pending = sum(1 for p in similar_patterns if str(p.get("outcome", "")).upper() == "PENDING")
             completed_trades = wins + losses
             win_rate = wins / completed_trades if completed_trades > 0 else 0.0
             
@@ -119,6 +121,58 @@ class PatternMatcher:
             reasoning = self._generate_reasoning(
                 event_type, direction, win_rate, avg_profit, total, completed_trades, session
             )
+
+            executed_net_profits = [
+                float(pattern["net_profit"])
+                for pattern in similar_patterns
+                if str(pattern.get("outcome", "")).upper() in {"WIN", "LOSS"}
+                and pattern.get("net_profit") is not None
+            ]
+            total_net_profit = sum(executed_net_profits)
+
+            rejection_groups = defaultdict(list)
+            for pattern in similar_patterns:
+                if str(pattern.get("outcome", "")).upper() != "REJECTED":
+                    continue
+                reason_code = pattern.get("reject_reason_code") or "UNKNOWN"
+                reason_raw = pattern.get("reject_reason_raw") or "Unknown"
+                rejection_groups[(reason_code, reason_raw)].append(
+                    float(pattern.get("similarity", 0.0))
+                )
+
+            reason_distribution = []
+            for (reason_code, reason_raw), similarities in rejection_groups.items():
+                count = len(similarities)
+                reason_distribution.append({
+                    "reason_code": reason_code,
+                    "reason_raw": reason_raw,
+                    "count": count,
+                    "share_of_rejections": count / rejected if rejected else 0.0,
+                    "average_similarity": sum(similarities) / count,
+                    "max_similarity": max(similarities),
+                })
+            reason_distribution.sort(
+                key=lambda item: (item["count"], item["max_similarity"]),
+                reverse=True,
+            )
+
+            top_matches = sorted(
+                similar_patterns,
+                key=lambda pattern: float(pattern.get("similarity", 0.0)),
+                reverse=True,
+            )[:10]
+
+            outcome_distribution = {
+                "matches": total,
+                "executed": completed_trades,
+                "wins": wins,
+                "losses": losses,
+                "rejected": rejected,
+                "pending": pending,
+                "executed_win_rate": win_rate,
+                "rejection_rate": rejected / total if total else 0.0,
+                "completion_rate": completed_trades / total if total else 0.0,
+            }
             
             result = {
                 "patterns": similar_patterns,  # Show all matching patterns
@@ -128,7 +182,17 @@ class PatternMatcher:
                 "completed_count": completed_trades,
                 "recommendation": recommendation,
                 "confidence": confidence,
-                "reasoning": reasoning
+                "reasoning": reasoning,
+                "outcome_distribution": outcome_distribution,
+                "net_profit_statistics": {
+                    "total": total_net_profit,
+                    "average": total_net_profit / len(executed_net_profits) if executed_net_profits else 0.0,
+                },
+                "rejection_analysis": {
+                    "total_rejected": rejected,
+                    "reason_distribution": reason_distribution,
+                },
+                "top_matches": top_matches,
             }
             
             logger.info(
@@ -142,15 +206,37 @@ class PatternMatcher:
             
         except Exception as e:
             logger.error(f"Pattern matching failed: {e}")
-            return {
-                "patterns": [],
-                "win_rate": 0.0,
-                "avg_profit": 0.0,
-                "total_count": 0,
-                "recommendation": "NEUTRAL",
-                "confidence": 0.0,
-                "reasoning": f"Error: {str(e)}"
-            }
+            return self._empty_evidence(f"Error: {str(e)}")
+
+    @staticmethod
+    def _empty_evidence(reasoning: str) -> Dict[str, Any]:
+        return {
+            "patterns": [],
+            "win_rate": 0.0,
+            "avg_profit": 0.0,
+            "total_count": 0,
+            "completed_count": 0,
+            "recommendation": "NEUTRAL",
+            "confidence": 0.0,
+            "reasoning": reasoning,
+            "outcome_distribution": {
+                "matches": 0,
+                "executed": 0,
+                "wins": 0,
+                "losses": 0,
+                "rejected": 0,
+                "pending": 0,
+                "executed_win_rate": 0.0,
+                "rejection_rate": 0.0,
+                "completion_rate": 0.0,
+            },
+            "net_profit_statistics": {"total": 0.0, "average": 0.0},
+            "rejection_analysis": {
+                "total_rejected": 0,
+                "reason_distribution": [],
+            },
+            "top_matches": [],
+        }
     
     def _generate_recommendation(
         self,

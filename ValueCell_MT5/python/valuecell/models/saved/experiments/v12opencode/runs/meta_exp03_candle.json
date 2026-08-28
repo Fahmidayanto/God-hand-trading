@@ -1,0 +1,53 @@
+{
+  "tag": "exp03_candle",
+  "families": [
+    "F_CANDLE"
+  ],
+  "extra_cols": [],
+  "model_mode": "dual",
+  "seeds": [
+    42
+  ],
+  "embargo_days": 0,
+  "dataset_sha16": "dataset_v12opencode_unconstrained",
+  "scored_csv": "B:\\Project MT5\\ValueCell_MT5\\python\\valuecell\\models\\saved\\experiments\\v12opencode\\runs\\scored_exp03_candle.csv",
+  "n_rows_scored": 1713,
+  "winners_sample": [
+    {
+      "seed": 42,
+      "fold": 2020,
+      "mfe": "XGBoost_d3_n120_lr002_f10",
+      "mae": "XGBoost_d3_n120_lr002_f10"
+    },
+    {
+      "seed": 42,
+      "fold": 2021,
+      "mfe": "XGBoost_d3_n120_lr002_f10",
+      "mae": "Ridge_alpha10.0_f15"
+    },
+    {
+      "seed": 42,
+      "fold": 2022,
+      "mfe": "Ridge_alpha10.0_f15",
+      "mae": "Ridge_alpha10.0_f15"
+    },
+    {
+      "seed": 42,
+      "fold": 2023,
+      "mfe": "RandomForest_d5_n200_leaf15_f20",
+      "mae": "Ridge_alpha10.0_f10"
+    },
+    {
+      "seed": 42,
+      "fold": 2024,
+      "mfe": "XGBoost_d3_n120_lr002_f15",
+      "mae": "RandomForest_d5_n200_leaf15_f15"
+    },
+    {
+      "seed": 42,
+      "fold": 2025,
+      "mfe": "RandomForest_d5_n200_leaf15_f20",
+      "mae": "RandomForest_d5_n200_leaf15_f25"
+    }
+  ]
+}

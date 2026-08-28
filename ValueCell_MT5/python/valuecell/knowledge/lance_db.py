@@ -19,6 +19,30 @@ import numpy as np
 from loguru import logger
 
 
+def normalize_reject_reason(raw_reason: Optional[str]) -> str:
+    """Map free-form rejection text to a stable evidence category."""
+    reason = str(raw_reason or "").strip().upper()
+    if not reason or reason in {"N/A", "NONE", "NAN", "NULL"}:
+        return "UNKNOWN"
+    if "H1" in reason and "EMA" in reason:
+        return "H1_EMA200_FILTER"
+    if "H4" in reason and "EMA" in reason:
+        return "H4_EMA_FILTER"
+    if "BODY" in reason and "RATIO" in reason:
+        return "BODY_RATIO_FILTER"
+    if "STRETCH" in reason and "EMA" in reason:
+        return "EMA_STRETCH_FILTER"
+    if "CYCLE" in reason or "BOS" in reason:
+        return "BOS_CYCLE_LIMIT"
+    if "SESSION" in reason:
+        return "SESSION_FILTER"
+    if "RISK" in reason:
+        return "RISK_MANAGEMENT"
+    if "CONSENSUS" in reason:
+        return "LOW_CONSENSUS"
+    return "OTHER"
+
+
 class LanceDBManager:
     """
     Manages LanceDB vector database for pattern similarity search.
@@ -91,6 +115,11 @@ class LanceDBManager:
         if "news_sentiment_cache" not in self._table_names():
             logger.info("Creating collection: news_sentiment_cache")
             self._create_news_sentiment_cache_collection()
+
+        # Collection 6: Economic Calendar Events
+        if "economic_calendar_events" not in self._table_names():
+            logger.info("Creating collection: economic_calendar_events")
+            self._create_economic_calendar_events_collection()
         
         logger.info(f"[OK] LanceDB collections ready: {len(self._table_names())} collections")
     
@@ -115,7 +144,11 @@ class LanceDBManager:
             "prior_choch": False,
             "outcome": "WIN",  # WIN/LOSS/PENDING
             "profit_pips": 40.0,
+            "net_profit": 40.0,
             "duration_minutes": 17,
+            "reject_reason_raw": "",
+            "reject_reason_code": "NONE",
+            "price_ratio": 1.0,
             # Vector representation (will be calculated)
             "vector": [0.0] * 16  # 16-dimensional vector
         }]
@@ -155,28 +188,7 @@ class LanceDBManager:
         try:
             table = self.db.open_table("historical_structures")
             
-            # Calculate vector representation
-            vector = self._pattern_to_vector(pattern)
-            
-            # Prepare data
-            data = {
-                "id": f"{pattern['symbol']}_{pattern['timestamp']}",
-                "timestamp": pattern["timestamp"],
-                "symbol": pattern["symbol"],
-                "timeframe": pattern["timeframe"],
-                "event_type": pattern["event_type"],
-                "direction": pattern["direction"],
-                "price": float(pattern["price"]),
-                "ema200": float(pattern.get("ema200", 0)),
-                "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
-                "session": pattern.get("session", "Unknown"),
-                "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
-                "prior_choch": bool(pattern.get("prior_choch", False)),
-                "outcome": pattern.get("outcome", "PENDING"),
-                "profit_pips": float(pattern.get("profit_pips", 0)),
-                "duration_minutes": int(pattern.get("duration_minutes", 0)),
-                "vector": vector
-            }
+            data = self.prepare_structure_pattern(pattern)
             
             # Add to table
             table.add([data])
@@ -198,26 +210,7 @@ class LanceDBManager:
             table = self.db.open_table("historical_structures")
             data_list = []
             for pattern in patterns:
-                vector = self._pattern_to_vector(pattern)
-                data = {
-                    "id": f"{pattern['symbol']}_{pattern['timestamp']}",
-                    "timestamp": pattern["timestamp"],
-                    "symbol": pattern["symbol"],
-                    "timeframe": pattern["timeframe"],
-                    "event_type": pattern["event_type"],
-                    "direction": pattern["direction"],
-                    "price": float(pattern["price"]),
-                    "ema200": float(pattern.get("ema200", 0)),
-                    "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
-                    "session": pattern.get("session", "Unknown"),
-                    "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
-                    "prior_choch": bool(pattern.get("prior_choch", False)),
-                    "outcome": pattern.get("outcome", "PENDING"),
-                    "profit_pips": float(pattern.get("profit_pips", 0)),
-                    "duration_minutes": int(pattern.get("duration_minutes", 0)),
-                    "vector": vector
-                }
-                data_list.append(data)
+                data_list.append(self.prepare_structure_pattern(pattern))
             
             table.add(data_list)
             logger.info(f"✅ Successfully batch added {len(data_list)} patterns to LanceDB")
@@ -225,6 +218,44 @@ class LanceDBManager:
         except Exception as e:
             logger.error(f"Failed to batch add structure patterns: {e}")
             return False
+
+    def prepare_structure_pattern(self, pattern: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize one historical structure according to the table contract."""
+        outcome = str(pattern.get("outcome", "PENDING")).upper()
+        reject_reason_raw = str(pattern.get("reject_reason_raw") or "").strip()
+        reject_reason_code = pattern.get("reject_reason_code")
+        if outcome == "REJECTED":
+            reject_reason_code = reject_reason_code or normalize_reject_reason(reject_reason_raw)
+        else:
+            reject_reason_raw = ""
+            reject_reason_code = "NONE"
+
+        net_profit = pattern.get("net_profit")
+        duration_minutes = pattern.get("duration_minutes")
+        price_ratio = pattern.get("price_ratio")
+
+        return {
+            "id": pattern.get("id") or f"{pattern['symbol']}_{pattern['timestamp']}",
+            "timestamp": pattern["timestamp"],
+            "symbol": pattern["symbol"],
+            "timeframe": pattern["timeframe"],
+            "event_type": pattern["event_type"],
+            "direction": pattern["direction"],
+            "price": float(pattern["price"]),
+            "ema200": float(pattern.get("ema200", 0)),
+            "ema_distance": float(pattern["price"]) - float(pattern.get("ema200", 0)),
+            "session": pattern.get("session", "Unknown"),
+            "hour": datetime.fromisoformat(pattern["timestamp"]).hour,
+            "prior_choch": bool(pattern.get("prior_choch", False)),
+            "outcome": outcome,
+            "profit_pips": float(pattern.get("profit_pips") or 0.0),
+            "net_profit": float(net_profit) if net_profit is not None and not pd.isna(net_profit) else None,
+            "duration_minutes": int(duration_minutes) if duration_minutes is not None and not pd.isna(duration_minutes) else None,
+            "reject_reason_raw": reject_reason_raw,
+            "reject_reason_code": str(reject_reason_code),
+            "price_ratio": float(price_ratio) if price_ratio is not None else 1.0,
+            "vector": self._pattern_to_vector(pattern),
+        }
     
     def search_similar_patterns(
         self, 
@@ -683,6 +714,93 @@ class LanceDBManager:
         except Exception as e:
             logger.error(f"Failed to write news cache to LanceDB: {e}")
             return False
+
+    # ========== COLLECTION 6: Economic Calendar Events ==========
+
+    def _create_economic_calendar_events_collection(self):
+        """Create economic_calendar_events collection with schema definition"""
+        sample_data = [{
+            "id": "sample_econ_1",
+            "timestamp": "2026-01-28T19:00:00Z",
+            "year": 2026,
+            "currency": "USD",
+            "event_name": "FOMC Rate Decision",
+            "impact": "HIGH",
+            "category": "CENTRAL_BANK",
+            "blackout_start": "2026-01-28T18:30:00Z",
+            "blackout_end": "2026-01-28T19:30:00Z",
+            "vector": [0.0, 0.0]
+        }]
+        df = pd.DataFrame(sample_data)
+        table = self.db.create_table("economic_calendar_events", df)
+        logger.info("✅ Collection 'economic_calendar_events' created")
+        return table
+
+    def add_economic_calendar_events(self, events: List[Dict[str, Any]]) -> bool:
+        """Batch add economic calendar events to LanceDB"""
+        try:
+            if "economic_calendar_events" not in self._table_names():
+                self._create_economic_calendar_events_collection()
+            
+            table = self.db.open_table("economic_calendar_events")
+            
+            data_list = []
+            for ev in events:
+                data = {
+                    "id": str(ev.get("id", f"econ_{ev.get('timestamp')}")),
+                    "timestamp": str(ev.get("timestamp", "")),
+                    "year": int(ev.get("year", 2026)),
+                    "currency": str(ev.get("currency", "USD")),
+                    "event_name": str(ev.get("event_name", "")),
+                    "impact": str(ev.get("impact", "HIGH")),
+                    "category": str(ev.get("category", "GENERAL")),
+                    "blackout_start": str(ev.get("blackout_start", "")),
+                    "blackout_end": str(ev.get("blackout_end", "")),
+                    "vector": ev.get("vector", [0.0, 0.0])
+                }
+                data_list.append(data)
+            
+            table.add(data_list)
+            logger.info(f"✅ Successfully inserted {len(data_list)} economic calendar events to LanceDB")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to add economic calendar events to LanceDB: {e}")
+            return False
+
+    def check_news_blackout(self, target_time_iso: str, window_minutes: int = 30) -> Dict[str, Any]:
+        """Check if target_time is inside any high-impact news blackout window."""
+        try:
+            if "economic_calendar_events" not in self._table_names():
+                return {"is_blackout": False, "events": []}
+            
+            table = self.db.open_table("economic_calendar_events")
+            df = table.search().to_pandas()
+            if df.empty:
+                return {"is_blackout": False, "events": []}
+            
+            t_dt = pd.to_datetime(target_time_iso, utc=True)
+            active_events = []
+            
+            for _, row in df.iterrows():
+                b_start = pd.to_datetime(row.get("blackout_start"), utc=True)
+                b_end = pd.to_datetime(row.get("blackout_end"), utc=True)
+                if pd.notna(b_start) and pd.notna(b_end):
+                    if b_start <= t_dt <= b_end:
+                        active_events.append({
+                            "event_name": row.get("event_name"),
+                            "impact": row.get("impact"),
+                            "release_time": row.get("timestamp"),
+                            "category": row.get("category")
+                        })
+            
+            return {
+                "is_blackout": len(active_events) > 0,
+                "events": active_events,
+                "target_time": target_time_iso
+            }
+        except Exception as e:
+            logger.error(f"Error checking news blackout: {e}")
+            return {"is_blackout": False, "events": [], "error": str(e)}
 
     def close(self):
         """Close database connection"""

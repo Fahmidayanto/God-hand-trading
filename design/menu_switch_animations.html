@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>5 Rekomendasi Menu Switch Animation - Three.js & GSAP | God Hand Trading</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- GSAP & Plugins -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Tailwind CDN for fast utility styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              200: '#bae0fd',
+              300: '#7cc7fb',
+              400: '#38a9f8',
+              500: '#0e8ce9',
+              600: '#026fc7',
+              700: '#0358a1',
+              800: '#074b84',
+              900: '#0c3f6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-page: #f4f8fc;
+      --card-bg: rgba(255, 255, 255, 0.85);
+      --card-border: rgba(186, 224, 253, 0.8);
+      --card-shadow: 0 10px 25px -10px rgba(37, 99, 235, 0.08);
+      --card-shadow-hover: 0 20px 45px -15px rgba(37, 99, 235, 0.18);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-page);
+      color: #0f172a;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    /* ThreeJS Background Canvas */
+    #three-bg-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    /* Glass Effect Utilities */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(191, 219, 254, 0.8);
+    }
+
+    .glass-card-09 {
+      background: linear-gradient(135deg, #ffffff 0%, rgba(240, 249, 255, 0.6) 50%, rgba(224, 242, 254, 0.7) 100%);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(191, 219, 254, 0.85);
+      box-shadow: var(--card-shadow);
+      transition: box-shadow 0.25s ease, transform 0.25s ease;
+    }
+    .glass-card-09:hover {
+      box-shadow: var(--card-shadow-hover);
+      transform: translateY(-2px);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.5);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(147, 197, 253, 0.6);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(59, 130, 246, 0.8);
+    }
+
+    /* Active Nav Indicator Glow */
+    .nav-pill-active {
+      background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
+      color: #ffffff !important;
+      box-shadow: 0 4px 15px -2px rgba(37, 99, 235, 0.4);
+    }
+
+    /* Hologram Scanlines */
+    .holo-grid {
+      background-size: 30px 30px;
+      background-image: 
+        linear-gradient(to right, rgba(59, 130, 246, 0.05) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="relative min-h-screen flex flex-col">
+
+  <!-- 3D Three.js Background Canvas -->
+  <canvas id="three-bg-canvas"></canvas>
+
+  <!-- Top Showcase Header & Preset Selector -->
+  <header class="relative z-30 sticky top-0 glass-panel border-b px-4 lg:px-8 py-3.5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+    <div class="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i data-lucide="sparkles" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-sm sm:text-base font-black tracking-tight text-slate-900 flex items-center gap-2">
+            5 Rekomendasi Menu Switch Animation
+            <span class="font-mono text-[9px] px-2 py-0.5 rounded-full bg-blue-100 border border-blue-300 text-blue-800 font-bold uppercase">Three.js + GSAP</span>
+          </h1>
+          <p class="text-[11px] text-slate-500 font-medium">Klik menu di sidebar kiri atau tombol preset di bawah untuk melihat animasi transisi perpindahan halaman.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Animation Preset Selector Buttons -->
+    <div class="flex flex-wrap items-center gap-1.5 p-1 rounded-2xl bg-slate-100/90 border border-blue-200/70 text-xs w-full md:w-auto justify-center">
+      <button onclick="setPreset(1)" id="btn-preset-1" class="preset-btn px-3 py-1.5 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+        01. Sovereign Liquid
+      </button>
+      <button onclick="setPreset(2)" id="btn-preset-2" class="preset-btn px-3 py-1.5 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+        02. Kinetic 3D Hologram
+      </button>
+      <button onclick="setPreset(3)" id="btn-preset-3" class="preset-btn px-3 py-1.5 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+        03. Sapphire Ripple
+      </button>
+      <button onclick="setPreset(4)" id="btn-preset-4" class="preset-btn px-3 py-1.5 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        04. Velocity Momentum
+      </button>
+      <button onclick="setPreset(5)" id="btn-preset-5" class="preset-btn px-3 py-1.5 rounded-xl font-bold transition-all duration-200 flex items-center gap-1.5 text-slate-700 hover:text-blue-600">
+        <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+        05. Orbital Morph Prism
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Body Grid: Sidebar + Live Content -->
+  <div class="relative z-10 flex-1 flex flex-col md:flex-row">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="w-full md:w-64 lg:w-72 glass-panel border-r p-4 flex flex-col justify-between shrink-0">
+      <div>
+        <div class="flex items-center justify-between px-3 py-2 mb-4 border-b border-blue-200/50">
+          <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Navigation Menu</span>
+          <span id="active-preset-badge" class="font-mono text-[9px] font-bold px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700">Preset #1</span>
+        </div>
+
+        <nav class="space-y-1" id="nav-list">
+          <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="home" class="w-4 h-4 text-blue-500"></i>
+            <span>Dashboard Overview</span>
+          </button>
+          <button onclick="switchTab('trades')" data-tab="trades" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-500"></i>
+            <span>Activity / Trades</span>
+          </button>
+          <button onclick="switchTab('rongsokan')" data-tab="rongsokan" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="battery-charging" class="w-4 h-4 text-amber-500"></i>
+            <span>Rongsokan Explorer</span>
+          </button>
+          <button onclick="switchTab('performance')" data-tab="performance" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-500"></i>
+            <span>Performance Analytics</span>
+          </button>
+          <button onclick="switchTab('agents')" data-tab="agents" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="bot" class="w-4 h-4 text-cyan-500"></i>
+            <span>AI Trading Agents</span>
+          </button>
+          <button onclick="switchTab('database')" data-tab="database" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="database" class="w-4 h-4 text-purple-500"></i>
+            <span>Database Inspector</span>
+          </button>
+          <button onclick="switchTab('replay')" data-tab="replay" class="nav-item w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50/80 hover:text-blue-700 transition-all duration-200 text-left">
+            <i data-lucide="clapperboard" class="w-4 h-4 text-rose-500"></i>
+            <span>Replay Trades</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Controls & Specs Box -->
+      <div class="mt-6 p-3.5 rounded-2xl bg-white/90 border border-blue-200/80 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold text-slate-700">Animation Speed</span>
+          <span id="speed-val" class="font-mono text-[10px] font-bold text-blue-600">2.00s</span>
+        </div>
+        <input type="range" id="speed-slider" min="0.2" max="3.0" step="0.05" value="2.0" class="w-full accent-blue-600 cursor-pointer" oninput="updateSpeed(this.value)">
+        
+        <div class="text-[10px] text-slate-500 leading-tight space-y-1">
+          <p><strong>Physics:</strong> <span id="physics-name" class="text-slate-800">circ.out (Geometry Polyhedron Spin + Alpha Morph)</span></p>
+          <p><strong>3D Scene:</strong> <span id="three-status" class="text-purple-600 font-semibold">Active Three.js 3D Morph Prism</span></p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Container with Animation Target -->
+    <main class="flex-1 p-4 sm:p-6 lg:p-8 overflow-hidden relative flex flex-col justify-between">
+      
+      <!-- Translatable & Animatable Container Wrapper -->
+      <div id="page-transition-wrapper" class="w-full max-w-[1600px] mx-auto relative perspective-1000">
+        
+        <!-- Live Header Banner -->
+        <div id="hero-header" class="anim-node mb-6 p-4 sm:p-5 rounded-[22px] glass-card-09 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span id="page-icon" class="p-1.5 rounded-lg bg-blue-600 text-white shadow-sm">
+                <i data-lucide="home" class="w-4 h-4"></i>
+              </span>
+              <h2 id="page-title" class="text-xl sm:text-2xl font-black tracking-tight text-slate-900">Dashboard Overview</h2>
+            </div>
+            <p id="page-desc" class="text-xs text-slate-500 font-medium">Real-time trading telemetry, account status, and autonomous agents consensus.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold text-xs">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              MT5 LIVE CONNECTED
+            </span>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards (Theme 09 Sapphire Platinum Sovereign) -->
+        <div id="cards-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          
+          <!-- Card 1 -->
+          <div class="anim-node glass-card-09 p-4 sm:p-5 rounded-[22px] flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span id="card-label-1" class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Account Balance</span>
+              <span id="card-badge-1" class="font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">USD</span>
+            </div>
+            <div id="card-val-1" class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">$1,135.92</div>
+            <div id="card-sub-1" class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>Equity:</span>
+              <strong class="text-emerald-600 font-bold">$1,135.92</strong>
+              <span>(100%)</span>
+            </div>
+          </div>
+
+          <!-- Card 2 -->
+          <div class="anim-node glass-card-09 p-4 sm:p-5 rounded-[22px] flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span id="card-label-2" class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Positions</span>
+              <span id="card-badge-2" class="font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">LIVE</span>
+            </div>
+            <div id="card-val-2" class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">0</div>
+            <div id="card-sub-2" class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>No active orders</span>
+              <span>•</span>
+              <span>Margin 0%</span>
+            </div>
+          </div>
+
+          <!-- Card 3 -->
+          <div class="anim-node glass-card-09 p-4 sm:p-5 rounded-[22px] flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span id="card-label-3" class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Today P&L</span>
+              <span id="card-badge-3" class="font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">REALTIME</span>
+            </div>
+            <div id="card-val-3" class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">+$0.00</div>
+            <div id="card-sub-3" class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span class="text-emerald-600 font-bold">+0.00%</span>
+              <span>dari deposit awal</span>
+            </div>
+          </div>
+
+          <!-- Card 4 -->
+          <div class="anim-node glass-card-09 p-4 sm:p-5 rounded-[22px] flex flex-col justify-between gap-2">
+            <div class="flex items-center justify-between">
+              <span id="card-label-4" class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">System Health</span>
+              <span id="card-badge-4" class="font-mono text-[9px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">ONLINE</span>
+            </div>
+            <div id="card-val-4" class="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">100%</div>
+            <div id="card-sub-4" class="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span class="text-emerald-600 font-bold">All systems operational</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Section 2: Chart & Detail Split Box -->
+        <div id="content-grid" class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+          
+          <!-- Large Chart Simulation Box -->
+          <div class="anim-node lg:col-span-2 glass-card-09 p-5 rounded-[22px] flex flex-col justify-between min-h-[280px]">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-2">
+                <i data-lucide="trending-up" class="w-4 h-4 text-blue-600"></i>
+                <h3 id="chart-box-title" class="text-sm font-bold text-slate-900">Market Structure & Price Action (XAUUSD M15)</h3>
+              </div>
+              <span class="font-mono text-[10px] font-bold text-slate-500">REALTIME BRIDGE</span>
+            </div>
+
+            <!-- Simulated SVG Chart Wave -->
+            <div class="w-full h-44 bg-gradient-to-b from-blue-50/50 to-white/90 rounded-xl border border-blue-200/60 relative overflow-hidden flex items-end p-3">
+              <svg class="w-full h-full text-blue-500" viewBox="0 0 500 120" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="chartGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="rgba(37, 99, 235, 0.35)" />
+                    <stop offset="100%" stop-color="rgba(37, 99, 235, 0.0)" />
+                  </linearGradient>
+                </defs>
+                <path id="svg-chart-path" d="M 0 80 Q 80 30, 150 60 T 300 40 T 420 20 T 500 35 L 500 120 L 0 120 Z" fill="url(#chartGrad)" />
+                <path id="svg-chart-stroke" d="M 0 80 Q 80 30, 150 60 T 300 40 T 420 20 T 500 35" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" />
+              </svg>
+            </div>
+            
+            <div class="flex items-center justify-between text-[11px] text-slate-500 font-medium mt-3">
+              <span>Period: <strong>Last 30 Days</strong></span>
+              <span class="text-emerald-600 font-bold">+284.50 Pips Profit Factor: 4.22</span>
+            </div>
+          </div>
+
+          <!-- Side Consensus / Info Box -->
+          <div class="anim-node glass-card-09 p-5 rounded-[22px] flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <i data-lucide="cpu" class="w-4 h-4 text-purple-600"></i>
+                  Autonomous Agent Matrix
+                </h3>
+                <span class="font-mono text-[9px] font-bold px-2 py-0.5 rounded bg-purple-50 border border-purple-200 text-purple-700">4 AGENTS</span>
+              </div>
+              <div class="space-y-2.5 text-xs">
+                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-blue-200/60">
+                  <span class="font-medium text-slate-700">Market Structure</span>
+                  <span class="font-mono font-bold text-emerald-600">BULLISH BOS (92%)</span>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-blue-200/60">
+                  <span class="font-medium text-slate-700">ML CatBoost Filter</span>
+                  <span class="font-mono font-bold text-sky-600">CONFIRMED (88%)</span>
+                </div>
+                <div class="flex items-center justify-between p-2 rounded-xl bg-white border border-blue-200/60">
+                  <span class="font-medium text-slate-700">Risk Manager</span>
+                  <span class="font-mono font-bold text-slate-800">1.0% LOT SAFE</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-blue-200/60 flex items-center justify-between text-xs">
+              <span class="text-slate-500 font-medium">Final Consensus:</span>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold text-[11px] shadow-sm">STRONG BUY</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Bottom Implementation Details & Code Peek -->
+      <footer class="mt-6 p-4 rounded-2xl glass-panel text-xs flex flex-col md:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <i data-lucide="code-2" class="w-4 h-4 text-blue-600"></i>
+          <span class="text-slate-600 font-medium">Karakteristik Animasi Aktif:</span>
+          <strong id="preset-spec-title" class="text-blue-700 font-bold">01. Sovereign Liquid Shift</strong>
+        </div>
+        <div id="preset-spec-desc" class="text-slate-500 text-right">
+          GSAP Flip-like stagger slide up + Three.js ambient light refraction. Ultra luxury & responsive.
+        </div>
+      </footer>
+
+    </main>
+
+  </div>
+
+  <!-- JavaScript Animation Controller -->
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // State Variables
+    let currentPreset = 5;
+    let animDuration = 2.0;
+    let currentTab = 'dashboard';
+    let prevTabIndex = 0;
+
+    const tabData = {
+      dashboard: {
+        title: "Dashboard Overview",
+        desc: "Real-time trading telemetry, account status, and autonomous agents consensus.",
+        icon: "home",
+        cards: [
+          { label: "Account Balance", badge: "USD", val: "$1,135.92", sub: "Equity: $1,135.92 (100%)" },
+          { label: "Open Positions", badge: "LIVE", val: "0", sub: "No active orders • Margin 0%" },
+          { label: "Today P&L", badge: "REALTIME", val: "+$0.00", sub: "+0.00% dari deposit awal" },
+          { label: "System Health", badge: "ONLINE", val: "100%", sub: "All systems operational" }
+        ],
+        chartTitle: "Market Structure & Price Action (XAUUSD M15)"
+      },
+      trades: {
+        title: "Activity / Trades",
+        desc: "Live executions, historical order journal, win rates and trade duration metrics.",
+        icon: "bar-chart-3",
+        cards: [
+          { label: "Total Trades", badge: "2024", val: "1,248", sub: "Jan - Des 2024 Backtest" },
+          { label: "Win Rate", badge: "PROFITABLE", val: "68.4%", sub: "Target 60% tercapai" },
+          { label: "Total Net P&L", badge: "REALTIME", val: "+$4,892.40", sub: "Net realized profit" },
+          { label: "Open Orders", badge: "ACTIVE", val: "0", sub: "No active trades" }
+        ],
+        chartTitle: "Cumulative Net Profit Growth Curve"
+      },
+      rongsokan: {
+        title: "Rongsokan Explorer",
+        desc: "Algorithmic market pattern lab, tick data validation and structural stress-test.",
+        icon: "battery-charging",
+        cards: [
+          { label: "Parsed Swings", badge: "M15", val: "18,420", sub: "HH/LL Major Points" },
+          { label: "BoS Validations", badge: "VALID", val: "94.2%", sub: "True break rate" },
+          { label: "CHoCH Triggers", badge: "REVERSAL", val: "312", sub: "Confirmed reversals" },
+          { label: "Noise Ratio", badge: "FILTERED", val: "4.1%", sub: "Ultra low false triggers" }
+        ],
+        chartTitle: "High-Frequency Swing Resonance Spectrum"
+      },
+      performance: {
+        title: "Performance Analytics",
+        desc: "Sharpe ratios, drawdown curves, monthly return heatmaps and Monte Carlo risk.",
+        icon: "trending-up",
+        cards: [
+          { label: "Total Return", badge: "ALL TIME", val: "+489.2%", sub: "Across 24 months test" },
+          { label: "Profit Factor", badge: "QUALITY", val: "4.22", sub: "Excellent risk-reward" },
+          { label: "Sharpe Ratio", badge: "VOLATILITY", val: "2.84", sub: "Above institutional grade" },
+          { label: "Max Drawdown", badge: "STRICT", val: "4.8%", sub: "Well below 10% limit" }
+        ],
+        chartTitle: "Equity Drawdown vs Benchmark Growth"
+      },
+      agents: {
+        title: "AI Trading Agents",
+        desc: "Multi-agent swarm architecture: Price Action, LLM Sentiment, Risk and Execution agents.",
+        icon: "bot",
+        cards: [
+          { label: "Active Models", badge: "4 SWARM", val: "4 / 4", sub: "100% consensus sync" },
+          { label: "Avg Latency", badge: "INFERENCE", val: "14ms", sub: "Ultra low latency loop" },
+          { label: "Accuracy", badge: "ROC-AUC", val: "0.892", sub: "CatBoost calibrated" },
+          { label: "Veto Triggered", badge: "RISK MGR", val: "18", sub: "High spread rejected" }
+        ],
+        chartTitle: "Agent Voting Weights & Confidence Stream"
+      },
+      database: {
+        title: "Database Inspector",
+        desc: "Neon PostgreSQL Cloud & LanceDB vector storage synchronization tracker.",
+        icon: "database",
+        cards: [
+          { label: "Neon DB Rows", badge: "NEON", val: "1.42M", sub: "Structure & trade records" },
+          { label: "CSV Files", badge: "SYNCED", val: "100%", sub: "All logs synced to DB" },
+          { label: "Vector Chunks", badge: "LANCEDB", val: "84,000", sub: "Pattern embeddings" },
+          { label: "Sync Latency", badge: "HEALTHY", val: "32ms", sub: "WebSocket live stream" }
+        ],
+        chartTitle: "Database Write Throughput & Storage Index"
+      },
+      replay: {
+        title: "Replay Trades",
+        desc: "Tick-by-tick market replay simulator with visual step-through and PnL curve replay.",
+        icon: "clapperboard",
+        cards: [
+          { label: "Total Replay", badge: "100% DATA", val: "1,248", sub: "Full backtest stream" },
+          { label: "Replay Speed", badge: "TIMESCALE", val: "10x", sub: "Fast forward enabled" },
+          { label: "Current Bar", badge: "M15 BAR", val: "#4,180", sub: "Session London Open" },
+          { label: "Realized PnL", badge: "SIMULATED", val: "+$3,240", sub: "Strategy Bot v11" }
+        ],
+        chartTitle: "Dynamic Replay Balance Progression"
+      }
+    };
+
+    const presetSpecs = {
+      1: {
+        title: "01. Sovereign Liquid Shift",
+        desc: "GSAP Staggered Cascade + Three.js Ambient Gradient Waves. Sangat elegan, halus, tanpa hentakan tajam.",
+        physics: "power4.out (Stagger 0.04s, blur shift)",
+        color: 0x38bdf8
+      },
+      2: {
+        title: "02. Kinetic 3D Hologram Flip",
+        desc: "Three.js 3D Depth Warp + GSAP Matrix Perspective. Kartu berotasi halus pada sumbu 3D Y-Axis.",
+        physics: "back.out(1.2) + 3D RotateY 15deg",
+        color: 0x6366f1
+      },
+      3: {
+        title: "03. Sapphire Ripple Pulse",
+        desc: "Three.js Radial Shockwave + GSAP Elastic Scale. Memberi sensasi gelombang safir saat tombol ditekan.",
+        physics: "expo.out (Scale 0.95 -> 1.0, Ripple wave)",
+        color: 0x2563eb
+      },
+      4: {
+        title: "04. Velocity Momentum Slide",
+        desc: "Direction-Aware Inertia + Stretch Physics. Bergeser dinamis ke atas/bawah mengikuti urutan menu yang diklik.",
+        physics: "power3.inOut (Directional Y + Velocity Stretch)",
+        color: 0x06b6d4
+      },
+      5: {
+        title: "05. Orbital Morph Prism",
+        desc: "Three.js 3D Floating Dodecahedron Morph + GSAP Cross-Dissolve. Cocok untuk nuansa AI Core canggih.",
+        physics: "circ.out (Geometry Polyhedron Spin + Alpha Morph)",
+        color: 0xa855f7
+      }
+    };
+
+    // ==========================================
+    // Three.js 3D Background Engine
+    // ==========================================
+    let scene, camera, renderer, meshParticles, floatingCore;
+    const canvas = document.getElementById('three-bg-canvas');
+
+    function initThree() {
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.z = 30;
+
+      renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      // Particle Wave
+      const particleCount = 120;
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(particleCount * 3);
+      const scales = new Float32Array(particleCount);
+
+      for (let i = 0; i < particleCount * 3; i += 3) {
+        positions[i] = (Math.random() - 0.5) * 80;
+        positions[i + 1] = (Math.random() - 0.5) * 50;
+        positions[i + 2] = (Math.random() - 0.5) * 40;
+        scales[i / 3] = Math.random() * 2 + 1;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('scale', new THREE.BufferAttribute(scales, 1));
+
+      const material = new THREE.PointsMaterial({
+        color: 0x60a5fa,
+        size: 0.8,
+        transparent: true,
+        opacity: 0.45,
+        blending: THREE.AdditiveBlending
+      });
+
+      meshParticles = new THREE.Points(geometry, material);
+      scene.add(meshParticles);
+
+      // Central Floating 3D Geometric Core
+      const coreGeo = new THREE.IcosahedronGeometry(7, 1);
+      const coreMat = new THREE.MeshBasicMaterial({
+        color: 0x93c5fd,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.2
+      });
+      floatingCore = new THREE.Mesh(coreGeo, coreMat);
+      floatingCore.position.set(25, 0, -10);
+      scene.add(floatingCore);
+
+      animateThree();
+    }
+
+    function animateThree() {
+      requestAnimationFrame(animateThree);
+      
+      if (meshParticles) {
+        meshParticles.rotation.y += 0.001;
+        meshParticles.rotation.x += 0.0005;
+      }
+      if (floatingCore) {
+        floatingCore.rotation.x += 0.003;
+        floatingCore.rotation.y += 0.005;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ==========================================
+    // Switch Preset Handler
+    // ==========================================
+    function setPreset(num) {
+      currentPreset = num;
+      
+      // Update Button Styles
+      document.querySelectorAll('.preset-btn').forEach((btn, idx) => {
+        if (idx + 1 === num) {
+          btn.classList.add('bg-white', 'text-blue-700', 'shadow-sm');
+          btn.classList.remove('text-slate-700');
+        } else {
+          btn.classList.remove('bg-white', 'text-blue-700', 'shadow-sm');
+          btn.classList.add('text-slate-700');
+        }
+      });
+
+      // Update Spec info
+      const spec = presetSpecs[num];
+      document.getElementById('active-preset-badge').textContent = `Preset #${num}`;
+      document.getElementById('preset-spec-title').textContent = spec.title;
+      document.getElementById('preset-spec-desc').textContent = spec.desc;
+      document.getElementById('physics-name').textContent = spec.physics;
+
+      // Animate 3D Background color
+      if (floatingCore && floatingCore.material) {
+        gsap.to(floatingCore.material.color, {
+          r: (spec.color >> 16 & 255) / 255,
+          g: (spec.color >> 8 & 255) / 255,
+          b: (spec.color & 255) / 255,
+          duration: 0.6
+        });
+      }
+
+      // Re-trigger animation on current tab to demonstrate immediately
+      switchTab(currentTab, true);
+    }
+
+    function updateSpeed(val) {
+      animDuration = parseFloat(val);
+      document.getElementById('speed-val').textContent = val + 's';
+    }
+
+    // ==========================================
+    // Master Tab Switching with 5 GSAP & Three Animations
+    // ==========================================
+    const tabOrder = ['dashboard', 'trades', 'rongsokan', 'performance', 'agents', 'database', 'replay'];
+
+    function switchTab(tabKey, force = false) {
+      if (currentTab === tabKey && !force) return;
+
+      const newIndex = tabOrder.indexOf(tabKey);
+      const isMovingDown = newIndex > prevTabIndex;
+      prevTabIndex = newIndex;
+      currentTab = tabKey;
+
+      // Update Sidebar Nav UI
+      document.querySelectorAll('.nav-item').forEach(item => {
+        if (item.getAttribute('data-tab') === tabKey) {
+          item.classList.add('nav-pill-active');
+        } else {
+          item.classList.remove('nav-pill-active');
+        }
+      });
+
+      const data = tabData[tabKey];
+      const wrapper = document.getElementById('page-transition-wrapper');
+      const nodes = document.querySelectorAll('.anim-node');
+
+      // ----------------------------------------------------
+      // PRESET 1: "Sovereign Liquid Shift" (GSAP Stagger + Blur)
+      // ----------------------------------------------------
+      if (currentPreset === 1) {
+        const tl = gsap.timeline();
+        
+        // Outro: Micro fade + blur up
+        tl.to(nodes, {
+          opacity: 0,
+          y: -14,
+          filter: 'blur(6px)',
+          duration: animDuration * 0.45,
+          stagger: 0.02,
+          ease: "power2.in",
+          onComplete: () => updateDOMContent(data)
+        });
+
+        // 3D Camera Shift
+        gsap.to(floatingCore.position, { y: (newIndex - 3) * 3, duration: 0.8, ease: "power2.out" });
+
+        // Intro: Smooth cascade slide up with liquid easing
+        tl.fromTo(nodes, 
+          { opacity: 0, y: 22, filter: 'blur(8px)' },
+          { opacity: 1, y: 0, filter: 'blur(0px)', duration: animDuration * 0.75, stagger: 0.035, ease: "power4.out" }
+        );
+      }
+
+      // ----------------------------------------------------
+      // PRESET 2: "Kinetic 3D Hologram Flip" (3D Rotation & Depth)
+      // ----------------------------------------------------
+      else if (currentPreset === 2) {
+        const tl = gsap.timeline();
+
+        // 3D Camera Warp
+        gsap.to(camera.position, { z: 35, duration: 0.25, yoyo: true, repeat: 1, ease: "sine.inOut" });
+        gsap.to(floatingCore.rotation, { y: "+=1.5", x: "+=0.8", duration: 0.8, ease: "back.out(1.4)" });
+
+        tl.to(nodes, {
+          opacity: 0,
+          rotationY: isMovingDown ? 18 : -18,
+          scale: 0.94,
+          z: -80,
+          duration: animDuration * 0.45,
+          stagger: 0.02,
+          ease: "power3.in",
+          transformOrigin: isMovingDown ? "top center" : "bottom center",
+          onComplete: () => updateDOMContent(data)
+        });
+
+        tl.fromTo(nodes,
+          { opacity: 0, rotationY: isMovingDown ? -18 : 18, scale: 0.94, z: 80 },
+          { opacity: 1, rotationY: 0, scale: 1, z: 0, duration: animDuration * 0.8, stagger: 0.04, ease: "back.out(1.2)" }
+        );
+      }
+
+      // ----------------------------------------------------
+      // PRESET 3: "Sapphire Ripple Pulse" (Elastic Scale & Radial)
+      // ----------------------------------------------------
+      else if (currentPreset === 3) {
+        const tl = gsap.timeline();
+
+        // Three.js Particle Burst Shockwave
+        if (meshParticles) {
+          gsap.fromTo(meshParticles.scale, { x: 0.8, y: 0.8 }, { x: 1.1, y: 1.1, duration: 0.6, ease: "elastic.out(1, 0.4)" });
+        }
+
+        tl.to(wrapper, {
+          opacity: 0,
+          scale: 0.96,
+          duration: animDuration * 0.4,
+          ease: "expo.in",
+          onComplete: () => updateDOMContent(data)
+        });
+
+        tl.fromTo(wrapper,
+          { opacity: 0, scale: 1.04 },
+          { opacity: 1, scale: 1, duration: animDuration * 0.85, ease: "elastic.out(1.1, 0.45)" }
+        );
+
+        tl.fromTo(nodes,
+          { opacity: 0, y: 15 },
+          { opacity: 1, y: 0, duration: animDuration * 0.6, stagger: 0.03, ease: "power3.out" },
+          "-=0.5"
+        );
+      }
+
+      // ----------------------------------------------------
+      // PRESET 4: "Velocity Momentum Slide" (Directional Momentum)
+      // ----------------------------------------------------
+      else if (currentPreset === 4) {
+        const tl = gsap.timeline();
+        const yDir = isMovingDown ? 40 : -40;
+
+        // Three.js background vertical shift
+        gsap.to(meshParticles.position, { y: isMovingDown ? "-=8" : "+=8", duration: 0.6, ease: "power3.out" });
+
+        tl.to(nodes, {
+          opacity: 0,
+          y: -yDir,
+          scaleY: 1.03,
+          duration: animDuration * 0.4,
+          stagger: 0.02,
+          ease: "power3.in",
+          onComplete: () => updateDOMContent(data)
+        });
+
+        tl.fromTo(nodes,
+          { opacity: 0, y: yDir, scaleY: 1.04 },
+          { opacity: 1, y: 0, scaleY: 1.0, duration: animDuration * 0.7, stagger: 0.03, ease: "power3.out" }
+        );
+      }
+
+      // ----------------------------------------------------
+      // PRESET 5: "Orbital Morph Prism" (3D Polyhedron Spin)
+      // ----------------------------------------------------
+      else if (currentPreset === 5) {
+        const tl = gsap.timeline();
+
+        // 3D Core Fast Spin
+        gsap.to(floatingCore.rotation, {
+          y: "+=" + (Math.PI * 2),
+          x: "+=" + Math.PI,
+          duration: animDuration * 1.5,
+          ease: "circ.inOut"
+        });
+
+        tl.to(nodes, {
+          opacity: 0,
+          scale: 0.9,
+          filter: "brightness(1.5) blur(10px)",
+          duration: animDuration * 0.4,
+          stagger: 0.025,
+          ease: "power2.inOut",
+          onComplete: () => updateDOMContent(data)
+        });
+
+        tl.fromTo(nodes,
+          { opacity: 0, scale: 1.08, filter: "brightness(1.3) blur(8px)" },
+          { opacity: 1, scale: 1, filter: "brightness(1) blur(0px)", duration: animDuration * 0.8, stagger: 0.035, ease: "circ.out" }
+        );
+      }
+    }
+
+    // Update DOM Content without layout shift
+    function updateDOMContent(data) {
+      document.getElementById('page-title').textContent = data.title;
+      document.getElementById('page-desc').textContent = data.desc;
+      document.getElementById('chart-box-title').textContent = data.chartTitle;
+
+      // Update Cards
+      data.cards.forEach((c, idx) => {
+        const num = idx + 1;
+        document.getElementById(`card-label-${num}`).textContent = c.label;
+        document.getElementById(`card-badge-${num}`).textContent = c.badge;
+        document.getElementById(`card-val-${num}`).textContent = c.val;
+        document.getElementById(`card-sub-${num}`).innerHTML = c.sub;
+      });
+
+      // Update Icon
+      document.getElementById('page-icon').innerHTML = `<i data-lucide="${data.icon}" class="w-4 h-4"></i>`;
+      lucide.createIcons();
+    }
+
+    // Initialize on Load
+    window.addEventListener('DOMContentLoaded', () => {
+      initThree();
+      setPreset(5);
+      switchTab('dashboard', true);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "canonical_baseline_name": "v8_walk_forward_normalized",
+  "dataset_v5_sha256": "6145bddba76366df",
+  "total_trades": 435,
+  "win_rate": 55.172413793103445,
+  "flat_net_pnl": 18884.57,
+  "dynamic_net_pnl": 86960.60000000002,
+  "profit_factor": 2.081752616228516,
+  "max_drawdown": -8560.250000000002,
+  "by_year": {
+    "2020": {
+      "trades": 35,
+      "wins": 19,
+      "win_rate": 54.285714285714285,
+      "flat_pnl": -1.4800000000000466,
+      "dyn_pnl": -2241.5500000000006
+    },
+    "2021": {
+      "trades": 87,
+      "wins": 36,
+      "win_rate": 41.37931034482759,
+      "flat_pnl": -748.55,
+      "dyn_pnl": -3675.690000000001
+    },
+    "2022": {
+      "trades": 63,
+      "wins": 34,
+      "win_rate": 53.96825396825397,
+      "flat_pnl": 1671.12,
+      "dyn_pnl": 9016.04
+    },
+    "2023": {
+      "trades": 60,
+      "wins": 35,
+      "win_rate": 58.333333333333336,
+      "flat_pnl": 2067.5899999999997,
+      "dyn_pnl": 9970.91
+    },
+    "2024": {
+      "trades": 63,
+      "wins": 36,
+      "win_rate": 57.14285714285714,
+      "flat_pnl": 4139.0999999999985,
+      "dyn_pnl": 20996.62
+    },
+    "2025": {
+      "trades": 61,
+      "wins": 40,
+      "win_rate": 65.57377049180327,
+      "flat_pnl": 4165.0,
+      "dyn_pnl": 16476.210000000003
+    },
+    "2026": {
+      "trades": 66,
+      "wins": 40,
+      "win_rate": 60.60606060606061,
+      "flat_pnl": 7591.789999999999,
+      "dyn_pnl": 36418.06000000001
+    }
+  }
+}

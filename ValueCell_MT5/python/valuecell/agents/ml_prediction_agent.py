@@ -74,7 +74,7 @@ class MLPredictionAgent:
         self.feature_engineer = FeatureEngineer()
         
         # Override threshold if regression metadata defines a custom optimal_rr_threshold
-        is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8")
+        is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8") or self.model_type.startswith("regression_v9")
         if is_regression and self.metadata and "optimal_rr_threshold" in self.metadata:
             self.threshold = float(self.metadata["optimal_rr_threshold"])
 
@@ -114,12 +114,32 @@ class MLPredictionAgent:
             # Price-Ratio Dynamic Scaling (EA Dev_Bot_v11_Gold: BaseReferencePrice=4500):
             # training target = target_points / (entry_price / 4500), so inference
             # multiplies back by entry_price / 4500.
-            self.norm_target = self.model_type.startswith("regression_v8")
+            self.norm_target = (
+                self.model_type.startswith("regression_v8")
+                or self.model_type.startswith("regression_v9")
+                or self.model_type.startswith("regression_v10")
+                or self.model_type.startswith("regression_v11")
+            )
             self.base_reference_price = float(
                 self.metadata.get("base_reference_price", 4500.0)
             )
 
-            if self.model_type in ("regression_v5", "regression_v5_unconstrained"):
+            if self.model_type.startswith("regression_v11"):
+                # v11: Planned R:R & Reject Reason Aware + News-Aware + Price-Ratio
+                self.mfe_model = joblib.load(self.model_path / "model_v11_final_mfe.pkl")
+                self.mfe_scaler = joblib.load(self.model_path / "scaler_v11_final_mfe.pkl")
+                self.mae_model = joblib.load(self.model_path / "model_v11_final_mae.pkl")
+                self.mae_scaler = joblib.load(self.model_path / "scaler_v11_final_mae.pkl")
+                logger.info("✅ v11 Final Dual Regression Models (Planned R:R & Reject Reason Aware) loaded successfully.")
+            elif self.model_type.startswith("regression_v10"):
+                # v10: Multi-Output Joint Regressor (News-Aware + Price-Ratio Normalized)
+                self.joint_model = joblib.load(self.model_path / "model_v10_final_joint.pkl")
+                self.joint_scaler = joblib.load(self.model_path / "scaler_v10_final_joint.pkl")
+                self.joint_feature_names = list(self.metadata.get("joint_features", []))
+                if not self.joint_feature_names:
+                    self.joint_feature_names = list(getattr(self.joint_scaler, "feature_names_in_", []))
+                logger.info("✅ v10 Final Multi-Output Joint Regression Model and Scaler loaded successfully.")
+            elif self.model_type in ("regression_v5", "regression_v5_unconstrained"):
                 # Load MFE model and scaler
                 self.mfe_model = joblib.load(self.model_path / "model_v5_mfe.pkl")
                 self.mfe_scaler = joblib.load(self.model_path / "scaler_v5_mfe.pkl")
@@ -129,17 +149,36 @@ class MLPredictionAgent:
                 self.mae_scaler = joblib.load(self.model_path / "scaler_v5_mae.pkl")
 
                 logger.info("✅ v5 Dual Regression Models and Scalers loaded successfully.")
+            elif self.model_type.startswith("regression_v9"):
+                # v9: News-Aware + Price-Ratio Normalized model
+                self.mfe_model = joblib.load(self.model_path / "model_v9_final_mfe.pkl")
+                self.mfe_scaler = joblib.load(self.model_path / "scaler_v9_final_mfe.pkl")
+
+                self.mae_model = joblib.load(self.model_path / "model_v9_final_mae.pkl")
+                self.mae_scaler = joblib.load(self.model_path / "scaler_v9_final_mae.pkl")
+
+                logger.info("✅ v9 Final Dual Regression Models (News-Aware & Price-Ratio Normalized) loaded successfully.")
             elif self.model_type.startswith("regression_v8"):
-                # v8: walk-forward fold model, trained with price-ratio normalized
+                # v8: Final or walk-forward fold model, trained with price-ratio normalized
                 # targets (fixes extrapolation failure across gold's price regime shift).
-                fold = self.metadata.get("production_fold", "2026")
-                self.mfe_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mfe.pkl")
-                self.mfe_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mfe.pkl")
+                fold = self.metadata.get("production_fold", "final")
+                if fold == "final" or "final" in self.model_type:
+                    mfe_file = "model_v8_final_mfe.pkl" if (self.model_path / "model_v8_final_mfe.pkl").exists() else "model_v8_foldfinal_mfe.pkl"
+                    mfe_scaler_file = "scaler_v8_final_mfe.pkl" if (self.model_path / "scaler_v8_final_mfe.pkl").exists() else "scaler_v8_foldfinal_mfe.pkl"
+                    mae_file = "model_v8_final_mae.pkl" if (self.model_path / "model_v8_final_mae.pkl").exists() else "model_v8_foldfinal_mae.pkl"
+                    mae_scaler_file = "scaler_v8_final_mae.pkl" if (self.model_path / "scaler_v8_final_mae.pkl").exists() else "scaler_v8_foldfinal_mae.pkl"
 
-                self.mae_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mae.pkl")
-                self.mae_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mae.pkl")
-
-                logger.info(f"✅ v8 Dual Regression Models (fold{fold}, price-ratio normalized) and Scalers loaded successfully.")
+                    self.mfe_model = joblib.load(self.model_path / mfe_file)
+                    self.mfe_scaler = joblib.load(self.model_path / mfe_scaler_file)
+                    self.mae_model = joblib.load(self.model_path / mae_file)
+                    self.mae_scaler = joblib.load(self.model_path / mae_scaler_file)
+                    logger.info("✅ v8 Final Dual Regression Models (Full Dataset, price-ratio normalized) and Scalers loaded successfully.")
+                else:
+                    self.mfe_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mfe.pkl")
+                    self.mfe_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mfe.pkl")
+                    self.mae_model = joblib.load(self.model_path / f"model_v8_fold{fold}_mae.pkl")
+                    self.mae_scaler = joblib.load(self.model_path / f"scaler_v8_fold{fold}_mae.pkl")
+                    logger.info(f"✅ v8 Dual Regression Models (fold{fold}, price-ratio normalized) and Scalers loaded successfully.")
             else:
                 # Load standard classification model and scaler
                 model_file = self.model_path / "filter_model_xgb.pkl"
@@ -150,7 +189,7 @@ class MLPredictionAgent:
                 self.scaler = joblib.load(scaler_file)
                 logger.info(f"✅ Scaler loaded: {scaler_file}")
 
-            if self.model_type.startswith("regression_v"):
+            if self.model_type.startswith("regression_v") and not self.model_type.startswith("regression_v10"):
                 self.mfe_feature_names = self._artifact_feature_names("mfe")
                 self.mae_feature_names = self._artifact_feature_names("mae")
                 
@@ -464,6 +503,57 @@ class MLPredictionAgent:
             "session_name": session_name,
             "session_is_dst": session_is_dst,
         }
+
+        # News & Economic Calendar Context from LanceDB
+        is_news_blackout = 0.0
+        minutes_to_next_news = 1440.0
+        minutes_since_last_news = 1440.0
+        is_fomc_day = 0.0
+        hours_to_next_fomc = 168.0
+
+        try:
+            from valuecell.knowledge.lance_db import LanceDBManager
+            db = LanceDBManager()
+            if "economic_calendar_events" in db._table_names():
+                entry_dt_str = current_time.isoformat() if hasattr(current_time, "isoformat") else str(current_time)
+                e_t = pd.to_datetime(entry_dt_str, utc=True)
+                
+                # Check blackout — window diciutkan ke ±15 menit (dari ±30 menit)
+                # Tuning: lebih presisi, hanya blok 15 menit terpanas di sekitar rilis berita
+                blackout_res = db.check_news_blackout(entry_dt_str, window_minutes=15)
+                is_news_blackout = 1.0 if blackout_res.get("is_blackout") else 0.0
+                
+                # Calculate time distance to next/past news
+                tbl = db.db.open_table("economic_calendar_events")
+                events_df = tbl.search().to_pandas()
+                if not events_df.empty:
+                    events_df["time_dt"] = pd.to_datetime(events_df["timestamp"], utc=True)
+                    
+                    fut = events_df[events_df["time_dt"] > e_t]
+                    if not fut.empty:
+                        minutes_to_next_news = float(min(1440.0, (fut["time_dt"].min() - e_t).total_seconds() / 60.0))
+                    
+                    past = events_df[events_df["time_dt"] < e_t]
+                    if not past.empty:
+                        minutes_since_last_news = float(min(1440.0, (e_t - past["time_dt"].max()).total_seconds() / 60.0))
+                    
+                    fomc_ev = events_df[events_df["category"] == "CENTRAL_BANK"]
+                    if not fomc_ev.empty:
+                        if not fomc_ev[fomc_ev["time_dt"].dt.date == e_t.date()].empty:
+                            is_fomc_day = 1.0
+                        fut_fomc = fomc_ev[fomc_ev["time_dt"] > e_t]
+                        if not fut_fomc.empty:
+                            hours_to_next_fomc = float(min(168.0, (fut_fomc["time_dt"].min() - e_t).total_seconds() / 3600.0))
+        except Exception as e:
+            logger.debug(f"LanceDB news extraction skipped/fallback: {e}")
+
+        features.update({
+            "is_news_blackout": is_news_blackout,
+            "minutes_to_next_news": minutes_to_next_news,
+            "minutes_since_last_news": minutes_since_last_news,
+            "is_fomc_day": is_fomc_day,
+            "hours_to_next_fomc": hours_to_next_fomc,
+        })
         
         return features
 
@@ -473,6 +563,15 @@ class MLPredictionAgent:
         the exact column isn't already present in `features`."""
         if name in features:
             return features[name]
+
+        if name == "planned_rr":
+            return float(features.get("planned_rr", 2.0))
+        if name == "init_risk_points":
+            return float(features.get("init_risk_points", 3000.0))
+        if name == "init_reward_points":
+            return float(features.get("init_reward_points", 6000.0))
+        if name.startswith("reject_group_"):
+            return 1.0 if name == "reject_group_NONE" else 0.0
 
         for cat_col in ("session_name", "session_is_dst", "session_zone_name", "session_zone_is_dst", "signal"):
             prefix = f"{cat_col}_"
@@ -500,76 +599,156 @@ class MLPredictionAgent:
             if entry_price <= 0:
                 raise ValueError("Entry price must be greater than zero")
                 
-            is_regression = self.model_type in ("regression_v5", "regression_v5_unconstrained") or self.model_type.startswith("regression_v8")
+            is_regression = (
+                self.model_type in ("regression_v5", "regression_v5_unconstrained")
+                or self.model_type.startswith("regression_v8")
+                or self.model_type.startswith("regression_v9")
+                or self.model_type.startswith("regression_v10")
+                or self.model_type.startswith("regression_v11")
+            )
             if is_regression:
-                # Extract v5/v8 regression features (shared extractor; v8 reuses
-                # the same feature set plus a few additions like momentum_10_atr)
+                # Extract regression features (shared extractor with LanceDB news context)
                 features = self._extract_v5_features(market_data, entry_price, structure_signal)
 
-                # Make prediction for MFE
-                mfe_feat_names = self.mfe_feature_names
-                mfe_df = pd.DataFrame(
-                    [[self._resolve_feature_value(features, name) for name in mfe_feat_names]],
-                    columns=mfe_feat_names,
-                )
-                mfe_scaled = self.mfe_scaler.transform(mfe_df)
-                mfe_scaled_df = pd.DataFrame(mfe_scaled, columns=mfe_feat_names)
-                predicted_mfe = float(self.mfe_model.predict(mfe_scaled_df)[0])
+                # 1. Direct Hard Veto Check: News Blackout
+                if features.get("is_news_blackout", 0.0) == 1.0:
+                    logger.warning(f"🚨 {self.name}: Signal {structure_signal} VETOED due to Active High-Impact News Blackout Window!")
+                    return {
+                        "agent": self.name,
+                        "signal": "HOLD",
+                        "confidence": 0.95,
+                        "predicted_mfe": 0.0,
+                        "predicted_mae": 9999.0,
+                        "expected_rr": 0.0,
+                        "model_type": self.model_type,
+                        "reasoning": "LanceDB News Blackout Filter Active (+-30 mins from high impact US economic/geopolitical news). Vetoing entry to protect capital against slippage and spread widening.",
+                        "metadata": self.metadata,
+                    }
 
-                # Make prediction for MAE
-                mae_feat_names = self.mae_feature_names
-                mae_df = pd.DataFrame(
-                    [[self._resolve_feature_value(features, name) for name in mae_feat_names]],
-                    columns=mae_feat_names,
-                )
-                mae_scaled = self.mae_scaler.transform(mae_df)
-                mae_scaled_df = pd.DataFrame(mae_scaled, columns=mae_feat_names)
-                predicted_mae = float(self.mae_model.predict(mae_scaled_df)[0])
+                # 2. Weekend Gap Risk — Lot Penalty -50% (bukan hard veto)
+                # Tuning: trade tetap dieksekusi tapi lot dikurangi 50% untuk kompensasi gap risk.
+                # Data historis menunjukkan WR 100% pada 5 trade weekend, sehingga hard veto tidak optimal.
+                weekend_lot_penalty = 1.0  # default: tidak ada penalty
+                current_time_raw = market_data.get("current_bar", {}).get("time")
+                if current_time_raw is not None:
+                    t_dt = pd.to_datetime(current_time_raw, utc=True)
+                    # Friday Late Entry (Friday >= 18:00 UTC) — Lot penalty 50%
+                    if t_dt.weekday() == 4 and t_dt.hour >= 18:
+                        weekend_lot_penalty = 0.5
+                        logger.warning(
+                            f"⚠️ {self.name}: Signal {structure_signal} — Friday Late Entry, "
+                            f"applying 50% lot reduction as weekend gap risk penalty."
+                        )
+                    # Monday Market Open (Monday < 01:00 UTC / Sunday 22-24 UTC) — Lot penalty 50%
+                    elif (t_dt.weekday() == 6 and t_dt.hour >= 22) or (t_dt.weekday() == 0 and t_dt.hour < 1):
+                        weekend_lot_penalty = 0.5
+                        logger.warning(
+                            f"⚠️ {self.name}: Signal {structure_signal} — Monday Open window, "
+                            f"applying 50% lot reduction as weekend spread normalization penalty."
+                        )
 
-                # v8 targets are price-ratio normalized (target/(entry_price/4500)) --
-                # convert back to points by multiplying with entry_price / 4500
-                if getattr(self, "norm_target", False):
+                if self.model_type.startswith("regression_v10"):
+                    joint_feat_names = self.joint_feature_names
+                    joint_df = pd.DataFrame(
+                        [[self._resolve_feature_value(features, name) for name in joint_feat_names]],
+                        columns=joint_feat_names,
+                    )
+                    joint_scaled = self.joint_scaler.transform(joint_df)
+                    joint_scaled_df = pd.DataFrame(joint_scaled, columns=joint_feat_names)
+                    preds_norm = self.joint_model.predict(joint_scaled_df)
+
                     price_ratio_now = max(entry_price, 1.0) / self.base_reference_price
-                    predicted_mfe *= price_ratio_now
-                    predicted_mae *= price_ratio_now
+                    predicted_mfe = float(preds_norm[0, 0]) * price_ratio_now
+                    predicted_mae = float(preds_norm[0, 1]) * price_ratio_now
+                else:
+                    # Make prediction for MFE
+                    mfe_feat_names = self.mfe_feature_names
+                    mfe_df = pd.DataFrame(
+                        [[self._resolve_feature_value(features, name) for name in mfe_feat_names]],
+                        columns=mfe_feat_names,
+                    )
+                    mfe_scaled = self.mfe_scaler.transform(mfe_df)
+                    mfe_scaled_df = pd.DataFrame(mfe_scaled, columns=mfe_feat_names)
+                    predicted_mfe = float(self.mfe_model.predict(mfe_scaled_df)[0])
+
+                    # Make prediction for MAE
+                    mae_feat_names = self.mae_feature_names
+                    mae_df = pd.DataFrame(
+                        [[self._resolve_feature_value(features, name) for name in mae_feat_names]],
+                        columns=mae_feat_names,
+                    )
+                    mae_scaled = self.mae_scaler.transform(mae_df)
+                    mae_scaled_df = pd.DataFrame(mae_scaled, columns=mae_feat_names)
+                    predicted_mae = float(self.mae_model.predict(mae_scaled_df)[0])
+
+                    # v8/v9 targets are price-ratio normalized (target/(entry_price/4500)) --
+                    # convert back to points by multiplying with entry_price / 4500
+                    if getattr(self, "norm_target", False):
+                        price_ratio_now = max(entry_price, 1.0) / self.base_reference_price
+                        predicted_mfe *= price_ratio_now
+                        predicted_mae *= price_ratio_now
 
                 # Ensure predicted values are reasonable/positive
                 predicted_mfe = max(0.0, predicted_mfe)
                 predicted_mae = max(1.0, predicted_mae)
 
-                expected_rr = predicted_mfe / predicted_mae
+                # Dynamic Spread Penalty & High-Spread Veto Guard (Kerentanan 2)
+                raw_spread = float(features.get("spread", 0.15))
+                spread_points = raw_spread * 100.0 if raw_spread < 5.0 else raw_spread
+
+                # Compute Net Expected R:R (accounting for spread slippage/cost)
+                net_mfe = max(0.0, predicted_mfe - spread_points)
+                net_mae = max(1.0, predicted_mae + spread_points)
+                base_rr = net_mfe / net_mae
+
+                # Rule 4: Dynamic Structure Age Decay Penalty (Max penalty capped at 0.20 R:R)
+                raw_bos_age = float(features.get("last_bos_age_hours", features.get("bos_age", 0.0)))
+                bos_age_hours = min(72.0, raw_bos_age) if raw_bos_age < 900.0 else 48.0
+                age_penalty = max(0.0, min(0.20, (bos_age_hours - 12.0) / 48.0 * 0.15))
+                expected_rr = max(0.0, base_rr - age_penalty)
 
                 # ML gate anti-overfit: gate hanya VETO jika (a) fold produksi
                 # dilatih dengan cukup sampel, dan (b) expected RR di bawah
-                # ambang veto. Di atas ambang = teruskan tanpa menyentuh sinyal
-                # (EA filter tetap otoritatif). Fold tipis = gate pasif.
+                # ambang veto, ATAU (c) spread broker melebar ekstrem (> 35.0 poin).
                 gate_active = self.production_train_samples >= self.gate_min_train_samples
-                if not gate_active or expected_rr >= self.rr_gate_threshold:
+
+                if spread_points > 35.0:
+                    signal = "HOLD"
+                    confidence = 0.95
+                    reasoning = (
+                        f"🛡️ High-Spread Veto: Broker live spread ({spread_points:.1f} pts) "
+                        f"exceeds safe liquidity threshold (35.0 pts). Filtering trade to protect against slippage."
+                    )
+                elif not gate_active or expected_rr >= self.rr_gate_threshold:
                     signal = structure_signal
                     confidence = min(1.0, max(0.65, expected_rr / 3.0))
                     if not gate_active:
                         reasoning = (
                             f"ML gate pasif (fold training {self.production_train_samples} < "
                             f"{self.gate_min_train_samples} sampel). Sinyal {structure_signal} diteruskan "
-                            f"dengan prediksi R:R = {expected_rr:.2f} (MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts)."
+                            f"dengan prediksi Net R:R = {expected_rr:.2f} (Gross MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts, Spread: {spread_points:.1f} pts, Age Decay: -{age_penalty:.2f})."
                         )
                     else:
                         reasoning = (
-                            f"Model predicts favorable dynamic R:R = {expected_rr:.2f} "
-                            f"(predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) "
+                            f"Model predicts favorable Net R:R = {expected_rr:.2f} "
+                            f"(Gross MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts, Spread: {spread_points:.1f} pts, Age Decay: -{age_penalty:.2f}) "
                             f"which is above the veto threshold ({self.rr_gate_threshold:.2f})."
                         )
                 else:
                     signal = "HOLD"
                     confidence = max(0.0, min(1.0, 1.0 - (expected_rr / self.rr_gate_threshold) if self.rr_gate_threshold > 0 else 0.5))
                     reasoning = (
-                        f"Model predicts unfavorable dynamic R:R = {expected_rr:.2f} "
-                        f"(predicted MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts) "
+                        f"Model predicts unfavorable Net R:R = {expected_rr:.2f} "
+                        f"(Gross MFE: {predicted_mfe:.1f} pts, MAE: {predicted_mae:.1f} pts, Spread: {spread_points:.1f} pts, Age Decay: -{age_penalty:.2f}) "
                         f"which is below the veto threshold ({self.rr_gate_threshold:.2f}). Filtering setup."
                     )
                 
                 # Top contributing features
-                top_features = [{"name": name, "value": features[name], "importance": 1.0} for name in mfe_feat_names[:5]]
+                active_features_list = self.joint_feature_names if self.model_type.startswith("regression_v10") else mfe_feat_names
+                top_features = [
+                    {"name": name, "value": self._resolve_feature_value(features, name), "importance": 1.0}
+                    for name in active_features_list[:5]
+                ]
                 
                 response = {
                     "agent": self.name,
@@ -585,6 +764,7 @@ class MLPredictionAgent:
                     "expected_rr": round(expected_rr, 3),
                     "threshold": self.rr_gate_threshold,
                     "gate_active": gate_active,
+                    "weekend_lot_penalty": round(weekend_lot_penalty, 2),  # 0.5 = lot dikurangi 50%, 1.0 = normal
                     "features": features,
                     "top_features": top_features,
                     "model_type": self.model_type,

@@ -46,7 +46,7 @@ const defaultSettings: Settings = {
     timeframe: "M15",
   },
   appearance: {
-    theme: "dark",
+    theme: "light",
     zoom: 0.67,
     particles: true,
     animations: true,
@@ -61,7 +61,7 @@ const defaultSettings: Settings = {
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [activeTheme, setActiveTheme] = useState("dark");
+  const [activeTheme, setActiveTheme] = useState("light");
 
   useEffect(() => {
     loadSettings();
@@ -179,11 +179,12 @@ export default function SettingsPage() {
         className="relative z-10" 
         style={{ 
           width: "100%",
-          paddingLeft: "240px", // Space for sidebar (exact sidebar width)
+          paddingLeft: "var(--sidebar-offset, 250px)",
+          transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           minHeight: "100vh"
         }}
       >
-        <div className="px-12 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 py-6 max-w-[1920px] mx-auto">
 
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">
@@ -402,9 +403,9 @@ export default function SettingsPage() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { name: "Dark", value: "dark", gradient: "from-[#0a0e27] to-[#111827]" },
-                  { name: "Light", value: "light", gradient: "from-[#f0f4f8] to-[#e0e7ee]" },
-                  { name: "Midnight", value: "midnight", gradient: "from-[#000000] to-[#1a1a2e]" },
+                  { name: "Sapphire Light", value: "light", gradient: "from-[#FFFFFF] to-[#E0EDFF]" },
+                  { name: "Platinum Ice", value: "platinum", gradient: "from-[#FFFFFF] to-[#F0F6FF]" },
+                  { name: "Sapphire Deep", value: "sapphire-deep", gradient: "from-[#F8FBFF] to-[#DBEAFE]" },
                 ].map((theme) => (
                   <div
                     key={theme.value}

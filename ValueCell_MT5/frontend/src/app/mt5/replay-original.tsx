@@ -10,7 +10,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors, Clapperboard, MapPin, Shield, Clock3, Move, Zap, Bot, Brain, Lightbulb, Check, BarChart3, Package, Wallet, Tag, Scale, ClipboardList, AlertTriangle } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors, Clapperboard, MapPin, Shield, Clock3, Move, Zap, Bot, Brain, Lightbulb, Check, BarChart3, Package, Wallet, Tag, Scale, ClipboardList, AlertTriangle, ChevronDown, ArrowRight } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -34,7 +34,7 @@ import {
 import { useSessionZones } from "@/api/mt5_agents";
 import { followReplayPlayhead } from "./replay-chart";
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ReplayCandle {
   time: number;
@@ -116,11 +116,11 @@ interface EntryFilterParams {
   ema_slope_filter: boolean;
   body_ratio_filter: boolean;
   session_filter: boolean;
-  ema_stretch_filter: boolean; // 🛡️ Filter Regangan EMA (EMA Stretch > 3.5x ATR)
-  bos_cycle_filter: boolean;   // 🛡️ Filter Siklus BOS (BOS Cycle >= 4)
+  ema_stretch_filter: boolean; // ðŸ›¡ï¸ Filter Regangan EMA (EMA Stretch > 3.5x ATR)
+  bos_cycle_filter: boolean;   // ðŸ›¡ï¸ Filter Siklus BOS (BOS Cycle >= 4)
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SPEED_MAP: Record<string, number> = {
   "1x": 400,
@@ -589,7 +589,7 @@ function EntryToggle({
       title={disabled ? disabledReason : undefined}
     >
       <div className="min-w-0">
-        <div className="text-xs font-semibold text-slate-200">{label}</div>
+        <div className="text-xs font-semibold text-slate-800">{label}</div>
         {description && <div className="mt-0.5 text-[10px] text-slate-500">{description}</div>}
         {disabled && disabledReason && (
           <div className="mt-0.5 text-[9px] text-amber-400/80"><AlertTriangle size={10} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" /> {disabledReason}</div>
@@ -604,7 +604,7 @@ function EntryToggle({
         disabled={disabled}
         className={cn(
           "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-          checked ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900",
+          checked ? "border-cyan-400/50 bg-cyan-500/25" : "border-blue-300 bg-white",
           disabled && "cursor-not-allowed"
         )}
       >
@@ -629,7 +629,7 @@ function StructureSchemaMap({ params }: { params: EntryFilterParams }) {
   ];
 
   return (
-    <div className="relative h-28 overflow-hidden rounded-lg border border-slate-800/80 bg-slate-950/70">
+    <div className="relative h-28 overflow-hidden rounded-lg border border-blue-200/80 bg-[#F0F6FF]/90">
       <div className="absolute inset-x-0 bottom-0 h-16 opacity-50 [background-image:linear-gradient(rgba(30,41,59,.55)_1px,transparent_1px),linear-gradient(90deg,rgba(30,41,59,.55)_1px,transparent_1px)] [background-size:28px_16px] [transform:perspective(180px)_rotateX(58deg)] [transform-origin:bottom]" />
       <svg viewBox="0 0 320 82" className="absolute left-1/2 top-3 h-[74px] w-[290px] -translate-x-1/2" aria-hidden="true">
         <path d="M20 58 L48 24 L76 48 L104 20 L132 46 L160 20 L188 46 L216 20 L244 46 L272 20" fill="none" stroke="rgb(51 65 85)" strokeWidth="1.5" />
@@ -647,7 +647,7 @@ function StructureSchemaMap({ params }: { params: EntryFilterParams }) {
   );
 }
 
-// ── API helper ───────────────────────────────────────────────────────────────
+// â”€â”€ API helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
@@ -662,7 +662,7 @@ async function fetchReplayData(
   return res.json();
 }
 
-// ── Strategy Info Tooltip ───────────────────────────────────────────────────
+// â”€â”€ Strategy Info Tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface StrategyTooltipProps {
   fungsi: string;
@@ -672,29 +672,29 @@ interface StrategyTooltipProps {
 function StrategyTooltip({ fungsi, contoh }: StrategyTooltipProps) {
   return (
     <div className="group relative inline-block ml-1.5 align-middle cursor-help">
-      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-slate-800 text-[10px] text-slate-400 font-bold border border-slate-700/80 hover:bg-slate-700 hover:text-cyan-400 transition-colors">
+      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-[#BFDBFE] text-[10px] text-slate-500 font-bold border border-blue-300/75 hover:bg-slate-700 hover:text-cyan-400 transition-colors">
         ?
       </span>
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 hidden group-hover:block bg-slate-950/95 border border-slate-800 rounded-xl text-[11px] text-slate-300 shadow-2xl backdrop-blur-md z-30 transition-all pointer-events-none">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-3 hidden group-hover:block bg-white/95 border border-blue-200 rounded-xl text-[11px] text-slate-600 shadow-2xl backdrop-blur-md z-30 transition-all pointer-events-none">
         <div className="font-bold text-cyan-400 mb-1">Fungsi:</div>
-        <div className="mb-2 leading-relaxed text-slate-200">{fungsi}</div>
+        <div className="mb-2 leading-relaxed text-slate-800">{fungsi}</div>
         <div className="font-bold text-purple-400 mb-0.5">Contoh:</div>
-        <div className="leading-relaxed text-slate-400">{contoh}</div>
+        <div className="leading-relaxed text-slate-500">{contoh}</div>
         <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950/95" />
       </div>
     </div>
   );
 }
 
-// ── Custom Dropdown Component ────────────────────────────────────────────────
+// â”€â”€ Custom Dropdown Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const SELECT_ACCENTS = {
-  blue: { border: "var(--neon-blue, #38bdf8)", bg: "rgba(59,130,246,0.2)", text: "#93c5fd", shadow: "rgba(59,130,246,0.25)" },
-  purple: { border: "var(--neon-purple, #a855f7)", bg: "rgba(139,92,246,0.2)", text: "#c4b5fd", shadow: "rgba(139,92,246,0.25)" },
-  cyan: { border: "#06b6d4", bg: "rgba(6,182,212,0.2)", text: "#67e8f9", shadow: "rgba(6,182,212,0.25)" },
-  emerald: { border: "#10b981", bg: "rgba(16,185,129,0.2)", text: "#6ee7b7", shadow: "rgba(16,185,129,0.25)" },
-  amber: { border: "#f59e0b", bg: "rgba(245,158,11,0.2)", text: "#fcd34d", shadow: "rgba(245,158,11,0.25)" },
-  rose: { border: "#f43f5e", bg: "rgba(244,63,94,0.2)", text: "#fda4af", shadow: "rgba(244,63,94,0.25)" },
+  blue: { border: "rgba(59, 130, 246, 0.45)", bg: "rgba(239, 246, 255, 0.95)", text: "#1e40af", shadow: "rgba(59, 130, 246, 0.15)" },
+  purple: { border: "rgba(139, 92, 246, 0.45)", bg: "rgba(250, 245, 255, 0.95)", text: "#6b21a8", shadow: "rgba(139, 92, 246, 0.15)" },
+  cyan: { border: "rgba(6, 182, 212, 0.45)", bg: "rgba(236, 254, 255, 0.95)", text: "#0e7490", shadow: "rgba(6, 182, 212, 0.15)" },
+  emerald: { border: "rgba(16, 185, 129, 0.45)", bg: "rgba(236, 253, 245, 0.95)", text: "#047857", shadow: "rgba(16, 185, 129, 0.15)" },
+  amber: { border: "rgba(245, 158, 11, 0.45)", bg: "rgba(254, 252, 232, 0.95)", text: "#b45309", shadow: "rgba(245, 158, 11, 0.15)" },
+  rose: { border: "rgba(239, 68, 68, 0.45)", bg: "rgba(254, 242, 242, 0.95)", text: "#b91c1c", shadow: "rgba(239, 68, 68, 0.15)" },
 };
 
 interface CustomSelectProps<T> {
@@ -734,22 +734,23 @@ function CustomSelect<T extends string | number>({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-semibold text-white transition-all cursor-pointer whitespace-nowrap outline-none",
+          "inline-flex items-center gap-1.5 px-2.5 py-1.5 border rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap outline-none shadow-sm",
           className ? "w-full justify-between" : ""
         )}
         style={{
           backgroundColor: c.bg,
           borderColor: c.border,
-          boxShadow: `0 0 12px ${c.shadow}`,
+          color: c.text,
+          boxShadow: `0 1px 4px ${c.shadow}`,
         }}
       >
         <span>{getLabel(value)}</span>
-        <span className="ml-0.5 text-[9px] opacity-80">▾</span>
+        <ChevronDown size={12} className={cn("transition-transform duration-200", isOpen && "rotate-180")} style={{ color: c.text }} />
       </button>
 
       {isOpen && (
         <div
-          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-[var(--bg-surface,#0f172a)] border border-[var(--glass-border,rgba(255,255,255,0.1))] rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.5)] z-[110]"
+          className="absolute top-[calc(100%+6px)] right-0 min-w-[140px] bg-white border border-slate-200/90 rounded-[10px] p-1.5 shadow-[0_12px_32px_rgba(0,0,0,0.15)] z-[110]"
         >
           {options.map((opt) => {
             const active = opt === value;
@@ -782,7 +783,7 @@ function CustomSelect<T extends string | number>({
   );
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const getActualLotSize = (t: any): number => {
   const entry = t.entry_price ?? 0;
@@ -800,7 +801,7 @@ const getActualLotSize = (t: any): number => {
   return t.lot_size ?? 0.05;
 };
 
-// ponytail: flat object params with defaults — no class, no registry
+// ponytail: flat object params with defaults â€” no class, no registry
 interface StrategyParams {
   trailing_distance: number;   // USD, default 30.00 (3000 poin)
   tp_trigger: number;          // USD, default 10.00 (1000 poin)
@@ -1829,7 +1830,7 @@ export default function ReplayTrades() {
   const candleTimeMapRef = useRef<Map<number, ReplayCandle>>(new Map());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Filter state
+  // â”€â”€ Filter state
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [dbMonths, setDbMonths] = useState<{ year: number; month: number }[]>([]);
@@ -1858,12 +1859,12 @@ export default function ReplayTrades() {
     hoveredPrice: number | null;
   } | null>(null);
 
-  // ── Playback state
+  // â”€â”€ Playback state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [speed, setSpeed] = useState<string>("1x");
 
-  // ── Strategy params state
+  // â”€â”€ Strategy params state
   const [strategyParams, setStrategyParams] = useState({ ...DEFAULT_STRATEGY_PARAMS });
   const [entryFilterParams, setEntryFilterParams] = useState({ ...DEFAULT_ENTRY_FILTER_PARAMS });
   const [scenarios, setScenarios] = useState<any[]>([]);
@@ -1895,17 +1896,17 @@ export default function ReplayTrades() {
   const [decisionEngine, setDecisionEngine] = useState<"rule" | "llm" | "off">("off");
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
-  // LLM-executed positions — kept separate so they survive replay re-renders.
+  // LLM-executed positions â€” kept separate so they survive replay re-renders.
   const [llmPositions, setLlmPositions] = useState<any[]>([]);
   const [isMa20Visible, setIsMa20Visible] = useState(false);
   const [isMa50Visible, setIsMa50Visible] = useState(false);
 
-  // ── Position Planner (TradingView Style)
+  // â”€â”€ Position Planner (TradingView Style)
   const [plannerTool, setPlannerTool] = useState<"none" | "long" | "short">("none");
   const [selectedRrRatio, setSelectedRrRatio] = useState<number>(2.0);
   const [activePlanner, setActivePlanner] = useState<PositionPlanner | null>(null);
 
-  // ── Cut / Jump to Bar Replay (TradingView Bar Replay )
+  // â”€â”€ Cut / Jump to Bar Replay (TradingView Bar Replay )
   const [isCutMode, setIsCutMode] = useState<boolean>(false);
   const [cutHoverInfo, setCutHoverInfo] = useState<{
     x: number;
@@ -1955,7 +1956,7 @@ export default function ReplayTrades() {
     activePlannerRef.current = activePlanner;
   }, [activePlanner]);
 
-  // ── Position Planner Input Strings (Free delete & typing) ────────────────────
+  // â”€â”€ Position Planner Input Strings (Free delete & typing) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [plannerEntryInput, setPlannerEntryInput] = useState("");
   const [plannerTpInput, setPlannerTpInput] = useState("");
   const [plannerSlInput, setPlannerSlInput] = useState("");
@@ -1989,7 +1990,7 @@ export default function ReplayTrades() {
     activePlanner?.type,
   ]);
 
-  // ── Draggable Floating Panels State ─────────────────────────────────────────
+  // â”€â”€ Draggable Floating Panels State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [toolbarPos, setToolbarPos] = useState<{ x: number; y: number }>({ x: 24, y: 64 });
   const [hudCardPos, setHudCardPos] = useState<{ x: number; y: number }>({ x: 24, y: 124 });
   const [isHudMinimized, setIsHudMinimized] = useState(false);
@@ -2045,7 +2046,7 @@ export default function ReplayTrades() {
     };
   }, [toolbarPos, hudCardPos]);
 
-  // ── Position Planner Interactive Helpers ─────────────────────────────────────
+  // â”€â”€ Position Planner Interactive Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const updatePlannerEntry = (newEntry: number) => {
     setActivePlanner((prev) => {
       if (!prev) return null;
@@ -2206,7 +2207,7 @@ export default function ReplayTrades() {
     });
   };
 
-  // ── Drag & Drop Position Lines & 2D Free Move on Chart Canvas ───────────────
+  // â”€â”€ Drag & Drop Position Lines & 2D Free Move on Chart Canvas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const [dragMode, setDragMode] = useState<"none" | "tp" | "sl" | "entry" | "width" | "move">("none");
   const dragModeRef = useRef<"none" | "tp" | "sl" | "entry" | "width" | "move">("none");
   const [hoveredDragTarget, setHoveredDragTarget] = useState<"none" | "tp" | "sl" | "entry" | "width" | "move">("none");
@@ -2264,7 +2265,7 @@ export default function ReplayTrades() {
     const mouseY = e.clientY - rect.top;
     const mouseX = e.clientX - rect.left;
 
-    // ── Handle Cut / Jump to Bar Click (TradingView Bar Replay) ──
+    // â”€â”€ Handle Cut / Jump to Bar Click (TradingView Bar Replay) â”€â”€
     if ((isCutModeRef.current || e.altKey) && replayDataRef.current && chartRef.current) {
       const timeScale = chartRef.current.timeScale();
       const time = timeScale.coordinateToTime(mouseX);
@@ -2350,7 +2351,7 @@ export default function ReplayTrades() {
     const mouseY = e.clientY - rect.top;
     const mouseX = e.clientX - rect.left;
 
-    // ── Handle Cut / Jump to Bar hover (TradingView Cut Line) ──
+    // â”€â”€ Handle Cut / Jump to Bar hover (TradingView Cut Line) â”€â”€
     if ((isCutModeRef.current || e.altKey) && replayDataRef.current && chartRef.current) {
       const timeScale = chartRef.current.timeScale();
       const time = timeScale.coordinateToTime(mouseX);
@@ -2539,7 +2540,7 @@ export default function ReplayTrades() {
   const [tradeStats, setTradeStats] = useState({ total: 0, wins: 0, losses: 0 });
   const [activePositions, setActivePositions] = useState<any[]>([]);
 
-  // ── LLM Trade Setup: request recommendation from backend ──
+  // â”€â”€ LLM Trade Setup: request recommendation from backend â”€â”€
   const llmAbortControllerRef = useRef<AbortController | null>(null);
 
   const cancelLLMSetup = useCallback(() => {
@@ -2762,7 +2763,7 @@ export default function ReplayTrades() {
       }
     } catch (e: any) {
       if (e?.name === "AbortError" || controller.signal.aborted) {
-        console.log("🛑 Permintaan rekomendasi LLM dibatalkan.");
+        console.log("ðŸ›‘ Permintaan rekomendasi LLM dibatalkan.");
         return;
       }
       console.error("LLM setup request failed:", e);
@@ -2785,7 +2786,7 @@ export default function ReplayTrades() {
   }, [replayData, currentIndex, activePositions, strategyParams, activeTimeframe, entryFilterParams, allReplayData, yearFrom, monthFrom, yearTo, monthTo]);
 
   // Decision Engine (Rule | LLM) toggle dispatcher
-  // ── Decision Engine (SmartRuleEngine vs LLMDecisionEngine 7-Step Reasoning) ──
+  // â”€â”€ Decision Engine (SmartRuleEngine vs LLMDecisionEngine 7-Step Reasoning) â”€â”€
   const requestDecisionSetup = useCallback(async () => {
     if (!replayData || currentIndex === 0) {
       setDecisionError("Pilih candle terlebih dahulu");
@@ -2915,7 +2916,7 @@ export default function ReplayTrades() {
     }
   }, [replayData, currentIndex, allReplayData, decisionEngine, strategyParams, yearFrom, monthFrom, yearTo, monthTo]);
 
-  // ── LLM Trade Setup: execute the recommendation ──
+  // â”€â”€ LLM Trade Setup: execute the recommendation â”€â”€
   const executeLLMSetup = useCallback(() => {
     if (!llmRecommendation) return;
     const isTradeable = (llmRecommendation.signal === "BUY" || llmRecommendation.signal === "SELL") && (llmRecommendation.sl_price ?? llmRecommendation.sl ?? 0) > 0;
@@ -2961,11 +2962,11 @@ export default function ReplayTrades() {
       return [llmPos, ...prev];
     });
 
-    console.log("✅ LLM setup executed:", rec);
+    console.log("âœ… LLM setup executed:", rec);
     setLlmRecommendation(null);
   }, [llmRecommendation, replayData, currentIndex]);
 
-  // ── LLM Trade Setup: reject or handle HOLD recommendation ──
+  // â”€â”€ LLM Trade Setup: reject or handle HOLD recommendation â”€â”€
   const rejectLLMSetup = useCallback((reason = "Ditolak oleh User") => {
     if (!llmRecommendation || !replayData) {
       setLlmRecommendation(null);
@@ -3003,11 +3004,11 @@ export default function ReplayTrades() {
       return [rejectedPos, ...prev];
     });
 
-    console.log("❌ LLM setup rejected:", rejectedPos);
+    console.log("âŒ LLM setup rejected:", rejectedPos);
     setLlmRecommendation(null);
   }, [llmRecommendation, replayData, currentIndex]);
 
-  // ── Auto-trigger LLM Trade Setup on CHoCH & BOS ──
+  // â”€â”€ Auto-trigger LLM Trade Setup on CHoCH & BOS â”€â”€
   const processedLLMEventsRef = useRef<Set<number>>(new Set());
   const [autoDecisionEnabled, setAutoDecisionEnabled] = useState(false);
 
@@ -3019,7 +3020,7 @@ export default function ReplayTrades() {
     const candle = replayData.candles[currentIndex - 1];
     if (!candle) return;
 
-    // Cari CHoCH atau BOS event terbaru yang belum diproses dan ≤ current candle
+    // Cari CHoCH atau BOS event terbaru yang belum diproses dan â‰¤ current candle
     const event = [...replayData.structures]
       .reverse()
       .find((s) => {
@@ -3032,15 +3033,15 @@ export default function ReplayTrades() {
     const key = event.time ?? 0;
     processedLLMEventsRef.current.add(key);
     if (useLLMSetup) {
-      console.log(`🤖 Auto LLM Trade Setup (SL/TP/Lot) triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
+      console.log(`ðŸ¤– Auto LLM Trade Setup (SL/TP/Lot) triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
       requestLLMSetup(event);
     } else if (decisionEngine === "llm") {
-      console.log(`🧠 Auto LLM 7-Step Reasoning triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
+      console.log(`ðŸ§  Auto LLM 7-Step Reasoning triggered by ${event.type} @ ${new Date(key * 1000).toISOString()}`);
       requestDecisionSetup();
     }
   }, [useLLMSetup, decisionEngine, autoDecisionEnabled, replayData, currentIndex, llmLoading, decisionLoading, requestLLMSetup, requestDecisionSetup]);
 
-  // ── Auto-sync Entry Filter toggles ──
+  // â”€â”€ Auto-sync Entry Filter toggles â”€â”€
   const isAutoDecisionActive = autoDecisionEnabled && (decisionEngine === "llm" || useLLMSetup);
   useEffect(() => {
     if (isAutoDecisionActive && entryFilterParams.entry_choch) {
@@ -3064,7 +3065,7 @@ export default function ReplayTrades() {
   const [selectedMonthTrades, setSelectedMonthTrades] = useState<any[]>([]);
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
 
-  // ── Session Zones ──────────────────────────────────────────────────────────
+  // â”€â”€ Session Zones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const sessionFromDate = `${yearFrom}-${String(monthFrom).padStart(2, "0")}-01`;
   const { data: sessionZonesData } = useSessionZones(sessionFromDate, "XAUUSD");
   useEffect(() => {
@@ -3129,7 +3130,7 @@ export default function ReplayTrades() {
     ? dbMonths.filter(d => d.year === yearTo && (yearTo > yearFrom || d.month >= monthFrom)).map(d => d.month).sort((a, b) => a - b)
     : Array.from({ length: 12 }, (_, i) => i + 1).filter(m => yearTo > yearFrom || m >= monthFrom);
 
-  // ── Init chart ───────────────────────────────────────────────────────────
+  // â”€â”€ Init chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -3350,7 +3351,7 @@ export default function ReplayTrades() {
     ma50SeriesRef.current?.applyOptions({ visible: isMa50Visible });
   }, [isMa50Visible]);
 
-  // ── Fetch Available Months ───────────────────────────────────────────────
+  // â”€â”€ Fetch Available Months â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const loadMonths = async () => {
       try {
@@ -3548,7 +3549,7 @@ export default function ReplayTrades() {
     }
   }, [strategyParams.show_supply_demand, strategyParams.show_liquidity_pools]);
 
-  // ── Load Data ────────────────────────────────────────────────────────────
+  // â”€â”€ Load Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const handleLoad = useCallback(async () => {
     if (isPlaying) stopPlayback();
@@ -3698,7 +3699,7 @@ export default function ReplayTrades() {
     }
   }, []);
 
-  // ── Advance one candle ────────────────────────────────────────────────────
+  // â”€â”€ Advance one candle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const advanceCandle = useCallback((idx: number, data: ReplayData, isBatchIntermediate: boolean = false) => {
     if (idx >= data.candles.length) return idx;
@@ -3996,7 +3997,7 @@ export default function ReplayTrades() {
     return idx + 1;
   }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe]);
 
-  // ── Playback controls (continued) ──
+  // â”€â”€ Playback controls (continued) â”€â”€
 
   const startPlayback = useCallback(() => {
     if (!replayData || currentIndex >= replayData.candles.length) return;
@@ -4047,7 +4048,7 @@ export default function ReplayTrades() {
   // Cleanup on unmount
   useEffect(() => () => stopPlayback(), [stopPlayback]);
 
-  // ── Derived ──────────────────────────────────────────────────────────────
+  // â”€â”€ Derived â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const totalCandles = replayData?.candles.length ?? 0;
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
@@ -4301,16 +4302,16 @@ export default function ReplayTrades() {
     downloadAnchor.remove();
   }, [replayData, allReplayData, entryFilterParams, strategyParams, useLLMSetup, decisionEngine, activePositions, yearFrom, monthFrom, yearTo, monthTo]);
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   return (
     <div
       className="flex flex-col size-full text-[var(--text-primary)] transition-all duration-300 ease-in-out"
-      style={{ background: "var(--bg-primary, #0f172a)", paddingLeft: "var(--sidebar-offset, 250px)", overflow: "hidden" }}
+      style={{ background: "var(--bg-page)", paddingLeft: "var(--sidebar-offset, 250px)", transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)", overflow: "hidden" }}
     >
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <div
-        className="relative z-30 flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 border-b backdrop-blur-md bg-[rgba(15,23,42,0.45)] overflow-visible flex-nowrap"
+        className="relative z-30 flex items-center justify-between gap-3 px-4 py-2.5 sm:px-6 sm:py-3 border-b backdrop-blur-md bg-[rgba(255,255,255,0.65)] overflow-visible flex-nowrap"
         style={{ borderColor: "rgba(var(--neon-blue-rgb), 0.15)", boxShadow: "0 4px 30px rgba(0,0,0,0.2)" }}
       >
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
@@ -4333,7 +4334,7 @@ export default function ReplayTrades() {
           {replayData && (
             <>
               {/* Playback Control Deck */}
-              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(240,247,255,0.7)] border border-blue-200/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
                 {/* Jump / Cut to Bar (TradingView Bar Replay ) */}
                 <button
                   onClick={() => {
@@ -4431,7 +4432,7 @@ export default function ReplayTrades() {
                   "flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold text-xs transition-all duration-200 active:scale-95 shadow-sm border select-none whitespace-nowrap",
                   isReplayFinished
                     ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border-emerald-500/30 shadow-[0_0_12px_rgba(16,185,129,0.25)] cursor-pointer animate-pulse"
-                    : "bg-slate-800/30 text-slate-500 border-slate-700/30 opacity-40 cursor-not-allowed"
+                    : "bg-[#BFDBFE]/50 text-slate-500 border-blue-300/50 opacity-40 cursor-not-allowed"
                 )}
               >
                 <Download size={12} />
@@ -4439,24 +4440,24 @@ export default function ReplayTrades() {
               </button>
 
               {/* Vertical separator */}
-              <div className="w-[1px] h-5 bg-slate-800/60 self-center mx-0.5" />
+              <div className="w-[1px] h-5 bg-[#BFDBFE]/70 self-center mx-0.5" />
             </>
           )}
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
             {/* Timeframe selector (tiru 100% dari page trades) */}
             <div className="flex items-center gap-1 sm:gap-1.5">
-              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-[rgba(15,23,42,0.55)] border border-slate-800/80 rounded-xl shadow-[inset_0_1.5px_3px_rgba(0,0,0,0.8)]">
+              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-sky-100/40 border border-sky-200/80 rounded-xl shadow-sm">
                 {["M15", "H1", "H4"].map((tf) => (
                   <button
                     key={tf}
                     disabled={isLoading}
                     onClick={() => handleTimeframeChange(tf)}
                     className={cn(
-                      "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-semibold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-40",
+                      "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-40",
                       tf === activeTimeframe
-                        ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-[0_0_10px_rgba(34,211,238,0.15)]"
-                        : "text-slate-400 hover:text-white hover:bg-white/5"
+                        ? "bg-sky-600 text-white shadow-sm border border-sky-600"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                     )}
                   >
                     {tf}
@@ -4484,7 +4485,7 @@ export default function ReplayTrades() {
               className="w-24 sm:w-28"
             />
 
-            <span className="text-[var(--text-secondary,#94a3b8)] text-xs font-semibold">→</span>
+            <ArrowRight size={13} className="text-slate-400 mx-0.5" />
 
             {/* To */}
             <CustomSelect
@@ -4506,121 +4507,123 @@ export default function ReplayTrades() {
             <button
               onClick={handleLoad}
               disabled={isLoading}
-              className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer border transition-all duration-200 outline-none hover:bg-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)] hover:text-white shrink-0"
-              style={
-                replayData
-                  ? {
-                    backgroundColor: "rgba(6, 182, 212, 0.18)",
-                    borderColor: "var(--neon-cyan, #06b6d4)",
-                    color: "#67e8f9",
-                    boxShadow: "0 0 12px rgba(6, 182, 212, 0.25)",
-                  }
-                  : {
-                    backgroundColor: "rgba(255, 255, 255, 0.04)",
-                    borderColor: "rgba(255, 255, 255, 0.15)",
-                    color: "rgba(255, 255, 255, 0.8)",
-                  }
-              }
+              className={cn(
+                "inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer border transition-all duration-200 active:scale-95 outline-none shrink-0 shadow-sm",
+                isLoading
+                  ? "bg-slate-200 text-slate-500 border-slate-300 cursor-not-allowed opacity-70"
+                  : "bg-sky-600 hover:bg-sky-700 text-white border-sky-600 shadow-[0_2px_8px_rgba(2,132,199,0.25)]"
+              )}
             >
-              Load
+              {isLoading ? (
+                <>
+                  <Loader2 size={12} className="animate-spin mr-1.5" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>Load</span>
+              )}
             </button>
           </div>
         </div>
       </div>
 
-      {/* ── Scrollable Body ── */}
+      {/* â”€â”€ Scrollable Body â”€â”€ */}
       <div className="flex-1 overflow-y-auto elegant-scrollbar px-6 py-4 flex flex-col gap-6">
-        {/* ── Stats Bar ── */}
-        <div
-          aria-live="polite"
-          className="relative flex min-h-[72px] flex-wrap overflow-hidden rounded-lg border border-slate-700/70 bg-[rgba(8,15,29,0.82)] shadow-[0_14px_32px_rgba(0,0,0,0.18)]"
-        >
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-cyan-400/50 via-slate-500/30 to-transparent" />
-            <div className="flex min-w-[210px] flex-1 items-center gap-3 border-b border-slate-700/50 px-4 py-3 lg:border-b-0 lg:border-r">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
-                <CalendarDays size={15} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Replay Range</div>
-                <div className="mt-0.5 truncate font-mono text-[11px] text-slate-200">
-                  {replayData ? <>{replayData.meta.date_from} <span className="text-slate-600">to</span> {replayData.meta.date_to}</> : <span className="text-slate-500">Awaiting dataset</span>}
-                </div>
-              </div>
+        {/* â”€â”€ Stats Bar â”€â”€ */}
+        {/* ── Theme 09 Sapphire Platinum Sovereign KPI Cards Grid ── */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          {/* Card 1: TOTAL NET PROFIT */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Net Profit</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                ALL TIME
+              </span>
             </div>
-            <div className="flex min-w-[170px] flex-1 items-center gap-3 border-b border-slate-700/50 px-4 py-3 lg:border-b-0 lg:border-r">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-blue-400/20 bg-blue-400/10 text-blue-300">
-                <ChartNoAxesCombined size={15} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Playback</div>
-                <div className="mt-0.5 flex items-baseline gap-1.5 font-mono tabular-nums">
-                  <span className="text-base font-bold text-slate-100">{currentIndex.toLocaleString()}</span>
-                  <span className="text-[11px] text-slate-500">/ {totalCandles.toLocaleString()}</span>
-                  <span className="text-[10px] text-cyan-300">{progress}%</span>
-                </div>
-              </div>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              {runningProfit >= 0 ? `+$${runningProfit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(runningProfit).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </div>
-            <div className="flex min-w-[135px] flex-1 items-center px-4 py-3 border-b border-slate-700/50 lg:border-b-0 lg:border-r">
-              <div className="min-w-0 font-mono tabular-nums">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Net PnL</div>
-                <div className={`mt-0.5 text-base font-bold ${currentEquity >= initialBalance ? "text-emerald-300" : "text-rose-300"}`}>${currentEquity.toFixed(2)}</div>
-              </div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className={runningProfit >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                {runningProfit >= 0 ? "+" : ""}{initialBalance > 0 ? ((runningProfit / initialBalance) * 100).toFixed(1) : "0.0"}%
+              </span>
+              <span>dari deposit awal ${initialBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex min-w-[175px] flex-1 items-center gap-3 border-b border-slate-700/50 px-4 py-3 lg:border-b-0 lg:border-r">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-amber-400/20 bg-amber-400/10 text-amber-300">
-                <Trophy size={15} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Trade Results</div>
-                <div className="mt-0.5 flex items-baseline gap-2 font-mono">
-                  <span className="text-base font-bold text-slate-100">{tradeStats.total}</span>
-                  <span className="text-[10px] text-slate-500">trades</span>
-                  <span className="text-[10px] text-emerald-300">{winRate}% win</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex min-w-[150px] flex-1 items-center gap-3 px-4 py-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-600/50 bg-slate-800/60 text-slate-300">
-                <TrendingDown size={15} />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Outcome</div>
-                <div className="mt-0.5 flex items-baseline gap-2 font-mono text-[11px]">
-                  <span className="text-emerald-300"><span className="text-slate-500">W</span> {tradeStats.wins}</span>
-                  <span className="text-rose-300"><span className="text-slate-500">L</span> {tradeStats.losses}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex w-full items-center justify-between gap-4 border-t border-slate-700/50 bg-slate-950/25 px-4 py-3 font-mono">
-              <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Modal Awal</div>
-                <div className="mt-0.5 text-base font-bold text-slate-200">${initialBalance.toFixed(2)}</div>
-              </div>
-              <div className="flex min-w-0 items-center gap-3 text-right">
-                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md border ${runningProfit >= 0 ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-rose-400/20 bg-rose-400/10 text-rose-300"}`}>
-                  <CircleDollarSign size={15} />
-                </div>
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Account Value</div>
-                  <div className={`mt-0.5 text-base font-bold ${currentEquity >= initialBalance ? "text-emerald-300" : "text-rose-300"}`}>${currentEquity.toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-            {currentCandle && (
-              <div className="flex w-full items-center justify-end border-t border-slate-700/50 bg-slate-950/25 px-4 py-1.5 font-mono text-[10px] text-slate-500">
-                {new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC
-              </div>
-            )}
-        </div>
+          </div>
 
-        {/* ── Error ── */}
+          {/* Card 2: WIN RATE */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Win Rate</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                {tradeStats.total} TRADES
+              </span>
+            </div>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+              {winRate}%
+            </div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span className="text-emerald-600 font-bold">{tradeStats.wins} Win</span>
+              <span>•</span>
+              <span className="text-rose-600 font-bold">{tradeStats.losses} Loss</span>
+              <span>•</span>
+              <span>Ratio {tradeStats.losses > 0 ? (tradeStats.wins / tradeStats.losses).toFixed(2) : tradeStats.wins > 0 ? tradeStats.wins.toFixed(1) : "0.00"}x</span>
+            </div>
+          </div>
+
+          {/* Card 3: PLAYBACK */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Playback</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                {replayData?.meta.timeframe || "M15"} TF
+              </span>
+            </div>
+            <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900 flex items-baseline gap-1.5">
+              <span>{currentIndex.toLocaleString()}</span>
+              <span className="text-sm font-semibold text-slate-400">/ {totalCandles.toLocaleString()}</span>
+              <span className="text-xs font-bold text-sky-600 ml-auto">({progress}%)</span>
+            </div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              {currentCandle ? (
+                <span>Candle: <strong className="text-slate-700 font-semibold">{new Date(currentCandle.time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC</strong></span>
+              ) : (
+                <span>{replayData ? `${replayData.meta.date_from} s/d ${replayData.meta.date_to}` : "Awaiting dataset"}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Card 4: ACCOUNT VALUE */}
+          <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Account Value</span>
+              <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                REALTIME
+              </span>
+            </div>
+            <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", currentEquity >= initialBalance ? "text-slate-900" : "text-rose-600")}>
+              ${currentEquity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+              <span>Modal: <strong className="text-slate-700 font-semibold">${initialBalance.toFixed(2)}</strong></span>
+              <span>•</span>
+              <span className={runningProfit >= 0 ? "text-emerald-600 font-semibold" : "text-rose-600 font-semibold"}>
+                Net: {runningProfit >= 0 ? "+" : ""}${runningProfit.toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+        </section>
+
+        {/* â”€â”€ Error â”€â”€ */}
         {loadError && (
           <div className="px-4 py-3 rounded bg-red-900/30 border border-red-500/30 text-red-400 text-sm">
             {loadError}
           </div>
         )}
 
-        {/* ── Empty state ── */}
+        {/* â”€â”€ Empty state â”€â”€ */}
         {!replayData && !loadError && (
           <div
             className="flex items-center justify-center flex-col gap-3 text-[var(--text-secondary,#94a3b8)] flex-shrink-0"
@@ -4631,13 +4634,13 @@ export default function ReplayTrades() {
           </div>
         )}
 
-        {/* ── Chart ── */}
+        {/* â”€â”€ Chart â”€â”€ */}
         <div className="relative px-4 pt-3 pb-0 flex-shrink-0" style={{ height: "790px", display: replayData ? "block" : "none" }}>
           {/* Floating Tooltip/Legend */}
           {hoveredInfo && (
-            <div className="absolute top-6 left-8 z-10 bg-slate-900/95 border border-slate-800/80 rounded px-3 py-1.5 text-[10px] font-mono flex items-center gap-3 text-slate-300 backdrop-blur-md pointer-events-none shadow-xl">
+            <div className="absolute top-6 left-8 z-10 bg-white/95 border border-blue-200/80 rounded px-3 py-1.5 text-[10px] font-mono flex items-center gap-3 text-slate-600 backdrop-blur-md pointer-events-none shadow-xl">
               {hoveredInfo.time && (
-                <span className="text-slate-400 mr-1">{hoveredInfo.time}</span>
+                <span className="text-slate-500 mr-1">{hoveredInfo.time}</span>
               )}
               {hoveredInfo.open !== null && (
                 <span className="flex items-center gap-0.5">
@@ -4650,13 +4653,13 @@ export default function ReplayTrades() {
               {hoveredInfo.high !== null && (
                 <span className="flex items-center gap-0.5">
                   <span className="text-slate-500">H</span>
-                  <span className="text-slate-200">{hoveredInfo.high.toFixed(2)}</span>
+                  <span className="text-slate-800">{hoveredInfo.high.toFixed(2)}</span>
                 </span>
               )}
               {hoveredInfo.low !== null && (
                 <span className="flex items-center gap-0.5">
                   <span className="text-slate-500">L</span>
-                  <span className="text-slate-200">{hoveredInfo.low.toFixed(2)}</span>
+                  <span className="text-slate-800">{hoveredInfo.low.toFixed(2)}</span>
                 </span>
               )}
               {hoveredInfo.close !== null && (
@@ -4668,7 +4671,7 @@ export default function ReplayTrades() {
                 </span>
               )}
               {hoveredInfo.hoveredPrice !== null && (
-                <span className="border-l border-slate-800 pl-3 flex items-center gap-1">
+                <span className="border-l border-blue-200 pl-3 flex items-center gap-1">
                   <span className="text-cyan-400">PRICE</span>
                   <span className="text-cyan-300 font-bold">{hoveredInfo.hoveredPrice.toFixed(2)}</span>
                 </span>
@@ -4676,16 +4679,16 @@ export default function ReplayTrades() {
             </div>
           )}
 
-          {/* ── TradingView-style Ultra Premium Draggable Long/Short Toolbar ── */}
+          {/* â”€â”€ TradingView-style Ultra Premium Draggable Long/Short Toolbar â”€â”€ */}
           <div
             style={{ left: toolbarPos.x, top: toolbarPos.y }}
-            className="absolute z-20 flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-950/85 px-2 py-1.5 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.7)] select-none transition-shadow hover:shadow-[0_16px_50px_rgba(0,0,0,0.85)] border-slate-700/60 hover:border-cyan-500/40 animate-in fade-in"
+            className="absolute z-20 flex items-center gap-1.5 rounded-xl border border-blue-300/75 bg-white/85 px-2 py-1.5 backdrop-blur-2xl shadow-[0_12px_40px_rgba(0,0,0,0.7)] select-none transition-shadow hover:shadow-[0_16px_50px_rgba(0,0,0,0.85)] border-blue-300/65 hover:border-cyan-500/40 animate-in fade-in"
           >
             {/* Drag Grip Handle */}
             <div
               onMouseDown={handleToolbarMouseDown}
               title="Klik & tahan untuk memindahkan toolbar"
-              className="flex items-center justify-center p-1 text-slate-500 hover:text-cyan-400 cursor-grab active:cursor-grabbing rounded hover:bg-slate-800/60 transition-colors"
+              className="flex items-center justify-center p-1 text-slate-500 hover:text-cyan-400 cursor-grab active:cursor-grabbing rounded hover:bg-[#BFDBFE]/70 transition-colors"
             >
               <GripVertical size={14} />
             </div>
@@ -4754,7 +4757,7 @@ export default function ReplayTrades() {
             <div className="h-4 w-px bg-slate-700/60" />
 
             {/* Target RR Selector */}
-            <div className="flex items-center gap-1 text-[11px] font-mono text-slate-300">
+            <div className="flex items-center gap-1 text-[11px] font-mono text-slate-600">
               <span className="text-[10px] text-slate-500 uppercase font-semibold">RR</span>
               {[1.0, 1.5, 2.0, 3.0].map((ratio) => (
                 <button
@@ -4777,7 +4780,7 @@ export default function ReplayTrades() {
                     "rounded px-1.5 py-0.5 text-[10px] font-bold transition-all cursor-pointer",
                     selectedRrRatio === ratio
                       ? "bg-cyan-400 text-slate-950 shadow-[0_0_10px_rgba(6,182,212,0.4)]"
-                      : "text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent hover:border-slate-700"
+                      : "text-slate-500 hover:bg-[#BFDBFE] hover:text-slate-800 border border-transparent hover:border-blue-300"
                   )}
                 >
                   1:{ratio}
@@ -4797,7 +4800,7 @@ export default function ReplayTrades() {
                     setPlannerTool("none");
                   }}
                   title="Hapus Position Tool"
-                  className="flex items-center justify-center rounded-lg p-1.5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-300 transition-all cursor-pointer hover:border hover:border-rose-500/30"
+                  className="flex items-center justify-center rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/20 hover:text-rose-300 transition-all cursor-pointer hover:border hover:border-rose-500/30"
                 >
                   <X size={14} />
                 </button>
@@ -4805,19 +4808,19 @@ export default function ReplayTrades() {
             )}
           </div>
 
-          {/* ── Position Planner Adaptive & Customizable Control HUD Card ── */}
+          {/* â”€â”€ Position Planner Adaptive & Customizable Control HUD Card â”€â”€ */}
           {activePlanner && (
             <div
               style={{ left: hudCardPos.x, top: hudCardPos.y }}
-              className="absolute z-20 w-[380px] rounded-2xl border border-slate-700/80 bg-gradient-to-b from-slate-900/95 via-slate-950/90 to-slate-900/95 p-4 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] font-mono text-xs text-slate-200 select-none hover:border-cyan-500/40 transition-all"
+              className="absolute z-20 w-[380px] rounded-2xl border border-blue-300/75 bg-gradient-to-b from-slate-900/95 via-slate-950/90 to-slate-900/95 p-4 backdrop-blur-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8),inset_0_1px_1px_rgba(255,255,255,0.1)] font-mono text-xs text-slate-800 select-none hover:border-cyan-500/40 transition-all"
             >
               {/* Header: Grip Handle, Type Toggle, Snap Structure, Minimize, Close */}
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
+              <div className="flex items-center justify-between border-b border-blue-200/80 pb-2.5">
                 <div className="flex items-center gap-2">
                   <div
                     onMouseDown={handleHudMouseDown}
                     title="Klik & tahan untuk memindahkan kartu"
-                    className="flex items-center justify-center p-1 text-slate-500 hover:text-cyan-400 cursor-grab active:cursor-grabbing rounded hover:bg-slate-800/60 transition-colors"
+                    className="flex items-center justify-center p-1 text-slate-500 hover:text-cyan-400 cursor-grab active:cursor-grabbing rounded hover:bg-[#BFDBFE]/70 transition-colors"
                   >
                     <GripVertical size={14} />
                   </div>
@@ -4825,7 +4828,7 @@ export default function ReplayTrades() {
                   <button
                     type="button"
                     onClick={togglePlannerType}
-                    title="Klik untuk ubah arah Long ↔ Short"
+                    title="Klik untuk ubah arah Long â†” Short"
                     className={cn(
                       "flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-bold uppercase transition-all cursor-pointer",
                       activePlanner.type === "long"
@@ -4835,7 +4838,7 @@ export default function ReplayTrades() {
                   >
                     {activePlanner.type === "long" ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
                     <span>{activePlanner.type === "long" ? "Long" : "Short"}</span>
-                    <span className="text-[9px] opacity-60">⇄</span>
+                    <span className="text-[9px] opacity-60">â‡„</span>
                   </button>
 
                   <button
@@ -4856,7 +4859,7 @@ export default function ReplayTrades() {
                   <button
                     type="button"
                     onClick={() => setIsHudMinimized((prev) => !prev)}
-                    className="text-slate-400 hover:text-cyan-300 cursor-pointer p-1 rounded hover:bg-slate-800 transition-colors"
+                    className="text-slate-500 hover:text-cyan-300 cursor-pointer p-1 rounded hover:bg-[#BFDBFE] transition-colors"
                     title={isHudMinimized ? "Perbesar Panel" : "Perkecil Panel"}
                   >
                     {isHudMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
@@ -4864,7 +4867,7 @@ export default function ReplayTrades() {
                   <button
                     type="button"
                     onClick={() => setActivePlanner(null)}
-                    className="text-slate-400 hover:text-rose-400 cursor-pointer p-1 rounded hover:bg-rose-500/20 transition-colors"
+                    className="text-slate-500 hover:text-rose-400 cursor-pointer p-1 rounded hover:bg-rose-500/20 transition-colors"
                     title="Tutup Planner"
                   >
                     <X size={13} />
@@ -4889,8 +4892,8 @@ export default function ReplayTrades() {
                 <>
 
               {/* Entry Price Row */}
-              <div className="mt-3 flex items-center justify-between gap-3 bg-slate-950/60 rounded-lg p-2 border border-slate-800/80">
-                <span className="text-[10px] font-semibold text-slate-400 uppercase">Entry Price</span>
+              <div className="mt-3 flex items-center justify-between gap-3 bg-[#F0F6FF]/80 rounded-lg p-2 border border-blue-200/80">
+                <span className="text-[10px] font-semibold text-slate-500 uppercase">Entry Price</span>
                 <div className="flex items-center gap-1.5">
                   <input
                     type="text"
@@ -4912,14 +4915,14 @@ export default function ReplayTrades() {
                         updatePlannerEntry(val);
                       }
                     }}
-                    className="h-6 w-24 rounded border border-slate-700 bg-slate-900 px-1.5 text-right font-mono text-xs font-bold text-slate-100 outline-none focus:border-cyan-500"
+                    className="h-6 w-24 rounded border border-blue-300 bg-white px-1.5 text-right font-mono text-xs font-bold text-slate-900 outline-none focus:border-cyan-500"
                   />
                   {currentCandle && (
                     <button
                       type="button"
                       onClick={() => updatePlannerEntry(currentCandle.close)}
                       title="Set Entry ke harga candle replay saat ini"
-                      className="rounded border border-slate-700 bg-slate-800 px-1.5 py-0.5 text-[9px] font-bold text-cyan-400 hover:bg-slate-700 cursor-pointer"
+                      className="rounded border border-blue-300 bg-[#BFDBFE] px-1.5 py-0.5 text-[9px] font-bold text-cyan-400 hover:bg-slate-700 cursor-pointer"
                     >
                       <MapPin size={9} className="inline mr-0.5 -mt-px" aria-hidden="true" />Candle
                     </button>
@@ -4973,7 +4976,7 @@ export default function ReplayTrades() {
                           updatePlannerTPPrice(val);
                         }
                       }}
-                      className="h-6 w-24 rounded border border-emerald-500/40 bg-slate-900 px-1.5 text-left font-mono text-xs font-bold text-emerald-300 outline-none focus:border-emerald-400"
+                      className="h-6 w-24 rounded border border-emerald-500/40 bg-white px-1.5 text-left font-mono text-xs font-bold text-emerald-300 outline-none focus:border-emerald-400"
                     />
                   </div>
                   <div className="text-right text-[10px] text-emerald-400/90 font-medium">
@@ -5003,7 +5006,7 @@ export default function ReplayTrades() {
                         "rounded px-1.5 py-0.5 text-[9px] font-bold transition-all cursor-pointer",
                         Math.abs(activePlanner.riskRewardRatio - ratio) < 0.05
                           ? "bg-emerald-400 text-slate-950 shadow-sm"
-                          : "bg-slate-900/80 text-slate-400 hover:bg-emerald-500/20 hover:text-emerald-300"
+                          : "bg-white/85 text-slate-500 hover:bg-emerald-500/20 hover:text-emerald-300"
                       )}
                     >
                       1:{ratio}
@@ -5086,7 +5089,7 @@ export default function ReplayTrades() {
                           updatePlannerSLPrice(val);
                         }
                       }}
-                      className="h-6 w-24 rounded border border-rose-500/40 bg-slate-900 px-1.5 text-left font-mono text-xs font-bold text-rose-300 outline-none focus:border-rose-400"
+                      className="h-6 w-24 rounded border border-rose-500/40 bg-white px-1.5 text-left font-mono text-xs font-bold text-rose-300 outline-none focus:border-rose-400"
                     />
                   </div>
                   <div className="text-right text-[10px] text-rose-400/90 font-medium">
@@ -5117,10 +5120,10 @@ export default function ReplayTrades() {
               </div>
 
               {/* Lot & Risk Management Footer */}
-              <div className="mt-3 border-t border-slate-800/80 pt-2.5">
+              <div className="mt-3 border-t border-blue-200/80 pt-2.5">
                 <div className="flex items-center justify-between text-[10px]">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-slate-400 font-semibold">Mode:</span>
+                    <span className="text-slate-500 font-semibold">Mode:</span>
                     <button
                       type="button"
                       onClick={() => setActivePlanner((prev) => (prev ? { ...prev, isAutoRisk: false } : null))}
@@ -5128,7 +5131,7 @@ export default function ReplayTrades() {
                         "rounded px-1.5 py-0.5 text-[9px] font-bold transition-all cursor-pointer",
                         !activePlanner.isAutoRisk
                           ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                          : "text-slate-500 hover:text-slate-300"
+                          : "text-slate-500 hover:text-slate-600"
                       )}
                     >
                       Fixed Lot
@@ -5140,7 +5143,7 @@ export default function ReplayTrades() {
                         "rounded px-1.5 py-0.5 text-[9px] font-bold transition-all cursor-pointer",
                         activePlanner.isAutoRisk
                           ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                          : "text-slate-500 hover:text-slate-300"
+                          : "text-slate-500 hover:text-slate-600"
                       )}
                     >
                       Auto Risk ($)
@@ -5149,7 +5152,7 @@ export default function ReplayTrades() {
 
                   {!activePlanner.isAutoRisk ? (
                     <div className="flex items-center gap-1">
-                      <span className="text-slate-400">Lot:</span>
+                      <span className="text-slate-500">Lot:</span>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -5170,12 +5173,12 @@ export default function ReplayTrades() {
                             updatePlannerLot(val);
                           }
                         }}
-                        className="h-5 w-14 rounded border border-slate-700 bg-slate-950 px-1 text-center font-mono text-[10px] font-bold text-cyan-300 outline-none focus:border-cyan-500"
+                        className="h-5 w-14 rounded border border-blue-300 bg-[#DBEAFE] px-1 text-center font-mono text-[10px] font-bold text-cyan-300 outline-none focus:border-cyan-500"
                       />
                     </div>
                   ) : (
                     <div className="flex items-center gap-1">
-                      <span className="text-slate-400">Risk $:</span>
+                      <span className="text-slate-500">Risk $:</span>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -5196,7 +5199,7 @@ export default function ReplayTrades() {
                             updatePlannerRiskAmount(val);
                           }
                         }}
-                        className="h-5 w-14 rounded border border-cyan-500/50 bg-slate-950 px-1 text-center font-mono text-[10px] font-bold text-cyan-300 outline-none focus:border-cyan-400"
+                        className="h-5 w-14 rounded border border-cyan-500/50 bg-[#DBEAFE] px-1 text-center font-mono text-[10px] font-bold text-cyan-300 outline-none focus:border-cyan-400"
                       />
                       <span className="text-[9px] text-cyan-400 font-bold">({activePlanner.lotSize.toFixed(2)}L)</span>
                     </div>
@@ -5211,7 +5214,7 @@ export default function ReplayTrades() {
           {/* Top Center Non-Obstructive Live HUD Indicator */}
           {(dragMode !== "none" || hoveredDragTarget !== "none") && activePlanner && (
             <div
-              className="pointer-events-none absolute top-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-slate-900/95 px-4 py-1.5 font-mono text-xs font-bold shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-slate-700/90 backdrop-blur-md transition-all select-none animate-in fade-in zoom-in-95"
+              className="pointer-events-none absolute top-4 left-1/2 z-30 -translate-x-1/2 rounded-full bg-white/95 px-4 py-1.5 font-mono text-xs font-bold shadow-[0_8px_30px_rgba(0,0,0,0.6)] border border-blue-300/80 backdrop-blur-md transition-all select-none animate-in fade-in zoom-in-95"
             >
               {dragMode === "tp" || hoveredDragTarget === "tp" ? (
                 <div className="flex items-center gap-3">
@@ -5233,7 +5236,7 @@ export default function ReplayTrades() {
                       ).toFixed(2)}
                     </span>
                     <span className="text-cyan-300">RR 1:{activePlanner.riskRewardRatio}</span>
-                    <span className="text-slate-400">({activePlanner.lotSize.toFixed(2)} Lot)</span>
+                    <span className="text-slate-500">({activePlanner.lotSize.toFixed(2)} Lot)</span>
                   </div>
                 </div>
               ) : dragMode === "sl" || hoveredDragTarget === "sl" ? (
@@ -5256,7 +5259,7 @@ export default function ReplayTrades() {
                       ).toFixed(2)}
                     </span>
                     <span className="text-cyan-300">RR 1:{activePlanner.riskRewardRatio}</span>
-                    <span className="text-slate-400">({activePlanner.lotSize.toFixed(2)} Lot)</span>
+                    <span className="text-slate-500">({activePlanner.lotSize.toFixed(2)} Lot)</span>
                   </div>
                 </div>
               ) : dragMode === "width" || hoveredDragTarget === "width" ? (
@@ -5266,9 +5269,9 @@ export default function ReplayTrades() {
                     <span className="text-white font-bold">{activePlanner.durationBars || 15} Candle M15</span>
                   </div>
                   <div className="h-3.5 w-px bg-slate-700" />
-                  <div className="text-[11px] text-slate-300 font-normal">
+                  <div className="text-[11px] text-slate-600 font-normal">
                     Durasi: {Math.floor(((activePlanner.durationBars || 15) * 15) / 60) > 0 ? `${Math.floor(((activePlanner.durationBars || 15) * 15) / 60)} Jam ` : ""}
-                    {((activePlanner.durationBars || 15) * 15) % 60} Menit (Tarik ↔ untuk perlebar)
+                    {((activePlanner.durationBars || 15) * 15) % 60} Menit (Tarik â†” untuk perlebar)
                   </div>
                 </div>
               ) : dragMode === "move" || hoveredDragTarget === "move" ? (
@@ -5278,7 +5281,7 @@ export default function ReplayTrades() {
                     <span className="text-white font-bold">${activePlanner.entryPrice.toFixed(2)}</span>
                   </div>
                   <div className="h-3.5 w-px bg-slate-700" />
-                  <div className="text-[11px] text-slate-300 font-normal">
+                  <div className="text-[11px] text-slate-600 font-normal">
                     Tarik bebas ke Atas/Bawah (Harga) & Kiri/Kanan (Waktu Candle)
                   </div>
                 </div>
@@ -5291,7 +5294,7 @@ export default function ReplayTrades() {
             </div>
           )}
 
-          {/* ── TradingView-Style Jump / Cut Line Overlay (✂️ Bar Replay) ── */}
+          {/* â”€â”€ TradingView-Style Jump / Cut Line Overlay (âœ‚ï¸ Bar Replay) â”€â”€ */}
           {isCutMode && cutHoverInfo && (
             <div className="pointer-events-none absolute inset-x-4 top-3 bottom-0 z-30 overflow-hidden select-none">
               {/* Vertical Cut Dotted Line */}
@@ -5300,10 +5303,10 @@ export default function ReplayTrades() {
                 style={{ left: `${cutHoverInfo.x}px` }}
               >
                 {/* Top Floating Badge with Scissors Icon & Timestamp */}
-                <div className="absolute top-4 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900/95 border border-amber-400 text-amber-300 text-xs font-mono font-bold shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md whitespace-nowrap animate-bounce">
+                <div className="absolute top-4 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/95 border border-amber-400 text-amber-300 text-xs font-mono font-bold shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md whitespace-nowrap animate-bounce">
                   <Scissors size={13} className="text-amber-400" />
                   <span>Potong Replay ke: {cutHoverInfo.formattedTime}</span>
-                  <span className="text-[10px] text-slate-400 font-normal">
+                  <span className="text-[10px] text-slate-500 font-normal">
                     (Bar #{cutHoverInfo.index + 1})
                   </span>
                 </div>
@@ -5336,46 +5339,46 @@ export default function ReplayTrades() {
                 ? "cursor-crosshair"
                 : "cursor-default"
             )}
-            style={{ background: "rgba(15,23,42,0.5)" }}
+            style={{ background: "rgba(224,237,255,0.6)" }}
           />
         </div>
 
 
 
-        {/* ── Active Positions Panel ── */}
+        {/* â”€â”€ Active Positions Panel â”€â”€ */}
         {replayData && (
           <div className="glass-card flex-shrink-0">
-            <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <span className="animate-pulse w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span>
-              <Zap size={14} className="inline shrink-0" aria-hidden="true" /> Daftar Posisi
+            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block shadow-sm"></span>
+              <Zap size={15} className="inline shrink-0 text-sky-600" aria-hidden="true" /> Daftar Posisi
               {activePositions.length > 0 && (
-                <span className="ml-auto text-xs font-normal text-slate-400">
-                  <span className="text-cyan-400 font-semibold">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
-                  {" · "}
-                  <span className="text-slate-400 font-semibold">{activePositions.filter(p => p.is_closed).length}</span> closed
-                  {" · "}
-                  <span className="text-rose-400 font-semibold">{activePositions.filter(p => p.is_rejected).length}</span> rejected
+                <span className="ml-auto text-xs font-medium text-slate-600">
+                  <span className="text-sky-700 font-bold">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
+                  {" • "}
+                  <span className="text-slate-700 font-bold">{activePositions.filter(p => p.is_closed).length}</span> closed
+                  {" • "}
+                  <span className="text-rose-700 font-bold">{activePositions.filter(p => p.is_rejected).length}</span> rejected
                 </span>
               )}
             </h2>
 
             {/* ── LLM Trade Setup Recommendation Panel ── */}
             {(useLLMSetup || decisionEngine === "llm" || llmLoading || decisionLoading || llmRecommendation) && (
-              <div className="mb-4 rounded-xl border border-purple-500/40 bg-gradient-to-br from-purple-950/40 via-slate-950/80 to-purple-900/15 p-4 shadow-lg backdrop-blur-md">
-                <div className="flex items-center justify-between gap-3 border-b border-purple-500/20 pb-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-purple-300">
-                    <Bot size={15} aria-hidden="true" />
+              <div className="mb-4 rounded-xl border border-purple-200 bg-purple-50/70 p-4 shadow-sm backdrop-blur-md">
+                <div className="flex items-center justify-between gap-3 border-b border-purple-200 pb-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-purple-950">
+                    <Bot size={16} className="text-purple-700" aria-hidden="true" />
                     <span>LLM Trade Setup ({decisionEngine === "llm" ? "7-Step Reasoning" : "CHoCH & BOS"})</span>
                     {llmRecommendation?.cycle_stage && (
                       <span className={cn(
                         "font-bold px-2 py-0.5 rounded text-[10px]",
                         String(llmRecommendation.cycle_stage).includes("OVEREXTENDED")
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                          ? "bg-rose-100 text-rose-800 border border-rose-300"
                           : String(llmRecommendation.cycle_stage).includes("MID_CYCLE")
-                          ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                          ? "bg-amber-100 text-amber-900 border border-amber-300"
                           : String(llmRecommendation.cycle_stage).includes("REVERSAL") || String(llmRecommendation.cycle_stage).includes("CHOCH")
-                          ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
-                          : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                          ? "bg-purple-100 text-purple-800 border border-purple-300"
+                          : "bg-emerald-100 text-emerald-800 border border-emerald-300"
                       )}>
                         {llmRecommendation.cycle_stage}
                       </span>
@@ -5383,14 +5386,14 @@ export default function ReplayTrades() {
                   </div>
                   {(llmLoading || decisionLoading) && (
                     <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-semibold text-purple-300 animate-pulse">
-                        <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-purple-800 animate-pulse">
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
                         <span>LLM Berpikir & Menganalisis...</span>
                       </span>
                       <button
                         type="button"
                         onClick={cancelLLMSetup}
-                        className="rounded-md border border-rose-500/40 bg-rose-500/15 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/25 transition-colors cursor-pointer"
+                        className="rounded-md border border-rose-300 bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-800 hover:bg-rose-200 transition-colors cursor-pointer"
                         title="Batalkan permintaan rekomendasi LLM"
                       >
                         Batal
@@ -5401,13 +5404,13 @@ export default function ReplayTrades() {
 
                 {!llmRecommendation && !llmLoading && !decisionLoading && (
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-slate-600 font-medium">
                       Otomatis menganalisis saat CHoCH/BOS terdeteksi, atau minta LLM menentukan Signal, SL, TP, & Lot sekarang.
                     </span>
                     <button
                       type="button"
                       onClick={() => (decisionEngine === "llm" ? requestDecisionSetup() : requestLLMSetup())}
-                      className="rounded-md border border-purple-500/40 bg-purple-500/20 px-3.5 py-1.5 text-xs font-semibold text-purple-200 hover:bg-purple-500/30 transition-all cursor-pointer shadow-sm"
+                      className="rounded-md border border-purple-300 bg-purple-600 hover:bg-purple-700 px-3.5 py-1.5 text-xs font-bold text-white transition-all cursor-pointer shadow-sm"
                     >
                       <Brain size={13} className="inline mr-1 -mt-px" aria-hidden="true" />Analisis Sekarang (LLM)
                     </button>
@@ -5422,35 +5425,35 @@ export default function ReplayTrades() {
                   return (
                     <div className="mt-3 space-y-3">
                       <div className="grid grid-cols-2 gap-2.5 text-xs sm:grid-cols-4">
-                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Signal</div>
-                          <div className={`font-bold text-sm ${sigUpper === "BUY" ? "text-emerald-400" : sigUpper === "SELL" ? "text-rose-400" : isBlocked ? "text-amber-400" : "text-slate-400"}`}>
+                        <div className="rounded-lg bg-white border border-sky-200 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Signal</div>
+                          <div className={`font-bold text-sm ${sigUpper === "BUY" ? "text-emerald-700" : sigUpper === "SELL" ? "text-rose-700" : isBlocked ? "text-amber-800" : "text-slate-700"}`}>
                             {sigUpper} ({Math.round((llmRecommendation.confidence ?? 0) * 100)}%)
                           </div>
                         </div>
-                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Risk %</div>
-                          <div className="font-mono font-bold text-amber-400 text-sm">
+                        <div className="rounded-lg bg-white border border-sky-200 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Risk %</div>
+                          <div className="font-mono font-bold text-amber-800 text-sm">
                             {isTradeable && llmRecommendation.risk_pct ? `${Number(llmRecommendation.risk_pct).toFixed(1)}%` : "-"}
                           </div>
                         </div>
-                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">SL / TP</div>
+                        <div className="rounded-lg bg-white border border-sky-200 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">SL / TP</div>
                           <div className="font-mono text-xs font-semibold flex items-center gap-1">
                             {isTradeable ? (
                               <>
-                                <span className="text-rose-400 font-bold">${llmRecommendation.sl_price?.toFixed(2)}</span>
-                                <span className="text-slate-600">/</span>
-                                <span className="text-emerald-400 font-bold">${llmRecommendation.tp_price?.toFixed(2)}</span>
+                                <span className="text-rose-700 font-bold">${llmRecommendation.sl_price?.toFixed(2)}</span>
+                                <span className="text-slate-400">/</span>
+                                <span className="text-emerald-700 font-bold">${llmRecommendation.tp_price?.toFixed(2)}</span>
                               </>
                             ) : (
                               <span className="text-slate-500 font-mono">- / -</span>
                             )}
                           </div>
                         </div>
-                        <div className="rounded-lg bg-slate-950/90 border border-slate-800/80 p-2.5 shadow-sm">
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-0.5">Lot Size</div>
-                          <div className="font-mono font-bold text-cyan-300 text-sm">
+                        <div className="rounded-lg bg-white border border-sky-200 p-2.5 shadow-sm">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-0.5">Lot Size</div>
+                          <div className="font-mono font-bold text-sky-950 text-sm">
                             {isTradeable ? `${Math.max(0.01, Number(llmRecommendation.lot_size || 0.01)).toFixed(2)} Lot` : "-"}
                           </div>
                         </div>
@@ -5476,11 +5479,11 @@ export default function ReplayTrades() {
                         if (!reasoningStr) return null;
 
                         return (
-                          <div className="rounded-lg border border-purple-500/30 bg-slate-950/95 p-3 text-xs leading-relaxed text-slate-200 shadow-sm">
-                            <div className="font-bold text-purple-300 flex items-center gap-1.5 mb-1.5 pb-1 border-b border-slate-800/80 text-xs">
-                              <Lightbulb size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" /> Analisis & Pertimbangan AI:
+                          <div className="rounded-lg border border-purple-200 bg-white p-3 text-xs leading-relaxed text-slate-800 shadow-sm">
+                            <div className="font-bold text-purple-900 flex items-center gap-1.5 mb-1.5 pb-1 border-b border-purple-100 text-xs">
+                              <Lightbulb size={13} className="inline mr-1 -mt-px shrink-0 text-purple-600" aria-hidden="true" /> Analisis & Pertimbangan AI:
                             </div>
-                            <div className="whitespace-pre-line text-slate-300 font-sans leading-relaxed text-[11px] space-y-1">
+                            <div className="whitespace-pre-line text-slate-700 font-sans leading-relaxed text-[11px] space-y-1">
                               {reasoningStr}
                             </div>
                           </div>
@@ -5493,7 +5496,7 @@ export default function ReplayTrades() {
                           <button
                             type="button"
                             onClick={() => rejectLLMSetup(llmRecommendation.reasoning || `Ditolak oleh LLM (${sigUpper})`)}
-                            className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-colors cursor-pointer active:scale-95"
+                            className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-100 hover:bg-slate-200 px-4 py-2 text-xs font-bold text-slate-800 transition-colors cursor-pointer active:scale-95 shadow-sm"
                           >
                             <Check size={12} className="inline shrink-0" aria-hidden="true" />
                             <span>Pahami Keputusan ({sigUpper} - Stand Aside)</span>
@@ -5503,7 +5506,7 @@ export default function ReplayTrades() {
                             <button
                               type="button"
                               onClick={executeLLMSetup}
-                              className="flex items-center gap-1.5 rounded-lg border border-emerald-500/60 bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition-all cursor-pointer shadow-sm active:scale-95"
+                              className="flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 text-xs font-bold text-white transition-all cursor-pointer shadow-sm active:scale-95"
                             >
                               <Check size={12} className="inline shrink-0" aria-hidden="true" />
                               <span>Eksekusi Trade ({sigUpper})</span>
@@ -5511,7 +5514,7 @@ export default function ReplayTrades() {
                             <button
                               type="button"
                               onClick={() => rejectLLMSetup("Ditolak oleh User")}
-                              className="flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-4 py-2 text-xs font-semibold text-rose-300 hover:bg-rose-500/25 transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-100 hover:bg-rose-200 px-4 py-2 text-xs font-bold text-rose-800 transition-all cursor-pointer active:scale-95 shadow-sm"
                             >
                               <X size={12} className="inline shrink-0" aria-hidden="true" />
                               <span>Tolak Setup</span>
@@ -5526,13 +5529,13 @@ export default function ReplayTrades() {
             )}
 
             {activePositions.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-sm bg-slate-900/20 rounded-lg border border-slate-800/40">
+              <div className="py-8 text-center text-slate-600 font-medium text-sm bg-sky-50/50 rounded-lg border border-sky-200/80">
                 Tidak ada posisi aktif saat ini
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-lg border border-slate-800/50">
-                <table className="min-w-full divide-y divide-slate-800/60 bg-slate-900/10">
-                  <thead className="bg-slate-900/40 text-slate-400 text-[11px] font-semibold tracking-wider uppercase">
+              <div className="overflow-x-auto rounded-lg border border-sky-200/80 shadow-sm">
+                <table className="min-w-full divide-y divide-sky-100 bg-white">
+                  <thead className="bg-sky-100/70 text-sky-950 text-[11px] font-bold tracking-wider uppercase border-b border-sky-200">
                     <tr>
                       <th className="py-3 px-4 text-left">Ticket</th>
                       <th className="py-3 px-4 text-left">Type</th>
@@ -5549,7 +5552,7 @@ export default function ReplayTrades() {
                       <th className="py-3 px-4 text-right">Floating PnL</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-200 text-xs font-medium">
+                  <tbody className="divide-y divide-sky-100 text-slate-900 text-xs font-medium">
                     {[...activePositions]
                       .sort((a, b) => getTimestampSeconds(b.entry_time) - getTimestampSeconds(a.entry_time))
                       .map((pos) => {
@@ -5565,80 +5568,80 @@ export default function ReplayTrades() {
                       const hasTPChanged = Boolean(pos.tp && pos.original_tp && Math.abs(pos.tp - pos.original_tp) > 0.01);
 
                       // Status Badge Classes
-                      let badgeClass = "bg-slate-800/40 text-slate-400 border border-slate-700/30";
+                      let badgeClass = "bg-slate-100 text-slate-700 border border-slate-300 font-bold";
                       if (isRejected) {
-                        badgeClass = "bg-rose-500/15 text-rose-400 border border-rose-500/30";
+                        badgeClass = "bg-rose-100 text-rose-800 border border-rose-300 font-bold";
                       } else if (isClosed) {
                         badgeClass = isWin
-                          ? "bg-emerald-900/30 text-emerald-500 border border-emerald-700/40"
-                          : "bg-rose-900/30 text-rose-500 border border-rose-700/40";
+                          ? "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold"
+                          : "bg-rose-100 text-rose-800 border border-rose-300 font-bold";
                       } else if (pos.status === "BE + TP Expanded") {
-                        badgeClass = "bg-fuchsia-500/15 text-fuchsia-400 border border-fuchsia-500/30 shadow-[0_0_8px_rgba(217,70,239,0.15)]";
+                        badgeClass = "bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-300 font-bold shadow-xs";
                       } else if (pos.status === "Break-Even") {
-                        badgeClass = "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]";
+                        badgeClass = "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold shadow-xs";
                       } else if (pos.status === "TP Expanded") {
-                        badgeClass = "bg-amber-500/15 text-amber-400 border border-amber-500/30 shadow-[0_0_8px_rgba(245,158,11,0.15)]";
+                        badgeClass = "bg-amber-100 text-amber-900 border border-amber-300 font-bold shadow-xs";
                       } else if (pos.status === "Trailing") {
-                        badgeClass = "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-[0_0_8px_rgba(6,182,212,0.15)]";
+                        badgeClass = "bg-sky-100 text-sky-900 border border-sky-300 font-bold shadow-xs";
+                      }
+
+                      let rowBg = "hover:bg-sky-50/70 transition-colors";
+                      if (isRejected) {
+                        rowBg = "bg-slate-50/80 hover:bg-slate-100/80 text-slate-500";
+                      } else if (isClosed) {
+                        rowBg = isWin ? "bg-emerald-50/30 hover:bg-emerald-50/60" : "bg-rose-50/30 hover:bg-rose-50/60";
+                      } else {
+                        rowBg = isBuy ? "bg-emerald-50/40 hover:bg-emerald-50/80" : "bg-rose-50/40 hover:bg-rose-50/80";
                       }
 
                       return (
                         <tr
                           key={`${pos.ticket}-${pos.entry_time ?? "unknown"}-${pos.is_rejected ? "rejected" : "trade"}`}
-                          className={cn(
-                            "transition-colors",
-                            isClosed
-                              ? isWin
-                                ? "bg-emerald-950/15"
-                                : "bg-rose-950/15"
-                              : isRejected
-                                ? "bg-rose-950/15"
-                                : isBuy
-                                  ? "bg-emerald-950/10 hover:bg-emerald-950/20"
-                                  : "bg-rose-950/10 hover:bg-rose-950/20"
-                          )}
+                          className={rowBg}
                         >
-                          <td className="py-3.5 px-4 font-mono text-slate-400">#{pos.ticket}</td>
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-700">#{pos.ticket}</td>
                           <td className="py-3.5 px-4">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${
+                            <span className={cn(
+                              "inline-block px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider border shadow-xs",
                               isBuy
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                            }`}>
+                                ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                : "bg-rose-100 text-rose-800 border-rose-300"
+                            )}>
                               {pos.type}
                             </span>
                           </td>
                           <td className="py-3.5 px-4">
                             {signalType ? (
-                              <span className={`inline-block rounded border px-2 py-0.5 text-[10px] font-bold tracking-wider ${
+                              <span className={cn(
+                                "inline-block rounded border px-2 py-0.5 text-[10px] font-bold tracking-wider",
                                 signalType === "CHOCH"
-                                  ? "border-violet-400/30 bg-violet-400/10 text-violet-300"
-                                  : "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                              }`}>
+                                  ? "border-purple-300 bg-purple-100 text-purple-800"
+                                  : "border-amber-300 bg-amber-100 text-amber-900"
+                              )}>
                                 {signalType}
                               </span>
                             ) : (
-                              <span className="text-slate-600">-</span>
+                              <span className="text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-[10px] text-rose-300">{pos.reject_reason || "-"}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">{pos.lot_size.toFixed(2)}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${pos.entry_price.toFixed(2)}</td>
-                          <td className="py-3.5 px-4 font-mono text-[10px] text-slate-400 whitespace-nowrap">
+                          <td className="py-3.5 px-4 text-[10px] font-medium text-rose-700">{pos.reject_reason || "-"}</td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">{pos.lot_size.toFixed(2)}</td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">${pos.entry_price.toFixed(2)}</td>
+                          <td className="py-3.5 px-4 font-mono text-[10px] text-slate-600 font-medium whitespace-nowrap">
                             {pos.entry_time == null
                               ? "-"
                               : `${new Date(pos.entry_time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`}
                           </td>
-                          <td className={`py-3.5 px-4 text-right font-mono ${isClosed ? "text-slate-500" : ""}`}>
+                          <td className={cn("py-3.5 px-4 text-right font-mono font-bold", isClosed ? "text-slate-600" : "text-slate-900")}>
                             {isRejected ? (
-                              <span className="text-slate-600">-</span>
+                              <span className="text-slate-400">-</span>
                             ) : (
                               <>
                                 {isClosed ? (
                                   pos.close_reason === "24H_FORCE" ? (
-                                    <span className="text-[10px] text-amber-400 font-bold">24h: </span>
+                                    <span className="text-[10px] text-amber-800 font-bold">24h: </span>
                                   ) : pos.close_reason === "PROFIT_TARGET" ? (
-                                    <span className="text-[10px] text-blue-400 font-bold">Target: </span>
+                                    <span className="text-[10px] text-sky-800 font-bold">Target: </span>
                                   ) : (
                                     <span className="text-[10px] text-slate-500">Exit: </span>
                                   )
@@ -5650,20 +5653,20 @@ export default function ReplayTrades() {
                           <td className="py-3.5 px-4 text-right font-mono">
                             {hasSLChanged ? (
                               <span className="flex items-center justify-end gap-1.5">
-                                <span className="text-slate-400">${pos.original_sl.toFixed(2)}</span>
-                                <span className="text-slate-500">→</span>
-                                <span className="text-rose-400 font-bold">${pos.sl.toFixed(2)}</span>
+                                <span className="text-slate-500">${pos.original_sl.toFixed(2)}</span>
+                                <ArrowRight size={10} className="text-slate-400" />
+                                <span className="text-rose-700 font-bold">${pos.sl.toFixed(2)}</span>
                                 {isClosed && pos.close_reason === "SL" && (
-                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-bold rounded border border-rose-500/30">
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-100 text-rose-800 font-bold rounded border border-rose-300">
                                     Hit SL
                                   </span>
                                 )}
                               </span>
                             ) : (
                               <span className="flex items-center justify-end gap-1.5">
-                                <span className="text-slate-400">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
+                                <span className="text-slate-600 font-medium">${pos.original_sl ? pos.original_sl.toFixed(2) : "-"}</span>
                                 {isClosed && pos.close_reason === "SL" && (
-                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-500/20 text-rose-300 font-bold rounded border border-rose-500/30">
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-rose-100 text-rose-800 font-bold rounded border border-rose-300">
                                     Hit SL
                                   </span>
                                 )}
@@ -5675,15 +5678,15 @@ export default function ReplayTrades() {
                               const tpNumber = pos.tp_history?.length || (pos.expansion_count ? pos.expansion_count + 1 : 1);
                               const tpBadge = isClosed ? (
                                 pos.close_reason === "TP" ? (
-                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 font-bold rounded border border-emerald-500/30">
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded border border-emerald-300">
                                     Hit TP {tpNumber}
                                   </span>
                                 ) : pos.close_reason === "24H_FORCE" ? (
-                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-amber-500/20 text-amber-300 font-bold rounded border border-amber-500/30">
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-amber-100 text-amber-900 font-bold rounded border border-amber-300">
                                     Hit 24h
                                   </span>
                                 ) : pos.close_reason === "PROFIT_TARGET" ? (
-                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold rounded border border-blue-500/30">
+                                  <span className="ml-1 text-[9px] px-1.5 py-0.5 bg-sky-100 text-sky-900 font-bold rounded border border-sky-300">
                                     Hit Target USD
                                   </span>
                                 ) : null
@@ -5696,8 +5699,8 @@ export default function ReplayTrades() {
                                       const isLast = idx === pos.tp_history.length - 1;
                                       return (
                                         <span key={idx} className="inline-flex items-center gap-1">
-                                          {idx > 0 && <span className="text-slate-500 text-[10px]">→</span>}
-                                          <span className={isLast ? "text-emerald-400 font-bold" : "text-slate-400"}>
+                                          {idx > 0 && <ArrowRight size={10} className="text-slate-400" />}
+                                          <span className={isLast ? "text-emerald-700 font-bold" : "text-slate-500"}>
                                             ${val.toFixed(2)}
                                           </span>
                                         </span>
@@ -5711,9 +5714,9 @@ export default function ReplayTrades() {
                               if (hasTPChanged) {
                                 return (
                                   <span className="flex items-center justify-end gap-1.5">
-                                    <span className="text-slate-400">${pos.original_tp.toFixed(2)}</span>
-                                    <span className="text-slate-500">→</span>
-                                    <span className="text-emerald-400 font-bold">${pos.tp.toFixed(2)}</span>
+                                    <span className="text-slate-500">${pos.original_tp.toFixed(2)}</span>
+                                    <ArrowRight size={10} className="text-slate-400" />
+                                    <span className="text-emerald-700 font-bold">${pos.tp.toFixed(2)}</span>
                                     {tpBadge}
                                   </span>
                                 );
@@ -5721,7 +5724,7 @@ export default function ReplayTrades() {
 
                               return (
                                 <span className="flex items-center justify-end gap-1.5">
-                                  <span className="text-slate-400">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
+                                  <span className="text-slate-600 font-medium">${pos.original_tp ? pos.original_tp.toFixed(2) : "-"}</span>
                                   {tpBadge}
                                 </span>
                               );
@@ -5729,27 +5732,27 @@ export default function ReplayTrades() {
                           </td>
                           <td className="py-3.5 px-4 text-left font-mono text-[10px] space-y-0.5">
                             {isRejected ? (
-                              <span className="text-slate-600">-</span>
+                              <span className="text-slate-400">-</span>
                             ) : (
                               <>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-slate-500">BE:</span>
+                                  <span className="text-slate-500 font-semibold">BE:</span>
                                   {pos.be_trigger_price == null ? (
-                                    <span className="text-slate-600">-</span>
+                                    <span className="text-slate-400">-</span>
                                   ) : pos.is_be_active ? (
-                                    <span className="px-1.5 py-0.2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded font-bold">Active</span>
+                                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded font-bold">Active</span>
                                   ) : (
-                                    <span className="text-slate-300">${pos.be_trigger_price.toFixed(2)}</span>
+                                    <span className="text-slate-700 font-medium">${pos.be_trigger_price.toFixed(2)}</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-slate-500">TP-Ex:</span>
+                                  <span className="text-slate-500 font-semibold">TP-Ex:</span>
                                   {pos.is_tp_maxed ? (
-                                    <span className="px-1.5 py-0.2 bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded font-bold text-[9px]">Maxed</span>
+                                    <span className="px-1.5 py-0.2 bg-rose-100 text-rose-800 border border-rose-300 rounded font-bold text-[9px]">Maxed</span>
                                   ) : pos.tp_trigger_price == null ? (
-                                    <span className="text-slate-600">-</span>
+                                    <span className="text-slate-400">-</span>
                                   ) : (
-                                    <span className="text-cyan-400">${pos.tp_trigger_price.toFixed(2)}</span>
+                                    <span className="text-sky-800 font-bold">${pos.tp_trigger_price.toFixed(2)}</span>
                                   )}
                                 </div>
                               </>
@@ -5760,10 +5763,11 @@ export default function ReplayTrades() {
                               {pos.status}
                             </span>
                           </td>
-                          <td className={`py-3.5 px-4 text-right font-mono font-bold text-sm ${
-                            isRejected ? "text-white" : isWin ? "text-emerald-400" : "text-rose-500"
-                          }`}>
-                            {isWin ? "+" : ""}${pos.pnl.toFixed(2)}
+                          <td className={cn(
+                            "py-3.5 px-4 text-right font-mono font-bold text-sm",
+                            isRejected ? "text-slate-500" : isWin ? "text-emerald-700" : "text-rose-700"
+                          )}>
+                            {isWin && !isRejected ? "+" : ""}${pos.pnl.toFixed(2)}
                           </td>
                         </tr>
                       );
@@ -5785,29 +5789,29 @@ export default function ReplayTrades() {
                     const isNetWin = totalPnL >= 0;
 
                     return (
-                      <tfoot className="border-t-2 border-slate-700/80 bg-slate-950/80 font-semibold text-xs text-slate-200">
+                      <tfoot className="border-t-2 border-sky-300 bg-sky-50/90 font-bold text-xs text-slate-900">
                         <tr>
-                          <td colSpan={4} className="py-3 px-4 text-left font-bold text-slate-300">
+                          <td colSpan={4} className="py-3 px-4 text-left font-bold text-sky-950">
                             <div className="flex items-center gap-2">
-                              <span className="text-cyan-400"><BarChart3 size={12} className="inline mr-1 -mt-px" aria-hidden="true" />TOTAL REKAPITULASI:</span>
-                              <span className="text-[11px] font-normal text-slate-400">
-                                ({executedPositions.length} Dieksekusi · {rejectedPositions.length} Ditolak)
+                              <span className="text-sky-900"><BarChart3 size={13} className="inline mr-1 -mt-px" aria-hidden="true" />TOTAL REKAPITULASI:</span>
+                              <span className="text-[11px] font-medium text-slate-600">
+                                ({executedPositions.length} Dieksekusi • {rejectedPositions.length} Ditolak)
                               </span>
                             </div>
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-cyan-300">
+                          <td className="py-3 px-4 text-right font-mono font-bold text-sky-950">
                             {totalLots.toFixed(2)}
                           </td>
-                          <td colSpan={7} className="py-3 px-4 text-right font-mono text-[11px] text-slate-400">
+                          <td colSpan={7} className="py-3 px-4 text-right font-mono text-[11px] text-slate-600">
                             <span>Win Rate: </span>
-                            <span className="text-emerald-400 font-bold">{winRate}%</span>
-                            <span className="mx-2">·</span>
+                            <span className="text-emerald-700 font-bold">{winRate}%</span>
+                            <span className="mx-2">•</span>
                             <span>Realized: </span>
-                            <span className={realizedPnL >= 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                            <span className={realizedPnL >= 0 ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
                               {realizedPnL >= 0 ? "+" : ""}${realizedPnL.toFixed(2)}
                             </span>
                           </td>
-                          <td className={`py-3 px-4 text-right font-mono font-bold text-base ${isNetWin ? "text-emerald-400" : "text-rose-400"}`}>
+                          <td className={`py-3 px-4 text-right font-mono font-bold text-base ${isNetWin ? "text-emerald-700" : "text-rose-700"}`}>
                             {isNetWin ? "+" : ""}${totalPnL.toFixed(2)}
                           </td>
                         </tr>
@@ -5837,72 +5841,72 @@ export default function ReplayTrades() {
 
               return (
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Total Posisi
+                  <div className="rounded-xl border border-sky-200 bg-white p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-600 font-bold mb-1">
+                      <Target size={13} className="inline mr-1 -mt-px shrink-0 text-sky-600" aria-hidden="true" />Total Posisi
                     </div>
-                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-white font-mono">
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-slate-900 font-mono">
                       <span>{activePositions.length}</span>
-                      <span className="text-xs font-normal text-slate-400">Trade</span>
+                      <span className="text-xs font-medium text-slate-500">Trade</span>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400 flex items-center gap-1.5">
-                      <span className="text-emerald-400 font-semibold">{wins}W</span>
-                      <span>·</span>
-                      <span className="text-rose-400 font-semibold">{losses}L</span>
-                      <span>·</span>
-                      <span className="text-slate-400">{openPositions.length} Open</span>
+                    <div className="mt-1 text-[11px] text-slate-600 flex items-center gap-1.5 font-medium">
+                      <span className="text-emerald-700 font-bold">{wins}W</span>
+                      <span>•</span>
+                      <span className="text-rose-700 font-bold">{losses}L</span>
+                      <span>•</span>
+                      <span className="text-slate-600">{openPositions.length} Open</span>
                       {rejectedPositions.length > 0 && (
                         <>
-                          <span>·</span>
-                          <span className="text-rose-300 font-semibold">{rejectedPositions.length} Rej</span>
+                          <span>•</span>
+                          <span className="text-rose-700 font-bold">{rejectedPositions.length} Rej</span>
                         </>
                       )}
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      <BarChart3 size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Win Rate
+                  <div className="rounded-xl border border-sky-200 bg-white p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-600 font-bold mb-1">
+                      <BarChart3 size={13} className="inline mr-1 -mt-px shrink-0 text-sky-600" aria-hidden="true" />Win Rate
                     </div>
-                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-emerald-400 font-mono">
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-emerald-700 font-mono">
                       <span>{winRate}%</span>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400">
+                    <div className="mt-1 text-[11px] text-slate-600 font-medium">
                       {wins} Menang dari {wins + losses} Posisi Closed
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-3.5 shadow-sm">
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      <Package size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Volume Lot
+                  <div className="rounded-xl border border-sky-200 bg-white p-3.5 shadow-sm">
+                    <div className="text-[10px] uppercase tracking-wider text-slate-600 font-bold mb-1">
+                      <Package size={13} className="inline mr-1 -mt-px shrink-0 text-sky-600" aria-hidden="true" />Volume Lot
                     </div>
-                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-cyan-300 font-mono">
+                    <div className="flex items-baseline gap-1.5 font-bold text-lg text-sky-950 font-mono">
                       <span>{totalLots.toFixed(2)}</span>
-                      <span className="text-xs font-normal text-slate-400">Lot</span>
+                      <span className="text-xs font-medium text-slate-500">Lot</span>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-400">
+                    <div className="mt-1 text-[11px] text-slate-600 font-medium">
                       Rata-rata: {executedPositions.length > 0 ? (totalLots / executedPositions.length).toFixed(2) : "0.00"} Lot/Trade
                     </div>
                   </div>
 
                   <div className={cn(
-                    "rounded-xl border p-3.5 shadow-sm",
+                    "rounded-xl border p-3.5 shadow-sm bg-white",
                     isNetWin
-                      ? "border-emerald-500/30 bg-emerald-950/20"
-                      : "border-rose-500/30 bg-rose-950/20"
+                      ? "border-emerald-300"
+                      : "border-rose-300"
                   )}>
-                    <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
-                      <Wallet size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Total Net Profit
+                    <div className="text-[10px] uppercase tracking-wider text-slate-600 font-bold mb-1">
+                      <Wallet size={13} className="inline mr-1 -mt-px shrink-0 text-sky-600" aria-hidden="true" />Total Net Profit
                     </div>
                     <div className={cn(
                       "flex items-baseline gap-1.5 font-bold text-lg font-mono",
-                      isNetWin ? "text-emerald-400" : "text-rose-400"
+                      isNetWin ? "text-emerald-700" : "text-rose-700"
                     )}>
                       <span>{isNetWin ? "+" : ""}${totalPnL.toFixed(2)}</span>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-300 flex items-center justify-between">
+                    <div className="mt-1 text-[11px] text-slate-600 flex items-center justify-between font-medium">
                       <span>Saldo Akhir:</span>
-                      <span className="font-mono font-bold text-white">${finalEquity.toFixed(2)}</span>
+                      <span className="font-mono font-bold text-slate-950">${finalEquity.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -5911,41 +5915,41 @@ export default function ReplayTrades() {
           </div>
         )}
 
-        {/* ── Strategy Settings & Parameters ── */}
+        {/* â”€â”€ Strategy Settings & Parameters â”€â”€ */}
         {replayData && (
-          <section className="flex-shrink-0 rounded-xl border border-slate-800/80 bg-slate-900/45 p-5 shadow-[0_8px_32px_rgba(0,0,0,.28)]">
+          <section className="flex-shrink-0 rounded-xl border border-blue-200/80 bg-white/70 p-5 shadow-[0_8px_32px_rgba(0,0,0,.28)]">
             <button
               type="button"
               onClick={() => setIsStrategyPanelOpen((open) => !open)}
               aria-expanded={isStrategyPanelOpen}
               className="flex w-full cursor-pointer items-center justify-between gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
             >
-              <span className="flex items-center gap-2.5 text-sm font-bold text-slate-100">
+              <span className="flex items-center gap-2.5 text-sm font-bold text-slate-900">
                 <span className="flex h-7 w-7 items-center justify-center rounded-md border border-cyan-500/25 bg-cyan-500/10 text-cyan-400">
                   <Settings className="h-4 w-4" />
                 </span>
                 Strategy Settings &amp; Parameters
               </span>
-              <span className="rounded border border-slate-800 bg-slate-950/40 px-2 py-1 text-[10px] font-semibold text-slate-400">
-                {isStrategyPanelOpen ? "Tutup Panel ▲" : "Buka Panel ▼"}
+              <span className="rounded border border-blue-200 bg-[#F0F6FF]/60 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                {isStrategyPanelOpen ? "Tutup Panel â–²" : "Buka Panel â–¼"}
               </span>
             </button>
 
             {isStrategyPanelOpen && (
-              <div className="mt-5 border-t border-slate-800/60 pt-5">
+              <div className="mt-5 border-t border-blue-200/70 pt-5">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-1.5 border-b border-slate-800/50 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <div className="flex items-center gap-1.5 border-b border-blue-200/50 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <Target className="h-3.5 w-3.5 text-fuchsia-400" />
                     Trend &amp; Cycle Schema Map
                   </div>
                   <StructureSchemaMap params={entryFilterParams} />
-                  <div className="grid border-t border-slate-800/50 lg:grid-cols-2">
-                    {/* ══════════════════════════════════════════════ */}
-                    {/* ── KOLOM KIRI: ENTRY, FILTER & AI ANALYSIS ── */}
-                    {/* ══════════════════════════════════════════════ */}
+                  <div className="grid border-t border-blue-200/50 lg:grid-cols-2">
+                    {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+                    {/* â”€â”€ KOLOM KIRI: ENTRY, FILTER & AI ANALYSIS â”€â”€ */}
+                    {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
                     <div className="divide-y divide-slate-800/50 py-2 lg:pr-5">
                       {/* 1. Entry Settings & Structure */}
-                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Entry Settings &amp; Structure
                       </div>
                       <EntryToggle
@@ -5954,7 +5958,7 @@ export default function ReplayTrades() {
                         checked={entryFilterParams.entry_choch}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_choch: !prev.entry_choch }))}
                         disabled={isAutoDecisionActive}
-                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif â€” LLM auto-thinking aktif" : undefined}
                       />
                       <EntryToggle
                         label="BOS Cycle 1 Entries"
@@ -5962,7 +5966,7 @@ export default function ReplayTrades() {
                         checked={entryFilterParams.entry_bos}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos: !prev.entry_bos }))}
                         disabled={isAutoDecisionActive}
-                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif â€” LLM auto-thinking aktif" : undefined}
                       />
                       <EntryToggle
                         label="BOS Cycle 2+ Entries"
@@ -5970,11 +5974,11 @@ export default function ReplayTrades() {
                         checked={entryFilterParams.entry_bos_cycle_2_plus}
                         onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos_cycle_2_plus: !prev.entry_bos_cycle_2_plus }))}
                         disabled={isAutoDecisionActive}
-                        disabledReason={isAutoDecisionActive ? "Nonaktif — LLM auto-thinking aktif" : undefined}
+                        disabledReason={isAutoDecisionActive ? "Nonaktif â€” LLM auto-thinking aktif" : undefined}
                       />
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Max Cycle BOS</span>
+                          <span className="block text-xs font-semibold text-slate-800">Max Cycle BOS</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">0 means unlimited cycles</span>
                         </span>
                         <input
@@ -5996,12 +6000,12 @@ export default function ReplayTrades() {
                             setMaxBosCycleInput("0");
                             setEntryFilterParams((prev) => ({ ...prev, max_bos_cycle: 0 }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
 
                       {/* 2. EA Trend & Entry Filters */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         EA Trend &amp; Entry Filters
                       </div>
                       <EntryToggle
@@ -6048,7 +6052,7 @@ export default function ReplayTrades() {
                       />
 
                       {/* 3. Mesin Keputusan & AI Analysis */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Mesin Keputusan &amp; AI Analysis
                       </div>
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
@@ -6074,7 +6078,7 @@ export default function ReplayTrades() {
                           }}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-                            decisionEngine === "rule" ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                            decisionEngine === "rule" ? "border-cyan-400/50 bg-cyan-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6109,7 +6113,7 @@ export default function ReplayTrades() {
                           }}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            decisionEngine === "llm" ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                            decisionEngine === "llm" ? "border-purple-400/50 bg-purple-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6127,7 +6131,7 @@ export default function ReplayTrades() {
                             <Bot size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Gunakan LLM untuk SL/TP/Lot
                             <StrategyTooltip
                               fungsi="Saat terdeteksi struktur CHoCH atau BOS, AI langsung menganalisis dan memunculkan kartu rekomendasi setup posisi (Signal, SL, TP, & Lot) di Daftar Posisi dengan tombol Eksekusi dan Tolak."
-                              contoh="Struktur CHoCH muncul → LLM thinking → Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 → Anda klik 'Eksekusi' untuk membuka posisi atau 'Tolak'."
+                              contoh="Struktur CHoCH muncul â†’ LLM thinking â†’ Muncul kartu rekomendasi BUY, SL $4419.70, TP $4509.60, Lot 0.01 â†’ Anda klik 'Eksekusi' untuk membuka posisi atau 'Tolak'."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6148,7 +6152,7 @@ export default function ReplayTrades() {
                           }}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                            useLLMSetup ? "border-purple-400/50 bg-purple-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6161,7 +6165,7 @@ export default function ReplayTrades() {
                       </div>
 
                       {/* 4. Chart Visuals & SMC Elements */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Chart Visuals &amp; SMC Elements
                       </div>
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
@@ -6193,7 +6197,7 @@ export default function ReplayTrades() {
                           }}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            strategyParams.show_supply_demand ? "border-purple-400/50 bg-purple-500/25" : "border-slate-700 bg-slate-900"
+                            strategyParams.show_supply_demand ? "border-purple-400/50 bg-purple-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6234,7 +6238,7 @@ export default function ReplayTrades() {
                           }}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70",
-                            strategyParams.show_liquidity_pools ? "border-sky-400/50 bg-sky-500/25" : "border-slate-700 bg-slate-900"
+                            strategyParams.show_liquidity_pools ? "border-sky-400/50 bg-sky-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6260,17 +6264,17 @@ export default function ReplayTrades() {
                       />
                     </div>
 
-                    {/* ══════════════════════════════════════════════════════════ */}
-                    {/* ── KOLOM KANAN: POSITION, SL/TP, TRAILING, BE & SCALING ── */}
-                    {/* ══════════════════════════════════════════════════════════ */}
-                    <div className="divide-y divide-slate-800/50 border-t border-slate-800/50 py-2 lg:border-l lg:border-t-0 lg:pl-5">
+                    {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+                    {/* â”€â”€ KOLOM KANAN: POSITION, SL/TP, TRAILING, BE & SCALING â”€â”€ */}
+                    {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+                    <div className="divide-y divide-slate-800/50 border-t border-blue-200/50 py-2 lg:border-l lg:border-t-0 lg:pl-5">
                       {/* 1. Position & Account Sizing */}
-                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Position &amp; Account Sizing
                       </div>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Initial Balance ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">Initial Balance ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Modal awal akun replay</span>
                         </span>
                         <input
@@ -6292,12 +6296,12 @@ export default function ReplayTrades() {
                             setInitialBalanceInput(String(balance));
                             setStrategyParams((prev) => ({ ...prev, initial_balance: balance }));
                           }}
-                          className="h-8 w-24 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-24 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Lot Size</span>
+                          <span className="block text-xs font-semibold text-slate-800">Lot Size</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">0 = Auto Risk Manager</span>
                         </span>
                         <input
@@ -6319,7 +6323,7 @@ export default function ReplayTrades() {
                             setLotSizeInput(String(lotSize));
                             setStrategyParams((prev) => ({ ...prev, lot_override: lotSize }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <EntryToggle
@@ -6335,7 +6339,7 @@ export default function ReplayTrades() {
                         onChange={() => setStrategyParams((prev) => ({ ...prev, enable_profit_target_exit: !prev.enable_profit_target_exit }))}
                       />
                       {strategyParams.enable_profit_target_exit && (
-                        <label className="flex items-center justify-between gap-4 px-1 py-3 bg-slate-900/50 rounded-md border border-slate-800 my-1">
+                        <label className="flex items-center justify-between gap-4 px-1 py-3 bg-white/50 rounded-md border border-blue-200 my-1">
                           <span>
                             <span className="block text-xs font-semibold text-emerald-300">Target Profit Amount ($)</span>
                             <span className="mt-0.5 block text-[10px] text-slate-500">Nominal profit untuk auto-close (USD)</span>
@@ -6358,18 +6362,18 @@ export default function ReplayTrades() {
                               setProfitTargetExitInput(String(val));
                               setStrategyParams((prev) => ({ ...prev, profit_target_exit_usd: val }));
                             }}
-                            className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           />
                         </label>
                       )}
 
                       {/* 2. Custom SL, TP & Trailing Stop */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Custom SL, TP &amp; Trailing Stop
                       </div>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Initial TP Distance ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">Initial TP Distance ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Target Profit awal (30 USD = 3000 poin)</span>
                         </span>
                         <input
@@ -6390,12 +6394,12 @@ export default function ReplayTrades() {
                             setInitialTpDistInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, initial_tp_dist: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">SL Safety Buffer ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">SL Safety Buffer ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Jarak aman di luar LL/HH (10 USD = 1000 poin)</span>
                         </span>
                         <input
@@ -6416,12 +6420,12 @@ export default function ReplayTrades() {
                             setSlSafetyBufferInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, sl_safety_buffer: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-rose-300 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-rose-300 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Min SL Distance ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">Min SL Distance ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Batas minimum jarak SL (15 USD = 1500 poin)</span>
                         </span>
                         <input
@@ -6442,12 +6446,12 @@ export default function ReplayTrades() {
                             setMinSlDistInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, min_sl_dist: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Max SL Distance ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">Max SL Distance ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Batas maksimum jarak SL (30 USD = 3000 poin)</span>
                         </span>
                         <input
@@ -6468,12 +6472,12 @@ export default function ReplayTrades() {
                             setMaxSlDistInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, max_sl_dist: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-rose-400 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-rose-400 outline-none focus:border-rose-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Trailing SL Distance ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">Trailing SL Distance ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Jarak Dynamic Trailing Stop (30 USD = 3000 poin)</span>
                         </span>
                         <input
@@ -6494,12 +6498,12 @@ export default function ReplayTrades() {
                             setTrailingDistanceInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, trailing_distance: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">TP Expansion Trigger ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">TP Expansion Trigger ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Sisa jarak ke TP untuk melebarkan target ($10)</span>
                         </span>
                         <input
@@ -6520,12 +6524,12 @@ export default function ReplayTrades() {
                             setTpTriggerInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, tp_trigger: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">TP Expansion Amount ($)</span>
+                          <span className="block text-xs font-semibold text-slate-800">TP Expansion Amount ($)</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">Tambahan jarak saat TP diperlebar ($20)</span>
                         </span>
                         <input
@@ -6546,12 +6550,12 @@ export default function ReplayTrades() {
                             setTpEkspansiInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, tp_ekspansi: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-amber-300 outline-none focus:border-amber-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
                       <label className="flex items-center justify-between gap-4 px-1 py-3">
                         <span>
-                          <span className="block text-xs font-semibold text-slate-200">Max TP Expansion Count</span>
+                          <span className="block text-xs font-semibold text-slate-800">Max TP Expansion Count</span>
                           <span className="mt-0.5 block text-[10px] text-slate-500">0 = Unlimited expansion</span>
                         </span>
                         <input
@@ -6572,18 +6576,18 @@ export default function ReplayTrades() {
                             setMaxEkspansiInput(String(val));
                             setStrategyParams((prev) => ({ ...prev, max_ekspansi: val }));
                           }}
-                          className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-slate-300 outline-none focus:border-slate-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                          className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-slate-600 outline-none focus:border-slate-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         />
                       </label>
 
                       {/* 3. Break-Even Protection */}
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-slate-200">
+                          <div className="flex items-center text-xs font-semibold text-slate-800">
                             Break-Even (BE) Lock
                             <StrategyTooltip
                               fungsi="Mengunci SL ke atas harga entry saat running profit telah mencapai target trigger, melindungi posisi dari pembalikan arah."
-                              contoh="Profit sudah mencapai $15.00 → SL otomatis digeser ke Entry + $1.00."
+                              contoh="Profit sudah mencapai $15.00 â†’ SL otomatis digeser ke Entry + $1.00."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6598,7 +6602,7 @@ export default function ReplayTrades() {
                           onClick={() => setStrategyParams((prev) => ({ ...prev, enable_breakeven: !prev.enable_breakeven }))}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-                            strategyParams.enable_breakeven ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                            strategyParams.enable_breakeven ? "border-cyan-400/50 bg-cyan-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6614,7 +6618,7 @@ export default function ReplayTrades() {
                         <>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">BE Trigger Profit ($)</span>
+                              <span className="block text-xs font-semibold text-slate-800">BE Trigger Profit ($)</span>
                               <span className="mt-0.5 block text-[10px] text-slate-500">Jarak profit running untuk memicu BE ($15)</span>
                             </span>
                             <input
@@ -6635,12 +6639,12 @@ export default function ReplayTrades() {
                                 setBeTriggerInput(String(val));
                                 setStrategyParams((prev) => ({ ...prev, breakeven_trigger: val }));
                               }}
-                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">BE Buffer Profit ($)</span>
+                              <span className="block text-xs font-semibold text-slate-800">BE Buffer Profit ($)</span>
                               <span className="mt-0.5 block text-[10px] text-slate-500">Jarak aman SL di atas entry ($1.00)</span>
                             </span>
                             <input
@@ -6661,14 +6665,14 @@ export default function ReplayTrades() {
                                 setBeBufferInput(String(val));
                                 setStrategyParams((prev) => ({ ...prev, breakeven_buffer: val }));
                               }}
-                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
                         </>
                       )}
 
                       {/* 4. Price-Ratio Scaling */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Price-Ratio Scaling (Multi-Price Level)
                       </div>
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
@@ -6677,7 +6681,7 @@ export default function ReplayTrades() {
                             <Scale size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Price-Ratio Dynamic Scaling (Opsi 1)
                             <StrategyTooltip
                               fungsi="Menyesuaikan jarak SL, TP, buffer ayunan struktur, dan ukuran lot secara proporsional dari harga patokan dasar (mis. 2000 USD). Menjaga risiko dolar ($) tetap konstan di semua era harga Gold (1000 vs 2000 vs 5000 USD) tanpa lagging indikator."
-                              contoh="Harga Emas $5000 (2.5x dari $2000) → SL & TP otomatis melebar 2.5x ($75), lot mengecil dari 0.05 ke 0.02 → Total risiko kerugian tetap konstan $150 USD."
+                              contoh="Harga Emas $5000 (2.5x dari $2000) â†’ SL & TP otomatis melebar 2.5x ($75), lot mengecil dari 0.05 ke 0.02 â†’ Total risiko kerugian tetap konstan $150 USD."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6692,7 +6696,7 @@ export default function ReplayTrades() {
                           onClick={() => setStrategyParams((prev) => ({ ...prev, use_price_ratio_scaling: !prev.use_price_ratio_scaling }))}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70",
-                            strategyParams.use_price_ratio_scaling ? "border-emerald-400/50 bg-emerald-500/25" : "border-slate-700 bg-slate-900"
+                            strategyParams.use_price_ratio_scaling ? "border-emerald-400/50 bg-emerald-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6707,7 +6711,7 @@ export default function ReplayTrades() {
                         <>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">Base Reference Price ($)</span>
+                              <span className="block text-xs font-semibold text-slate-800">Base Reference Price ($)</span>
                               <span className="mt-0.5 block text-[10px] text-slate-500">Harga patokan dasar (1.0x skala, default 2000)</span>
                             </span>
                             <input
@@ -6728,17 +6732,17 @@ export default function ReplayTrades() {
                                 setBaseRefPriceInput(String(val));
                                 setStrategyParams((prev) => ({ ...prev, base_reference_price: val }));
                               }}
-                              className="h-8 w-24 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-24 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-emerald-300 outline-none focus:border-emerald-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
 
-                          {/* ⚡ Quick Presets Range Harga XAUUSD */}
+                          {/* âš¡ Quick Presets Range Harga XAUUSD */}
                           <div className="mt-1 mb-3 rounded-xl border border-cyan-500/25 bg-cyan-950/20 p-2.5">
                             <div className="mb-2 flex items-center justify-between">
                               <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
                                 <Zap size={13} className="inline mr-1 -mt-px" aria-hidden="true" />Quick Presets Range Emas (Data Teruji)
                               </span>
-                              <span className="text-[9px] text-slate-400">Auto-fill SL, TP &amp; Lot</span>
+                              <span className="text-[9px] text-slate-500">Auto-fill SL, TP &amp; Lot</span>
                             </div>
                             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                               {[
@@ -6838,7 +6842,7 @@ export default function ReplayTrades() {
                                       "group relative flex flex-col items-start rounded-lg border p-2 text-left transition-all cursor-pointer",
                                       isCurrent
                                         ? "border-cyan-400/80 bg-cyan-500/20 text-cyan-200 shadow-[0_0_12px_rgba(6,182,212,0.25)]"
-                                        : "border-slate-800 bg-slate-900/80 text-slate-300 hover:border-slate-700 hover:bg-slate-800/80"
+                                        : "border-blue-200 bg-white/85 text-slate-600 hover:border-blue-300 hover:bg-[#BFDBFE]/80"
                                     )}
                                   >
                                     <div className="flex w-full items-center justify-between gap-1">
@@ -6854,7 +6858,7 @@ export default function ReplayTrades() {
                                         </span>
                                       )}
                                     </div>
-                                    <span className="mt-0.5 text-[9px] text-slate-400">{preset.sub}</span>
+                                    <span className="mt-0.5 text-[9px] text-slate-500">{preset.sub}</span>
                                   </button>
                                 );
                               })}
@@ -6864,16 +6868,16 @@ export default function ReplayTrades() {
                       )}
 
                       {/* 5. ATR Adaptive SL/TP (Alternatif) */}
-                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <div className="px-1 pt-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         ATR Adaptive SL/TP (Alternatif)
                       </div>
                       <div className="flex items-center justify-between gap-4 px-1 py-3">
                         <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-slate-200">
+                          <div className="flex items-center text-xs font-semibold text-slate-800">
                             Gunakan ATR untuk SL/TP
                             <StrategyTooltip
                               fungsi="Jarak SL/TP dihitung dari ATR (Average True Range) sehingga menyesuaikan volatilitas pasar. Saat harga tinggi (mis. 5000), SL/TP otomatis lebih lebar; saat harga rendah (mis. 1000), SL/TP lebih ketat. Ini mencegah SL/TP terlalu sempit di harga tinggi."
-                              contoh="Entry $5000, ATR $40 → SL = 40 × 1.5 = $60 (600 pips), TP = 40 × 2.0 = $80 (800 pips). Entry $1000, ATR $8 → SL = 8 × 1.5 = $12 (120 pips), TP = 8 × 2.0 = $16 (160 pips)."
+                              contoh="Entry $5000, ATR $40 â†’ SL = 40 Ã— 1.5 = $60 (600 pips), TP = 40 Ã— 2.0 = $80 (800 pips). Entry $1000, ATR $8 â†’ SL = 8 Ã— 1.5 = $12 (120 pips), TP = 8 Ã— 2.0 = $16 (160 pips)."
                             />
                           </div>
                           <div className="mt-0.5 text-[10px] text-slate-500">
@@ -6888,7 +6892,7 @@ export default function ReplayTrades() {
                           onClick={() => setStrategyParams((prev) => ({ ...prev, use_atr_sltp: !prev.use_atr_sltp }))}
                           className={cn(
                             "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
-                            strategyParams.use_atr_sltp ? "border-cyan-400/50 bg-cyan-500/25" : "border-slate-700 bg-slate-900"
+                            strategyParams.use_atr_sltp ? "border-cyan-400/50 bg-cyan-500/25" : "border-blue-300 bg-white"
                           )}
                         >
                           <span
@@ -6903,7 +6907,7 @@ export default function ReplayTrades() {
                         <>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">ATR Period</span>
+                              <span className="block text-xs font-semibold text-slate-800">ATR Period</span>
                               <span className="mt-0.5 block text-[10px] text-slate-500">Jumlah candle untuk hitung ATR</span>
                             </span>
                             <input
@@ -6924,13 +6928,13 @@ export default function ReplayTrades() {
                                 setAtrPeriodInput(String(value));
                                 setStrategyParams((prev) => ({ ...prev, atr_period: value }));
                               }}
-                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">SL Multiplier</span>
-                              <span className="mt-0.5 block text-[10px] text-slate-500">SL = ATR × pengali (default 1.5)</span>
+                              <span className="block text-xs font-semibold text-slate-800">SL Multiplier</span>
+                              <span className="mt-0.5 block text-[10px] text-slate-500">SL = ATR Ã— pengali (default 1.5)</span>
                             </span>
                             <input
                               type="text"
@@ -6950,13 +6954,13 @@ export default function ReplayTrades() {
                                 setAtrSlMultInput(String(value));
                                 setStrategyParams((prev) => ({ ...prev, atr_sl_multiplier: value }));
                               }}
-                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
                           <label className="flex items-center justify-between gap-4 px-1 py-3">
                             <span>
-                              <span className="block text-xs font-semibold text-slate-200">TP Multiplier</span>
-                              <span className="mt-0.5 block text-[10px] text-slate-500">TP = ATR × pengali (default 2.0)</span>
+                              <span className="block text-xs font-semibold text-slate-800">TP Multiplier</span>
+                              <span className="mt-0.5 block text-[10px] text-slate-500">TP = ATR Ã— pengali (default 2.0)</span>
                             </span>
                             <input
                               type="text"
@@ -6976,7 +6980,7 @@ export default function ReplayTrades() {
                                 setAtrTpMultInput(String(value));
                                 setStrategyParams((prev) => ({ ...prev, atr_tp_multiplier: value }));
                               }}
-                              className="h-8 w-20 appearance-none rounded-md border border-slate-700 bg-slate-950/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="h-8 w-20 appearance-none rounded-md border border-blue-300 bg-white/80 px-2 text-center font-mono text-xs text-cyan-300 outline-none focus:border-cyan-500/60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                           </label>
                         </>
@@ -6989,7 +6993,7 @@ export default function ReplayTrades() {
           </section>
         )}
 
-        {/* ── Monthly Summary Section (100% Identical to trades.tsx) ── */}
+        {/* â”€â”€ Monthly Summary Section (100% Identical to trades.tsx) â”€â”€ */}
         <div className="glass-card mt-2 flex-shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <h2 className="text-xl font-semibold inline-flex items-center gap-2"><ClipboardList size={18} aria-hidden="true" /> Monthly Performance Summary</h2>
@@ -6999,13 +7003,13 @@ export default function ReplayTrades() {
               {/* Year Select Dropdown */}
               <div className="relative">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">Tahun:</span>
+                  <span className="text-xs text-slate-500 font-medium">Tahun:</span>
                   <button
                     onClick={() => setIsYearDropdownOpen((prev) => !prev)}
-                    className="flex items-center justify-between gap-2 bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:outline-none hover:bg-cyan-500/15 transition-all cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.1)] min-w-[75px]"
+                    className="flex items-center justify-between gap-2 bg-sky-50 hover:bg-sky-100 border border-sky-300/80 text-sky-950 rounded-lg px-3 py-1.5 text-xs font-bold focus:outline-none transition-all cursor-pointer shadow-sm min-w-[75px]"
                   >
                     <span>{monthlySummaryYearFilter}</span>
-                    <span className="text-[10px] text-cyan-400">▼</span>
+                    <ChevronDown size={13} className={`text-sky-600 transition-transform duration-200 ${isYearDropdownOpen ? "rotate-180" : ""}`} />
                   </button>
                 </div>
 
@@ -7015,7 +7019,7 @@ export default function ReplayTrades() {
                       className="fixed inset-0 z-40"
                       onClick={() => setIsYearDropdownOpen(false)}
                     />
-                    <div className="absolute right-0 mt-1.5 w-24 bg-slate-900/90 border border-slate-800 rounded-lg shadow-2xl backdrop-blur-xl z-50 overflow-hidden py-1">
+                    <div className="absolute right-0 mt-1.5 w-24 bg-white/95 border border-sky-200 rounded-lg shadow-xl backdrop-blur-xl z-50 overflow-hidden py-1">
                       {availableYears.map((year) => (
                         <button
                           key={year}
@@ -7023,8 +7027,9 @@ export default function ReplayTrades() {
                             setMonthlySummaryYearFilter(year);
                             setIsYearDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-cyan-500/10 hover:text-cyan-300 font-medium cursor-pointer ${monthlySummaryYearFilter === year ? "text-cyan-400 bg-cyan-500/5" : "text-slate-300"
-                            }`}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-sky-50 hover:text-sky-900 font-semibold cursor-pointer ${
+                            monthlySummaryYearFilter === year ? "text-sky-700 bg-sky-100/80" : "text-slate-700"
+                          }`}
                         >
                           {year}
                         </button>
@@ -7035,15 +7040,16 @@ export default function ReplayTrades() {
               </div>
 
               {/* Performance Status Tabs */}
-              <div className="flex bg-slate-950/40 p-0.5 rounded-lg border border-slate-800/80 backdrop-blur-md shadow-[0_4px_12px_rgba(0,0,0,0.2)]">
+              <div className="flex bg-sky-100/40 p-1 rounded-lg border border-sky-200/80 backdrop-blur-md shadow-sm gap-1">
                 {(["all", "profit", "loss"] as const).map((perfFilter) => (
                   <button
                     key={perfFilter}
                     onClick={() => setMonthlySummaryPerformanceFilter(perfFilter)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${monthlySummaryPerformanceFilter === perfFilter
-                      ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-[0_0_12px_rgba(6,182,212,0.15)]"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
-                      }`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                      monthlySummaryPerformanceFilter === perfFilter
+                        ? "bg-sky-600 text-white shadow-sm"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
+                    }`}
                   >
                     {perfFilter === "all" ? "Semua" : perfFilter === "profit" ? "Profit Only" : "Loss Only"}
                   </button>
@@ -7054,7 +7060,7 @@ export default function ReplayTrades() {
 
           <div className="overflow-hidden">
             <table className="w-full border-collapse text-sm">
-              <thead className="bg-slate-900/30 border-b border-slate-800/60">
+              <thead className="bg-white/60 border-b border-blue-200/70">
                 <tr>
                   <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Month</th>
                   <th className="px-4 py-3.5 text-left text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-semibold whitespace-nowrap">Trades</th>
@@ -7084,7 +7090,7 @@ export default function ReplayTrades() {
                   if (filteredMonthlyPNL.length === 0) {
                     return (
                       <tr>
-                        <td colSpan={7} className="px-4 py-12 text-center text-slate-400 italic">
+                        <td colSpan={7} className="px-4 py-12 text-center text-slate-500 italic">
                           Tidak ada ringkasan bulanan yang cocok dengan kriteria filter.
                         </td>
                       </tr>
@@ -7098,25 +7104,25 @@ export default function ReplayTrades() {
                       className="border-b border-[rgba(100,116,139,0.1)] hover:bg-cyan-500/10 cursor-pointer transition-colors"
                       title="Klik untuk melihat detail transaksi"
                     >
-                      <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-200">
+                      <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-800">
                         {month.month_label || `${month.month ?? "N/A"}-${month.year ?? ""}`}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap font-mono">{month.executed_trades ?? month.trades ?? 0}</td>
                       <td className={`px-4 py-3.5 whitespace-nowrap font-semibold ${
                         (month.win_rate ?? 0) > 50
-                          ? "text-green-400"
+                          ? "text-emerald-600"
                           : (month.win_rate ?? 0) === 50
-                          ? "text-white"
-                          : "text-red-400"
+                          ? "text-slate-700"
+                          : "text-rose-600"
                       }`}>
                         {(month.win_rate ?? 0).toFixed(1)}%
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-green-400">{(month.profit ?? 0).toFixed(2)}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-red-400">{(month.loss ?? 0).toFixed(2)}</td>
-                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-emerald-600">{(month.profit ?? 0).toFixed(2)}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-mono font-semibold text-rose-600">{(month.loss ?? 0).toFixed(2)}</td>
+                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${(month.net_profit ?? 0) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {(month.net_profit ?? 0) >= 0 ? "+" : ""}{(month.net_profit ?? 0).toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className={`px-4 py-3.5 whitespace-nowrap font-mono font-semibold ${((month.net_profit ?? 0) / 1000 * 100) >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {((month.net_profit ?? 0) / 1000 * 100).toFixed(2)}%
                       </td>
                     </tr>
@@ -7142,25 +7148,25 @@ export default function ReplayTrades() {
                 const initialBal  = strategyParams.initial_balance ?? 1000;
                 const totalReturn = (totalNet / initialBal) * 100;
                 return (
-                  <tfoot className="border-t-2 border-cyan-500/40 bg-slate-900/60">
+                  <tfoot className="border-t-2 border-sky-300 bg-sky-50/60">
                     <tr>
-                      <td className="px-4 py-3.5 text-xs font-bold text-cyan-300 uppercase tracking-wider whitespace-nowrap">
+                      <td className="px-4 py-3.5 text-xs font-bold text-sky-900 uppercase tracking-wider whitespace-nowrap">
                         Total ({filtered.length} bulan)
                       </td>
-                      <td className="px-4 py-3.5 font-mono font-bold text-slate-200 whitespace-nowrap">{totalTrades}</td>
-                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${avgWinRate > 50 ? "text-green-400" : avgWinRate === 50 ? "text-white" : "text-red-400"}`}>
+                      <td className="px-4 py-3.5 font-mono font-bold text-slate-800 whitespace-nowrap">{totalTrades}</td>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${avgWinRate > 50 ? "text-emerald-600" : avgWinRate === 50 ? "text-slate-700" : "text-rose-600"}`}>
                         {avgWinRate.toFixed(1)}%
                       </td>
-                      <td className="px-4 py-3.5 font-mono font-bold text-green-400 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-mono font-bold text-emerald-600 whitespace-nowrap">
                         +{totalProfit.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3.5 font-mono font-bold text-red-400 whitespace-nowrap">
+                      <td className="px-4 py-3.5 font-mono font-bold text-rose-600 whitespace-nowrap">
                         {totalLoss.toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalNet >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalNet >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {totalNet >= 0 ? "+" : ""}{totalNet.toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalReturn >= 0 ? "text-green-400" : "text-red-400"}`}>
+                      <td className={`px-4 py-3.5 font-mono font-bold whitespace-nowrap ${totalReturn >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
                         {totalReturn >= 0 ? "+" : ""}{totalReturn.toFixed(2)}%
                       </td>
                     </tr>
@@ -7174,22 +7180,84 @@ export default function ReplayTrades() {
 
 
 
-      {/* Progress popup for Loading Replay Data */}
+      {/* Progress popup for Loading Replay Data - Sovereign Platinum Glassmorphism */}
       {loadProgress.visible && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[200]">
-          <div className="bg-gray-900 border border-purple-500/30 rounded-xl p-6 shadow-2xl w-96">
-            <div className="text-center mb-4">
-              <div className="text-purple-300 font-semibold text-sm mb-2">
-                <Loader2 size={14} className="inline animate-spin mr-1.5 -mt-0.5" aria-hidden="true" />Loading Replay Data
-              </div>
-              <div className="text-3xl font-bold text-white mb-1">
-                {loadProgress.percent}%
-              </div>
-              <div className="text-xs text-gray-400">{loadProgress.step}</div>
-            </div>
-            <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/30 backdrop-blur-md animate-in fade-in duration-200">
+          <style>{`
+            @keyframes spinRing1 {
+              0% { transform: rotateZ(0deg); }
+              100% { transform: rotateZ(360deg); }
+            }
+            @keyframes spinRing2 {
+              0% { transform: rotateZ(0deg) rotateX(30deg); }
+              100% { transform: rotateZ(360deg) rotateX(30deg); }
+            }
+            @keyframes spinRing3 {
+              0% { transform: rotateZ(0deg); }
+              100% { transform: rotateZ(360deg); }
+            }
+            @keyframes pulseCoreDot {
+              0% { transform: scale(0.8); opacity: 0.7; }
+              100% { transform: scale(1.25); opacity: 1; filter: drop-shadow(0 0 10px rgba(2,132,199,0.8)); }
+            }
+          `}</style>
+          
+          <div className="relative w-full max-w-sm rounded-3xl border border-blue-200/90 bg-white/95 p-7 shadow-[0_25px_60px_-15px_rgba(37,99,235,0.22),0_10px_30px_rgba(0,0,0,0.06)] backdrop-blur-2xl text-center flex flex-col items-center animate-in zoom-in-95 duration-200 overflow-hidden">
+            {/* Top Accent Line */}
+            <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-sky-400 via-blue-600 to-indigo-600 shadow-[0_0_12px_rgba(37,99,235,0.5)]" />
+
+            {/* Kinetic 3D Multi-Ring Gyro Stage */}
+            <div className="relative w-32 h-32 mb-5 flex items-center justify-center rounded-2xl bg-gradient-to-br from-sky-50/90 via-blue-50/50 to-indigo-50/60 border border-blue-100/80 shadow-inner" style={{ perspective: "800px" }}>
               <div
-                className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-150"
+                className="relative w-24 h-24"
+                style={{
+                  transformStyle: "preserve-3d",
+                  transform: "rotateX(55deg) rotateY(15deg)",
+                }}
+              >
+                {/* Ring 1 - Sapphire Sky */}
+                <div
+                  className="absolute inset-0 rounded-full border-2 border-transparent border-t-sky-500 border-r-sky-500 shadow-[0_0_12px_rgba(2,132,199,0.5)]"
+                  style={{ animation: "spinRing1 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}
+                />
+                {/* Ring 2 - Deep Indigo */}
+                <div
+                  className="absolute inset-2.5 rounded-full border-2 border-transparent border-b-indigo-600 border-l-indigo-600 shadow-[0_0_12px_rgba(79,70,229,0.5)]"
+                  style={{ animation: "spinRing2 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse" }}
+                />
+                {/* Ring 3 - Vibrant Cyan */}
+                <div
+                  className="absolute inset-5 rounded-full border-2 border-transparent border-t-cyan-500 border-l-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                  style={{ animation: "spinRing3 2.2s linear infinite" }}
+                />
+                {/* Center Glowing Core */}
+                <div
+                  className="absolute top-1/2 left-1/2 w-3.5 h-3.5 -mt-[7px] -ml-[7px] rounded-full bg-gradient-to-tr from-sky-600 to-indigo-600 shadow-[0_0_12px_rgba(2,132,199,0.9),0_0_20px_rgba(56,189,248,0.8)]"
+                  style={{ animation: "pulseCoreDot 1s ease-in-out infinite alternate" }}
+                />
+              </div>
+            </div>
+
+            {/* Title & Status */}
+            <div className="text-xs font-extrabold uppercase tracking-widest text-sky-700 mb-1 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-600 animate-ping inline-block" />
+              <span>Memuat Dataset Replay</span>
+            </div>
+
+            {/* Percentage Display */}
+            <div className="text-4xl font-black font-mono tracking-tight text-slate-900 mb-1.5">
+              {loadProgress.percent}%
+            </div>
+
+            {/* Step Label */}
+            <div className="text-xs text-slate-600 font-semibold max-w-[280px] truncate mb-4">
+              {loadProgress.step || "Memproses dataset..."}
+            </div>
+
+            {/* Progress Bar Container */}
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-blue-200/80 p-0.5 shadow-inner">
+              <div
+                className="h-full bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 rounded-full transition-all duration-150 shadow-[0_0_10px_rgba(37,99,235,0.4)]"
                 style={{ width: `${loadProgress.percent}%` }}
               />
             </div>
@@ -7197,31 +7265,31 @@ export default function ReplayTrades() {
         </div>
       )}
 
-      {/* ── Transaction Detail Pop-up Modal (100% Identical to trades.tsx) ── */}
+      {/* â”€â”€ Transaction Detail Pop-up Modal (100% Identical to trades.tsx) â”€â”€ */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-slate-900/90 border border-slate-800 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200">
+          <div className="w-full max-w-[95vw] xl:max-w-[1400px] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200 relative">
             {/* Premium Gradient Top Accent Line */}
             <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500" />
 
             {/* Header */}
-            <div className="p-6 pt-7 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+            <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
               <div className="flex items-center gap-3">
                 <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/15">
                   <CalendarDays className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-100 tracking-tight">
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">
                     Detail Transaksi - {modalTitle}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Daftar transaksi yang ditutup pada bulan ini
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-2 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
+                className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                 title="Tutup"
               >
                 <X className="size-5" />
@@ -7231,24 +7299,24 @@ export default function ReplayTrades() {
             {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-6 space-y-5">
               {isLoadingTrades ? (
-                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-400">
+                <div className="py-20 flex flex-col items-center justify-center gap-3 text-slate-500">
                   <Loader2 className="size-8 text-cyan-500 animate-spin" />
                   <span className="text-sm">Memuat data transaksi...</span>
                 </div>
               ) : selectedMonthTrades.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 text-sm italic">
+                <div className="py-20 text-center text-slate-500 text-sm italic">
                   Tidak ada transaksi yang tercatat pada bulan ini.
                 </div>
               ) : (
                 <>
                   {/* Summary Dashboard Cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
-                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Total Trades</span>
-                      <span className="text-2xl font-bold text-slate-200 font-mono">{selectedMonthTrades.length}</span>
+                    <div className="bg-[#DBEAFE]/30 border border-blue-200/70 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Total Trades</span>
+                      <span className="text-2xl font-bold text-slate-800 font-mono">{selectedMonthTrades.length}</span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
-                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Win Rate</span>
+                    <div className="bg-[#DBEAFE]/30 border border-blue-200/70 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Win Rate</span>
                       <span className="text-2xl font-bold text-cyan-400 font-mono">
                         {(() => {
                           const wins = selectedMonthTrades.filter(t => (t.net_profit ?? 0) > 0).length;
@@ -7256,8 +7324,8 @@ export default function ReplayTrades() {
                         })()}%
                       </span>
                     </div>
-                    <div className="bg-slate-950/30 border border-slate-800/60 rounded-xl p-4 flex flex-col">
-                      <span className="text-xs text-slate-400 uppercase tracking-wider mb-1">Net P&L</span>
+                    <div className="bg-[#DBEAFE]/30 border border-blue-200/70 rounded-xl p-4 flex flex-col">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider mb-1">Net P&L</span>
                       <span className={`text-2xl font-bold font-mono ${selectedMonthTrades.reduce((sum, t) => sum + (t.net_profit ?? 0), 0) >= 0 ? "text-emerald-400" : "text-rose-500"
                         }`}>
                         {selectedMonthTrades.reduce((sum, t) => sum + (t.net_profit ?? 0), 0) >= 0 ? "+" : ""}
@@ -7267,10 +7335,10 @@ export default function ReplayTrades() {
                   </div>
 
                   {/* Trades Detail Table */}
-                  <div className="border border-slate-800/80 rounded-xl overflow-hidden bg-slate-950/20">
+                  <div className="border border-blue-200/80 rounded-xl overflow-hidden bg-[#F0F6FF]/40">
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-900/60 border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold whitespace-nowrap">
+                        <thead className="bg-white/75 border-b border-blue-200 text-slate-500 text-xs uppercase font-semibold whitespace-nowrap">
                           <tr>
                             <th className="py-3 px-4">Ticket</th>
                             <th className="py-3 px-4">Type</th>
@@ -7284,14 +7352,14 @@ export default function ReplayTrades() {
                             <th className="py-3 px-4">Exit Time</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                        <tbody className="divide-y divide-blue-200/70 text-slate-800">
                           {[...selectedMonthTrades]
                             .sort((a, b) => (a.entry_time || "").localeCompare(b.entry_time || ""))
                             .map((trade) => {
                               const isWin = (trade.net_profit ?? 0) >= 0;
                               return (
-                                <tr key={trade.ticket} className="hover:bg-slate-800/30 transition-colors whitespace-nowrap">
-                                  <td className="py-3 px-4 font-mono text-xs text-slate-400">#{trade.ticket}</td>
+                                <tr key={trade.ticket} className="hover:bg-[#BFDBFE]/50 transition-colors whitespace-nowrap">
+                                  <td className="py-3 px-4 font-mono text-xs text-slate-500">#{trade.ticket}</td>
                                   <td className="py-3 px-4">
                                     <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold tracking-wider ${trade.type === "BUY"
                                       ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
@@ -7313,8 +7381,8 @@ export default function ReplayTrades() {
                                     }`}>
                                     {isWin ? "+" : ""}${(trade.net_profit ?? 0).toFixed(2)}
                                   </td>
-                                  <td className="py-3 px-4 text-xs text-slate-400">{trade.entry_time}</td>
-                                  <td className="py-3 px-4 text-xs text-slate-400">{trade.exit_time}</td>
+                                  <td className="py-3 px-4 text-xs text-slate-500">{trade.entry_time}</td>
+                                  <td className="py-3 px-4 text-xs text-slate-500">{trade.exit_time}</td>
                                 </tr>
                               );
                             })}
@@ -7327,10 +7395,10 @@ export default function ReplayTrades() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-800 bg-slate-900/30 flex justify-end">
+            <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-semibold transition-all cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup
               </button>

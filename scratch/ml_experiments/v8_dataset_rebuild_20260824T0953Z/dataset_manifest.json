@@ -1,0 +1,26 @@
+{
+  "created_utc": "2026-08-24T09:55:00.720399+00:00",
+  "backtest_dir": "B:\\Project MT5\\Backtest_result",
+  "dataset_path": "scratch\\ml_experiments\\v8_dataset_rebuild_20260824T0953Z\\dataset_v5_unconstrained_rebuilt.csv",
+  "dataset_sha256": "6145bddba76366df9eb84523eaa94bae0804e67b90a0fd00dc912fcd77c78a5d",
+  "rows": 1942,
+  "columns": 71,
+  "years": [
+    2019,
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "build_info": {
+    "skipped": {
+      "missing_files": 0,
+      "no_m15_bar": 1,
+      "insufficient_forward_data": 0,
+      "total_structures": 1943
+    }
+  }
+}

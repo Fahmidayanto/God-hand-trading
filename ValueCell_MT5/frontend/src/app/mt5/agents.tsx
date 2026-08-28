@@ -198,11 +198,12 @@ export default function AgentsPage() {
         className="relative z-10" 
         style={{ 
           width: "100%",
-          paddingLeft: "240px", // Space for sidebar (exact sidebar width)
+          paddingLeft: "var(--sidebar-offset, 250px)",
+          transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
           minHeight: "100vh"
         }}
       >
-        <div className="px-12 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 py-6 max-w-[1920px] mx-auto">
 
         {/* Page Header */}
         <div className="flex items-center gap-4 mb-8">

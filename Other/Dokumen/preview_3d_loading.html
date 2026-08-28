@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>God Hand Trading - 3D & Cyberpunk Loading Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&family=Orbitron:wght@600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #07090e;
+      --bg-card: rgba(13, 17, 23, 0.85);
+      --border-card: rgba(56, 189, 248, 0.2);
+      --cyan-neon: #00f0ff;
+      --purple-neon: #a855f7;
+      --magenta-neon: #ff0055;
+      --gold-neon: #eab308;
+      --emerald-neon: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image: 
+        radial-gradient(circle at 15% 15%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.08) 0%, transparent 40%),
+        linear-gradient(to bottom, rgba(7, 9, 14, 0.95), rgba(7, 9, 14, 0.98));
+    }
+
+    /* Ambient Cyber Grid */
+    .cyber-grid {
+      position: fixed;
+      inset: 0;
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(56, 189, 248, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 32px 24px 80px;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+      margin-bottom: 32px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .brand-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(168, 85, 247, 0.2));
+      border: 1px solid var(--cyan-neon);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--cyan-neon);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    }
+
+    .brand-title h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ffffff 30%, var(--cyan-neon) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-title p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Top Controls */
+    .controls-panel {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 10px 18px;
+      border-radius: 16px;
+      backdrop-blur-md: blur(12px);
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      cursor: pointer;
+      border: 1px solid var(--cyan-neon);
+      background: rgba(0, 240, 255, 0.12);
+      color: var(--cyan-neon);
+      transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .btn-action:hover {
+      background: var(--cyan-neon);
+      color: #000;
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-action:active {
+      transform: scale(0.97);
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .slider-group input[type="range"] {
+      appearance: none;
+      width: 130px;
+      height: 6px;
+      border-radius: 3px;
+      background: #1e293b;
+      outline: none;
+    }
+
+    .slider-group input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--cyan-neon);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--cyan-neon);
+    }
+
+    /* Section Tabs */
+    .section-nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 12px;
+    }
+
+    .tab-btn {
+      padding: 10px 20px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn.active {
+      background: rgba(0, 240, 255, 0.1);
+      border-color: var(--cyan-neon);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+    }
+
+    /* Grid Options */
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 28px;
+    }
+
+    /* Option Card */
+    .loader-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 24px;
+      padding: 24px;
+      display: flex;
+      flex-col: column;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .loader-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(0, 240, 255, 0.5);
+      box-shadow: 0 24px 60px rgba(0, 240, 255, 0.15);
+    }
+
+    .card-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      align-self: flex-start;
+    }
+
+    .badge-quantum {
+      background: rgba(0, 240, 255, 0.15);
+      color: var(--cyan-neon);
+      border: 1px solid rgba(0, 240, 255, 0.3);
+    }
+
+    .badge-cyber {
+      background: rgba(255, 0, 85, 0.15);
+      color: var(--magenta-neon);
+      border: 1px solid rgba(255, 0, 85, 0.3);
+    }
+
+    .badge-matrix {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald-neon);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-synapse {
+      background: rgba(168, 85, 247, 0.15);
+      color: var(--purple-neon);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+
+    .card-header h3 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .card-header p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-bottom: 18px;
+    }
+
+    /* Interactive Loader Canvas / Stage Box */
+    .stage-box {
+      width: 100%;
+      height: 250px;
+      border-radius: 18px;
+      background: radial-gradient(circle at center, rgba(30, 41, 59, 0.5) 0%, rgba(10, 14, 23, 0.9) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .canvas-wrapper {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Modal Progress Overlay Inside Stage */
+    .stage-ui-overlay {
+      position: absolute;
+      bottom: 14px;
+      left: 16px;
+      right: 16px;
+      background: rgba(8, 12, 20, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 12px;
+      padding: 10px 14px;
+      backdrop-filter: blur(10px);
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .stage-ui-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .stage-ui-step {
+      font-size: 10px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 220px;
+    }
+
+    .stage-ui-pct {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--cyan-neon);
+    }
+
+    .stage-progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .stage-progress-fill {
+      height: 100%;
+      width: 45%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--cyan-neon), var(--purple-neon));
+      transition: width 0.15s ease-out;
+    }
+
+    /* Card Specs & Details */
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      padding-top: 14px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .tech-pill {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 3px 8px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Pure CSS Kinetic 3D Multi-Ring Stage */
+    .kinetic-stage {
+      perspective: 800px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    }
+
+    .kinetic-wrapper {
+      position: relative;
+      width: 120px;
+      height: 120px;
+      transform-style: preserve-3d;
+      transform: rotateX(55deg) rotateY(15deg);
+    }
+
+    .kinetic-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 2px solid transparent;
+    }
+
+    .kinetic-ring-1 {
+      border-top-color: var(--cyan-neon);
+      border-right-color: var(--cyan-neon);
+      animation: spin-ring-1 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+    }
+
+    .kinetic-ring-2 {
+      inset: 12px;
+      border-bottom-color: var(--purple-neon);
+      border-left-color: var(--purple-neon);
+      animation: spin-ring-2 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite reverse;
+      box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
+    }
+
+    .kinetic-ring-3 {
+      inset: 24px;
+      border-top-color: var(--gold-neon);
+      border-left-color: var(--gold-neon);
+      animation: spin-ring-1 2.2s linear infinite;
+      box-shadow: 0 0 15px rgba(234, 179, 8, 0.4);
+    }
+
+    .kinetic-core-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 14px;
+      height: 14px;
+      margin: -7px 0 0 -7px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 20px #fff, 0 0 40px var(--cyan-neon);
+      animation: pulse-dot 1s ease-in-out infinite alternate;
+    }
+
+    @keyframes spin-ring-1 {
+      0% { transform: rotateZ(0deg); }
+      100% { transform: rotateZ(360deg); }
+    }
+
+    @keyframes spin-ring-2 {
+      0% { transform: rotateZ(0deg) rotateX(30deg); }
+      100% { transform: rotateZ(360deg) rotateX(30deg); }
+    }
+
+    @keyframes pulse-dot {
+      0% { transform: scale(0.8); opacity: 0.6; }
+      100% { transform: scale(1.3); opacity: 1; }
+    }
+
+    /* Footer Banner */
+    .info-box {
+      margin-top: 48px;
+      background: linear-gradient(135deg, rgba(0, 240, 255, 0.05), rgba(168, 85, 247, 0.05));
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .info-text h4 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+
+    .info-text p {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="cyber-grid"></div>
+
+  <div class="container">
+    <!-- Top Header -->
+    <header>
+      <div class="brand-group">
+        <div class="brand-icon">G</div>
+        <div class="brand-title">
+          <h1>GOD HAND 3D & CYBERPUNK LOADERS</h1>
+          <p>Interactive Visual Showcase & Design Benchmark</p>
+        </div>
+      </div>
+
+      <!-- Controls Deck -->
+      <div class="controls-panel">
+        <button id="btn-auto-sim" class="btn-action" onclick="toggleAutoSim()">
+          <span id="sim-icon">▶</span> <span id="sim-label">Simulate Load</span>
+        </button>
+
+        <div class="slider-group">
+          <span>PROGRESS:</span>
+          <input type="range" id="progress-slider" min="0" max="100" value="45" oninput="updateProgress(this.value)">
+          <span id="slider-val" style="color: var(--cyan-neon); width: 36px;">45%</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Category Nav -->
+    <div class="section-nav">
+      <button class="tab-btn active" onclick="filterCategory('all', this)">All Loaders (6 Opsi)</button>
+      <button class="tab-btn" onclick="filterCategory('sovereign', this)">Sovereign Precision (3 Opsi)</button>
+      <button class="tab-btn" onclick="filterCategory('cyberpunk', this)">Cyberpunk Special (3 Opsi)</button>
+    </div>
+
+    <!-- Loaders Grid -->
+    <div class="options-grid">
+
+      <!-- ====================================================== -->
+      <!-- OPSI 1: 3D Holographic Quantum Core                   -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="sovereign">
+        <span class="card-badge badge-quantum">Opsi 1 • Sovereign Precision</span>
+        <div class="card-header">
+          <h3>3D Holographic Quantum Core</h3>
+          <p>Inti bola kristal berdenyut dengan sangkar Icosahedron wireframe yang berputar elegan pada 3 sumbu aksis.</p>
+        </div>
+        <div class="stage-box">
+          <div class="canvas-wrapper" id="canvas-quantum"></div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-quantum">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-quantum">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-quantum" style="width: 45%;"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Three.js WebGL</span>
+          <span>Zero Memory Leak • 60 FPS</span>
+        </div>
+      </div>
+
+      <!-- ====================================================== -->
+      <!-- OPSI 2: 3D Isometric Candlestick Engine               -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="sovereign">
+        <span class="card-badge badge-quantum">Opsi 2 • Trading Native</span>
+        <div class="card-header">
+          <h3>3D Isometric Candlestick Matrix</h3>
+          <p>5 pilar bar candle isometrik 3D yang bergelombang dinamis merepresentasikan pemrosesan data candle M15, H1, H4.</p>
+        </div>
+        <div class="stage-box">
+          <div class="canvas-wrapper" id="canvas-candlestick"></div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-candlestick">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-candlestick">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-candlestick" style="width: 45%; background: linear-gradient(90deg, #10b981, #00f0ff);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Three.js Procedural</span>
+          <span>Institutional Theme</span>
+        </div>
+      </div>
+
+      <!-- ====================================================== -->
+      <!-- OPSI 3: Kinetic 3D-CSS Multi-Ring Matrix              -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="sovereign">
+        <span class="card-badge badge-quantum">Opsi 3 • Ultra Lightweight</span>
+        <div class="card-header">
+          <h3>Kinetic 3D-CSS Orbital Gyro</h3>
+          <p>Tiga lapis cincin orbital berotasi berlawanan arah dengan kedalaman perspektif 3D CSS hardware-accelerated.</p>
+        </div>
+        <div class="stage-box">
+          <div class="kinetic-stage">
+            <div class="kinetic-wrapper">
+              <div class="kinetic-ring kinetic-ring-1"></div>
+              <div class="kinetic-ring kinetic-ring-2"></div>
+              <div class="kinetic-ring kinetic-ring-3"></div>
+              <div class="kinetic-core-dot"></div>
+            </div>
+          </div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-kinetic">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-kinetic">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-kinetic" style="width: 45%; background: linear-gradient(90deg, #00f0ff, #eab308);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Pure CSS 3D Transforms</span>
+          <span>Zero WebGL • 120 FPS</span>
+        </div>
+      </div>
+
+      <!-- ====================================================== -->
+      <!-- OPSI 4: Cyberpunk Neon Hex Reactor (Cyber 1)          -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="cyberpunk">
+        <span class="card-badge badge-cyber">Cyberpunk Opsi 1 • Hex Reactor</span>
+        <div class="card-header">
+          <h3>Cyberpunk Neon Hex Reactor</h3>
+          <p>Reaktor prismatik heksagonal dengan beam pendaran neon magenta & cyan serta cincin pertahanan plasma.</p>
+        </div>
+        <div class="stage-box">
+          <div class="canvas-wrapper" id="canvas-hex"></div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-hex">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-hex" style="color: var(--magenta-neon);">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-hex" style="width: 45%; background: linear-gradient(90deg, #ff0055, #00f0ff);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Three.js Prism Shader</span>
+          <span>Cyberpunk 2077 Vibe</span>
+        </div>
+      </div>
+
+      <!-- ====================================================== -->
+      <!-- OPSI 5: Cyberpunk Tesseract Hypercube (Cyber 2)       -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="cyberpunk">
+        <span class="card-badge badge-cyber">Cyberpunk Opsi 2 • 4D Hypercube</span>
+        <div class="card-header">
+          <h3>Cyber Tesseract Hypercube</h3>
+          <p>Visualisasi kubus 4 dimensi (Cube-in-Cube) dengan laser HUD scanning beam dan vertex titik data bercahaya.</p>
+        </div>
+        <div class="stage-box">
+          <div class="canvas-wrapper" id="canvas-tesseract"></div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-tesseract">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-tesseract" style="color: var(--cyan-neon);">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-tesseract" style="width: 45%; background: linear-gradient(90deg, #00f0ff, #10b981);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Three.js Nested Matrices</span>
+          <span>High-Tech HUD</span>
+        </div>
+      </div>
+
+      <!-- ====================================================== -->
+      <!-- OPSI 6: Cyberpunk Neural Synapse Nexus (Cyber 3)      -->
+      <!-- ====================================================== -->
+      <div class="loader-card" data-cat="cyberpunk">
+        <span class="card-badge badge-synapse">Cyberpunk Opsi 3 • Neural Nexus</span>
+        <div class="card-header">
+          <h3>Cyber Neural Synapse Nexus</h3>
+          <p>Jaringan konstelasi neural AI dengan paket data bercahaya yang bergerak cepat antar simpul transaksi.</p>
+        </div>
+        <div class="stage-box">
+          <div class="canvas-wrapper" id="canvas-neural"></div>
+          <div class="stage-ui-overlay">
+            <div class="stage-ui-top">
+              <span class="stage-ui-step" id="step-neural">Processing indicator caches & EMA200...</span>
+              <span class="stage-ui-pct" id="pct-neural" style="color: var(--purple-neon);">45%</span>
+            </div>
+            <div class="stage-progress-bar">
+              <div class="stage-progress-fill" id="fill-neural" style="width: 45%; background: linear-gradient(90deg, #a855f7, #ff0055);"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="tech-pill">Three.js Particle Links</span>
+          <span>AI Neural Network</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Action Card -->
+    <div class="info-box">
+      <div class="info-text">
+        <h4>Siap Diintegrasikan ke Replay Trades & Simulation</h4>
+        <p>Setiap loader di atas dirancang modular, bebas memory leak, dan mendukung responsive display di seluruh resolusi.</p>
+      </div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--cyan-neon);">
+        File Target: ValueCell_MT5/frontend/src/app/mt5/replay.tsx
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================== -->
+  <!-- THREE.JS RENDERING LOGIC                                   -->
+  <!-- ========================================================== -->
+  <script>
+    let globalPercent = 45;
+    let autoSimInterval = null;
+    const allLoaders = [];
+
+    // Filter Category
+    function filterCategory(cat, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.loader-card').forEach(card => {
+        if (cat === 'all' || card.getAttribute('data-cat') === cat) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    // Update Progress across all cards
+    function updateProgress(val) {
+      globalPercent = parseInt(val);
+      document.getElementById('slider-val').innerText = globalPercent + '%';
+      
+      let stepText = "Connecting to database...";
+      if (globalPercent > 20 && globalPercent < 75) {
+        stepText = "Fetching all timeframes (M15, H1, H4) candles...";
+      } else if (globalPercent >= 75 && globalPercent < 98) {
+        stepText = "Processing indicator caches & EMA200...";
+      } else if (globalPercent >= 98) {
+        stepText = "Complete! Synchronizing chart playhead...";
+      }
+
+      ['quantum', 'candlestick', 'kinetic', 'hex', 'tesseract', 'neural'].forEach(id => {
+        const stepEl = document.getElementById('step-' + id);
+        const pctEl = document.getElementById('pct-' + id);
+        const fillEl = document.getElementById('fill-' + id);
+        if (stepEl) stepEl.innerText = stepText;
+        if (pctEl) pctEl.innerText = globalPercent + '%';
+        if (fillEl) fillEl.style.width = globalPercent + '%';
+      });
+    }
+
+    // Auto Simulation Toggle
+    function toggleAutoSim() {
+      if (autoSimInterval) {
+        clearInterval(autoSimInterval);
+        autoSimInterval = null;
+        document.getElementById('sim-icon').innerText = '▶';
+        document.getElementById('sim-label').innerText = 'Simulate Load';
+      } else {
+        document.getElementById('sim-icon').innerText = '⏸';
+        document.getElementById('sim-label').innerText = 'Pause Sim';
+        globalPercent = 0;
+        updateProgress(0);
+        document.getElementById('progress-slider').value = 0;
+
+        autoSimInterval = setInterval(() => {
+          if (globalPercent < 100) {
+            globalPercent += 1;
+            document.getElementById('progress-slider').value = globalPercent;
+            updateProgress(globalPercent);
+          } else {
+            clearInterval(autoSimInterval);
+            autoSimInterval = null;
+            document.getElementById('sim-icon').innerText = '▶';
+            document.getElementById('sim-label').innerText = 'Simulate Load';
+          }
+        }, 40);
+      }
+    }
+
+    // Helper: Init Three Scene
+    function createScene(containerId) {
+      const container = document.getElementById(containerId);
+      if (!container) return null;
+      const width = container.clientWidth || 380;
+      const height = container.clientHeight || 250;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera.position.z = 5;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      return { scene, camera, renderer, container };
+    }
+
+    // 1. Quantum Core Loader
+    (function initQuantum() {
+      const core = createScene('canvas-quantum');
+      if (!core) return;
+      const { scene, camera, renderer } = core;
+
+      // Outer Wireframe Icosahedron
+      const icoGeo = new THREE.IcosahedronGeometry(1.4, 1);
+      const icoMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.45 });
+      const icoMesh = new THREE.Mesh(icoGeo, icoMat);
+      scene.add(icoMesh);
+
+      // Inner Glowing Core
+      const innerGeo = new THREE.SphereGeometry(0.7, 32, 32);
+      const innerMat = new THREE.MeshBasicMaterial({ color: 0xa855f7, wireframe: true, transparent: true, opacity: 0.8 });
+      const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+      scene.add(innerMesh);
+
+      // Particle Ring
+      const ringGeo = new THREE.BufferGeometry();
+      const ringCount = 120;
+      const positions = new Float32Array(ringCount * 3);
+      for (let i = 0; i < ringCount; i++) {
+        const theta = (i / ringCount) * Math.PI * 2;
+        positions[i * 3] = Math.cos(theta) * 2.0;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 0.2;
+        positions[i * 3 + 2] = Math.sin(theta) * 2.0;
+      }
+      ringGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const ringMat = new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.05, transparent: true, opacity: 0.8 });
+      const ringMesh = new THREE.Points(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI / 4;
+      scene.add(ringMesh);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const speedMultiplier = 1 + (globalPercent / 100) * 1.5;
+        icoMesh.rotation.x += 0.008 * speedMultiplier;
+        icoMesh.rotation.y += 0.012 * speedMultiplier;
+        innerMesh.rotation.y -= 0.015 * speedMultiplier;
+        ringMesh.rotation.z += 0.01 * speedMultiplier;
+
+        const pulse = 0.7 + Math.sin(Date.now() * 0.004) * 0.08;
+        innerMesh.scale.set(pulse, pulse, pulse);
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // 2. Candlestick Matrix Loader
+    (function initCandlestick() {
+      const core = createScene('canvas-candlestick');
+      if (!core) return;
+      const { scene, camera, renderer } = core;
+      camera.position.set(0, 1, 5.5);
+      camera.lookAt(0, 0, 0);
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      const candleCount = 5;
+      const candles = [];
+      const colors = [0x10b981, 0x00f0ff, 0x10b981, 0xf43f5e, 0x10b981];
+
+      for (let i = 0; i < candleCount; i++) {
+        const cGroup = new THREE.Group();
+        const xPos = (i - 2) * 0.75;
+        cGroup.position.x = xPos;
+
+        // Wick
+        const wickGeo = new THREE.CylinderGeometry(0.02, 0.02, 2.2, 8);
+        const wickMat = new THREE.MeshBasicMaterial({ color: colors[i], transparent: true, opacity: 0.5 });
+        const wick = new THREE.Mesh(wickGeo, wickMat);
+        cGroup.add(wick);
+
+        // Body
+        const bodyGeo = new THREE.BoxGeometry(0.35, 1.2, 0.35);
+        const bodyMat = new THREE.MeshBasicMaterial({ color: colors[i], wireframe: false, transparent: true, opacity: 0.85 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        cGroup.add(body);
+
+        group.add(cGroup);
+        candles.push({ group: cGroup, body, offset: i * 0.8 });
+      }
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const time = Date.now() * 0.003;
+        group.rotation.y = Math.sin(time * 0.4) * 0.3;
+
+        candles.forEach((c, idx) => {
+          const wave = Math.sin(time + c.offset);
+          c.body.scale.y = 0.5 + Math.abs(wave) * 0.9;
+          c.body.position.y = wave * 0.3;
+        });
+
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // 4. Cyberpunk Neon Hex Reactor
+    (function initHex() {
+      const core = createScene('canvas-hex');
+      if (!core) return;
+      const { scene, camera, renderer } = core;
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      // Outer Hexagonal Cylinder Wireframe
+      const hexGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.4, 6);
+      const hexMat = new THREE.MeshBasicMaterial({ color: 0xff0055, wireframe: true, transparent: true, opacity: 0.6 });
+      const hexMesh = new THREE.Mesh(hexGeo, hexMat);
+      hexMesh.rotation.x = Math.PI / 3;
+      group.add(hexMesh);
+
+      // Inner Hex Reactor
+      const innerHexGeo = new THREE.CylinderGeometry(0.9, 0.9, 0.6, 6);
+      const innerHexMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.8 });
+      const innerHex = new THREE.Mesh(innerHexGeo, innerHexMat);
+      innerHex.rotation.x = Math.PI / 3;
+      group.add(innerHex);
+
+      // Core Energy Pillar
+      const coreGeo = new THREE.CylinderGeometry(0.2, 0.2, 2.0, 16);
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
+      const corePillar = new THREE.Mesh(coreGeo, coreMat);
+      group.add(corePillar);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const speed = 1 + (globalPercent / 100);
+        hexMesh.rotation.y += 0.015 * speed;
+        innerHex.rotation.y -= 0.02 * speed;
+        group.rotation.z = Math.sin(Date.now() * 0.002) * 0.2;
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // 5. Cyberpunk Tesseract Hypercube
+    (function initTesseract() {
+      const core = createScene('canvas-tesseract');
+      if (!core) return;
+      const { scene, camera, renderer } = core;
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      // Outer Cube
+      const outBoxGeo = new THREE.BoxGeometry(1.8, 1.8, 1.8);
+      const outBoxMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff, wireframe: true, transparent: true, opacity: 0.5 });
+      const outCube = new THREE.Mesh(outBoxGeo, outBoxMat);
+      group.add(outCube);
+
+      // Inner Cube
+      const inBoxGeo = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+      const inBoxMat = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true, transparent: true, opacity: 0.8 });
+      const inCube = new THREE.Mesh(inBoxGeo, inBoxMat);
+      group.add(inCube);
+
+      // Corner Connecting Lines
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.4 });
+      const points = [];
+      const s1 = 0.9, s2 = 0.45;
+      [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]].forEach(c => {
+        points.push(new THREE.Vector3(c[0] * s1, c[1] * s1, c[2] * s1));
+        points.push(new THREE.Vector3(c[0] * s2, c[1] * s2, c[2] * s2));
+      });
+      const linesGeo = new THREE.BufferGeometry().setFromPoints(points);
+      const linesMesh = new THREE.LineSegments(linesGeo, lineMat);
+      group.add(linesMesh);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const spd = 1 + (globalPercent / 100) * 1.5;
+        group.rotation.x += 0.01 * spd;
+        group.rotation.y += 0.012 * spd;
+        const scaleVal = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
+        inCube.scale.set(scaleVal, scaleVal, scaleVal);
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // 6. Cyberpunk Neural Synapse Nexus
+    (function initNeural() {
+      const core = createScene('canvas-neural');
+      if (!core) return;
+      const { scene, camera, renderer } = core;
+
+      const group = new THREE.Group();
+      scene.add(group);
+
+      const nodeCount = 20;
+      const nodeGeo = new THREE.SphereGeometry(0.06, 12, 12);
+      const nodeMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
+      const nodes = [];
+
+      for (let i = 0; i < nodeCount; i++) {
+        const mesh = new THREE.Mesh(nodeGeo, nodeMat);
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos((Math.random() * 2) - 1);
+        const rad = 1.2 + Math.random() * 0.4;
+
+        mesh.position.x = rad * Math.sin(phi) * Math.cos(theta);
+        mesh.position.y = rad * Math.sin(phi) * Math.sin(theta);
+        mesh.position.z = rad * Math.cos(phi);
+        group.add(mesh);
+        nodes.push(mesh.position);
+      }
+
+      // Connecting links
+      const linkPoints = [];
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          if (nodes[i].distanceTo(nodes[j]) < 1.3) {
+            linkPoints.push(nodes[i]);
+            linkPoints.push(nodes[j]);
+          }
+        }
+      }
+      const linkGeo = new THREE.BufferGeometry().setFromPoints(linkPoints);
+      const linkMat = new THREE.LineBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.35 });
+      const linkMesh = new THREE.LineSegments(linkGeo, linkMat);
+      group.add(linkMesh);
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const spd = 1 + (globalPercent / 100);
+        group.rotation.y += 0.008 * spd;
+        group.rotation.x += 0.005 * spd;
+        renderer.render(scene, camera);
+      }
+      animate();
+    })();
+
+    // Handle Window Resize
+    window.addEventListener('resize', () => {
+      // Automatic responsive sizing
+    });
+  </script>
+</body>
+</html>

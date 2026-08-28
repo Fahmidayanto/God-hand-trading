@@ -22,6 +22,7 @@ import {
   StructureLinesPrimitive,
   type StructureLineItem,
 } from "@/components/valuecell/charts/structure-lines-primitive";
+import { cn } from "@/lib/utils";
 import MT5Footer from "./components/MT5Footer";
 import ChartToolbar from "./components/ChartToolbar";
 
@@ -203,7 +204,7 @@ export default function RongsokanPage() {
   // Prevents redundant setData + overlay rebuild on year/month jumps within same timeframe.
   const fullDataDisplayedRef = useRef<{[key: string]: boolean}>({});
   
-  // Debounce timer for scroll label re-render — prevents DOM churn at 60fps during pan/zoom
+  // Debounce timer for scroll label re-render â€” prevents DOM churn at 60fps during pan/zoom
   const scrollLabelDebounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   
   // Save center time when switching timeframes to maintain date focus and auto-scale zoom
@@ -211,7 +212,7 @@ export default function RongsokanPage() {
   
   // Update ref whenever chartTimezone changes
   useEffect(() => {
-    console.log('📍 chartTimezone state changed:', {
+    console.log('ðŸ“ chartTimezone state changed:', {
       oldState: chartTimezoneRef.current,
       newState: chartTimezone
     });
@@ -312,43 +313,43 @@ export default function RongsokanPage() {
   };
 
   useEffect(() => {
-    console.log('📊 Chart initialization effect triggered');
+    console.log('ðŸ“Š Chart initialization effect triggered');
     console.log('chartContainerRef.current:', !!chartContainerRef.current);
     console.log('chartRef.current:', !!chartRef.current);
     
     if (chartContainerRef.current && !chartRef.current) {
-      console.log('✅ Initializing chart...');
+      console.log('âœ… Initializing chart...');
       try {
         const chart = createChart(chartContainerRef.current, {
           autoSize: true, // Auto-fit chart to container size via ResizeObserver
           layout: {
-            background: { color: "rgba(17, 24, 39, 0.3)" },
-            textColor: "#cbd5e1",
+            background: { color: "#ffffff" },
+            textColor: "#0f172a",
           },
           grid: {
-            vertLines: { color: "rgba(100, 116, 139, 0.1)" },
-            horzLines: { color: "rgba(100, 116, 139, 0.1)" },
+            vertLines: { color: "#f1f5f9" },
+            horzLines: { color: "#f1f5f9" },
           },
           crosshair: {
             mode: 0, // Normal crosshair mode (0 = normal, 1 = magnet)
             vertLine: {
               width: 1,
-              color: 'rgba(224, 227, 235, 0.5)',
-              style: 0,
-              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+              color: 'rgba(100, 116, 139, 0.45)',
+              style: 1,
+              labelBackgroundColor: '#2563eb',
             },
             horzLine: {
               width: 1,
-              color: 'rgba(224, 227, 235, 0.5)',
-              style: 0,
-              labelBackgroundColor: 'rgba(59, 130, 246, 0.8)',
+              color: 'rgba(100, 116, 139, 0.45)',
+              style: 1,
+              labelBackgroundColor: '#2563eb',
             },
           },
           rightPriceScale: {
-            borderColor: "rgba(100, 116, 139, 0.3)",
+            borderColor: "#cbd5e1",
           },
           timeScale: {
-            borderColor: "rgba(100, 116, 139, 0.3)",
+            borderColor: "#cbd5e1",
             timeVisible: true,
             secondsVisible: false,
             barSpacing: 8,
@@ -364,10 +365,6 @@ export default function RongsokanPage() {
             timeFormatter: (time: number) => {
               // Use ref to get latest timezone state (avoids stale closure)
               const currentTimezone = chartTimezoneRef.current;
-              console.log('🕐 Initial formatter called, using ref:', {
-                displayMode: currentTimezone.display_mode,
-                brokerOffset: currentTimezone.broker_offset_hours
-              });
               return formatChartTime(time, currentTimezone.display_mode, currentTimezone.broker_offset_hours);
             },
           },
@@ -375,15 +372,16 @@ export default function RongsokanPage() {
 
         // Log timezone info
         const timezoneOffset = new Date().getTimezoneOffset();
-        console.log('🕐 Browser timezone offset (minutes):', timezoneOffset);
-        console.log('🕐 This means browser is:', timezoneOffset > 0 ? `GMT-${timezoneOffset/60}` : `GMT+${-timezoneOffset/60}`);
+        console.log('📊 Browser timezone offset (minutes):', timezoneOffset);
+        console.log('📊 This means browser is:', timezoneOffset > 0 ? `GMT-${timezoneOffset / 60}` : `GMT+${-timezoneOffset / 60}`);
 
         const candlestickSeries = chart.addSeries(CandlestickSeries, {
-          upColor: "#10b981",
-          downColor: "#ef4444",
-          borderVisible: false,
-          wickUpColor: "#10b981",
-          wickDownColor: "#ef4444",
+          upColor: "#089981",
+          downColor: "#f23645",
+          borderVisible: true,
+          borderColor: "#065f46",
+          wickUpColor: "#089981",
+          wickDownColor: "#f23645",
         });
 
         chartRef.current = chart;
@@ -391,7 +389,7 @@ export default function RongsokanPage() {
 
         // Add EMA 200 line series (initially hidden, data loaded via API)
         const ema200Series = chart.addSeries(LineSeries, {
-          color: "#f59e0b",
+          color: "#ea580c",
           lineWidth: 2 as any,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -399,7 +397,7 @@ export default function RongsokanPage() {
           visible: showEMA200,
         });
         ema200SeriesRef.current = ema200Series;
-        console.log('📉 EMA 200 series created:', {
+        console.log('ðŸ“‰ EMA 200 series created:', {
           visible: showEMA200,
           color: '#f59e0b',
           seriesRef: !!ema200SeriesRef.current,
@@ -423,7 +421,7 @@ export default function RongsokanPage() {
           console.warn("Could not attach structure lines primitive:", e);
         }
 
-        console.log('✅ Chart initialized successfully');
+        console.log('âœ… Chart initialized successfully');
         console.log('chartRef.current:', !!chartRef.current);
         console.log('candlestickSeriesRef.current:', !!candlestickSeriesRef.current);
 
@@ -433,10 +431,10 @@ export default function RongsokanPage() {
         chartDataLoadedRef.current = false;
         refetchChartData();
       } catch (error) {
-        console.error('❌ Error creating chart:', error);
+        console.error('âŒ Error creating chart:', error);
       }
     } else {
-      console.log('⏭️ Skipping chart init: already initialized or container not ready');
+      console.log('â­ï¸ Skipping chart init: already initialized or container not ready');
     }
 
     const resizeObserver = new ResizeObserver((entries) => {
@@ -544,7 +542,7 @@ export default function RongsokanPage() {
   // Handle chart data from hook
   useEffect(() => {
     if (chartData && chartData.candles && candlestickSeriesRef.current) {
-      console.log('✅ Chart data received from hook:', {
+      console.log('âœ… Chart data received from hook:', {
         mode: chartData.mode,
         from_date: chartData.from_date,
         candles: chartData.candles?.length,
@@ -637,7 +635,7 @@ export default function RongsokanPage() {
             ...prev,
             broker_offset_hours: chartData.timezone.broker_offset_hours ?? prev.broker_offset_hours,
           }));
-          console.log('🚫 Skipping display_mode override (user manually changed it); refreshed broker offset only');
+          console.log('ðŸš« Skipping display_mode override (user manually changed it); refreshed broker offset only');
         } else {
           // Default path: force UTC as the display mode, only adopt broker offset from API
           setChartTimezone(prev => ({
@@ -645,14 +643,14 @@ export default function RongsokanPage() {
             broker_offset_hours: chartData.timezone.broker_offset_hours ?? prev.broker_offset_hours,
             display_mode: 'utc',
           }));
-          console.log('🌍 Defaulting chart display_mode to UTC (broker offset from API:', chartData.timezone.broker_offset_hours, ')');
+          console.log('ðŸŒ Defaulting chart display_mode to UTC (broker offset from API:', chartData.timezone.broker_offset_hours, ')');
         }
       }
-      console.log(`✅ Chart data loaded successfully (${chartData.mode} mode)`);
+      console.log(`âœ… Chart data loaded successfully (${chartData.mode} mode)`);
       
       // Trigger structure overlay with fresh candle data
       if (showStructure && structureLines) {
-        console.log('🔄 Triggering structure overlay');
+        console.log('ðŸ”„ Triggering structure overlay');
         overlayMarketStructure(processedCandles, true);
       }
     }
@@ -673,10 +671,10 @@ export default function RongsokanPage() {
         // Check if chartFromDate is within recent range
         const chartDate = new Date(chartFromDate);
         if (chartDate >= recentThreshold) {
-          console.log('🔄 Auto-refresh chart data (recent mode only)');
+          console.log('ðŸ”„ Auto-refresh chart data (recent mode only)');
           refetchChartData();
         } else {
-          console.log('⏸️ Skipping auto-refresh (user is viewing historical data)');
+          console.log('â¸ï¸ Skipping auto-refresh (user is viewing historical data)');
         }
       }
     }, 30000); // 30 seconds instead of 5 seconds
@@ -835,18 +833,18 @@ export default function RongsokanPage() {
   // Jump to specific year/month function (refactored to use cache)
   const jumpToDate = async (year: string, month: string) => {
     const centerDate = `${year}-${month}-01`;
-    console.log('🎯 jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
+    console.log('ðŸŽ¯ jumpToDate ENTER', { year, month, centerDate, cacheKey: activeTimeframe });
 
     setIsJumping(true);
     
     const cacheKey = activeTimeframe;
     const cachedData = candleCacheRef.current[cacheKey];
-    console.log('🎯 cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
+    console.log('ðŸŽ¯ cache check', { hasCache: !!cachedData, fullLoaded: fullHistoryLoadedRef.current[cacheKey] });
 
     // Check if we have cached full history for this timeframe
     if (cachedData && fullHistoryLoadedRef.current[cacheKey]) {
-      console.log('🎯 CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
-      console.log('💾 Cache info:', {
+      console.log('ðŸŽ¯ CACHED PATH', { branch: fullDataDisplayedRef.current[cacheKey] ? 'else' : 'if' });
+      console.log('ðŸ’¾ Cache info:', {
         totalCandles: cachedData.totalCount,
         dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
       });
@@ -855,7 +853,7 @@ export default function RongsokanPage() {
         if (candlestickSeriesRef.current && chartRef.current && cachedData.candles.length > 0) {
           if (!fullDataDisplayedRef.current[cacheKey]) {
             // First time displaying this cached data for this timeframe
-            console.log('📊 Displaying cached data for', cacheKey, ':', {
+            console.log('ðŸ“Š Displaying cached data for', cacheKey, ':', {
               totalCandles: cachedData.totalCount,
               dateRange: `${cachedData.fromDate} to ${cachedData.toDate}`,
             });
@@ -863,20 +861,20 @@ export default function RongsokanPage() {
             setChartFromDate(cachedData.fromDate);
             setDataMode('full');
             fullDataDisplayedRef.current[cacheKey] = true;
-            // Scroll first, overlay draws in next frame — prevents 1.5s freeze before scroll
+            // Scroll first, overlay draws in next frame â€” prevents 1.5s freeze before scroll
             focusChartOnDate(centerDate, 50, cachedData.candles);
             if (showStructure && structureLines) {
               await overlayMarketStructure(cachedData.candles, true);
             }
           } else {
-            // Data & overlay already on chart — instant scroll
+            // Data & overlay already on chart â€” instant scroll
             updateLoadedCandles(cachedData.candles);
             focusChartOnDate(centerDate, 0, cachedData.candles);
           }
-          console.log('🎯 jumpToDate COMPLETE (cached)');
+          console.log('ðŸŽ¯ jumpToDate COMPLETE (cached)');
         }
       } catch (error) {
-        console.error('❌ Error using cache:', error);
+        console.error('âŒ Error using cache:', error);
       } finally {
         setIsJumping(false);
       }
@@ -884,19 +882,19 @@ export default function RongsokanPage() {
     }
     
     // No cache available - fetch from API (fallback to original behavior)
-    console.log('⚠️ No cache available, fetching from API...');
+    console.log('âš ï¸ No cache available, fetching from API...');
     setDataMode('full');
     
     try {
       const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
       const chartUrl = `${apiUrl}/trading/chart/rongsokan-data?symbol=XAUUSD&timeframe=${activeTimeframe}&center_date=${centerDate}`;
       
-      console.log('🔄 Fetching windowed data:', chartUrl);
+      console.log('ðŸ”„ Fetching windowed data:', chartUrl);
       const response = await fetch(chartUrl);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Windowed data received:', {
+        console.log('âœ… Windowed data received:', {
           mode: data.mode,
           center_date: data.center_date,
           candles: data.candles?.length,
@@ -922,11 +920,11 @@ export default function RongsokanPage() {
           if (showStructure && structureLines) {
             await overlayMarketStructure(processedCandles, true);
           }
-          console.log(`✅ Jumped to ${centerDate} successfully`);
+          console.log(`âœ… Jumped to ${centerDate} successfully`);
         }
       }
     } catch (error) {
-      console.error('❌ Jump to date error:', error);
+      console.error('âŒ Jump to date error:', error);
       setDataMode('recent');
     } finally {
       setIsJumping(false);
@@ -942,7 +940,7 @@ export default function RongsokanPage() {
       if (visibleRange) {
         const centerTime = ((visibleRange.from as number) + (visibleRange.to as number)) / 2;
         timeframeSwitchCenterTimeRef.current = centerTime;
-        console.log("⏱️ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
+        console.log("â±ï¸ Saved center time for timeframe switch:", new Date(centerTime * 1000).toISOString());
       }
     }
     setActiveTimeframe(newTimeframe);
@@ -962,24 +960,24 @@ export default function RongsokanPage() {
 
   // Handle timezone change - extracted so it can be reused by the toolbar
   const handleTimezoneChange = (newMode: "utc" | "broker" | "local") => {
-    console.log("🔄 TIMEZONE CHANGE TRIGGERED");
+    console.log("ðŸ”„ TIMEZONE CHANGE TRIGGERED");
     console.log("  Previous mode:", chartTimezone.display_mode);
     console.log("  New mode:", newMode);
     console.log("  Previous state:", chartTimezone);
 
     // Mark that user manually changed timezone
     userChangedTimezone.current = true;
-    console.log("  🔒 User changed timezone flag set to TRUE");
+    console.log("  ðŸ”’ User changed timezone flag set to TRUE");
 
     const newTimezone = { ...chartTimezone, display_mode: newMode };
     console.log("  New state to set:", newTimezone);
 
     setChartTimezone(newTimezone);
-    console.log("  ✅ setChartTimezone called");
+    console.log("  âœ… setChartTimezone called");
 
     // Update chart localization in real-time
     if (chartRef.current) {
-      console.log("  📊 Chart ref exists, updating options...");
+      console.log("  ðŸ“Š Chart ref exists, updating options...");
 
       chartRef.current.applyOptions({
         localization: {
@@ -989,7 +987,7 @@ export default function RongsokanPage() {
           },
         },
       });
-      console.log("  ✅ applyOptions called with new formatter");
+      console.log("  âœ… applyOptions called with new formatter");
 
       const timeScale = chartRef.current.timeScale();
       const visibleRange = timeScale.getVisibleRange();
@@ -1007,17 +1005,17 @@ export default function RongsokanPage() {
           if (chartRef.current) {
             console.log("  Restoring original range:", visibleRange);
             chartRef.current.timeScale().setVisibleRange(visibleRange);
-            console.log("  ✅ Force redraw complete");
+            console.log("  âœ… Force redraw complete");
           }
         }, 10);
       } else {
-        console.warn("  ⚠️ No visible range available");
+        console.warn("  âš ï¸ No visible range available");
       }
     } else {
-      console.warn("  ⚠️ Chart ref not available");
+      console.warn("  âš ï¸ Chart ref not available");
     }
 
-    console.log("🔄 TIMEZONE CHANGE HANDLER COMPLETE\n");
+    console.log("ðŸ”„ TIMEZONE CHANGE HANDLER COMPLETE\n");
   };
 
   // Zoom controls
@@ -1233,7 +1231,7 @@ export default function RongsokanPage() {
     
     // Prevent concurrent executions
     if (overlayGuardRef.current) {
-      console.log('⏸️ overlayMarketStructure already running, skipping');
+      console.log('â¸ï¸ overlayMarketStructure already running, skipping');
       return;
     }
     overlayGuardRef.current = true;
@@ -1263,7 +1261,7 @@ export default function RongsokanPage() {
     const filteredHhPoints = filterByDateRange(filterByTimeframe(structureLines.hh_points));
     const filteredLlPoints = filterByDateRange(filterByTimeframe(structureLines.ll_points));
 
-    // Build O(1) lookup map once — eliminates O(n) candle scans per line (n=200k)
+    // Build O(1) lookup map once â€” eliminates O(n) candle scans per line (n=200k)
     const candleTimeMap = new Map<number, ChartCandle>();
     const candleTimeArray: number[] = [];
     for (let i = 0; i < candlesToUse.length; i++) {
@@ -1331,7 +1329,7 @@ export default function RongsokanPage() {
           : null;
         
         if (lineType === 'BOS_CHOCH') {
-          // BoS/CHoCH: line from level formation → break event
+          // BoS/CHoCH: line from level formation â†’ break event
           // startTime = when the level was first formed (from HH/LL data)
           // endTime = the break event time
           const timeframePeriod = timeframePeriods[activeTimeframe] ?? 900;
@@ -1361,7 +1359,7 @@ export default function RongsokanPage() {
           endTimeSeconds = lastCandleTime ?? eventTimeSeconds;
         }
         
-        // Find the breaking candle for HH/LL lines — cap at 20 candles after formation
+        // Find the breaking candle for HH/LL lines â€” cap at 20 candles after formation
         if (lineType === 'HH' || lineType === 'LL') {
           const hhStart = lowerBound(startTimeSeconds + 1);
           const endIdx = Math.min(hhStart + 20, candleTimeArray.length);
@@ -1381,12 +1379,12 @@ export default function RongsokanPage() {
         
         // Always start line from the actual candle OPEN time (not close time)
         // CSV timestamp is candle CLOSE time, so we need to subtract 1 period
-        // Find which candle formed this HH/LL — O(1) Map lookup
+        // Find which candle formed this HH/LL â€” O(1) Map lookup
         let actualStartTime = startTimeSeconds;
         const matchingCandle = candleTimeMap.get(startTimeSeconds);
         
         if (!matchingCandle) {
-          // No exact match — binary search for nearest candle before event
+          // No exact match â€” binary search for nearest candle before event
           const idx = lowerBound(startTimeSeconds);
           if (idx > 0) {
             actualStartTime = candleTimeArray[idx - 1];
@@ -1422,8 +1420,8 @@ export default function RongsokanPage() {
     // IMPORTANT: We look up the BoS/CHoCH's OWN price (the level that the line is
     // drawn at), NOT PreviousPrice. The BoS line is drawn at `bos.price`, so its
     // formation time must be when that exact level first appeared in HH/LL data.
-    // - BoS/CHoCH Bullish at price X → the level is an HH (higher high) → search HH points
-    // - BoS/CHoCH Bearish at price X → the level is an LL (lower low)  → search LL points
+    // - BoS/CHoCH Bullish at price X â†’ the level is an HH (higher high) â†’ search HH points
+    // - BoS/CHoCH Bearish at price X â†’ the level is an LL (lower low)  â†’ search LL points
     // We keep the OLDEST (earliest) occurrence (first time that level was formed).
     const PRICE_TOLERANCE_VAL = 0.05;
     const getPriceBucket = (p: number) => Math.round(p / PRICE_TOLERANCE_VAL);
@@ -1641,7 +1639,7 @@ export default function RongsokanPage() {
     // Set lines to primitive at the end
     structurePrimitiveRef.current?.setLines(linesToPrimitive);
 
-    console.log('\n✅ ===== OVERLAY COMPLETE =====');
+    console.log('\nâœ… ===== OVERLAY COMPLETE =====');
     console.log('Total structure lines parsed:', totalLines);
     
     overlayGuardRef.current = false;
@@ -1650,7 +1648,7 @@ export default function RongsokanPage() {
   // Sync overlays when data/state changes
   useEffect(() => {
     if (showStructure && structureLines) {
-      console.log('🔄 useEffect: Triggering structure overlay');
+      console.log('ðŸ”„ useEffect: Triggering structure overlay');
       overlayMarketStructure(chartCandles);
     } else {
       // Clean up overlay lines
@@ -1787,11 +1785,12 @@ export default function RongsokanPage() {
         className="relative z-10"
         style={{
           width: "100%",
-          paddingLeft: "240px",
-          minHeight: "calc(149vh - 0px)"
+          paddingLeft: "var(--sidebar-offset, 250px)",
+          transition: "padding-left 0.3s cubic-bezier(0.22, 1, 0.36, 1)",
+          minHeight: "100vh"
         }}
       >
-        <div className="w-full px-12 py-8">
+        <div className="w-full px-4 sm:px-6 md:px-8 xl:px-12 max-w-[1920px] mx-auto py-6 md:py-8">
           {/* Page Header */}
           <div className="flex items-center gap-4 mb-8">
             <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-2xl hover:scale-105 transition-transform duration-200 ease-out shadow-[0_0_15px_rgba(16,185,129,0.15)] select-none">
@@ -1807,50 +1806,78 @@ export default function RongsokanPage() {
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-4 gap-6 mb-8">
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Total Trades
+          {/* Stats Grid - Theme 09 Sapphire Platinum Sovereign Cards */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            {/* Card 1: Total Trades */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Trades</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  ALL TIME
+                </span>
               </div>
-              <div className="text-2xl font-semibold mono mb-1">
-                {stats.total_trades}
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
+                {stats.total_trades.toLocaleString()}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Last 30 days</div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>Total transaksi historis terekam</span>
+              </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Win Rate
+            {/* Card 2: Win Rate */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Win Rate</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  {stats.win_rate >= 50 ? "PROFITABLE" : "DRAWDOWN"}
+                </span>
               </div>
-              <div className={`text-2xl font-semibold mono mb-1 ${stats.win_rate >= 50 ? 'positive' : 'negative'}`}>
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
                 {stats.win_rate.toFixed(1)}%
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Winning percentage</div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span className={stats.win_rate >= 50 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                  {stats.win_rate >= 50 ? "Target tercapai" : "Di bawah target"}
+                </span>
+                <span>• Winning percentage</span>
+              </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Total P&L
+            {/* Card 3: Total P&L */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Net P&L</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  REALTIME
+                </span>
               </div>
-              <div className={`text-2xl font-semibold mono mb-1 ${stats.total_pnl >= 0 ? 'positive' : 'negative'}`}>
-                {stats.total_pnl >= 0 ? '+' : ''}${stats.total_pnl.toFixed(2)}
+              <div className={cn("font-sans text-2xl sm:text-[28px] font-black tracking-tight", stats.total_pnl >= 0 ? "text-slate-900" : "text-rose-600")}>
+                {stats.total_pnl >= 0 ? `+$${stats.total_pnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(stats.total_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">Profit & Loss</div>
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span className={stats.total_pnl >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
+                  Net PnL
+                </span>
+                <span>Akumulasi profit/loss bersih</span>
+              </div>
             </div>
 
-            <div className="glass-card !p-5 !mb-0 hover:scale-105 hover:-translate-y-1">
-              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Open Positions
+            {/* Card 4: Open Positions */}
+            <div className="relative flex flex-col justify-between gap-2 p-4 sm:p-5 rounded-[22px] border border-blue-200/80 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/60 shadow-[0_10px_25px_-10px_rgba(37,99,235,0.08)] hover:shadow-[0_20px_45px_-15px_rgba(37,99,235,0.18)] hover:-translate-y-0.5 transition-all duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Open Positions</span>
+                <span className="font-mono text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-lg bg-white border border-blue-200/80 text-slate-700 shadow-sm uppercase tracking-wider">
+                  ACTIVE
+                </span>
               </div>
-              <div className="text-2xl font-semibold neutral mono mb-1">
+              <div className="font-sans text-2xl sm:text-[28px] font-black tracking-tight text-slate-900">
                 {stats.open_positions}
               </div>
-              <div className="text-sm text-[var(--text-tertiary)]">
-                {stats.open_positions === 0 ? 'No active trades' : `${stats.open_positions} active trade${stats.open_positions > 1 ? 's' : ''}`}
+              <div className="text-xs text-slate-500 font-medium flex items-center gap-1.5 truncate">
+                <span>{stats.open_positions === 0 ? "No active trades" : `${stats.open_positions} active trade${stats.open_positions > 1 ? "s" : ""}`}</span>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Chart Section */}
           <div className="glass-card mb-8">
@@ -1892,7 +1919,7 @@ export default function RongsokanPage() {
             <div
               ref={chartContainerRef}
               id="chart-container"
-              className="w-full rounded-xl overflow-hidden relative bg-slate-950/20"
+              className="w-full rounded-xl overflow-hidden relative bg-[#F0F6FF]/40"
               style={{ width: "100%", height: "700px" }}
             >
               <div
