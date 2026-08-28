@@ -13,7 +13,7 @@
     <style>
         :root {
             --bg-color: #0b0f19;
-            --card-bg: rgba(17, 25, 40, 0.85);
+            --card-bg: #111928;
             --border-color: rgba(255, 255, 255, 0.12);
             --glow-color: rgba(0, 229, 255, 0.2);
 
@@ -61,6 +61,13 @@
             pointer-events: none;
             text-align: left;
             padding: 0;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .header-title-group {
+            pointer-events: none;
         }
 
         header h1 {
@@ -122,6 +129,8 @@
             gap: 3.5rem;
             padding: 80px 0 0 10%;
             transform-origin: 0 0;
+            pointer-events: none; /* Let pointer events reach SVG lines, delete buttons, and viewport */
+            z-index: 10;
         }
 
         .flow-line-svg {
@@ -141,10 +150,10 @@
         .flow-path-hover-bridge {
             fill: none;
             stroke: transparent;
-            stroke-width: 22;
+            stroke-width: 26;
             cursor: pointer;
-            pointer-events: stroke;
-            /* Capture mouse pointers */
+            pointer-events: stroke !important;
+            /* Capture mouse pointers for line selection/deletion */
         }
 
         .flow-path {
@@ -182,28 +191,28 @@
         }
 
         .edge-delete-btn {
-            opacity: 0.6;
+            opacity: 0;
             cursor: pointer;
-            pointer-events: auto;
-            /* Always visible so user knows it's clickable */
-            transition: opacity 0.2s;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
         .edge-group:hover .edge-delete-btn,
         .edge-delete-btn:hover {
             opacity: 1;
+            pointer-events: all !important;
         }
 
         .edge-delete-btn circle.hit-area {
             fill: transparent;
-            pointer-events: all;
+            pointer-events: all !important;
         }
 
         .edge-delete-btn circle.icon-bg {
             fill: #ff1744;
             stroke: #121214;
             stroke-width: 1.5;
-            pointer-events: all;
+            pointer-events: all !important;
             transition: fill 0.2s, r 0.2s;
         }
 
@@ -236,27 +245,16 @@
             border-radius: 16px;
             padding: 1.5rem;
             width: 500px;
-            max-width: 90%;
+            box-sizing: border-box;
+            flex-shrink: 0;
             position: relative;
             z-index: 10;
             cursor: pointer;
             transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5), 0 0 16px var(--glow-color, transparent);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6), 0 0 16px var(--glow-color, transparent);
             pointer-events: auto;
-        }
-
-        .node-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 16px;
-            padding: 1.5px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.01));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
+            isolation: isolate;
+            will-change: transform;
         }
 
         .node-card:hover {
@@ -651,28 +649,17 @@
             border-radius: 16px;
             padding: 1.25rem;
             width: 250px;
-            max-width: 90%;
+            box-sizing: border-box;
+            flex-shrink: 0;
             position: relative;
             z-index: 10;
             cursor: pointer;
             transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 16px var(--glow-color, transparent);
+            box-shadow: 0 4px 25px rgba(0, 0, 0, 0.5), 0 0 16px var(--glow-color, transparent);
             pointer-events: auto;
+            isolation: isolate;
+            will-change: transform;
             /* Re-enable pointer events for the cards */
-        }
-
-        .agent-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: 16px;
-            padding: 1.5px;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.01));
-            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-            -webkit-mask-composite: xor;
-            mask-composite: exclude;
-            pointer-events: none;
         }
 
         .agent-card:hover {
@@ -690,6 +677,55 @@
         .agent-card.multiselected, .node-card.multiselected {
             border-color: #ffeb3b !important;
             box-shadow: 0 0 25px rgba(255, 235, 59, 0.4) !important;
+        }
+
+        /* Data Transfer / Payload Pipe Distinct Cards */
+        .transfer-card {
+            background: #0d1527 !important;
+            background-image: 
+                linear-gradient(135deg, rgba(255, 170, 0, 0.05) 25%, transparent 25%), 
+                linear-gradient(225deg, rgba(255, 170, 0, 0.05) 25%, transparent 25%), 
+                linear-gradient(45deg, rgba(255, 170, 0, 0.05) 25%, transparent 25%), 
+                linear-gradient(315deg, rgba(255, 170, 0, 0.05) 25%, #0d1527 25%) !important;
+            background-position: 10px 0, 10px 0, 0 0, 0 0 !important;
+            background-size: 20px 20px !important;
+            border: 1.5px dashed rgba(255, 170, 0, 0.6) !important;
+            border-top: 3px solid #ffaa00 !important;
+            border-radius: 8px 24px 8px 24px !important; /* Distinct Asymmetric Tech Chamfer Capsule */
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 16px rgba(255, 170, 0, 0.15) !important;
+            position: relative;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+        }
+
+        .transfer-card::before {
+            content: '⚡ DATA PIPE';
+            position: absolute;
+            top: -9px;
+            right: 18px;
+            background: #ffaa00;
+            color: #0b0f19;
+            font-family: 'Space Grotesk', monospace;
+            font-size: 0.58rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            padding: 1px 7px;
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(255, 170, 0, 0.6);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .transfer-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: #ffd700 !important;
+            box-shadow: 0 10px 35px rgba(0, 0, 0, 0.7), 0 0 25px rgba(255, 170, 0, 0.35) !important;
+        }
+
+        .transfer-card.selected {
+            border-color: #ffaa00 !important;
+            border-style: solid !important;
+            box-shadow: 0 0 35px rgba(255, 170, 0, 0.5), 0 0 20px #ffaa00 !important;
+            background-color: rgba(20, 30, 50, 0.98) !important;
         }
 
         /* Detail Side Panel (On-Demand Drawer) */
@@ -710,6 +746,8 @@
             gap: 1.5rem;
             z-index: 200;
             overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
             transform: translateX(calc(100% + 4rem));
             opacity: 0;
             pointer-events: none;
@@ -865,40 +903,129 @@
             display: block;
         }
 
-        #reset-btn, #toggle-arrows-btn {
+        /* Header Dropdown Menu (Canvas Options) */
+        .header-dropdown-container {
+            position: relative;
             pointer-events: auto;
-            /* Allow clicks since parent has pointer-events: none */
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: var(--text-secondary);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
+        }
+
+        .header-dropdown-btn {
+            background: rgba(17, 25, 40, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--text-primary);
+            padding: 0.45rem 0.85rem;
+            border-radius: 10px;
             font-family: inherit;
             font-size: 0.8rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
             display: flex;
             align-items: center;
-            gap: 0.4rem;
-            width: fit-content;
-            margin-top: 0.75rem;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            gap: 0.5rem;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 10px rgba(0, 229, 255, 0.1);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        #reset-btn:hover, #toggle-arrows-btn:hover {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-            color: var(--text-primary);
+        .header-dropdown-btn:hover {
+            background: rgba(0, 229, 255, 0.15);
+            border-color: rgba(0, 229, 255, 0.4);
+            color: #00e5ff;
+            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3);
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
         }
 
-        #reset-btn:active, #toggle-arrows-btn:active {
-            transform: translateY(1px);
+        .header-dropdown-btn .dropdown-chevron {
+            font-size: 0.65rem;
+            transition: transform 0.25s ease;
+            opacity: 0.7;
         }
 
-        /* Floating Zoom Controls */
+        .header-dropdown-container.open .header-dropdown-btn .dropdown-chevron {
+            transform: rotate(180deg);
+        }
+
+        .header-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            min-width: 230px;
+            background: rgba(13, 20, 36, 0.96);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            padding: 0.4rem;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 229, 255, 0.15);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-6px) scale(0.97);
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 300;
+        }
+
+        .header-dropdown-container.open .header-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+
+        .dropdown-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.55rem 0.75rem;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(2px);
+        }
+
+        .dropdown-item.danger:hover {
+            background: rgba(255, 23, 68, 0.18);
+            color: #ff5252;
+        }
+
+        .dropdown-item .item-icon {
+            font-size: 1rem;
+            width: 24px;
+            text-align: center;
+        }
+
+        .dropdown-item .item-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .dropdown-item .item-title {
+            font-size: 0.78rem;
+            font-weight: 600;
+        }
+
+        .dropdown-item .item-desc {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.08);
+            margin: 0.3rem 0.2rem;
+        }
+
+        /* Floating Zoom & Interaction Controls */
         .zoom-controls {
             position: fixed;
             bottom: 2rem;
@@ -907,14 +1034,74 @@
             display: flex;
             align-items: center;
             gap: 0.35rem;
-            background: rgba(17, 25, 40, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(17, 25, 40, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             padding: 0.35rem 0.55rem;
-            border-radius: 12px;
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.15);
+            border-radius: 14px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(0, 229, 255, 0.15);
             user-select: none;
+        }
+
+        /* 2-Mode Interaction Toggle */
+        .mode-toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 3px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .mode-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.35rem 0.65rem;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: inherit;
+            white-space: nowrap;
+        }
+
+        .mode-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .mode-btn.active {
+            background: #00e5ff !important;
+            color: #000 !important;
+            font-weight: 700;
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.5);
+        }
+
+        /* Marquee Drag Selection Box */
+        #selection-box {
+            position: absolute;
+            border: 2px dashed #00e5ff;
+            background: rgba(0, 229, 255, 0.12);
+            pointer-events: none;
+            z-index: 9999;
+            display: none;
+            border-radius: 4px;
+            box-shadow: 0 0 16px rgba(0, 229, 255, 0.35);
+        }
+
+        .node-card.multiselected,
+        .agent-card.multiselected {
+            border-color: #ffd700 !important;
+            box-shadow: 0 0 22px rgba(255, 215, 0, 0.5), inset 0 0 12px rgba(255, 215, 0, 0.2) !important;
+            outline: 2px dashed #ffd700 !important;
+            outline-offset: 3px;
         }
 
         .zoom-btn {
@@ -1017,6 +1204,101 @@
             animation: pulsePort 1s infinite alternate;
         }
 
+        /* Card Edge & Corner Resize Handles */
+        .card-resize-handle {
+            position: absolute;
+            z-index: 90;
+            pointer-events: auto;
+            background: transparent;
+            transition: background-color 0.15s ease, opacity 0.15s ease;
+        }
+
+        .card-resize-handle.handle-r {
+            top: 16px;
+            bottom: 16px;
+            right: 0;
+            width: 12px;
+            cursor: ew-resize;
+            border-right: 2px solid transparent;
+        }
+        .card-resize-handle.handle-r:hover {
+            background: rgba(0, 229, 255, 0.2);
+            border-right-color: #00e5ff;
+        }
+
+        .card-resize-handle.handle-l {
+            top: 16px;
+            bottom: 16px;
+            left: 0;
+            width: 12px;
+            cursor: ew-resize;
+            border-left: 2px solid transparent;
+        }
+        .card-resize-handle.handle-l:hover {
+            background: rgba(0, 229, 255, 0.2);
+            border-left-color: #00e5ff;
+        }
+
+        .card-resize-handle.handle-b {
+            left: 16px;
+            right: 16px;
+            bottom: 0;
+            height: 12px;
+            cursor: ns-resize;
+            border-bottom: 2px solid transparent;
+        }
+        .card-resize-handle.handle-b:hover {
+            background: rgba(0, 229, 255, 0.2);
+            border-bottom-color: #00e5ff;
+        }
+
+        .card-resize-handle.handle-t {
+            left: 16px;
+            right: 16px;
+            top: 0;
+            height: 12px;
+            cursor: ns-resize;
+            border-top: 2px solid transparent;
+        }
+        .card-resize-handle.handle-t:hover {
+            background: rgba(0, 229, 255, 0.2);
+            border-top-color: #00e5ff;
+        }
+
+        .card-resize-handle.handle-se {
+            right: 0;
+            bottom: 0;
+            width: 22px;
+            height: 22px;
+            cursor: nwse-resize;
+            z-index: 95;
+            display: flex;
+            align-items: flex-end;
+            justify-content: flex-end;
+            padding: 3px;
+            border-bottom-right-radius: 14px;
+        }
+
+        .card-resize-handle.handle-se::after {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid rgba(255, 255, 255, 0.4);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.4);
+            border-bottom-right-radius: 4px;
+            transition: border-color 0.2s;
+        }
+
+        .card-resize-handle.handle-se:hover {
+            background: rgba(0, 229, 255, 0.25);
+        }
+
+        .card-resize-handle.handle-se:hover::after,
+        .node-card:hover .card-resize-handle.handle-se::after,
+        .agent-card:hover .card-resize-handle.handle-se::after {
+            border-color: #00e5ff;
+        }
+
         @keyframes pulsePort {
             from {
                 transform: scale(1);
@@ -1047,20 +1329,21 @@
         .floating-popup {
             display: none;
             position: absolute;
-            z-index: 99999 !important;
+            z-index: 100000 !important;
             background: #0b0f19 !important;
             border: 1.5px solid #ff1744 !important;
             border-radius: 8px;
-            padding: 0.65rem 0.85rem;
-            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.95), 0 0 25px rgba(255, 23, 68, 0.4) !important;
+            padding: 0.75rem 1rem;
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.98), 0 0 30px rgba(255, 23, 68, 0.5) !important;
             color: var(--text-primary);
             font-family: inherit;
             font-size: 0.75rem;
             width: max-content;
-            max-width: 260px;
-            pointer-events: auto;
+            max-width: 280px;
+            pointer-events: auto !important;
             transform: translate(-50%, -100%);
             animation: popupFadeIn 0.15s ease-out;
+            backdrop-filter: blur(12px);
         }
 
         @keyframes popupFadeIn {
@@ -1124,19 +1407,53 @@
 <body>
 
     <header>
-        <h1>HYBRID ARSITEKTUR SYSTEM</h1>
-        <p>MT5 Ecosystem & AI-Powered Multi-Agent Decision Flow</p>
-        <button id="reset-btn" onclick="resetLayout()">
-            <span>🔄</span> Reset Layout
-        </button>
-        <button id="toggle-arrows-btn" onclick="deleteAllArrows()">
-            <span>🗑️</span> Hapus Semua Panah
-        </button>
+        <div class="header-title-group">
+            <h1>HYBRID ARSITEKTUR SYSTEM</h1>
+            <p>MT5 Ecosystem & AI-Powered Multi-Agent Decision Flow</p>
+        </div>
+
+        <!-- Dropdown Menu Opsi Kanvas -->
+        <div class="header-dropdown-container" id="header-dropdown-container">
+            <button class="header-dropdown-btn" id="header-menu-btn" onclick="toggleHeaderMenu(event)" title="Opsi & Pengaturan Kanvas">
+                <span>⚙️ Opsi Kanvas</span>
+                <span class="dropdown-chevron">▼</span>
+            </button>
+            <div class="header-dropdown-menu" id="header-dropdown-menu">
+                <button class="dropdown-item" onclick="resetLayout(); closeHeaderMenu();">
+                    <span class="item-icon">🔄</span>
+                    <div class="item-text">
+                        <div class="item-title">Reset Layout</div>
+                        <div class="item-desc">Kembalikan koordinat kartu & zoom ke awal</div>
+                    </div>
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item danger" onclick="deleteAllArrows(); closeHeaderMenu();">
+                    <span class="item-icon">🗑️</span>
+                    <div class="item-text">
+                        <div class="item-title">Hapus Semua Panah</div>
+                        <div class="item-desc">Bersihkan semua koneksi garis antar kartu</div>
+                    </div>
+                </button>
+            </div>
+        </div>
     </header>
 
     <div class="main-container">
-        <!-- Floating Zoom Controls -->
+        <!-- Floating Zoom & Mode Controls -->
         <div class="zoom-controls" id="zoom-controls">
+            <!-- 2-Mode Switcher -->
+            <div class="mode-toggle-group">
+                <button class="mode-btn active" id="btn-mode-card" onclick="setInteractionMode('card')" title="Mode Kartu: Geser kartu & tarik kotak seleksi banyak kartu">
+                    👆 Mode Kartu
+                </button>
+                <button class="mode-btn" id="btn-mode-pan" onclick="setInteractionMode('pan')" title="Mode Kanvas: Geser seluruh kanvas bebas">
+                    ✋ Mode Kanvas
+                </button>
+            </div>
+
+            <div style="width: 1px; height: 20px; background: rgba(255,255,255,0.15); margin: 0 4px;"></div>
+
+            <!-- Zoom Controls -->
             <button class="zoom-btn" id="zoom-in-btn" onclick="zoomIn()" title="Zoom In (Scroll Up)">➕</button>
             <div class="zoom-badge" id="zoom-level-badge" onclick="zoomReset()" title="Skala Zoom Aktif (Klik untuk Reset 100%)">100%</div>
             <button class="zoom-btn" id="zoom-out-btn" onclick="zoomOut()" title="Zoom Out (Scroll Down)">➖</button>
@@ -1145,91 +1462,149 @@
         </div>
 
         <div class="diagram-area" id="diagram-viewport">
+            <!-- Marquee Selection Rectangle Box -->
+            <div id="selection-box"></div>
+
             <!-- Dynamic Connecting Lines -->
             <svg class="flow-line-svg" id="svg-canvas"></svg>
 
+            <!-- Floating Delete Confirmation Popup (Outside pan-container to ALWAYS render in front of all lines and cards) -->
+            <div id="delete-popup" class="floating-popup">
+                <p id="delete-popup-text"></p>
+                <div class="popup-actions">
+                    <button id="popup-delete-btn" class="popup-btn delete">Hapus</button>
+                    <button id="popup-cancel-btn" class="popup-btn cancel">Batal</button>
+                </div>
+            </div>
+
             <div id="pan-container">
-                <!-- Floating Delete Confirmation Popup -->
-                <div id="delete-popup" class="floating-popup">
-                    <p id="delete-popup-text"></p>
-                    <div class="popup-actions">
-                        <button id="popup-delete-btn" class="popup-btn delete">Hapus</button>
-                        <button id="popup-cancel-btn" class="popup-btn cancel">Batal</button>
-                    </div>
-                </div>
-
-                <!-- Node 1: MT5 Terminal & EA -->
-                <div class="node-card" id="node-mt5" onclick="selectNode('mt5')">
-                    <div class="card-header">
-                        <div class="card-icon">📈</div>
-                        <div>
-                            <div class="card-title">MetaTrader 5 & MQL5 EA</div>
-                            <p style="font-size: 0.75rem; color: var(--text-secondary)">Terminal & Dev_Bot_v11.cs</p>
+                <!-- Top Ingestion & Triggering Layer: Automated MT5 Ingestion & Direct Trigger Bypass -->
+                <div style="display: flex; gap: 4rem; align-items: flex-start; margin-bottom: 0.5rem;">
+                    <!-- Column 1: Live MT5 Ingestion Chain -->
+                    <div style="display: flex; flex-direction: column; gap: 2.5rem; width: 500px;">
+                        <!-- Node 1: MT5 Terminal & EA -->
+                        <div class="node-card" id="node-mt5" onclick="selectNode('mt5')" style="width: 100%;">
+                            <div class="card-header">
+                                <div class="card-icon">📈</div>
+                                <div>
+                                    <div class="card-title">MetaTrader 5 & MQL5 EA</div>
+                                    <p style="font-size: 0.75rem; color: var(--text-secondary)">Terminal & Dev_Bot_v11.cs</p>
+                                </div>
+                                <span class="card-badge">Source</span>
+                            </div>
+                            <div class="card-content">
+                                Deteksi pergerakan swing harga tick XAUUSD (M15/H1/H4). EA secara otomatis mengekspor data
+                                transaksi serta struktur market ke file lokal CSV setiap kali candle ditutup.
+                                <ul class="card-list">
+                                    <li>HH / LL Detection</li>
+                                    <li>CHoCH / BoS Markers</li>
+                                    <li>CSV Export Loop</li>
+                                    <li>Chart Visual Indicators</li>
+                                </ul>
+                            </div>
                         </div>
-                        <span class="card-badge">Source</span>
-                    </div>
-                    <div class="card-content">
-                        Deteksi pergerakan swing harga tick XAUUSD (M15/H1/H4). EA secara otomatis mengekspor data
-                        transaksi serta struktur market ke file lokal CSV setiap kali candle ditutup.
-                        <ul class="card-list">
-                            <li>HH / LL Detection</li>
-                            <li>CHoCH / BoS Markers</li>
-                            <li>CSV Export Loop</li>
-                            <li>Chart Visual Indicators</li>
-                        </ul>
-                    </div>
-                </div>
 
-                <!-- Node 2: Watcher (Line Trigger) -->
-                <div class="node-card" id="node-watcher-trigger" onclick="selectNode('watcher')">
-                    <div class="card-header">
-                        <div class="card-icon" style="font-size: 1.1rem; width: 30px; height: 30px;">📁</div>
-                        <div class="card-title" style="font-size: 0.95rem;">CSV Watcher Service (ON)</div>
-                    </div>
-                </div>
-
-                <!-- Node 3: NeonDB Mapping -->
-                <div class="node-card" id="node-neondb-mapping" onclick="selectNode('neon')">
-                    <div class="card-header">
-                        <div class="card-icon">⚡</div>
-                        <div>
-                            <div class="card-title">Pemetaan File CSV ke NeonDB</div>
-                            <p style="font-size: 0.75rem; color: var(--text-secondary)">Ingestion & Relational Storage
-                            </p>
+                        <!-- Node 2: Watcher (Line Trigger) -->
+                        <div class="node-card" id="node-watcher-trigger" onclick="selectNode('watcher')" style="width: 100%;">
+                            <div class="card-header">
+                                <div class="card-icon" style="font-size: 1.1rem; width: 30px; height: 30px;">📁</div>
+                                <div class="card-title" style="font-size: 0.95rem;">CSV Watcher Service (ON)</div>
+                            </div>
                         </div>
-                        <span class="card-badge" style="letter-spacing: 0;">Neon PostgreSQL</span>
-                    </div>
-                    <div class="card-content">
-                        Membaca baris baru file CSV secara inkremental dan melakukan <em>bulk insert</em> ke database
-                        cloud Neon PostgreSQL.
-                        <ul class="card-list">
-                            <li>llhhbosdata_xauusd</li>
-                            <li>backtest_results_xauusd</li>
-                            <li>marketdata_xauusd_m15</li>
-                        </ul>
-                    </div>
-                </div>
 
-                <!-- Node 4: LanceDB Vector Database -->
-                <div class="node-card" id="node-lancedb" onclick="selectNode('lancedb')">
-                    <div class="card-header">
-                        <div class="card-icon">🔮</div>
-                        <div>
-                            <div class="card-title">KNOWLEDGE BASE (LanceDB)</div>
-                            <p style="font-size: 0.75rem; color: var(--text-secondary)">Vector & Similarity Search
-                                Storage</p>
+                        <!-- Node 3: NeonDB Mapping -->
+                        <div class="node-card" id="node-neondb-mapping" onclick="selectNode('neon')" style="width: 100%;">
+                            <div class="card-header">
+                                <div class="card-icon">⚡</div>
+                                <div>
+                                    <div class="card-title">Pemetaan File CSV ke NeonDB</div>
+                                    <p style="font-size: 0.75rem; color: var(--text-secondary)">Ingestion & Relational Storage</p>
+                                </div>
+                                <span class="card-badge" style="letter-spacing: 0;">Neon PostgreSQL</span>
+                            </div>
+                            <div class="card-content">
+                                Membaca baris baru file CSV secara inkremental dan melakukan <em>bulk insert</em> ke database
+                                cloud Neon PostgreSQL.
+                                <ul class="card-list">
+                                    <li>llhhbosdata_xauusd</li>
+                                    <li>backtest_results_xauusd</li>
+                                    <li>marketdata_xauusd_m15</li>
+                                </ul>
+                            </div>
                         </div>
-                        <span class="card-badge">LanceDB</span>
+
+                        <!-- Node 4: LanceDB Vector Database -->
+                        <div class="node-card" id="node-lancedb" onclick="selectNode('lancedb')" style="width: 100%;">
+                            <div class="card-header">
+                                <div class="card-icon">🔮</div>
+                                <div>
+                                    <div class="card-title">KNOWLEDGE BASE (LanceDB)</div>
+                                    <p style="font-size: 0.75rem; color: var(--text-secondary)">Vector & Similarity Search Storage</p>
+                                </div>
+                                <span class="card-badge">LanceDB</span>
+                            </div>
+                            <div class="card-content">
+                                Menyimpan representasi vektor pola historis. Sinkronisasi data di-trigger oleh Watcher setelah
+                                data masuk ke NeonDB (Opsi B).
+                                <ul class="card-list">
+                                    <li>historical_structures</li>
+                                    <li>market_conditions</li>
+                                    <li>session_patterns</li>
+                                    <li>trade_outcomes</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-content">
-                        Menyimpan representasi vektor pola historis. Sinkronisasi data di-trigger oleh Watcher setelah
-                        data masuk ke NeonDB (Opsi B).
-                        <ul class="card-list">
-                            <li>historical_structures</li>
-                            <li>market_conditions</li>
-                            <li>session_patterns</li>
-                            <li>trade_outcomes</li>
-                        </ul>
+
+                    <!-- Column 2: 3 Data Transfer Cards (Watcher -> Orchestrator: CHoCH, HH/LL, BoS) -->
+                    <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 400px; margin-top: 40px;">
+                        <!-- Card 1: CHoCH Event Trigger -->
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-choch" onclick="selectNode('watcher-to-orch-choch')" style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
+                                <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">🔄</div>
+                                <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">1. Data Transfer: CHoCH (Pembalikan)</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Sinyal Patah Struktur Awal (Change of Character):
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                    • event: "CHOCH_DETECTED" | dir: "Bullish/Bearish"<br>
+                                    • broken_level: 2640.00 USD | symbol: "XAUUSD"<br>
+                                    • action: "INITIATE_NEW_CYCLE"
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: HH / LL Swing Setup -->
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-hh" onclick="selectNode('watcher-to-orch-hh')" style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
+                                <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">📐</div>
+                                <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">2. Data Transfer: HH / LL (Setup)</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Update Titik Puncak/Lembah (Higher High / Lower Low):
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                    • event: "SWING_POINT_UPDATE" | type: "HH" / "LL"<br>
+                                    • status: "PENDING_SETUP_WARMUP"<br>
+                                    • action: "WARMUP_ML_AND_SENTIMENT"
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 3: BoS Execution Trigger -->
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-bos" onclick="selectNode('watcher-to-orch-bos')" style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
+                                <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">⚡</div>
+                                <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">3. Data Transfer: BoS (Pemicu Entry)</div>
+                            </div>
+                            <div class="card-content" style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Penembusan Struktur Terkonfirmasi (Break of Structure):
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                    • event: "BOS_CONFIRMED" | trigger_price: 2645.50<br>
+                                    • signal: "CONFIRMED_ENTRY_TRIGGER"<br>
+                                    • action: "PIPELINE_CONSENSUS_EVALUATION"
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1253,6 +1628,26 @@
                 <div class="agents-row">
                     <!-- Market Structure Agent Column -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
+                        <!-- Data Transfer: ORCH -> MSA Info Box -->
+                        <div class="agent-card transfer-card" id="node-orch-to-msa-info" onclick="selectNode('orch-to-msa-info')"
+                            style="width: 100%; padding: 1rem;">
+                            <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
+                                <div class="card-icon"
+                                    style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
+                                    📤</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: #ffaa00;">Data Transfer: ORCH &rarr; MSA</div>
+                            </div>
+                            <div class="card-content"
+                                style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
+                                Delegasi 3 Event Struktur Pasar:
+                                <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.25); line-height: 1.4;">
+                                    • 1. CHoCH ➔ Inisiasi Pembalikan<br>
+                                    • 2. HH / LL ➔ PENDING_SETUP Warmup<br>
+                                    • 3. BoS ➔ Pemicu Eksekusi BUY/SELL
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Market Structure Agent Main Card -->
                         <div class="agent-card" id="node-ms-agent" onclick="selectNode('ms-agent')"
                             style="width: 100%;">
@@ -1300,7 +1695,7 @@
                     </div>
 
                     <!-- Data Transfer: MSA -> ML Agent Info Box -->
-                    <div class="agent-card" id="node-msa-to-ml-info" onclick="selectNode('msa-to-ml-info')"
+                    <div class="agent-card transfer-card" id="node-msa-to-ml-info" onclick="selectNode('msa-to-ml-info')"
                         style="padding: 1rem; width: 240px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
@@ -1317,7 +1712,6 @@
                         </div>
                     </div>
 
-                    <!-- ML Prediction Agent Column -->
                     <!-- ML Prediction Agent Column -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                         <!-- ML Prediction Agent Main Card -->
@@ -1390,7 +1784,7 @@
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
                                 Prediksi MFE & MAE dikalikan kembali dengan nilai ATR14 pasar saat ini untuk mendapatkan
-                                poin harga nyata.
+                                point harga nyata.
                             </div>
                         </div>
 
@@ -1411,7 +1805,7 @@
                     </div>
 
                     <!-- Data Transfer: MSA -> Sentiment Agent Info Box -->
-                    <div class="agent-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')"
+                    <div class="agent-card transfer-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')"
                         style="padding: 1rem; width: 220px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
@@ -1755,6 +2149,158 @@
                 </div>
 
                 <!-- Content panels populated dynamically -->
+                <div class="panel-content" id="panel-orch-to-msa-info">
+                    <h2 class="panel-section-title">Data Transfer: Orchestrator ➔ Market Structure Agent</h2>
+                    <p class="panel-text">Kontrak delegasi tugas dari Orchestrator ke Market Structure Agent (MSA) untuk menganalisis 3 jenis event struktur pasar (CHoCH, HH/LL, BoS) dengan konteks multi-timeframe dan pencocokan kemiripan vektor LanceDB.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">1. Delegasi Event 1: CHoCH (Change of Character - Inisiasi Pembalikan)</span>
+                            <span class="meta-value">
+                                • <strong>Konteks:</strong> Terjadi saat harga menembus batas swing sebelumnya (patah struktur awal).<br>
+                                • <strong>Instruksi ORCH ke MSA:</strong> Reset siklus lama, buka analisis arah baru, dan validasi karakter pembalikan tren.
+                            </span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
+                                [Payload ORCH ➔ MSA - Kasus CHoCH]:<br>
+                                {<br>
+                                &nbsp;&nbsp;"action": "ANALYZE_CHOCH_REVERSAL",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"timeframe": "M15",<br>
+                                &nbsp;&nbsp;"event_type": "CHOCH_BULLISH",<br>
+                                &nbsp;&nbsp;"broken_resistance": 2640.00,<br>
+                                &nbsp;&nbsp;"candle_close": 2645.50,<br>
+                                &nbsp;&nbsp;"multi_tf_ema": { "m15_ema200": 2638.20, "h1_ema200": 2630.50, "h4_ema200": 2615.00 },<br>
+                                &nbsp;&nbsp;"last_swing_events": ["LL_4309.97", "Accepted"]<br>
+                                }
+                            </div>
+                        </li>
+
+                        <li>
+                            <span class="meta-label">2. Delegasi Event 2: HH / LL (Swing Points - Setup &amp; Pemanasan)</span>
+                            <span class="meta-value">
+                                • <strong>Konteks:</strong> Terjadi saat titik puncak baru (Higher High) atau lembah baru (Lower Low) terkunci.<br>
+                                • <strong>Instruksi ORCH ke MSA:</strong> Kalkulasi keselarasan Multi-TF EMA (M15 +0.2, H1 +0.1, H4 +0.1), cari kemiripan pola di LanceDB, dan terbitkan status <code>PENDING_SETUP</code> untuk warmup multi-agen.
+                            </span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
+                                [Payload ORCH ➔ MSA - Kasus HH / LL]:<br>
+                                {<br>
+                                &nbsp;&nbsp;"action": "EVALUATE_SWING_UPDATE",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"swing_type": "HH",<br>
+                                &nbsp;&nbsp;"swing_price": 2648.80,<br>
+                                &nbsp;&nbsp;"price_ratio": 0.7511,<br>
+                                &nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;"lancedb_vector_search": true,<br>
+                                &nbsp;&nbsp;"expected_phase": "PENDING_SETUP_WARMUP"<br>
+                                }
+                            </div>
+                        </li>
+
+                        <li>
+                            <span class="meta-label">3. Delegasi Event 3: BoS (Break of Structure - Pemicu Eksekusi)</span>
+                            <span class="meta-value">
+                                • <strong>Konteks:</strong> Terjadi saat candle berikutnya menembus level HH atau LL setelah pullback selesai.<br>
+                                • <strong>Instruksi ORCH ke MSA:</strong> Ubah sinyal dari <code>HOLD</code> menjadi <code>BUY</code> atau <code>SELL</code> terkonfirmasi, tentukan confidence final MSA (misal: 0.85), dan serahkan ke Consensus Engine.
+                            </span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.65rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.7rem; line-height: 1.45; font-family: monospace; color: #fff;">
+                                [Payload ORCH ➔ MSA - Kasus BoS Trigger]:<br>
+                                {<br>
+                                &nbsp;&nbsp;"action": "CONFIRMED_BOS_ENTRY_TRIGGER",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"bos_direction": "Bullish",<br>
+                                &nbsp;&nbsp;"breakout_price": 2652.30,<br>
+                                &nbsp;&nbsp;"trigger_candle_close": 2652.30,<br>
+                                &nbsp;&nbsp;"atr14": 24.5,<br>
+                                &nbsp;&nbsp;"pipeline_action": "EXECUTE_CONSENSUS_VOTING"<br>
+                                }
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-watcher-to-orch-choch">
+                    <h2 class="panel-section-title">Data Transfer 1: Watcher ➔ ORCH (Event CHoCH)</h2>
+                    <p class="panel-text">Pemicu awal saat Watcher mendeteksi patahnya struktur tren lama (Change of Character) di file <code>LLHHBOSData_XAUUSD.csv</code>.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">1. Skenario Terjadinya Event</span>
+                            <span class="meta-value">Ketika harga emas menembus swing level yang berlawanan arah dengan tren sebelumnya, mengindikasikan potensi awal pembalikan arah pasar.</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">2. Payload Data yang Ditransfer</span>
+                            <div class="meta-value" style="margin-top: 0.5rem; padding: 0.75rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; word-break: normal; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"trigger": "CSV_WATCHER_SERVICE",<br>
+                                &nbsp;&nbsp;"event_type": "CHOCH_DETECTED",<br>
+                                &nbsp;&nbsp;"direction": "Bullish",<br>
+                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;"broken_resistance": 2640.00,<br>
+                                &nbsp;&nbsp;"action": "INITIATE_NEW_MARKET_CYCLE"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Respon Orchestrator</span>
+                            <span class="meta-value">Orchestrator membuka siklus evaluasi baru dan menginstruksikan Market Structure Agent untuk mulai memantau pembentukan Higher High (HH).</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-watcher-to-orch-hh">
+                    <h2 class="panel-section-title">Data Transfer 2: Watcher ➔ ORCH (Event HH / LL)</h2>
+                    <p class="panel-text">Pemicu saat titik ekstrem baru (Higher High / Lower Low) terbentuk dan terkunci sebagai batas setup.</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">1. Skenario Terjadinya Event</span>
+                            <span class="meta-value">Setelah CHoCH terjadi, harga mencetak puncak baru (HH) atau lembah baru (LL). Status market memasuki fase <code>PENDING_SETUP</code>.</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">2. Payload Data yang Ditransfer</span>
+                            <div class="meta-value" style="margin-top: 0.5rem; padding: 0.75rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; word-break: normal; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"trigger": "CSV_WATCHER_SERVICE",<br>
+                                &nbsp;&nbsp;"event_type": "SWING_POINT_UPDATE",<br>
+                                &nbsp;&nbsp;"point_type": "HH",<br>
+                                &nbsp;&nbsp;"swing_price": 2648.80,<br>
+                                &nbsp;&nbsp;"status": "PENDING_SETUP",<br>
+                                &nbsp;&nbsp;"action": "TRIGGER_BACKGROUND_WARMUP"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Respon Orchestrator (Warmup Mode)</span>
+                            <span class="meta-value">Orchestrator memicu pemanasan awal (*warmup*) pada ML Prediction Agent (XGBoost) dan Sentiment Agent agar saat BoS terjadi eksekusi instan tanpa jeda komputasi.</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="panel-content" id="panel-watcher-to-orch-bos">
+                    <h2 class="panel-section-title">Data Transfer 3: Watcher ➔ ORCH (Event BoS)</h2>
+                    <p class="panel-text">Pemicu eksekusi final saat harga menembus level batas swing dengan momentum kuat (Break of Structure).</p>
+                    <ul class="meta-list">
+                        <li>
+                            <span class="meta-label">1. Skenario Terjadinya Event</span>
+                            <span class="meta-value">Setelah pullback/retracement selesai, candle berikutnya menembus level HH (untuk Bullish) atau LL (untuk Bearish). Ini adalah pemicu sinyal eksekusi nyata (*Confirmed Entry Trigger*).</span>
+                        </li>
+                        <li>
+                            <span class="meta-label">2. Payload Data yang Ditransfer</span>
+                            <div class="meta-value" style="margin-top: 0.5rem; padding: 0.75rem; background: rgba(255, 170, 0, 0.04); border-left: 3px solid #ffaa00; border-radius: 4px; font-size: 0.72rem; line-height: 1.5; font-family: monospace; word-break: normal; color: #fff;">
+                                {<br>
+                                &nbsp;&nbsp;"trigger": "CSV_WATCHER_SERVICE",<br>
+                                &nbsp;&nbsp;"event_type": "BOS_CONFIRMED",<br>
+                                &nbsp;&nbsp;"direction": "Bullish",<br>
+                                &nbsp;&nbsp;"trigger_price": 2645.50,<br>
+                                &nbsp;&nbsp;"signal": "BUY_CONFIRMED",<br>
+                                &nbsp;&nbsp;"action": "EVALUATE_CONSENSUS_AND_EXECUTE"<br>
+                                }
+                            </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">3. Respon Orchestrator</span>
+                            <span class="meta-value">Orchestrator langsung mengumpulkan skor MSA, ML, dan Sentiment ke Consensus Engine untuk kalkulasi kelayakan trading dan eksekusi order.</span>
+                        </li>
+                    </ul>
+                </div>
+
                 <div class="panel-content" id="panel-mt5">
                     <h2 class="panel-section-title">MetaTrader 5 & EA</h2>
                     <p class="panel-text">Expert Advisor <code>Dev_Bot_v11.cs</code> bertindak sebagai terminal utama
@@ -2944,11 +3490,17 @@
                 { from: "node-neondb-mapping", fromPort: "bottom", to: "node-lancedb", toPort: "top" },
                 { from: "node-lancedb", fromPort: "bottom", to: "node-orchestrator", toPort: "top" },
 
-                // Stage 1 Ingestion Bypass / Direct Trigger to Orchestrator (Left Bypass Corridor)
-                { from: "node-watcher-trigger", fromPort: "left", to: "node-orchestrator", toPort: "left" },
+                // Stage 1 Ingestion Bypass / Direct Trigger via 3 Data Transfer Cards (CHoCH, HH/LL, BoS)
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-watcher-to-orch-choch", toPort: "left" },
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-watcher-to-orch-hh", toPort: "left" },
+                { from: "node-watcher-trigger", fromPort: "right", to: "node-watcher-to-orch-bos", toPort: "left" },
+                { from: "node-watcher-to-orch-choch", fromPort: "right", to: "node-orchestrator", toPort: "top" },
+                { from: "node-watcher-to-orch-hh", fromPort: "right", to: "node-orchestrator", toPort: "top" },
+                { from: "node-watcher-to-orch-bos", fromPort: "right", to: "node-orchestrator", toPort: "top" },
 
-                // Stage 2 Orchestrator -> Stage 3 Sub-Agents (Top of each agent column)
-                { from: "node-orchestrator", fromPort: "bottom", to: "node-ms-agent", toPort: "top" },
+                // Stage 2 Orchestrator -> Stage 3 Sub-Agents
+                { from: "node-orchestrator", fromPort: "bottom", to: "node-orch-to-msa-info", toPort: "top" },
+                { from: "node-orch-to-msa-info", fromPort: "bottom", to: "node-ms-agent", toPort: "top" },
                 { from: "node-orchestrator", fromPort: "bottom", to: "node-ml-agent", toPort: "top" },
                 { from: "node-orchestrator", fromPort: "bottom", to: "node-sentiment-agent", toPort: "top" },
                 { from: "node-orchestrator", fromPort: "bottom", to: "node-risk-agent", toPort: "top" },
@@ -3009,11 +3561,17 @@
             ];
 
             let connections = [...defaultConnections];
-            const LAYOUT_VERSION = 12; // Bump version to force clean cache update
+            const LAYOUT_VERSION = 16; // Bump version to include orch-to-msa-info card
 
             // Selection & Hover Flow State
             let hoveredCardId = null;
             let selectedNodeCardId = null;
+            let interactionMode = 'card'; // 'card' | 'pan'
+
+            // Marquee Drag Selection State
+            let isMarqueeSelecting = false;
+            let marqueeStartX = 0;
+            let marqueeStartY = 0;
 
             // Drag-and-drop state
             let activeDragCard = null;
@@ -3047,6 +3605,11 @@
 
             // Mouse Wheel Focal Zoom Handler (Zoom towards cursor position)
             function handleWheelZoom(e) {
+                // Do not zoom canvas if wheel event originates inside side detail panel or controls
+                if (e.target.closest('#side-panel') || e.target.closest('.detail-panel') || e.target.closest('.zoom-controls') || e.target.closest('.floating-popup')) {
+                    return;
+                }
+
                 e.preventDefault();
                 const viewport = document.getElementById('diagram-viewport');
                 const rect = viewport.getBoundingClientRect();
@@ -3185,11 +3748,65 @@
                 drawLines();
             });
 
-            // Clear connection source selection when pressing Escape key
+            // Keyboard Controls: Escape to cancel, Arrow keys to nudge selected cards
+            let saveLayoutTimeout = null;
+            function debouncedSaveLayout() {
+                clearTimeout(saveLayoutTimeout);
+                saveLayoutTimeout = setTimeout(saveLayoutState, 300);
+            }
+
             window.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') {
                     clearConnectionSelection();
                     hideDeletePopup();
+                    return;
+                }
+
+                // Check for arrow keys movement
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                    // Do not intercept if user is typing inside an input/textarea
+                    if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+                    // Locate active/selected cards robustly
+                    let targetCards = Array.from(document.querySelectorAll('.multiselected'));
+                    if (targetCards.length === 0) {
+                        targetCards = Array.from(document.querySelectorAll('.node-card.selected, .agent-card.selected'));
+                    }
+                    if (targetCards.length === 0 && selectedNodeCardId) {
+                        const selCard = document.getElementById(selectedNodeCardId);
+                        if (selCard) targetCards = [selCard];
+                    }
+
+                    if (targetCards.length > 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Step size: Normal = 10px, Shift = 50px, Alt = 1px
+                        let step = 10;
+                        if (e.shiftKey) step = 50;
+                        else if (e.altKey) step = 1;
+
+                        let moveX = 0;
+                        let moveY = 0;
+                        if (e.key === 'ArrowUp') moveY = -step;
+                        if (e.key === 'ArrowDown') moveY = step;
+                        if (e.key === 'ArrowLeft') moveX = -step;
+                        if (e.key === 'ArrowRight') moveX = step;
+
+                        targetCards.forEach(card => {
+                            const currX = parseFloat(card.getAttribute('data-dx') || '0');
+                            const currY = parseFloat(card.getAttribute('data-dy') || '0');
+                            const nextX = currX + moveX;
+                            const nextY = currY + moveY;
+                            card.setAttribute('data-dx', nextX);
+                            card.setAttribute('data-dy', nextY);
+                            card.style.transition = 'none';
+                            card.style.transform = `translate(${nextX}px, ${nextY}px)`;
+                        });
+
+                        drawLines();
+                        debouncedSaveLayout();
+                    }
                 }
             });
 
@@ -3209,6 +3826,22 @@
                         handle.title = `Tarik aliran baru dari gagang ${port} ini...`;
                         handle.addEventListener('click', (e) => handlePortClick(e, card.id, port));
                         card.appendChild(handle);
+                    });
+
+                    // Add 5 resize handles (top, bottom, left, right, corner bottom-right)
+                    [
+                        { dir: 'r', cls: 'handle-r', title: 'Tarik untuk melebarkan horizontal' },
+                        { dir: 'b', cls: 'handle-b', title: 'Tarik untuk meninggikan vertikal' },
+                        { dir: 't', cls: 'handle-t', title: 'Tarik untuk mengatur batas atas' },
+                        { dir: 'l', cls: 'handle-l', title: 'Tarik untuk mengatur batas kiri' },
+                        { dir: 'se', cls: 'handle-se', title: 'Tarik sudut untuk ubah ukuran bebas' }
+                    ].forEach(rh => {
+                        const rHandle = document.createElement('div');
+                        rHandle.className = `card-resize-handle ${rh.cls}`;
+                        rHandle.title = rh.title;
+                        rHandle.addEventListener('mousedown', (e) => cardResizeStart(e, card, rh.dir));
+                        rHandle.addEventListener('touchstart', (e) => cardResizeStart(e, card, rh.dir), { passive: false });
+                        card.appendChild(rHandle);
                     });
 
                     card.addEventListener('mousedown', dragStart);
@@ -3234,6 +3867,14 @@
                 viewport.addEventListener('mousedown', viewportPanStart);
                 viewport.addEventListener('touchstart', viewportPanStart, { passive: false });
                 viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
+
+                // 3. Stop wheel event propagation from side panel to prevent canvas zoom
+                const sidePanelEl = document.getElementById('side-panel');
+                if (sidePanelEl) {
+                    sidePanelEl.addEventListener('wheel', (e) => {
+                        e.stopPropagation();
+                    }, { passive: true });
+                }
             }
 
             // Connection Editor Click Actions
@@ -3302,7 +3943,7 @@
                 return titleEl ? titleEl.textContent.trim() : id;
             }
 
-            function showDeletePopup(x, y, fromId, toId) {
+            function showDeletePopup(screenX, screenY, fromId, toId) {
                 const popup = document.getElementById('delete-popup');
                 const text = document.getElementById('delete-popup-text');
                 const delBtn = document.getElementById('popup-delete-btn');
@@ -3312,9 +3953,17 @@
                 const nameB = getNameForCard(toId);
                 text.innerHTML = `Hapus aliran dari <strong>${nameA}</strong> ke <strong>${nameB}</strong>?`;
 
-                popup.style.left = `${x}px`;
-                popup.style.top = `${y}px`;
+                // Calculate position relative to diagram viewport
+                const vRect = document.getElementById('diagram-viewport').getBoundingClientRect();
+                const vx = screenX - vRect.left;
+                const vy = screenY - vRect.top;
+
+                popup.style.left = `${vx}px`;
+                popup.style.top = `${vy}px`;
                 popup.style.display = 'block';
+
+                popup.onmousedown = (e) => e.stopPropagation();
+                popup.ontouchstart = (e) => e.stopPropagation();
 
                 delBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -3328,20 +3977,75 @@
                 };
             }
 
+            // Interaction Mode Handlers (Pan Canvas vs Drag & Marquee Select Cards)
+            function setInteractionMode(mode) {
+                interactionMode = mode;
+                const btnCard = document.getElementById('btn-mode-card');
+                const btnPan = document.getElementById('btn-mode-pan');
+                const viewport = document.getElementById('diagram-viewport');
+                if (mode === 'pan') {
+                    if (btnCard) btnCard.classList.remove('active');
+                    if (btnPan) btnPan.classList.add('active');
+                    if (viewport) viewport.style.cursor = 'grab';
+                    document.querySelectorAll('.node-card, .agent-card').forEach(card => card.style.cursor = 'grab');
+                } else {
+                    if (btnCard) btnCard.classList.add('active');
+                    if (btnPan) btnPan.classList.remove('active');
+                    if (viewport) viewport.style.cursor = 'crosshair';
+                    document.querySelectorAll('.node-card, .agent-card').forEach(card => card.style.cursor = 'pointer');
+                }
+            }
+
             function hideDeletePopup() {
                 const popup = document.getElementById('delete-popup');
                 if (popup) popup.style.display = 'none';
             }
 
-            // Viewport Pan handlers
+            // Viewport Pan & Marquee Selection handlers
             function viewportPanStart(e) {
-                if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('a') || e.target.closest('ul') || e.target.closest('button') || e.target.closest('.floating-popup') || e.target.closest('.zoom-controls') || e.target.closest('.detail-panel')) return;
+                if (e.target.closest('button') || e.target.closest('.floating-popup') || e.target.closest('.zoom-controls') || e.target.closest('.detail-panel') || e.target.closest('.edge-delete-btn') || e.target.closest('.port-handle') || e.target.closest('a')) return;
                 if (e.type === 'mousedown' && e.button !== 0) return;
 
-                // Clear selection, close side panel, and hide popup when clicking empty space
-                if (sourceNodeId) {
-                    clearConnectionSelection();
+                // Mode 1: CARD MODE -> Marquee Box Selection on empty canvas
+                if (interactionMode === 'card') {
+                    if (e.target.closest('.node-card') || e.target.closest('.agent-card') || e.target.closest('.flow-path-hover-bridge')) return;
+
+                    // Clear previous selection if not holding Shift or Ctrl
+                    if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                        document.querySelectorAll('.multiselected').forEach(c => c.classList.remove('multiselected'));
+                        if (sourceNodeId) clearConnectionSelection();
+                        closeSidePanel();
+                        hideDeletePopup();
+                    }
+
+                    isMarqueeSelecting = true;
+                    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+                    marqueeStartX = clientX;
+                    marqueeStartY = clientY;
+
+                    const vRect = document.getElementById('diagram-viewport').getBoundingClientRect();
+                    const box = document.getElementById('selection-box');
+                    if (box) {
+                        box.style.left = `${clientX - vRect.left}px`;
+                        box.style.top = `${clientY - vRect.top}px`;
+                        box.style.width = '0px';
+                        box.style.height = '0px';
+                        box.style.display = 'block';
+                    }
+
+                    document.addEventListener('mousemove', handleGlobalMove);
+                    document.addEventListener('mouseup', handleGlobalEnd);
+                    document.addEventListener('touchmove', handleGlobalMove, { passive: false });
+                    document.addEventListener('touchend', handleGlobalEnd);
+
+                    if (e.type === 'touchstart') e.preventDefault();
+                    return;
                 }
+
+                // Mode 2: PAN MODE -> Free Viewport Pan
+                if (sourceNodeId) clearConnectionSelection();
                 closeSidePanel();
                 hideDeletePopup();
 
@@ -3354,55 +4058,239 @@
                 panStartX = clientX - panX;
                 panStartY = clientY - panY;
 
-                document.addEventListener('mousemove', viewportPanMove);
-                document.addEventListener('mouseup', viewportPanEnd);
-                document.addEventListener('touchmove', viewportPanMove, { passive: false });
-                document.addEventListener('touchend', viewportPanEnd);
+                document.addEventListener('mousemove', handleGlobalMove);
+                document.addEventListener('mouseup', handleGlobalEnd);
+                document.addEventListener('touchmove', handleGlobalMove, { passive: false });
+                document.addEventListener('touchend', handleGlobalEnd);
 
-                if (e.type === 'touchstart') {
-                    e.preventDefault();
+                if (e.type === 'touchstart') e.preventDefault();
+            }
+
+            function handleGlobalMove(e) {
+                const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+
+                if (isPanning) {
+                    panX = clientX - panStartX;
+                    panY = clientY - panStartY;
+                    updateTransform();
+                    if (e.type === 'touchmove') e.preventDefault();
+                    return;
+                }
+
+                if (isMarqueeSelecting) {
+                    const viewport = document.getElementById('diagram-viewport');
+                    const vRect = viewport.getBoundingClientRect();
+                    const box = document.getElementById('selection-box');
+
+                    const curX = clientX - vRect.left;
+                    const curY = clientY - vRect.top;
+                    const startX = marqueeStartX - vRect.left;
+                    const startY = marqueeStartY - vRect.top;
+
+                    const minX = Math.min(startX, curX);
+                    const minY = Math.min(startY, curY);
+                    const width = Math.abs(curX - startX);
+                    const height = Math.abs(curY - startY);
+
+                    if (box) {
+                        box.style.left = `${minX}px`;
+                        box.style.top = `${minY}px`;
+                        box.style.width = `${width}px`;
+                        box.style.height = `${height}px`;
+                    }
+
+                    // Check collision with cards
+                    const boxScreenRect = {
+                        left: Math.min(marqueeStartX, clientX),
+                        top: Math.min(marqueeStartY, clientY),
+                        right: Math.max(marqueeStartX, clientX),
+                        bottom: Math.max(marqueeStartY, clientY)
+                    };
+
+                    document.querySelectorAll('.node-card, .agent-card').forEach(card => {
+                        const cRect = card.getBoundingClientRect();
+                        const isIntersecting = !(
+                            boxScreenRect.right < cRect.left ||
+                            boxScreenRect.left > cRect.right ||
+                            boxScreenRect.bottom < cRect.top ||
+                            boxScreenRect.top > cRect.bottom
+                        );
+                        if (isIntersecting) {
+                            card.classList.add('multiselected');
+                        } else if (!e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                            card.classList.remove('multiselected');
+                        }
+                    });
+
+                    if (e.type === 'touchmove') e.preventDefault();
                 }
             }
 
-            function viewportPanMove(e) {
-                if (!isPanning) return;
+            function handleGlobalEnd() {
+                if (isPanning) {
+                    isPanning = false;
+                    const cursorState = interactionMode === 'pan' ? 'grab' : 'crosshair';
+                    document.getElementById('diagram-viewport').style.cursor = cursorState;
+                    saveLayoutState();
+                }
+
+                if (isMarqueeSelecting) {
+                    isMarqueeSelecting = false;
+                    const box = document.getElementById('selection-box');
+                    if (box) box.style.display = 'none';
+                }
+
+                document.removeEventListener('mousemove', handleGlobalMove);
+                document.removeEventListener('mouseup', handleGlobalEnd);
+                document.removeEventListener('touchmove', handleGlobalMove);
+                document.removeEventListener('touchend', handleGlobalEnd);
+            }
+
+            // Card Drag & Resize handlers
+            let dragOffsets = new Map(); // Store original offsets for each active drag node
+            let isCardMoved = false;
+            let ignoreCardClickUntil = 0;
+
+            // Card Resizing State
+            let isResizing = false;
+            let activeResizeCard = null;
+            let resizeDirection = '';
+            let resizeStartX = 0;
+            let resizeStartY = 0;
+            let resizeStartWidth = 0;
+            let resizeStartHeight = 0;
+            let resizeStartDx = 0;
+            let resizeStartDy = 0;
+
+            function cardResizeStart(e, card, direction) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (e.type === 'mousedown' && e.button !== 0) return;
+
+                isResizing = true;
+                activeResizeCard = card;
+                resizeDirection = direction;
+
+                const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+
+                resizeStartX = clientX;
+                resizeStartY = clientY;
+
+                const rect = card.getBoundingClientRect();
+                resizeStartWidth = rect.width / zoomScale;
+                resizeStartHeight = rect.height / zoomScale;
+                resizeStartDx = parseFloat(card.getAttribute('data-dx') || '0');
+                resizeStartDy = parseFloat(card.getAttribute('data-dy') || '0');
+
+                card.style.transition = 'none';
+                card.style.maxWidth = 'none';
+                card.style.minWidth = '0';
+                card.style.flexShrink = '0';
+                card.style.flex = 'none';
+
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = direction.includes('r') || direction.includes('l') 
+                    ? (direction.includes('b') || direction.includes('t') ? 'nwse-resize' : 'ew-resize') 
+                    : 'ns-resize';
+
+                document.addEventListener('mousemove', cardResizeMove, { passive: false });
+                document.addEventListener('mouseup', cardResizeEnd);
+                document.addEventListener('touchmove', cardResizeMove, { passive: false });
+                document.addEventListener('touchend', cardResizeEnd);
+            }
+
+            function cardResizeMove(e) {
+                if (!isResizing || !activeResizeCard) return;
 
                 const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-                panX = clientX - panStartX;
-                panY = clientY - panStartY;
+                const deltaX = (clientX - resizeStartX) / zoomScale;
+                const deltaY = (clientY - resizeStartY) / zoomScale;
 
-                updateTransform();
+                const minW = 160;
+                const minH = 45;
+                const maxW = 1500;
+                const maxH = 1500;
 
-                if (e.type === 'touchmove') {
-                    e.preventDefault();
+                let newWidth = resizeStartWidth;
+                let newHeight = resizeStartHeight;
+                let newDx = resizeStartDx;
+                let newDy = resizeStartDy;
+
+                if (resizeDirection.includes('r')) {
+                    newWidth = Math.max(minW, Math.min(maxW, resizeStartWidth + deltaX));
                 }
+                if (resizeDirection.includes('b')) {
+                    newHeight = Math.max(minH, Math.min(maxH, resizeStartHeight + deltaY));
+                }
+                if (resizeDirection.includes('l')) {
+                    const potentialW = resizeStartWidth - deltaX;
+                    if (potentialW >= minW && potentialW <= maxW) {
+                        newWidth = potentialW;
+                        newDx = resizeStartDx + deltaX;
+                        activeResizeCard.setAttribute('data-dx', newDx);
+                        activeResizeCard.style.transform = `translate(${newDx}px, ${newDy}px)`;
+                    }
+                }
+                if (resizeDirection.includes('t')) {
+                    const potentialH = resizeStartHeight - deltaY;
+                    if (potentialH >= minH && potentialH <= maxH) {
+                        newHeight = potentialH;
+                        newDy = resizeStartDy + deltaY;
+                        activeResizeCard.setAttribute('data-dy', newDy);
+                        activeResizeCard.style.transform = `translate(${newDx}px, ${newDy}px)`;
+                    }
+                }
+
+                activeResizeCard.style.maxWidth = 'none';
+                activeResizeCard.style.minWidth = '0';
+                activeResizeCard.style.flexShrink = '0';
+                activeResizeCard.style.flex = 'none';
+                activeResizeCard.style.width = `${Math.round(newWidth)}px`;
+                activeResizeCard.style.height = `${Math.round(newHeight)}px`;
+                activeResizeCard.setAttribute('data-w', Math.round(newWidth));
+                activeResizeCard.setAttribute('data-h', Math.round(newHeight));
+
+                drawLines();
+
+                if (e.cancelable) e.preventDefault();
             }
 
-            function viewportPanEnd() {
-                if (!isPanning) return;
-                isPanning = false;
+            function cardResizeEnd(e) {
+                if (!isResizing || !activeResizeCard) return;
 
-                document.getElementById('diagram-viewport').style.cursor = 'grab';
+                ignoreCardClickUntil = Date.now() + 200;
+                activeResizeCard.style.transition = 'border-color 0.3s ease, box-shadow 0.3s ease, background 0.3s ease';
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
 
-                document.removeEventListener('mousemove', viewportPanMove);
-                document.removeEventListener('mouseup', viewportPanEnd);
-                document.removeEventListener('touchmove', viewportPanMove);
-                document.removeEventListener('touchend', viewportPanEnd);
+                isResizing = false;
+                activeResizeCard = null;
+
+                document.removeEventListener('mousemove', cardResizeMove);
+                document.removeEventListener('mouseup', cardResizeEnd);
+                document.removeEventListener('touchmove', cardResizeMove);
+                document.removeEventListener('touchend', cardResizeEnd);
 
                 saveLayoutState();
             }
 
-            // Card Drag handlers
-            let dragOffsets = new Map(); // Store original offsets for each active drag node
-
             function dragStart(e) {
                 if (e.type === 'mousedown' && e.button !== 0) return;
-                if (e.target.closest('a') || e.target.closest('ul') || e.target.closest('.port-handle')) return;
+                if (e.target.closest('a') || e.target.closest('ul') || e.target.closest('.port-handle') || e.target.closest('.card-resize-handle')) return;
+
+                // In PAN mode, clicking/dragging card acts as canvas pan!
+                if (interactionMode === 'pan') {
+                    viewportPanStart(e);
+                    return;
+                }
 
                 const targetCard = e.currentTarget;
                 hideDeletePopup();
+                isCardMoved = false;
 
                 // If Ctrl key is pressed, toggle selection and skip immediate dragging
                 if (e.ctrlKey || e.metaKey) {
@@ -3440,10 +4328,6 @@
                     card.style.cursor = 'grabbing';
                     card.style.zIndex = '100';
                 });
-
-                // Highlight target node in side panel
-                const nodeId = targetCard.id.split('-').slice(1).join('-');
-                selectNode(nodeId);
 
                 // Connect automatically if a connection source is already selected
                 if (sourceNodeId && !targetCard.classList.contains('multiselected')) {
@@ -3496,8 +4380,15 @@
                 const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
                 const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
 
-                const dx = (clientX - dragStartX) / zoomScale;
-                const dy = (clientY - dragStartY) / zoomScale;
+                const deltaPixelX = clientX - dragStartX;
+                const deltaPixelY = clientY - dragStartY;
+
+                if (Math.abs(deltaPixelX) > 4 || Math.abs(deltaPixelY) > 4) {
+                    isCardMoved = true;
+                }
+
+                const dx = deltaPixelX / zoomScale;
+                const dy = deltaPixelY / zoomScale;
 
                 // Move all selected nodes in the group
                 dragOffsets.forEach((origOffset, card) => {
@@ -3517,6 +4408,10 @@
 
             function dragEnd() {
                 if (!activeDragCard) return;
+
+                if (isCardMoved) {
+                    ignoreCardClickUntil = Date.now() + 150;
+                }
 
                 dragOffsets.forEach((origOffset, card) => {
                     card.style.transition = 'transform 0.1s ease, box-shadow 0.4s, border-color 0.4s';
@@ -3545,10 +4440,15 @@
                     connections: connections
                 };
                 document.querySelectorAll('.node-card, .agent-card').forEach(card => {
-                    state.nodes[card.id] = {
+                    const nodeData = {
                         dx: parseFloat(card.getAttribute('data-dx') || '0'),
                         dy: parseFloat(card.getAttribute('data-dy') || '0')
                     };
+                    const w = parseFloat(card.getAttribute('data-w') || '0');
+                    const h = parseFloat(card.getAttribute('data-h') || '0');
+                    if (w) nodeData.w = w;
+                    if (h) nodeData.h = h;
+                    state.nodes[card.id] = nodeData;
                 });
                 localStorage.setItem('mt5_diagram_layout', JSON.stringify(state));
             }
@@ -3562,25 +4462,9 @@
                 }
                 try {
                     const state = JSON.parse(savedStateStr);
-                    // If version mismatch, perform clean reset so stale positions do not cause card/line detachment
-                    if (!state.version || state.version !== LAYOUT_VERSION) {
-                        localStorage.removeItem('mt5_diagram_layout');
-                        connections = [...defaultConnections];
-                        panX = 0;
-                        panY = 0;
-                        zoomScale = 1.0;
-                        updateTransform();
-                        document.querySelectorAll('.node-card, .agent-card').forEach(card => {
-                            card.setAttribute('data-dx', '0');
-                            card.setAttribute('data-dy', '0');
-                            card.style.transform = 'translate(0px, 0px)';
-                        });
-                        saveLayoutState();
-                        return;
-                    }
 
-                    // Always restore pan, zoom, and node positions
-                    if (state.pan) {
+                    // Always preserve user's customized pan and zoom
+                    if (state.pan && typeof state.pan.x === 'number' && typeof state.pan.y === 'number') {
                         panX = state.pan.x;
                         panY = state.pan.y;
                     }
@@ -3589,24 +4473,43 @@
                     }
                     updateTransform();
 
+                    // Always preserve user's customized node positions and custom dimensions
                     if (state.nodes) {
                         for (let id in state.nodes) {
                             const card = document.getElementById(id);
                             if (card) {
-                                const dx = state.nodes[id].dx;
-                                const dy = state.nodes[id].dy;
+                                const node = state.nodes[id];
+                                const dx = node.dx || 0;
+                                const dy = node.dy || 0;
                                 card.setAttribute('data-dx', dx);
                                 card.setAttribute('data-dy', dy);
                                 card.style.transform = `translate(${dx}px, ${dy}px)`;
+
+                                if (node.w) {
+                                    card.setAttribute('data-w', node.w);
+                                    card.style.maxWidth = 'none';
+                                    card.style.minWidth = '0';
+                                    card.style.flexShrink = '0';
+                                    card.style.flex = 'none';
+                                    card.style.width = `${node.w}px`;
+                                }
+                                if (node.h) {
+                                    card.setAttribute('data-h', node.h);
+                                    card.style.height = `${node.h}px`;
+                                }
                             }
                         }
                     }
 
-                    if (state.connections) {
+                    // Preserve user's connection configuration if available
+                    if (Array.isArray(state.connections) && state.connections.length > 0) {
                         connections = state.connections;
                     } else {
                         connections = [...defaultConnections];
                     }
+
+                    // Seamlessly persist without wiping coordinates
+                    saveLayoutState();
                 } catch (e) {
                     console.error("Failed to restore layout state", e);
                     connections = [...defaultConnections];
@@ -3622,6 +4525,14 @@
                 document.querySelectorAll('.node-card, .agent-card').forEach(card => {
                     card.setAttribute('data-dx', '0');
                     card.setAttribute('data-dy', '0');
+                    card.removeAttribute('data-w');
+                    card.removeAttribute('data-h');
+                    card.style.maxWidth = '';
+                    card.style.minWidth = '';
+                    card.style.flexShrink = '';
+                    card.style.flex = '';
+                    card.style.width = '';
+                    card.style.height = '';
                     card.style.transform = 'translate(0px, 0px)';
                 });
                 connections = [...defaultConnections];
@@ -3839,6 +4750,7 @@
             function getNodeThemeColor(cardId) {
                 if (!cardId) return '#00e5ff';
                 if (cardId.includes('mt5')) return '#ffaa00';
+                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa')) return '#ffaa00';
                 if (cardId.includes('watcher')) return '#00e5ff';
                 if (cardId.includes('neon')) return '#00e676';
                 if (cardId.includes('lancedb')) return '#d500f9';
@@ -3860,6 +4772,7 @@
             function getMarkerType(cardId) {
                 if (!cardId) return 'watcher';
                 if (cardId.includes('mt5')) return 'mt5';
+                if (cardId.includes('watcher-to-orch') || cardId.includes('orch-to-msa')) return 'info';
                 if (cardId.includes('watcher')) return 'watcher';
                 if (cardId.includes('neon')) return 'neon';
                 if (cardId.includes('lancedb')) return 'lancedb';
@@ -4079,16 +4992,22 @@
                         delBtnGroup.setAttribute('transform', `translate(${midPoint.x}, ${midPoint.y})`);
                     }
 
-                    // Click event listener to delete (triggered by both the invisible bridge path AND the delete button!)
+                    // Click & Pointer event listeners to delete (triggered by both the hover bridge path AND the delete button!)
+                    const handleBtnDown = (e) => {
+                        e.stopPropagation();
+                    };
                     const handleClick = (e) => {
                         e.stopPropagation();
-                        const rect = document.getElementById('pan-container').getBoundingClientRect();
-                        const x = (e.clientX - rect.left) / zoomScale;
-                        const y = (e.clientY - rect.top) / zoomScale;
-                        showDeletePopup(x, y, conn.from, conn.to);
+                        e.preventDefault();
+                        showDeletePopup(e.clientX, e.clientY, conn.from, conn.to);
                     };
 
+                    bridgePath.addEventListener('mousedown', handleBtnDown);
+                    bridgePath.addEventListener('touchstart', handleBtnDown, { passive: false });
                     bridgePath.addEventListener('click', handleClick);
+
+                    delBtnGroup.addEventListener('mousedown', handleBtnDown);
+                    delBtnGroup.addEventListener('touchstart', handleBtnDown, { passive: false });
                     delBtnGroup.addEventListener('click', handleClick);
                 });
 
@@ -4115,9 +5034,15 @@
 
             // Selection logic with Toggle support
             function selectNode(type) {
+                if (Date.now() < ignoreCardClickUntil) return;
+
                 const panel = document.getElementById('side-panel');
                 const cardMap = {
                     'mt5': { cardId: 'node-mt5', panelId: 'panel-mt5', color: '#ffaa00' },
+                    'watcher-to-orch-choch': { cardId: 'node-watcher-to-orch-choch', panelId: 'panel-watcher-to-orch-choch', color: '#ffaa00' },
+                    'watcher-to-orch-hh': { cardId: 'node-watcher-to-orch-hh', panelId: 'panel-watcher-to-orch-hh', color: '#ffaa00' },
+                    'watcher-to-orch-bos': { cardId: 'node-watcher-to-orch-bos', panelId: 'panel-watcher-to-orch-bos', color: '#ffaa00' },
+                    'orch-to-msa-info': { cardId: 'node-orch-to-msa-info', panelId: 'panel-orch-to-msa-info', color: '#ffaa00' },
                     'watcher': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: '#00e5ff' },
                     'watcher-trigger': { cardId: 'node-watcher-trigger', panelId: 'panel-watcher', color: '#00e5ff' },
                     'neon': { cardId: 'node-neondb-mapping', panelId: 'panel-neon', color: '#00e676' },
@@ -4165,7 +5090,7 @@
                     return;
                 }
 
-                // Toggle logic: If this exact card is already selected and panel is open -> Close it!
+                // Toggle logic: If this exact card is already selected and panel is open -> Close it (2nd click)!
                 if (selectedNodeCardId === config.cardId && panel && panel.classList.contains('open')) {
                     closeSidePanel();
                     return;
@@ -4228,6 +5153,42 @@
                     window.addEventListener('mouseup', onMouseUp);
                     e.preventDefault();
                 });
+            }
+
+            // Header Dropdown Menu Logic
+            function toggleHeaderMenu(e) {
+                if (e) e.stopPropagation();
+                const container = document.getElementById('header-dropdown-container');
+                if (container) container.classList.toggle('open');
+            }
+
+            function closeHeaderMenu() {
+                const container = document.getElementById('header-dropdown-container');
+                if (container) container.classList.remove('open');
+            }
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.header-dropdown-container')) {
+                    closeHeaderMenu();
+                }
+            });
+
+            // Live Reload Client (Auto-reload via node server.js / npm run dev)
+            if (window.location.protocol.startsWith('http')) {
+                try {
+                    const evtSource = new EventSource('/api/live-reload');
+                    evtSource.onmessage = function (event) {
+                        if (event.data === 'reload') {
+                            console.log('[Live-Reload] Perubahan file terdeteksi, me-reload halaman...');
+                            window.location.reload();
+                        }
+                    };
+                    evtSource.onerror = function () {
+                        // Silent retry handled automatically by EventSource
+                    };
+                } catch (e) {
+                    console.warn('[Live-Reload] SSE tidak aktif:', e);
+                }
             }
         </script>
 </body>
