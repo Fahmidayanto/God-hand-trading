@@ -1817,20 +1817,20 @@
                                 <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">1. Validasi CHoCH</div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Memeriksa urutan event dan memastikan status CHoCH aktif mendahului swing point baru via <code>_has_recent_choch</code>.
+                                Memeriksa CHoCH aktif terbaru sebelum HH/LL. CHoCH berlawanan yang lebih baru membatalkan arah setup lama via <code>_has_recent_choch</code>.
                             </div>
                         </div>
 
-                        <!-- MSA Step 2: Kunci Level Breakout -->
+                        <!-- MSA Step 2: Simpan Level Referensi -->
                         <div class="agent-card" id="node-ms-sub2" onclick="selectNode('ms-sub2')"
                             style="width: 100%; padding: 1rem;">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🎯</div>
-                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">2. Kunci Level Breakout</div>
+                                <div class="card-title" style="font-size: 0.8rem; color: var(--color-watcher);">2. Simpan Level Referensi</div>
                             </div>
                             <div class="card-content" style="font-size: 0.7rem; line-height: 1.35;">
-                                Menyimpan harga trigger <code>HH</code> (Bullish) atau <code>LL</code> (Bearish) sebagai ambang batas mutlak konfirmasi BoS.
+                                Menyimpan harga <code>HH</code> atau <code>LL</code> sebagai konteks setup, lalu menunggu event BoS terkonfirmasi dari detector upstream.
                             </div>
                         </div>
 
@@ -2657,13 +2657,14 @@
 
                 <div class="panel-content" id="panel-ms-sub1">
                     <h2 class="panel-section-title">MSA Step 1: Validasi CHoCH & Urutan</h2>
-                    <p class="panel-text">Memvalidasi bahwa sebelum terbentuknya titik swing baru (HH/LL), memang telah terjadi pembalikan tren awal (CHoCH) yang valid.</p>
+                    <p class="panel-text">Memvalidasi CHoCH aktif terbaru sebelum titik swing baru (HH/LL). Mesin berhenti pada CHoCH pertama yang ditemukan saat pencarian mundur; CHoCH berlawanan yang lebih baru membatalkan arah setup lama.</p>
                     <ul class="meta-list">
                         <li>
                             <span class="meta-label">1. Logika Validasi Sekuens</span>
                             <span class="meta-value">
                                 &bull; Fungsi: <code>_has_recent_choch(direction, max_lookback=10)</code><br>
                                 &bull; Iterasi mundur: <code>events[1:max_lookback]</code> — memeriksa hingga 9 event sebelum HH/LL.<br>
+                                &bull; <strong>CHoCH Aktif:</strong> CHoCH pertama yang ditemukan saat iterasi mundur menjadi satu-satunya penentu arah setup.<br>
                                 &bull; <strong>Bullish Sekuens:</strong> CHoCH Bullish aktif mendahului pembentukan <code>HH</code>.<br>
                                 &bull; <strong>Bearish Sekuens:</strong> CHoCH Bearish aktif mendahului pembentukan <code>LL</code>.
                             </span>
@@ -2675,7 +2676,7 @@
                                 <span style="color:#90a4ae;">// Satu event bisa terbentuk setelah puluhan candle berlalu</span><br><br>
                                 <span style="color:#fff;">[0]</span> <span style="color:#ffcc80;">HH</span> &nbsp;&nbsp;&larr; sedang dievaluasi (e1)<br>
                                 <span style="color:#fff;">[1]</span> HL &nbsp;&nbsp;&nbsp;engine mundur ...<br>
-                                <span style="color:#fff;">[2]</span> <span style="color:#69f0ae;">CHoCH Bullish</span> &larr; <span style="color:#69f0ae;">KETEMU! result = True ✅</span><br>
+                                <span style="color:#fff;">[2]</span> <span style="color:#69f0ae;">CHoCH Bullish</span> &larr; <span style="color:#69f0ae;">CHoCH aktif terbaru, result = True ✅</span><br>
                                 <span style="color:#fff;">[3]</span> LL<br>
                                 <span style="color:#fff;">[4]</span> <span style="color:#ff5252;">BoS</span> &nbsp;&nbsp;&nbsp;&larr; <span style="color:#ff5252;">kalau ini ditemukan dulu → BATAL ❌</span><br>
                                 <span style="color:#90a4ae;">...</span><br>
@@ -2702,23 +2703,34 @@
                             <span class="meta-label">4. Aturan Gugurnya Siklus (Sequence Hygiene)</span>
                             <span class="meta-value">
                                 &bull; <strong>BoS Ditemukan Duluan:</strong> Jika ditemukan event <code>BoS</code> sebelum CHoCH saat iterasi mundur, fungsi langsung kembalikan <code>False</code> — siklus CHoCH dianggap sudah selesai.<br>
+                                &bull; <strong>Opposite CHoCH Lebih Baru:</strong> Jika HH sedang diuji tetapi CHoCH aktif terbaru Bearish, hasil langsung <code>False</code>. Mesin tidak melanjutkan pencarian ke CHoCH Bullish yang lebih lama.<br>
                                 &bull; <strong>Lookback Habis:</strong> Jika sudah iterasi 9 event tanpa CHoCH ditemukan, fungsi kembalikan <code>False</code> — CHoCH kadaluarsa.
                             </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">5. Contoh Pembatalan Arah Lama</span>
+                            <div class="meta-value" style="margin-top: 0.4rem; padding: 0.7rem; background: rgba(255, 82, 82, 0.04); border-left: 3px solid #ff5252; border-radius: 4px; font-size: 0.72rem; line-height: 1.6; font-family: monospace; color: #fff;">
+                                [0] HH sedang dievaluasi<br>
+                                [1] CHoCH Bearish &larr; CHoCH aktif terbaru<br>
+                                [2] CHoCH Bullish &larr; arah lama, tidak diperiksa lagi<br><br>
+                                _has_recent_choch("Bullish") = false<br>
+                                Output: HOLD, pre_signal = null, state tetap IDLE
+                            </div>
                         </li>
                     </ul>
                 </div>
 
                 <div class="panel-content" id="panel-ms-sub2">
-                    <h2 class="panel-section-title">MSA Step 2: Mengunci Level Breakout</h2>
-                    <p class="panel-text">Mengunci koordinat harga tertinggi (HH) atau terendah (LL) sebagai level ambang batas pemicu BoS, sekaligus menghitung keyakinan awal dan memulai query LanceDB.</p>
+                    <h2 class="panel-section-title">MSA Step 2: Menyimpan Level Referensi HH/LL</h2>
+                    <p class="panel-text">Menyimpan koordinat HH atau LL sebagai konteks setup, <code>pre_signal</code>, dan evidence snapshot. Validasi candle-close breakout dimiliki detector event upstream; MSA menerima event BoS yang sudah berstatus Accepted atau Confirmed.</p>
                     <ul class="meta-list">
                         <li>
                             <span class="meta-label">1. Penyimpanan Level Referensi</span>
                             <span class="meta-value">
                                 &bull; Bullish Setup: <code>self._pending_hh_price = price</code> (contoh: 2648.80)<br>
                                 &bull; Bearish Setup: <code>self._pending_ll_price = price</code> (contoh: 2620.40)<br>
-                                &bull; Query LanceDB langsung dijalankan di step ini untuk menyiapkan <code>win_rate_historical</code> dan <code>pattern_count</code>.<br>
-                                &bull; State machine: <code>self._phase = AgentPhase.PENDING_SETUP</code>
+                                &bull; Level disalin ke <code>pre_signal</code> dan <code>evidence_snapshot</code> sebagai konteks trigger.<br>
+                                &bull; MSA tidak membandingkan <code>current_close</code> dengan level tersimpan di jalur trigger BoS.
                             </span>
                         </li>
                         <li>
@@ -2740,10 +2752,12 @@
                             </div>
                         </li>
                         <li>
-                            <span class="meta-label">3. Aturan Validasi Breakout</span>
+                            <span class="meta-label">3. Kontrak Event BoS dari Upstream</span>
                             <span class="meta-value">
-                                &bull; <strong>Konfirmasi Sah:</strong> BoS hanya terpicu jika harga penutupan lilin (Candle Close) menembus melampaui level terkunci.<br>
-                                &bull; <strong>Filter False Breakout:</strong> Sentuhan sesaat atau penolakan ekor (wick rejection) tidak diakui sebagai BoS.
+                                &bull; Detector upstream membentuk event BoS dan menyimpannya dengan status <code>Accepted</code> atau <code>Confirmed</code>.<br>
+                                &bull; <code>PENDING_SETUP</code> Bullish + BoS Bullish memanggil <code>_on_bos_confirmed(direction="Bullish")</code>.<br>
+                                &bull; <code>PENDING_SETUP</code> Bearish + BoS Bearish memanggil <code>_on_bos_confirmed(direction="Bearish")</code>.<br>
+                                &bull; Setelah state <code>BOS_TRIGGERED</code>, BoS lanjutan dengan arah sama tetap dapat memicu siklus kedua dan seterusnya.
                             </span>
                         </li>
                     </ul>
