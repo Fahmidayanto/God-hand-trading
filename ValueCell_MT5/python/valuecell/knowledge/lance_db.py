@@ -11,12 +11,16 @@ Manages 4 collections:
 import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import lancedb
 import pandas as pd
 import numpy as np
+import pyarrow as pa
 from loguru import logger
+
+
+VECTOR_VERSION = "msa-vector-v2-lite"
 
 
 def normalize_reject_reason(raw_reason: Optional[str]) -> str:
@@ -95,6 +99,9 @@ class LanceDBManager:
         if "historical_structures" not in self._table_names():
             logger.info("Creating collection: historical_structures")
             self._create_historical_structures_collection()
+        else:
+            table = self.db.open_table("historical_structures")
+            self._ensure_historical_structures_schema(table)
         
         # Collection 2: Market Conditions
         if "market_conditions" not in self._table_names():
@@ -124,9 +131,44 @@ class LanceDBManager:
         logger.info(f"[OK] LanceDB collections ready: {len(self._table_names())} collections")
     
     # ========== COLLECTION 1: Historical Structures ==========
+
+    def _ensure_historical_structures_schema(self, table) -> None:
+        """Add nullable evidence columns to an existing table."""
+        market_fields = (
+            "atr",
+            "body_ratio",
+            "range_atr_ratio",
+            "ema200_h1_distance_scaled",
+            "ema200_h4_distance_scaled",
+            "spread_atr_ratio",
+            "volume_ratio",
+            "trigger_distance_atr",
+        )
+        existing_fields = set(table.schema.names)
+        missing_fields = [
+            pa.field(field, pa.float64(), nullable=True)
+            for field in market_fields
+            if field not in existing_fields
+        ]
+        trade_fields = (
+            pa.field("entry_time", pa.string(), nullable=True),
+            pa.field("entry_price", pa.float64(), nullable=True),
+            pa.field("exit_time", pa.string(), nullable=True),
+            pa.field("exit_price", pa.float64(), nullable=True),
+            pa.field("close_reason", pa.string(), nullable=True),
+        )
+        missing_fields.extend(
+            field for field in trade_fields if field.name not in existing_fields
+        )
+        if missing_fields:
+            table.add_columns(missing_fields)
+            logger.info(
+                "Added historical_structures market fields: {}",
+                ", ".join(field.name for field in missing_fields),
+            )
     
     def _create_historical_structures_collection(self):
-        """Create historical_structures collection with sample data"""
+        """Create an empty historical_structures collection."""
         
         # Sample pattern for schema definition
         sample_data = [{
@@ -146,15 +188,47 @@ class LanceDBManager:
             "profit_pips": 40.0,
             "net_profit": 40.0,
             "duration_minutes": 17,
+            "entry_time": datetime.now().isoformat(),
+            "entry_price": 2350.50,
+            "exit_time": datetime.now().isoformat(),
+            "exit_price": 2354.50,
+            "close_reason": "TAKE_PROFIT",
             "reject_reason_raw": "",
             "reject_reason_code": "NONE",
             "price_ratio": 1.0,
+            "atr": None,
+            "body_ratio": None,
+            "range_atr_ratio": None,
+            "ema200_h1_distance_scaled": None,
+            "ema200_h4_distance_scaled": None,
+            "spread_atr_ratio": None,
+            "volume_ratio": None,
+            "trigger_distance_atr": None,
             # Vector representation (will be calculated)
             "vector": [0.0] * 16  # 16-dimensional vector
         }]
         
         df = pd.DataFrame(sample_data)
-        table = self.db.create_table("historical_structures", df)
+        nullable_market_fields = (
+            "atr",
+            "body_ratio",
+            "range_atr_ratio",
+            "ema200_h1_distance_scaled",
+            "ema200_h4_distance_scaled",
+            "spread_atr_ratio",
+            "volume_ratio",
+            "trigger_distance_atr",
+        )
+        for field in nullable_market_fields:
+            df[field] = df[field].astype("Float64")
+        inferred_schema = pa.Schema.from_pandas(df, preserve_index=False)
+        schema = pa.schema([
+            pa.field("vector", pa.list_(pa.float64(), 16), nullable=True)
+            if field.name == "vector"
+            else field
+            for field in inferred_schema
+        ])
+        table = self.db.create_table("historical_structures", schema=schema)
         
         logger.info("✅ Collection 'historical_structures' created")
         return table
@@ -219,6 +293,78 @@ class LanceDBManager:
             logger.error(f"Failed to batch add structure patterns: {e}")
             return False
 
+    def enrich_structure_pattern_from_trade(self, trade: Dict[str, Any]) -> bool:
+        """Enrich the latest matching structure formed within one hour before a trade."""
+        try:
+            entry_time = pd.Timestamp(trade["entry_time"])
+            window_start = entry_time - timedelta(hours=1)
+            direction = "Bullish" if str(trade.get("type", "")).upper() == "BUY" else "Bearish"
+            timeframe = str(trade.get("timeframe", "M15"))
+            event_type = str(trade.get("entry_structure", "")).strip()
+
+            table = self.db.open_table("historical_structures")
+            start_iso = window_start.isoformat()
+            end_iso = entry_time.isoformat()
+            safe_timeframe = timeframe.replace("'", "''")
+            safe_direction = direction.replace("'", "''")
+            candidates = (
+                table.search()
+                .where(
+                    f"timestamp >= '{start_iso}' AND timestamp <= '{end_iso}' "
+                    f"AND timeframe = '{safe_timeframe}' AND direction = '{safe_direction}'"
+                )
+                .limit(100)
+                .to_pandas()
+            )
+            timestamps = pd.to_datetime(candidates["timestamp"], errors="coerce")
+            mask = timestamps.between(window_start, entry_time)
+            if event_type:
+                mask &= candidates["event_type"].str.lower() == event_type.lower()
+
+            matches = candidates.loc[mask].copy()
+            if matches.empty:
+                logger.warning(
+                    "No historical structure matched trade at {} ({}, {}, {})",
+                    entry_time.isoformat(),
+                    timeframe,
+                    direction,
+                    event_type or "any event",
+                )
+                return False
+
+            matches["_timestamp"] = pd.to_datetime(matches["timestamp"])
+            existing = matches.sort_values("_timestamp").iloc[-1].to_dict()
+            atr = existing.get("atr")
+            entry_price = trade.get("entry_price")
+            trigger_distance_atr = None
+            if atr is not None and not pd.isna(atr) and float(atr) > 0 and entry_price is not None:
+                trigger_distance_atr = abs(float(entry_price) - float(existing["price"])) / float(atr)
+
+            existing.update({
+                "outcome": trade.get("outcome", "PENDING"),
+                "net_profit": trade.get("net_profit"),
+                "profit_pips": trade.get("profit_pips", 0.0),
+                "duration_minutes": trade.get("duration_minutes"),
+                "entry_time": trade.get("entry_time"),
+                "entry_price": trade.get("entry_price"),
+                "exit_time": trade.get("exit_time"),
+                "exit_price": trade.get("exit_price"),
+                "close_reason": trade.get("close_reason"),
+                "reject_reason_raw": trade.get("reject_reason_raw", ""),
+                "reject_reason_code": None,
+                "trigger_distance_atr": trigger_distance_atr,
+            })
+            existing.pop("_timestamp", None)
+            updated = self.prepare_structure_pattern(existing)
+            row_id = str(existing["id"]).replace("'", "''")
+            table.delete(f"id = '{row_id}'")
+            table.add([updated])
+            self._search_cache.clear()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to enrich structure pattern from trade: {e}")
+            return False
+
     def prepare_structure_pattern(self, pattern: Dict[str, Any]) -> Dict[str, Any]:
         """Serialize one historical structure according to the table contract."""
         outcome = str(pattern.get("outcome", "PENDING")).upper()
@@ -233,6 +379,19 @@ class LanceDBManager:
         net_profit = pattern.get("net_profit")
         duration_minutes = pattern.get("duration_minutes")
         price_ratio = pattern.get("price_ratio")
+        trade_detail_allowed = outcome in {"WIN", "LOSS"}
+        nullable_iso = lambda field: (
+            pd.Timestamp(pattern[field]).isoformat()
+            if trade_detail_allowed
+            and pattern.get(field) is not None
+            and not pd.isna(pattern[field])
+            else None
+        )
+        nullable_float = lambda field: (
+            float(pattern[field])
+            if pattern.get(field) is not None and not pd.isna(pattern[field])
+            else None
+        )
 
         return {
             "id": pattern.get("id") or f"{pattern['symbol']}_{pattern['timestamp']}",
@@ -251,9 +410,26 @@ class LanceDBManager:
             "profit_pips": float(pattern.get("profit_pips") or 0.0),
             "net_profit": float(net_profit) if net_profit is not None and not pd.isna(net_profit) else None,
             "duration_minutes": int(duration_minutes) if duration_minutes is not None and not pd.isna(duration_minutes) else None,
+            "entry_time": nullable_iso("entry_time"),
+            "entry_price": nullable_float("entry_price") if trade_detail_allowed else None,
+            "exit_time": nullable_iso("exit_time"),
+            "exit_price": nullable_float("exit_price") if trade_detail_allowed else None,
+            "close_reason": (
+                str(pattern.get("close_reason") or "").strip() or None
+                if trade_detail_allowed
+                else None
+            ),
             "reject_reason_raw": reject_reason_raw,
             "reject_reason_code": str(reject_reason_code),
             "price_ratio": float(price_ratio) if price_ratio is not None else 1.0,
+            "atr": nullable_float("atr"),
+            "body_ratio": nullable_float("body_ratio"),
+            "range_atr_ratio": nullable_float("range_atr_ratio"),
+            "ema200_h1_distance_scaled": nullable_float("ema200_h1_distance_scaled"),
+            "ema200_h4_distance_scaled": nullable_float("ema200_h4_distance_scaled"),
+            "spread_atr_ratio": nullable_float("spread_atr_ratio"),
+            "volume_ratio": nullable_float("volume_ratio"),
+            "trigger_distance_atr": nullable_float("trigger_distance_atr"),
             "vector": self._pattern_to_vector(pattern),
         }
     
@@ -329,7 +505,10 @@ class LanceDBManager:
         [6-9]: Session encoding (London, NY, Asia, Sydney)
         [10]: Hour normalized (0-1)
         [11]: Timeframe (M15=1, H1=2, H4=3)
-        [12-15]: Reserved for future features
+        [12]: Prior CHoCH
+        [13]: Candle body ratio, centered around 0.5
+        [14]: Candle range / ATR, centered around 1.5
+        [15]: Combined H1/H4 EMA distance in ATR units
         
         Returns:
             16-dimensional vector
@@ -344,10 +523,16 @@ class LanceDBManager:
         # [4] Direction
         vector[4] = 1.0 if pattern.get("direction") == "Bullish" else -1.0
         
-        # [5] EMA distance (normalized to -1 to 1, assume max distance 50 pips)
+        # [5] EMA distance normalized to the 4500 reference-price era.
         price = float(pattern.get("price", 0))
         ema200 = float(pattern.get("ema200", price))
-        ema_distance = (price - ema200) / 50.0  # Normalize
+        raw_price_ratio = pattern.get("price_ratio")
+        price_ratio = (
+            float(raw_price_ratio)
+            if raw_price_ratio is not None and not pd.isna(raw_price_ratio) and float(raw_price_ratio) > 0
+            else 1.0
+        )
+        ema_distance = ((price - ema200) / price_ratio) / 50.0
         vector[5] = max(-1.0, min(1.0, ema_distance))
         
         # [6-9] Session encoding
@@ -370,7 +555,28 @@ class LanceDBManager:
         # [12] Prior CHoCH context: was this pattern formed after a CHoCH? (1=yes, 0=no)
         vector[12] = 1.0 if pattern.get("prior_choch", False) else 0.0
         
-        # [13-15] Reserved (zeros for now)
+        def normalized_feature(field: str, center: float, scale: float) -> float:
+            value = pattern.get(field)
+            if value is None or pd.isna(value):
+                return 0.0
+            return max(-1.0, min(1.0, (float(value) - center) / scale))
+
+        # [13] Body ratio: 0.5 is neutral; full body maps to 1.
+        vector[13] = normalized_feature("body_ratio", center=0.5, scale=0.5)
+
+        # [14] Range/ATR: historical median is approximately 1.5.
+        vector[14] = normalized_feature("range_atr_ratio", center=1.5, scale=4.5)
+
+        # [15] Multi-timeframe trend context. Missing legs do not bias the score.
+        ema_context = []
+        for field, scale in (
+            ("ema200_h1_distance_scaled", 30.0),
+            ("ema200_h4_distance_scaled", 60.0),
+        ):
+            value = pattern.get(field)
+            if value is not None and not pd.isna(value):
+                ema_context.append(max(-1.0, min(1.0, float(value) / scale)))
+        vector[15] = sum(ema_context) / len(ema_context) if ema_context else 0.0
         
         return vector
     

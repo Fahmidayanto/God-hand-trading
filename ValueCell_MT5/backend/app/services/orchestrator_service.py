@@ -57,9 +57,15 @@ def _get_orchestrator():
         from valuecell.agents.orchestrator_agent import OrchestratorAgent
 
         _orchestrator = OrchestratorAgent(
+            enable_llm_msa=True,
             consensus_threshold=0.60,
             market_structure={"swing_length": 5, "timeframe": "M15"},
             risk_management={"account_balance": 1000.0},
+            llm_msa={
+                "provider": "suniesis",
+                "timeout_seconds": 20.0,
+                "suniesis_model_timeout_seconds": 15.0,
+            },
         )
         logger.info("[OrchestratorService] OrchestratorAgent initialized OK")
         return _orchestrator

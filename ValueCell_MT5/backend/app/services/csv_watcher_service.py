@@ -12,6 +12,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
+import pandas as pd
+
 from app.core.database import get_db_conn, is_pool_ready
 from psycopg2.extras import execute_values
 
@@ -68,6 +70,8 @@ class CSVWatcherService:
     - Uses OS file modification time (mtime) and size to incrementally parse new rows.
     """
 
+    MARKET_FEATURE_CACHE_LIMIT = 256
+
     def __init__(self, check_interval_seconds: int = 5):
         self.name = "CSVWatcherService"
         self.check_interval = check_interval_seconds
@@ -80,6 +84,11 @@ class CSVWatcherService:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self.lancedb = None
+        self._market_feature_rows: Dict[str, List[Dict[str, Any]]] = {
+            "M15": [],
+            "H1": [],
+            "H4": [],
+        }
         
         # In-memory cache of file metadata: {file_path: (mtime, size)}
         self._file_metadata: Dict[Path, tuple] = {}
@@ -162,6 +171,7 @@ class CSVWatcherService:
         # Find all relevant CSV files
         csv_files = list(self.backtest_dir.glob("*.csv"))
         valid_files = [fp for fp in csv_files if self._map_filename_to_table(fp.name)]
+        self._hydrate_market_feature_cache(valid_files)
         total = len(valid_files)
 
         logger.info(f"🔍 Found {total} valid CSV files to sync in {self.backtest_dir}")
@@ -191,6 +201,38 @@ class CSVWatcherService:
             self.is_syncing = False
             self.sync_percent = 100
             self.sync_step = "Sync complete"
+
+    def _hydrate_market_feature_cache(self, files: List[Path]) -> None:
+        """Load recent market candles so ATR context survives watcher restarts."""
+        market_tables = {
+            "marketdata_xauusd_m15": "M15",
+            "marketdata_xauusd_h1": "H1",
+            "marketdata_xauusd_h4": "H4",
+        }
+        for table_name, timeframe in market_tables.items():
+            matching_files = sorted(
+                (path for path in files if self._map_filename_to_table(path.name) == table_name),
+                key=lambda path: path.name,
+            )
+            if not matching_files:
+                continue
+
+            latest_file = matching_files[-1]
+            with open(latest_file, "r", encoding="utf-8", errors="ignore") as handle:
+                lines = handle.readlines()
+            if len(lines) < 2:
+                continue
+
+            headers = [header.strip() for header in lines[0].split(",")]
+            recent_rows = []
+            for values in csv.reader(lines[-self.MARKET_FEATURE_CACHE_LIMIT:]):
+                if len(values) < len(headers):
+                    continue
+                raw_row = {headers[index]: values[index] for index in range(len(headers))}
+                parsed_row = self._parse_row_by_table(raw_row, table_name, latest_file.name)
+                if parsed_row:
+                    recent_rows.append(parsed_row)
+            self._market_feature_rows[timeframe] = recent_rows[-self.MARKET_FEATURE_CACHE_LIMIT:]
 
     def _check_for_updates(self):
         """Scans directory and checks if mtime or size of any file has changed."""
@@ -487,7 +529,33 @@ class CSVWatcherService:
             return
             
         try:
-            if table_name == "llhhbosdata_xauusd":
+            market_timeframes = {
+                "marketdata_xauusd_m15": "M15",
+                "marketdata_xauusd_h1": "H1",
+                "marketdata_xauusd_h4": "H4",
+            }
+            if table_name in market_timeframes:
+                timeframe = market_timeframes[table_name]
+                self._market_feature_rows[timeframe].extend(parsed_rows)
+                self._market_feature_rows[timeframe].sort(key=lambda row: row["time"])
+                self._market_feature_rows[timeframe] = self._market_feature_rows[timeframe][
+                    -self.MARKET_FEATURE_CACHE_LIMIT:
+                ]
+
+            elif table_name == "llhhbosdata_xauusd":
+                project_root = self.backtest_dir.parent
+                py_dir = str(project_root / "ValueCell_MT5" / "python")
+                if py_dir not in sys.path:
+                    sys.path.insert(0, py_dir)
+                from valuecell.knowledge.historical_market_features import (
+                    build_market_feature_frame,
+                    extract_historical_market_features,
+                )
+
+                market_frames = {
+                    timeframe: build_market_feature_frame(pd.DataFrame(rows))
+                    for timeframe, rows in self._market_feature_rows.items()
+                }
                 logger.info(f"🔄 Fast sync {len(parsed_rows)} structures to LanceDB...")
                 patterns_to_add = []
                 for row in parsed_rows:
@@ -516,6 +584,15 @@ class CSVWatcherService:
                         norm_session = "NewYork"
                     else:
                         norm_session = "Asia"
+
+                    market_features = extract_historical_market_features(
+                        event_time=pd.Timestamp(s_time),
+                        structure_price=float(s_price),
+                        entry_price=None,
+                        m15=market_frames["M15"],
+                        h1=market_frames["H1"],
+                        h4=market_frames["H4"],
+                    )
                         
                     pattern_dict = {
                         "timestamp": s_time.isoformat(),
@@ -529,7 +606,8 @@ class CSVWatcherService:
                         "prior_choch": False,
                         "outcome": "PENDING",
                         "profit_pips": 0.0,
-                        "duration_minutes": 0
+                        "duration_minutes": None,
+                        **market_features,
                     }
                     patterns_to_add.append(pattern_dict)
                 
@@ -561,7 +639,7 @@ class CSVWatcherService:
                             pips = (entry_pr - exit_pr) * 10.0
                         outcome = "WIN" if net_profit > 0 else "LOSS"
                     else:
-                        outcome = "PENDING"
+                        outcome = "REJECTED"
                         
                     duration_minutes = 0
                     if t_exit and t_entry:
@@ -570,7 +648,12 @@ class CSVWatcherService:
                         except Exception:
                             duration_minutes = 0
                             
-                    structure_event = str(row.get("entry_structure", "")).strip() or "BoS"
+                    raw_structure_event = str(row.get("entry_structure", "")).strip()
+                    structure_event = ""
+                    for candidate_event in ("CHoCH", "BoS", "HH", "LL"):
+                        if raw_structure_event.lower().startswith(candidate_event.lower()):
+                            structure_event = candidate_event
+                            break
                     
                     trade_dict = {
                         "ticket": int(ticket),
@@ -582,7 +665,7 @@ class CSVWatcherService:
                         "profit_pips": round(pips, 2),
                         "duration_minutes": duration_minutes,
                         "outcome": outcome,
-                        "structure_event": structure_event,
+                        "structure_event": structure_event or "Unknown",
                         "session": self._normalize_session(session),
                         "consensus_score": 0.80,
                         "body_ratio": float(row["body_ratio"]) if row.get("body_ratio") is not None else None,
@@ -606,6 +689,22 @@ class CSVWatcherService:
                         "close_reason": row.get("close_reason", "")
                     }
                     trades_to_add.append(trade_dict)
+
+                    self.lancedb.enrich_structure_pattern_from_trade({
+                        "entry_time": t_entry,
+                        "exit_time": t_exit,
+                        "timeframe": str(row.get("timeframe", "M15")).strip(),
+                        "type": t_type,
+                        "entry_structure": structure_event,
+                        "entry_price": entry_pr,
+                        "exit_price": exit_pr,
+                        "outcome": outcome,
+                        "net_profit": net_profit if status.upper() != "REJECTED" else None,
+                        "profit_pips": round(pips, 2),
+                        "duration_minutes": duration_minutes if t_exit else None,
+                        "close_reason": str(row.get("close_reason", "")).strip(),
+                        "reject_reason_raw": str(row.get("reject_reason", "")).strip(),
+                    })
                     
                 if trades_to_add:
                     self.lancedb.add_trade_outcomes_batch(trades_to_add)

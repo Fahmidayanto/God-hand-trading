@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -32,6 +33,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { LLMMSAReport } from "./components/LLMMSAReport";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -546,6 +548,11 @@ interface SimFrame {
   // Counter-swing flag: frontend should NOT update Agent Consensus panel
   // when true â€” keeps warm-up values from the setup swing event visible.
   is_counter_swing?: boolean;
+  llm_msa?: {
+    status?: string;
+    mode?: string;
+    display_report?: Parameters<typeof LLMMSAReport>[0]["report"];
+  } | null;
 }
 
 const AGENT_PANEL_DEFS = [
@@ -791,10 +798,25 @@ export default function SimulationOfDead() {
   const [patternStructures, setPatternStructures] = useState<any[]>([]);
   const [patternCandlesLoading, setPatternCandlesLoading] = useState(false);
   const [patternSort, setPatternSort] = useState<{ key: string; dir: "asc" | "desc" }>({ key: "similarity", dir: "desc" });
+  const closeAgentModal = useCallback(() => {
+    setIsAgentModalOpen(false);
+    setSelectedPattern(null);
+  }, []);
   const togglePatternSort = (key: string) => {
     setPatternSort(prev => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: "desc" }));
   };
   const availableYears = ["2020", "2021", "2022", "2023", "2024", "2025", "2026"];
+
+  useEffect(() => {
+    if (!isAgentModalOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeAgentModal();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closeAgentModal, isAgentModalOpen]);
 
   // â”€â”€ Fetch OHLC window + nearby BOS/CHoCH/HH/LL structures for the pattern-detail popup â”€â”€
   useEffect(() => {
@@ -3838,9 +3860,18 @@ export default function SimulationOfDead() {
       )}
 
       {/* â”€â”€ Agent Detail Pop-up Modal â”€â”€ */}
-      {isAgentModalOpen && selectedAgent && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200">
-          <div className="w-[96vw] max-w-[96vw] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col max-h-[135vh] h-[135vh] animate-in zoom-in-95 duration-200 relative">
+      {isAgentModalOpen && selectedAgent && createPortal((
+        <div
+          className="fixed left-0 top-0 z-[9999] flex h-[100dvh] w-[100dvw] items-center justify-center p-4 bg-white/80 backdrop-blur-xl animate-in fade-in duration-200"
+          onClick={closeAgentModal}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${selectedAgent.name} detail`}
+            onClick={event => event.stopPropagation()}
+            className="w-[96vw] max-w-[96vw] h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] bg-white/92 border border-blue-200 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 relative"
+          >
             {/* Premium Gradient Top Accent Line */}
             <div
               className="absolute top-0 left-0 w-full h-[3px]"
@@ -3848,7 +3879,7 @@ export default function SimulationOfDead() {
             />
 
             {/* Header */}
-            <div className="p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
+            <div className="shrink-0 p-6 pt-7 border-b border-blue-200 flex items-center justify-between bg-white/70">
               <div className="flex items-center gap-3">
                 <div
                   className="p-2.5 rounded-xl text-lg border"
@@ -3866,7 +3897,7 @@ export default function SimulationOfDead() {
                 </div>
               </div>
               <button
-                onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
+                onClick={closeAgentModal}
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-800 hover:bg-[#BFDBFE] transition-all cursor-pointer hover:scale-105 active:scale-95 duration-150"
                 title="Tutup"
               >
@@ -3875,7 +3906,7 @@ export default function SimulationOfDead() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 space-y-6">
               {/* Agent Status and Confidence Card */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-[#F0F6FF]/55 border border-blue-200/70 rounded-xl p-4 flex flex-col justify-between">
@@ -3912,7 +3943,14 @@ export default function SimulationOfDead() {
               </div>
 
               {/* Specific Metadata Panel (e.g. LanceDB Pattern Matching for Market Structure) */}
-              {selectedAgent.meta && (selectedAgent.meta.win_rate !== undefined || selectedAgent.meta.pattern_count !== undefined) && (
+              {selectedAgent.key === "market_structure" && activeFrame?.llm_msa?.display_report && (
+                <LLMMSAReport
+                  report={activeFrame.llm_msa.display_report}
+                  status={activeFrame.llm_msa.status}
+                />
+              )}
+
+              {!activeFrame?.llm_msa?.display_report && selectedAgent.meta && (selectedAgent.meta.win_rate !== undefined || selectedAgent.meta.pattern_count !== undefined) && (
                 <div className="bg-[#F0F6FF]/40 border border-blue-200 rounded-xl p-5 space-y-4">
                   <h4 className="text-sm font-semibold text-slate-600 flex items-center gap-2"><Database size={14} aria-hidden="true" /> Database LanceDB Pattern Matching</h4>
                   <div className="grid grid-cols-2 gap-4">
@@ -4204,9 +4242,9 @@ export default function SimulationOfDead() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-blue-200 bg-white/60 flex justify-end">
+            <div className="shrink-0 p-4 border-t border-blue-200 bg-white/60 flex justify-end">
               <button
-                onClick={() => { setIsAgentModalOpen(false); setSelectedPattern(null); }}
+                onClick={closeAgentModal}
                 className="px-5 py-2 rounded-xl bg-[#BFDBFE] hover:bg-slate-700 text-slate-800 text-sm font-semibold transition-all cursor-pointer"
               >
                 Tutup
@@ -4214,7 +4252,7 @@ export default function SimulationOfDead() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

@@ -631,6 +631,7 @@ def _build_frame(ev: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
         "event_direction": ev.get("direction"),
         "session": _detect_session(ev_ts) if ev_ts else None,
         "is_first_bos": is_first_bos,
+        "llm_msa": _ar.get("llm_msa"),
         "agents": {
             "market_structure": view("market_structure"),
             "ml_prediction": view("ml_prediction"),
@@ -672,13 +673,22 @@ def get_orchestrator():
     if _cached_orchestrator is not None:
         return _cached_orchestrator
 
+    from dotenv import load_dotenv
     from valuecell.agents.orchestrator_agent import OrchestratorAgent
+
+    load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
     base_kwargs = dict(
         enable_market_structure=True,
         enable_ml_prediction=True,
         enable_risk_management=True,
+        enable_llm_msa=True,
         consensus_threshold=0.60,
+        llm_msa={
+            "provider": "suniesis",
+            "timeout_seconds": 240.0,
+            "suniesis_model_timeout_seconds": 220.0,
+        },
     )
     try:
         _cached_orchestrator = OrchestratorAgent(enable_sentiment=True, **base_kwargs)
@@ -687,7 +697,20 @@ def get_orchestrator():
             f"sim: sentiment-enabled orchestrator failed to build ({e}); "
             f"falling back to sentiment-disabled instance"
         )
-        _cached_orchestrator = OrchestratorAgent(enable_sentiment=False, **base_kwargs)
+        try:
+            _cached_orchestrator = OrchestratorAgent(enable_sentiment=False, **base_kwargs)
+        except ValueError as fallback_exc:
+            if "SUNIESIS_API_KEY" not in str(fallback_exc):
+                raise
+            logger.warning(
+                "sim: Suniesis credential unavailable; disabling shadow LLM MSA for this process"
+            )
+            fallback_kwargs = {**base_kwargs, "enable_llm_msa": False}
+            fallback_kwargs.pop("llm_msa", None)
+            _cached_orchestrator = OrchestratorAgent(
+                enable_sentiment=False,
+                **fallback_kwargs,
+            )
     return _cached_orchestrator
 
 
@@ -695,6 +718,22 @@ def analyze_with_orchestrator_lock(orch, market_data, symbol="XAUUSD", timeframe
     """Protect stateful simulation agent and warm-up cache from concurrent requests."""
     with _orchestrator_lock:
         return orch.analyze(market_data=market_data, symbol=symbol, timeframe=timeframe, veto_mode=veto_mode)
+
+
+def resolve_llm_msa_diagnostic_result(orch, result, timeout_seconds=245.0):
+    """Wait for shadow LLM output only when building an explicit diagnostic response."""
+    llm_result = (result.get("agent_results") or {}).get("llm_msa")
+    if not isinstance(llm_result, dict) or llm_result.get("status") != "pending":
+        return result
+
+    setup_id = llm_result.get("setup_id")
+    llm_agent = getattr(orch, "agents", {}).get("llm_msa")
+    if not setup_id or llm_agent is None:
+        return result
+
+    resolved = llm_agent.wait_for_result(setup_id, timeout=timeout_seconds)
+    result["agent_results"]["llm_msa"] = resolved
+    return result
 
 
 def reset_simulation_orchestrator():

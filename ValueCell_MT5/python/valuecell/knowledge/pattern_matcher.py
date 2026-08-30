@@ -9,7 +9,21 @@ from typing import List, Dict, Any, Optional, Union
 from datetime import datetime, timedelta
 
 from loguru import logger
-from .lance_db import LanceDBManager
+from .lance_db import LanceDBManager, VECTOR_VERSION
+
+
+SIMILARITY_FACTOR_DIMENSIONS = (
+    ("event_structure", range(0, 4)),
+    ("direction", range(4, 5)),
+    ("ema_distance_scaled", range(5, 6)),
+    ("session", range(6, 10)),
+    ("structure_hour", range(10, 11)),
+    ("timeframe", range(11, 12)),
+    ("prior_choch", range(12, 13)),
+    ("body_ratio", range(13, 14)),
+    ("range_atr_ratio", range(14, 15)),
+    ("ema200_h1_h4_context", range(15, 16)),
+)
 
 
 class PatternMatcher:
@@ -45,6 +59,10 @@ class PatternMatcher:
         prior_choch: bool = False,
         timestamp: Optional[Union[datetime, str]] = None,
         price_ratio: Optional[float] = None,
+        body_ratio: Optional[float] = None,
+        range_atr_ratio: Optional[float] = None,
+        ema200_h1_distance_scaled: Optional[float] = None,
+        ema200_h4_distance_scaled: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Find similar historical patterns and calculate statistics.
@@ -84,6 +102,10 @@ class PatternMatcher:
                 "symbol": "XAUUSD",
                 "prior_choch": prior_choch,
                 "price_ratio": price_ratio,
+                "body_ratio": body_ratio,
+                "range_atr_ratio": range_atr_ratio,
+                "ema200_h1_distance_scaled": ema200_h1_distance_scaled,
+                "ema200_h4_distance_scaled": ema200_h4_distance_scaled,
             }
             
             # Search similar patterns
@@ -130,6 +152,30 @@ class PatternMatcher:
             ]
             total_net_profit = sum(executed_net_profits)
 
+            executed_patterns = [
+                pattern
+                for pattern in similar_patterns
+                if str(pattern.get("outcome", "")).upper() in {"WIN", "LOSS"}
+            ]
+            winning_patterns = [
+                pattern
+                for pattern in executed_patterns
+                if str(pattern.get("outcome", "")).upper() == "WIN"
+            ]
+            losing_patterns = [
+                pattern
+                for pattern in executed_patterns
+                if str(pattern.get("outcome", "")).upper() == "LOSS"
+            ]
+            executed_similarity_weight = sum(
+                float(pattern.get("similarity", 0.0))
+                for pattern in executed_patterns
+            )
+            winning_similarity_weight = sum(
+                float(pattern.get("similarity", 0.0))
+                for pattern in winning_patterns
+            )
+
             rejection_groups = defaultdict(list)
             for pattern in similar_patterns:
                 if str(pattern.get("outcome", "")).upper() != "REJECTED":
@@ -161,6 +207,12 @@ class PatternMatcher:
                 key=lambda pattern: float(pattern.get("similarity", 0.0)),
                 reverse=True,
             )[:10]
+            for rank, pattern in enumerate(top_matches[:3], start=1):
+                pattern["similarity_breakdown_rank"] = rank
+                pattern["similarity_breakdown"] = self._build_similarity_breakdown(
+                    current_pattern,
+                    pattern,
+                )
 
             outcome_distribution = {
                 "matches": total,
@@ -175,6 +227,7 @@ class PatternMatcher:
             }
             
             result = {
+                "vector_version": VECTOR_VERSION,
                 "patterns": similar_patterns,  # Show all matching patterns
                 "win_rate": win_rate,
                 "avg_profit": avg_profit,
@@ -187,6 +240,22 @@ class PatternMatcher:
                 "net_profit_statistics": {
                     "total": total_net_profit,
                     "average": total_net_profit / len(executed_net_profits) if executed_net_profits else 0.0,
+                },
+                "weighted_statistics": {
+                    "executed_similarity_weight": executed_similarity_weight,
+                    "winning_similarity_weight": winning_similarity_weight,
+                    "weighted_win_rate": (
+                        winning_similarity_weight / executed_similarity_weight
+                        if executed_similarity_weight else 0.0
+                    ),
+                    "average_executed_similarity": (
+                        executed_similarity_weight / completed_trades
+                        if completed_trades else 0.0
+                    ),
+                },
+                "outcome_characteristics": {
+                    "wins": self._summarize_outcome_group(winning_patterns),
+                    "losses": self._summarize_outcome_group(losing_patterns),
                 },
                 "rejection_analysis": {
                     "total_rejected": rejected,
@@ -211,6 +280,7 @@ class PatternMatcher:
     @staticmethod
     def _empty_evidence(reasoning: str) -> Dict[str, Any]:
         return {
+            "vector_version": VECTOR_VERSION,
             "patterns": [],
             "win_rate": 0.0,
             "avg_profit": 0.0,
@@ -231,12 +301,175 @@ class PatternMatcher:
                 "completion_rate": 0.0,
             },
             "net_profit_statistics": {"total": 0.0, "average": 0.0},
+            "weighted_statistics": {
+                "executed_similarity_weight": 0.0,
+                "winning_similarity_weight": 0.0,
+                "weighted_win_rate": 0.0,
+                "average_executed_similarity": 0.0,
+            },
+            "outcome_characteristics": {
+                "wins": PatternMatcher._summarize_outcome_group([]),
+                "losses": PatternMatcher._summarize_outcome_group([]),
+            },
             "rejection_analysis": {
                 "total_rejected": 0,
                 "reason_distribution": [],
             },
             "top_matches": [],
         }
+
+    @staticmethod
+    def _summarize_outcome_group(patterns: List[Dict[str, Any]]) -> Dict[str, Any]:
+        def average(field: str) -> Optional[float]:
+            values = [
+                float(pattern[field])
+                for pattern in patterns
+                if pattern.get(field) is not None
+            ]
+            return sum(values) / len(values) if values else None
+
+        return {
+            "count": len(patterns),
+            "average_similarity": average("similarity"),
+            "average_net_profit": average("net_profit"),
+            "average_ema_distance": average("ema_distance"),
+            "average_range_atr_ratio": average("range_atr_ratio"),
+        }
+
+    @staticmethod
+    def _build_similarity_breakdown(
+        current_pattern: Dict[str, Any],
+        historical_pattern: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        vectorizer = LanceDBManager.__new__(LanceDBManager)
+        current_vector = vectorizer._pattern_to_vector(current_pattern)
+        historical_vector = vectorizer._pattern_to_vector(historical_pattern)
+        total_squared_distance = sum(
+            (current - historical) ** 2
+            for current, historical in zip(current_vector, historical_vector)
+        )
+
+        raw_values = {
+            "event_structure": (
+                current_pattern.get("event_type"),
+                historical_pattern.get("event_type"),
+            ),
+            "direction": (
+                current_pattern.get("direction"),
+                historical_pattern.get("direction"),
+            ),
+            "ema_distance_scaled": (
+                PatternMatcher._scaled_ema_distance(current_pattern),
+                PatternMatcher._scaled_ema_distance(historical_pattern),
+            ),
+            "session": (
+                current_pattern.get("session"),
+                historical_pattern.get("session"),
+            ),
+            "structure_hour": (
+                PatternMatcher._timestamp_hour(current_pattern.get("timestamp")),
+                PatternMatcher._timestamp_hour(historical_pattern.get("timestamp")),
+            ),
+            "timeframe": (
+                current_pattern.get("timeframe"),
+                historical_pattern.get("timeframe"),
+            ),
+            "prior_choch": (
+                current_pattern.get("prior_choch"),
+                historical_pattern.get("prior_choch"),
+            ),
+            "body_ratio": (
+                current_pattern.get("body_ratio"),
+                historical_pattern.get("body_ratio"),
+            ),
+            "range_atr_ratio": (
+                current_pattern.get("range_atr_ratio"),
+                historical_pattern.get("range_atr_ratio"),
+            ),
+            "ema200_h1_h4_context": (
+                PatternMatcher._ema_context_values(current_pattern),
+                PatternMatcher._ema_context_values(historical_pattern),
+            ),
+        }
+
+        factors = []
+        for factor_name, dimensions in SIMILARITY_FACTOR_DIMENSIONS:
+            dimension_list = list(dimensions)
+            squared_distance = sum(
+                (current_vector[index] - historical_vector[index]) ** 2
+                for index in dimension_list
+            )
+            vector_distance = squared_distance ** 0.5
+            current_value, historical_value = raw_values[factor_name]
+            available = PatternMatcher._factor_values_available(
+                current_value,
+                historical_value,
+            )
+            factors.append({
+                "factor": factor_name,
+                "current_value": current_value,
+                "historical_value": historical_value,
+                "vector_distance": vector_distance,
+                "factor_similarity": 1.0 / (1.0 + vector_distance),
+                "distance_contribution": (
+                    squared_distance / total_squared_distance
+                    if total_squared_distance > 0
+                    else 0.0
+                ),
+                "available": available,
+            })
+
+        return {
+            "total_similarity": float(historical_pattern.get("similarity", 0.0)),
+            "method": "vector-v2-lite-squared-l2",
+            "factors": factors,
+            "not_used_in_similarity": [
+                "outcome",
+                "net_profit",
+                "entry_time",
+                "entry_price",
+                "exit_time",
+                "exit_price",
+                "duration_minutes",
+                "close_reason",
+            ],
+        }
+
+    @staticmethod
+    def _scaled_ema_distance(pattern: Dict[str, Any]) -> Optional[float]:
+        price = pattern.get("price")
+        ema200 = pattern.get("ema200")
+        price_ratio = pattern.get("price_ratio")
+        if price is None or ema200 is None:
+            return None
+        ratio = float(price_ratio) if price_ratio is not None and float(price_ratio) > 0 else 1.0
+        return (float(price) - float(ema200)) / ratio
+
+    @staticmethod
+    def _timestamp_hour(timestamp: Any) -> Optional[float]:
+        if timestamp is None:
+            return None
+        try:
+            return datetime.fromisoformat(str(timestamp)).hour
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _ema_context_values(pattern: Dict[str, Any]) -> Optional[Dict[str, float]]:
+        values = {}
+        for field in ("ema200_h1_distance_scaled", "ema200_h4_distance_scaled"):
+            value = pattern.get(field)
+            if value is not None:
+                values[field] = float(value)
+        return values or None
+
+    @staticmethod
+    def _factor_values_available(current_value: Any, historical_value: Any) -> bool:
+        if current_value is None or historical_value is None:
+            return False
+        if isinstance(current_value, dict) and isinstance(historical_value, dict):
+            return bool(set(current_value) & set(historical_value))
+        return True
     
     def _generate_recommendation(
         self,

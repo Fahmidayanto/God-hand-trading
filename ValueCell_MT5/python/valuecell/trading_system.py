@@ -142,10 +142,16 @@ class TradingSystem:
 
         # Initialize Orchestrator (Sprint 1: pass shadow_mode to SentimentAgent)
         self.orchestrator = OrchestratorAgent(
+            enable_llm_msa=True,
             consensus_threshold=0.60,
             market_structure={"swing_length": 5, "timeframe": timeframe},
             risk_management={"account_balance": 10000.0},  # TODO: Get from MT5
             sentiment={"shadow_mode": sentiment_shadow_mode},
+            llm_msa={
+                "provider": "suniesis",
+                "timeout_seconds": 20.0,
+                "suniesis_model_timeout_seconds": 15.0,
+            },
         )
 
         # Initialize Execution Agent

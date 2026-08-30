@@ -33,6 +33,15 @@ logging.basicConfig(
 logger = logging.getLogger("populate_lancedb")
 
 from valuecell.knowledge.lance_db import LanceDBManager
+from valuecell.knowledge.historical_market_features import (
+    build_market_feature_frame,
+    extract_historical_market_features,
+)
+from valuecell.knowledge.historical_trade_matching import (
+    build_structure_trade_matches,
+    normalize_structure_direction,
+    normalize_structure_event,
+)
 
 
 def parse_dt_safe(time_str: str) -> datetime:
@@ -91,12 +100,9 @@ def main():
     # 1. Initialize LanceDB Manager
     db = LanceDBManager(str(PYTHON_DIR / "valuecell" / "data" / "lancedb"))
     
-    # Clear existing structures for a clean import
-    logger.info("Clearing all existing LanceDB collections...")
+    # Rebuild only the collection produced by this script.
+    logger.info("Clearing historical_structures for a clean import...")
     db.clear_collection("historical_structures")
-    db.clear_collection("market_conditions")
-    db.clear_collection("session_patterns")
-    db.clear_collection("trade_outcomes")
     
     # Find files
     structure_files = sorted(glob.glob(str(BACKTEST_DIR / "LLHHBOSData_XAUUSD_*.csv")))
@@ -135,6 +141,7 @@ def main():
     logger.info(f"Processing years: {years}")
     
     total_imported = 0
+    seen_events = set()
     
     for year in years:
         logger.info(f"\n📅 --- Processing Year: {year} ---")
@@ -157,14 +164,61 @@ def main():
             logger.info(f"Loaded {len(df_results)} trade outcome rows.")
         else:
             logger.warning(f"Trade results file missing for year {year}, continuing without outcomes.")
+
+        matching_structures = []
+        for _, structure_row in df_struct.iterrows():
+            structure_time = parse_dt_safe(str(structure_row.get("Time")).strip())
+            structure_type = normalize_structure_event(structure_row.get("Type"))
+            structure_direction = normalize_structure_direction(
+                structure_row.get("Type"),
+                structure_row.get("Direction/Action"),
+            )
+            structure_timeframe = str(structure_row.get("Timeframe")).strip()
+            event_key = (
+                structure_time.isoformat(),
+                structure_type,
+                structure_direction,
+                structure_timeframe,
+            )
+            matching_structures.append({
+                "event_key": event_key,
+                "event_time": structure_time,
+                "event_type": structure_type,
+                "direction": structure_direction,
+                "timeframe": structure_timeframe,
+            })
+
+        matching_trades = df_results.copy()
+        if not matching_trades.empty:
+            matching_trades["trade_key"] = matching_trades.index
+            matching_trades["entry_time"] = matching_trades["EntryTime"].map(
+                lambda value: parse_dt_safe(str(value))
+            )
+            matching_trades["type"] = matching_trades["Type"].astype(str).str.strip()
+            matching_trades["timeframe"] = matching_trades["Timeframe"].astype(str).str.strip()
+            matching_trades["entry_structure"] = matching_trades["EntryStructure"]
+
+        trade_matches, match_stats = build_structure_trade_matches(
+            pd.DataFrame(matching_structures),
+            matching_trades,
+        )
+        logger.info(
+            "One-to-one trade matching: %s matched, %s unmatched, %s exact event, %s fallback.",
+            match_stats["matched"],
+            match_stats["unmatched"],
+            match_stats["exact_event"],
+            match_stats["fallback"],
+        )
             
         # Load market data (M15, H1, H4) to match EMA200
         market_data = {}
+        market_feature_frames = {}
         for tf in ["M15", "H1", "H4"]:
             m_path = BACKTEST_DIR / f"MarketData_XAUUSD_{tf}_{year}.csv"
             if m_path.exists():
                 df_m = pd.read_csv(m_path)
                 df_m.columns = [c.strip() for c in df_m.columns]
+                market_feature_frames[tf] = build_market_feature_frame(df_m)
                 # Set index to Time for fast O(1) lookups
                 market_data[tf] = df_m.set_index("Time")
                 logger.info(f"Loaded market data {tf}: {len(df_m)} rows indexed.")
@@ -173,32 +227,16 @@ def main():
 
         # Convert structures to LanceDB format
         patterns_to_add = []
-        seen_events = set()
-        
         # Parse structures and try to join with trades/market data
         for _, row in df_struct.iterrows():
             raw_type = str(row.get("Type")).strip()
             raw_dir = str(row.get("Direction/Action")).strip()
             
             # Normalize event_type to match LanceDB (BoS, CHoCH, HH, LL)
-            event_type = "BoS"
-            if "choch" in raw_type.lower():
-                event_type = "CHoCH"
-            elif "hh" in raw_type.lower():
-                event_type = "HH"
-            elif "ll" in raw_type.lower():
-                event_type = "LL"
+            event_type = normalize_structure_event(raw_type)
                 
             # Normalize direction
-            direction = "Bullish"
-            if "bearish" in raw_dir.lower() or "bearish" in raw_type.lower():
-                direction = "Bearish"
-            elif "update" in raw_dir.lower():
-                # For updates, get direction from raw_type or direction
-                if "bullish" in raw_type.lower() or "hh" in raw_type.lower():
-                    direction = "Bullish"
-                elif "bearish" in raw_type.lower() or "ll" in raw_type.lower():
-                    direction = "Bearish"
+            direction = normalize_structure_direction(raw_type, raw_dir)
             
             tf = str(row.get("Timeframe")).strip()
             price = float(row.get("Price"))
@@ -230,35 +268,8 @@ def main():
                     # In case of series/multiple rows, take the first one
                     ema200 = float(ema_val.iloc[0] if isinstance(ema_val, pd.Series) else ema_val)
 
-            # Try to match with a trade in results
-            trade_match = None
-            if not df_results.empty:
-                # Convert time string to datetime to check proximity
-                try:
-                    struct_time = datetime.strptime(time_str, "%Y.%m.%d %H:%M:%S")
-                    
-                    # Find candidate trades matching Symbol, Timeframe, Type
-                    # BoS/CHoCH Bullish -> BUY, BoS/CHoCH Bearish -> SELL
-                    expected_type = "BUY" if direction == "Bullish" else "SELL"
-                    
-                    # Filter candidate trades
-                    candidates = df_results[
-                        (df_results["Symbol"] == "XAUUSD") & 
-                        (df_results["Timeframe"] == tf) &
-                        (df_results["Type"] == expected_type)
-                    ]
-                    
-                    for _, t_row in candidates.iterrows():
-                        t_entry_str = str(t_row.get("EntryTime")).strip()
-                        t_entry_time = datetime.strptime(t_entry_str, "%Y.%m.%d %H:%M:%S")
-                        
-                        # Match if entry time is within a 1-hour window after structure time
-                        time_diff = t_entry_time - struct_time
-                        if timedelta(minutes=0) <= time_diff <= timedelta(hours=1):
-                            trade_match = t_row
-                            break
-                except Exception as ex:
-                    logger.debug(f"Error matching trade: {ex}")
+            event_key = (row_dt.isoformat(), event_type, direction, tf)
+            trade_match = trade_matches.get(event_key)
             
             # Outcome formatting
             outcome = "PENDING"
@@ -317,10 +328,24 @@ def main():
                 dt_iso = datetime.now().isoformat()
                 
             # Prevent duplicate patterns from same event + time
-            event_key = (dt_iso, event_type, direction, tf)
             if event_key in seen_events:
                 continue
             seen_events.add(event_key)
+
+            entry_price = None
+            if trade_match is not None:
+                entry_value = trade_match.get("EntryPrice")
+                if entry_value is not None and pd.notna(entry_value):
+                    entry_price = float(entry_value)
+
+            market_features = extract_historical_market_features(
+                event_time=pd.Timestamp(row_dt),
+                structure_price=price,
+                entry_price=entry_price,
+                m15=market_feature_frames.get("M15", pd.DataFrame()),
+                h1=market_feature_frames.get("H1", pd.DataFrame()),
+                h4=market_feature_frames.get("H4", pd.DataFrame()),
+            )
                  
             patterns_to_add.append({
                 "timestamp": dt_iso,
@@ -335,9 +360,15 @@ def main():
                 "profit_pips": profit_pips,
                 "net_profit": net_profit,
                 "duration_minutes": duration_minutes,
+                "entry_time": trade_match.get("EntryTime") if trade_match is not None else None,
+                "entry_price": trade_match.get("EntryPrice") if trade_match is not None else None,
+                "exit_time": trade_match.get("ExitTime") if trade_match is not None else None,
+                "exit_price": trade_match.get("ExitPrice") if trade_match is not None else None,
+                "close_reason": trade_match.get("CloseReason") if trade_match is not None else None,
                 "prior_choch": prior_choch,
                 "reject_reason_raw": reject_reason_raw,
                 "price_ratio": round(price / 4500.0, 6) if price > 0 else 1.0,
+                **market_features,
             })
             
         # Add to LanceDB

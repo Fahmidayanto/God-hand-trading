@@ -19,6 +19,7 @@ Tahap 2: Execution Trigger (saat BoS terkonfirmasi)
 import os
 import sys
 import hashlib
+from copy import deepcopy
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from enum import Enum
@@ -26,6 +27,7 @@ import psycopg2
 import pandas as pd
 from loguru import logger
 
+from valuecell.knowledge.lance_db import VECTOR_VERSION
 from valuecell.knowledge.pattern_matcher import PatternMatcher
 
 
@@ -307,6 +309,7 @@ class MarketStructureAgent:
                     ema200_h4=ema200_h4,
                     session=session,
                     price_ratio=price_ratio,
+                    latest_candle=latest_candle,
                     veto_mode=veto_mode,
                 )
                 return self._build_response(
@@ -538,6 +541,12 @@ class MarketStructureAgent:
         # Query LanceDB: Mencocokkan kesamaan pola BoS jika kelak tertembus (Step 3)
         pattern_analysis = None
         if self.use_patterns and self.pattern_matcher:
+            vector_context = self._build_vector_market_context(
+                structure_price=price,
+                ema200_h1=ema200_h1,
+                ema200_h4=ema200_h4,
+                latest_candle=latest_candle,
+            )
             pattern_analysis = self._analyze_patterns(
                 event_type="BoS",
                 direction=direction,
@@ -548,6 +557,7 @@ class MarketStructureAgent:
                 prior_choch=True,
                 timestamp=event_timestamp,
                 price_ratio=price_ratio,
+                **vector_context,
             )
         self._pending_analysis = pattern_analysis
 
@@ -620,6 +630,7 @@ class MarketStructureAgent:
         ema200_h4: Optional[float],
         session: str,
         price_ratio: float,
+        latest_candle: Optional[Dict[str, Any]],
         veto_mode: str = "hard",
     ) -> Dict[str, Any]:
         """Dijalankan saat CHoCH langsung terkonfirmasi untuk entri agresif."""
@@ -647,6 +658,12 @@ class MarketStructureAgent:
         pattern_analysis = None
         if self.use_patterns and self.pattern_matcher:
             try:
+                vector_context = self._build_vector_market_context(
+                    structure_price=price,
+                    ema200_h1=ema200_h1,
+                    ema200_h4=ema200_h4,
+                    latest_candle=latest_candle,
+                )
                 pattern_analysis = self._analyze_patterns(
                     event_type="CHoCH",
                     direction=direction,
@@ -657,6 +674,7 @@ class MarketStructureAgent:
                     prior_choch=False,
                     timestamp=event_timestamp,
                     price_ratio=price_ratio,
+                    **vector_context,
                 )
             except Exception as e:
                 logger.warning(f"Gagal mencari pola CHoCH di LanceDB: {e}")
@@ -850,6 +868,10 @@ class MarketStructureAgent:
         prior_choch: bool = False,
         timestamp: Any = None,
         price_ratio: Optional[float] = None,
+        body_ratio: Optional[float] = None,
+        range_atr_ratio: Optional[float] = None,
+        ema200_h1_distance_scaled: Optional[float] = None,
+        ema200_h4_distance_scaled: Optional[float] = None,
     ) -> Optional[Dict[str, Any]]:
         """Query ke database vektor LanceDB untuk melihat kesamaan pola."""
         try:
@@ -865,11 +887,53 @@ class MarketStructureAgent:
                 prior_choch=prior_choch,
                 timestamp=timestamp,
                 price_ratio=price_ratio,
+                body_ratio=body_ratio,
+                range_atr_ratio=range_atr_ratio,
+                ema200_h1_distance_scaled=ema200_h1_distance_scaled,
+                ema200_h4_distance_scaled=ema200_h4_distance_scaled,
             )
             return result
         except Exception as e:
             logger.error(f"Pencarian pola di LanceDB gagal: {e}")
             return None
+
+    @staticmethod
+    def _build_vector_market_context(
+        structure_price: float,
+        ema200_h1: Optional[float],
+        ema200_h4: Optional[float],
+        latest_candle: Optional[Dict[str, Any]],
+    ) -> Dict[str, Optional[float]]:
+        context = {
+            "body_ratio": None,
+            "range_atr_ratio": None,
+            "ema200_h1_distance_scaled": None,
+            "ema200_h4_distance_scaled": None,
+        }
+        if not latest_candle:
+            return context
+
+        atr_raw = latest_candle.get("atr")
+        if atr_raw is None or pd.isna(atr_raw) or float(atr_raw) <= 0:
+            return context
+        atr = float(atr_raw)
+
+        required = ("open", "high", "low", "close")
+        if all(latest_candle.get(key) is not None and not pd.isna(latest_candle.get(key)) for key in required):
+            open_price = float(latest_candle["open"])
+            high_price = float(latest_candle["high"])
+            low_price = float(latest_candle["low"])
+            close_price = float(latest_candle["close"])
+            candle_range = high_price - low_price
+            if candle_range > 0:
+                context["body_ratio"] = abs(close_price - open_price) / candle_range
+                context["range_atr_ratio"] = candle_range / atr
+
+        if ema200_h1 is not None and not pd.isna(ema200_h1):
+            context["ema200_h1_distance_scaled"] = (structure_price - float(ema200_h1)) / atr
+        if ema200_h4 is not None and not pd.isna(ema200_h4):
+            context["ema200_h4_distance_scaled"] = (structure_price - float(ema200_h4)) / atr
+        return context
 
     @staticmethod
     def _build_setup_id(
@@ -937,9 +1001,16 @@ class MarketStructureAgent:
 
         trigger_price = pre_signal["hh_price"] or pre_signal["ll_price"]
         raw_distance = abs(current_price - trigger_price)
+        historical_evidence = deepcopy(pattern_analysis)
+        if historical_evidence is not None:
+            historical_evidence.pop("patterns", None)
+            historical_evidence["top_matches"] = historical_evidence.get(
+                "top_matches", []
+            )[:10]
 
         return {
             "schema_version": "msa-evidence-v1",
+            "vector_version": VECTOR_VERSION,
             "setup_id": pre_signal["setup_id"],
             "generated_at": datetime.now().isoformat(),
             "market_event_timestamp": pre_signal["market_event_timestamp"],
@@ -970,7 +1041,7 @@ class MarketStructureAgent:
                 "atr": {"value": atr_value, "timeframe": self.timeframe},
                 "candle_quality": candle_quality,
             },
-            "historical_evidence": pattern_analysis,
+            "historical_evidence": historical_evidence,
             "data_quality": {
                 "is_complete": not warnings,
                 "warnings": warnings,

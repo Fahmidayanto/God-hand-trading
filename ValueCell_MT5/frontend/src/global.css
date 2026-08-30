@@ -192,7 +192,10 @@
     padding: 0 !important;
     box-sizing: border-box !important;
     font-family: 'Inter', sans-serif !important;
-    /* Default: 100% (medium/large screens @ 1920x1080).
+    }
+
+    body > [data-slot="sidebar-wrapper"] {
+     /* Default: 100% (medium/large screens @ 1920x1080).
        Scale down on split screen, small laptops, and very large displays. */
     zoom: 1;
     -moz-transform: scale(1);
@@ -201,21 +204,21 @@
 
   /* Laptop & Split-screen (e.g. IDE preview tabs, 2-column editor views) */
   @media (max-width: 1536px) {
-    body {
+    body > [data-slot="sidebar-wrapper"] {
       zoom: 0.88;
       -moz-transform: scale(0.88);
     }
   }
 
   @media (max-width: 1200px) {
-    body {
+    body > [data-slot="sidebar-wrapper"] {
       zoom: 0.80;
       -moz-transform: scale(0.80);
     }
   }
 
   @media (max-width: 900px) {
-    body {
+    body > [data-slot="sidebar-wrapper"] {
       zoom: 0.72;
       -moz-transform: scale(0.72);
     }
@@ -223,7 +226,7 @@
 
   /* 2K / QHD (2560x1440) and above: gentle scale to keep info density */
   @media (min-width: 2560px) {
-    body {
+    body > [data-slot="sidebar-wrapper"] {
       zoom: 0.85;
       -moz-transform: scale(0.85);
     }
@@ -231,7 +234,7 @@
 
   /* 4K (3840x2160) and ultrawide: original scaling for the design target */
   @media (min-width: 3200px) {
-    body {
+    body > [data-slot="sidebar-wrapper"] {
       zoom: 0.7;
       -moz-transform: scale(0.7);
     }

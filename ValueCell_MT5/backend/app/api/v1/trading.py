@@ -1854,6 +1854,7 @@ async def get_single_event_simulation(
         analyze_with_orchestrator_lock,
         get_orchestrator,
         reconstruct_market_data,
+        resolve_llm_msa_diagnostic_result,
         _build_frame,
     )
     import pandas as pd
@@ -2066,6 +2067,9 @@ async def get_single_event_simulation(
         loguru_logger.info(f"   📰 News: {_news_count} headlines | 📅 Calendar: {_cal_count} events")
         result = await run_in_threadpool(
             analyze_with_orchestrator_lock, orch, md, symbol, timeframe, veto_mode
+        )
+        result = await run_in_threadpool(
+            resolve_llm_msa_diagnostic_result, orch, result
         )
 
         # --- Log: per-agent summary ---

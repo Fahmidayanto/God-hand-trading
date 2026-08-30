@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from valuecell.agents.market_structure_agent import AgentPhase, MarketStructureAgent
+from valuecell.knowledge.lance_db import VECTOR_VERSION
 
 
 def event(time, event_type, direction, price=2300.0):
@@ -73,6 +74,40 @@ def test_pending_setup_uses_market_event_timestamp_and_price_ratio():
     assert result["metadata"]["price_ratio"] == pytest.approx(0.751111)
 
 
+def test_pending_setup_forwards_vector_v2_lite_market_context():
+    agent = MarketStructureAgent(use_patterns=False)
+    matcher = CapturingPatternMatcher()
+    agent.use_patterns = True
+    agent.pattern_matcher = matcher
+    events = [
+        event(1, "LL", "Update"),
+        event(2, "CHoCH", "Bullish"),
+        event(3, "HH", "Update", price=3378.6),
+    ]
+    df_m15 = pd.DataFrame({
+        "open": [3360.0],
+        "high": [3385.0],
+        "low": [3355.0],
+        "close": [3380.0],
+        "ema200": [3350.0],
+        "atr": [24.0],
+    })
+
+    agent.analyze(
+        df_m15=df_m15,
+        df_h1=frame(3380.0, 3320.0),
+        df_h4=frame(3380.0, 3290.0),
+        structure_events=events,
+        session="London",
+        price_ratio=0.751111,
+    )
+
+    assert matcher.query["body_ratio"] == pytest.approx(20 / 30)
+    assert matcher.query["range_atr_ratio"] == pytest.approx(30 / 24)
+    assert matcher.query["ema200_h1_distance_scaled"] == pytest.approx((3378.6 - 3320.0) / 24)
+    assert matcher.query["ema200_h4_distance_scaled"] == pytest.approx((3378.6 - 3290.0) / 24)
+
+
 def test_pending_setup_builds_stable_llm_evidence_snapshot():
     agent = MarketStructureAgent(use_patterns=False)
     events = [
@@ -102,6 +137,7 @@ def test_pending_setup_builds_stable_llm_evidence_snapshot():
     snapshot = first["evidence_snapshot"]
 
     assert snapshot["schema_version"] == "msa-evidence-v1"
+    assert snapshot["vector_version"] == VECTOR_VERSION
     assert snapshot["setup_id"] == first["pre_signal"]["setup_id"]
     assert snapshot["market_event_timestamp"] == 3
     assert snapshot["market_context"]["ema200"] == {
@@ -126,6 +162,55 @@ def test_pending_setup_builds_stable_llm_evidence_snapshot():
         price_ratio=0.751111,
     )
     assert second["evidence_snapshot"]["setup_id"] == snapshot["setup_id"]
+
+
+def test_llm_evidence_sends_only_top_ten_historical_patterns():
+    agent = MarketStructureAgent(use_patterns=False)
+    matcher = CapturingPatternMatcher()
+    matcher.find_similar_patterns = lambda **_kwargs: {
+        "patterns": [{"id": f"pattern-{index}"} for index in range(23)],
+        "top_matches": [{"id": f"pattern-{index}"} for index in range(12)],
+        "win_rate": 0.62,
+        "avg_profit": 177.7,
+        "total_count": 23,
+        "completed_count": 21,
+        "recommendation": "BUY",
+    }
+    agent.use_patterns = True
+    agent.pattern_matcher = matcher
+    events = [
+        event(1, "LL", "Update", price=3300.0),
+        event(2, "CHoCH", "Bullish", price=3340.0),
+        event(3, "HH", "Update", price=3378.6),
+    ]
+    df_m15 = pd.DataFrame({
+        "open": [3360.0],
+        "high": [3385.0],
+        "low": [3355.0],
+        "close": [3380.0],
+        "ema200": [3350.0],
+        "atr": [24.0],
+    })
+
+    result = agent.analyze(
+        df_m15=df_m15,
+        df_h1=frame(3380.0, 3320.0),
+        df_h4=frame(3380.0, 3290.0),
+        structure_events=events,
+        session="London",
+        price_ratio=0.751111,
+    )
+
+    internal_history = result["pattern_analysis"]
+    llm_history = result["evidence_snapshot"]["historical_evidence"]
+
+    assert len(internal_history["patterns"]) == 23
+    assert "patterns" not in llm_history
+    assert [match["id"] for match in llm_history["top_matches"]] == [
+        f"pattern-{index}" for index in range(10)
+    ]
+    assert llm_history["total_count"] == 23
+    assert llm_history["completed_count"] == 21
 
 
 @pytest.mark.parametrize(

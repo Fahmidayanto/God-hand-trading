@@ -1,114 +1,77 @@
-import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+import inspect
 import os
+
+import pytest
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+
 from valuecell.agents.sentiment_agent import SentimentAgent, SentimentType
 
 class MockAgentRunResponse:
     def __init__(self, content):
         self.content = content
 
-def test_sentiment_agent_llm_glm_success():
-    """Test that SentimentAgent uses AgentRouter GLM-5.2 successfully on first try."""
-    agent = SentimentAgent(use_llm=True)
-    
-    glm_response = '{"sentiment": "bullish", "score": 0.90, "reasoning": "Strong gold demand on inflation (GLM-5.2)"}'
-    
-    with patch("agno.agent.Agent.run") as mock_run:
-        mock_run.return_value = MockAgentRunResponse(glm_response)
-        
-        result = agent.analyze(
-            signal="BUY",
-            confidence=0.70,
-            current_time=datetime.now(),
-            news_headlines=["Gold rallies on inflation fears"],
-            upcoming_events=[]
-        )
-        
-        assert result["sentiment"]["type"] == "bullish"
-        assert result["sentiment"]["score"] == 0.90
-        assert "GLM-5.2" in result["reasoning"]
-        mock_run.assert_called_once()
+def test_removed_sentiment_providers_are_not_constructor_options():
+    parameters = inspect.signature(SentimentAgent).parameters
 
-def test_sentiment_agent_llm_qwen397_fallback():
-    """Test fallback from GLM-5.2 to Qwen 397B."""
-    agent = SentimentAgent(use_llm=True)
-    
-    qwen397_response = '{"sentiment": "bullish", "score": 0.88, "reasoning": "Qwen 397B sentiment"}'
-    
-    run_mock = MagicMock()
-    run_mock.side_effect = [Exception("GLM-5.2 offline"), MockAgentRunResponse(qwen397_response)]
-    
-    with patch("agno.agent.Agent.run", run_mock):
-        result = agent.analyze(
-            signal="BUY",
-            confidence=0.70,
-            current_time=datetime.now(),
-            news_headlines=["Gold rallies on inflation fears"],
-            upcoming_events=[]
-        )
-        
-        assert result["sentiment"]["type"] == "bullish"
-        assert result["sentiment"]["score"] == 0.88
-        assert "Qwen 397B" in result["reasoning"]
-        assert run_mock.call_count == 2
+    for removed in (
+        "nineinference_api_key",
+        "agentrouter_api_key",
+        "iamhc_api_key",
+        "nvidia_397b_api_key",
+        "nvidia_inkling_api_key",
+        "nvidia_glm_api_key",
+    ):
+        assert removed not in parameters
 
-def test_sentiment_agent_llm_nemo120_fallback():
-    """Test fallback from GLM-5.2, Qwen 397B to Nemotron 120B."""
-    agent = SentimentAgent(use_llm=True)
-    
-    nemo120_response = '{"sentiment": "bullish", "score": 0.85, "reasoning": "Nemotron 120B sentiment"}'
-    
-    run_mock = MagicMock()
-    run_mock.side_effect = [Exception("GLM-5.2 offline"), Exception("Qwen 397B offline"), MockAgentRunResponse(nemo120_response)]
-    
-    with patch("agno.agent.Agent.run", run_mock):
-        result = agent.analyze(
-            signal="BUY",
-            confidence=0.70,
-            current_time=datetime.now(),
-            news_headlines=["Gold rallies on inflation fears"],
-            upcoming_events=[]
-        )
-        
-        assert result["sentiment"]["type"] == "bullish"
-        assert result["sentiment"]["score"] == 0.85
-        assert "Nemotron 120B" in result["reasoning"]
-        assert run_mock.call_count == 3
+    for replacement in (
+        "nvidia_kimi_k3_api_key",
+        "nvidia_deepseek_v4_pro_api_key",
+        "nvidia_deepseek_v4_flash_api_key",
+    ):
+        assert replacement in parameters
 
-def test_sentiment_agent_llm_gemini_fallback():
-    """Test fallback across 8 NVIDIA LLM tiers to Gemini."""
+
+@pytest.mark.parametrize(
+    ("tier", "model_name"),
+    [
+        (1, "Groq Qwen 3.6 27B"),
+        (2, "NVIDIA Nemotron 120B"),
+        (3, "NVIDIA Nemotron 550B"),
+        (4, "NVIDIA MiniMax M3"),
+        (5, "NVIDIA Kimi K3"),
+        (6, "NVIDIA Laguna"),
+        (7, "NVIDIA DeepSeek V4 Pro"),
+        (8, "NVIDIA DeepSeek V4 Flash"),
+        (9, "Gemini 2.5 Flash"),
+    ],
+)
+def test_sentiment_agent_llm_fallback_tiers(tier, model_name):
     agent = SentimentAgent(use_llm=True)
-    
-    gemini_response = '{"sentiment": "bearish", "score": -0.6, "reasoning": "Strong US dollar pressures gold (Gemini)"}'
-    
+
+    response = (
+        '{"sentiment": "bullish", "score": 0.82, '
+        f'"strength": "strong", "reasoning": "{model_name} sentiment"}}'
+    )
     run_mock = MagicMock()
-    run_mock.side_effect = [
-        Exception("GLM-5.2 offline"), 
-        Exception("Qwen 397B offline"), 
-        Exception("Nemotron 120B offline"), 
-        Exception("Nemotron 550B offline"), 
-        Exception("MiniMax M3 offline"), 
-        Exception("Inkling offline"), 
-        Exception("Laguna offline"), 
-        Exception("NVIDIA GLM offline"), 
-        MockAgentRunResponse(gemini_response)
+    run_mock.side_effect = [Exception("provider offline")] * (tier - 1) + [
+        MockAgentRunResponse(response)
     ]
-    
+
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "mock_key"}):
         with patch("agno.agent.Agent.run", run_mock):
             result = agent.analyze(
                 signal="BUY",
                 confidence=0.70,
                 current_time=datetime.now(),
-                news_headlines=["Strong economy pressures gold"],
+                news_headlines=["Gold rallies on inflation fears"],
                 upcoming_events=[]
             )
-            
-            assert result["sentiment"]["type"] == "bearish"
-            assert result["sentiment"]["score"] == -0.6
-            assert "Gemini" in result["reasoning"]
-            assert run_mock.call_count == 9
+
+    assert result["sentiment"]["type"] == "bullish"
+    assert result["sentiment"]["score"] == pytest.approx(0.82)
+    assert model_name in result["reasoning"]
+    assert run_mock.call_count == tier
 
 def test_sentiment_agent_llm_all_failed_keyword_fallback():
     """Test fallback to keyword-based analysis if all LLMs fail."""

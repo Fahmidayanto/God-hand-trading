@@ -1554,10 +1554,10 @@
         <div class="zoom-controls" id="zoom-controls">
             <!-- 2-Mode Switcher -->
             <div class="mode-toggle-group">
-                <button class="mode-btn active" id="btn-mode-card" onclick="setInteractionMode('card')" title="Mode Kartu: Geser kartu & tarik kotak seleksi banyak kartu">
+                <button class="mode-btn" id="btn-mode-card" onclick="setInteractionMode('card')" title="Mode Kartu: Geser kartu & tarik kotak seleksi banyak kartu">
                     👆 Mode Kartu
                 </button>
-                <button class="mode-btn" id="btn-mode-pan" onclick="setInteractionMode('pan')" title="Mode Kanvas: Geser seluruh kanvas bebas">
+                <button class="mode-btn active" id="btn-mode-pan" onclick="setInteractionMode('pan')" title="Mode Kanvas: Geser seluruh kanvas bebas">
                     ✋ Mode Kanvas
                 </button>
             </div>
@@ -1628,7 +1628,7 @@
                     <!-- Column 1: Live MT5 Ingestion Chain -->
                     <div style="display: flex; flex-direction: column; gap: 2.5rem; width: 500px;">
                         <!-- Node 1: MT5 Terminal & EA -->
-                        <div class="node-card" id="node-mt5" onclick="selectNode('mt5')" style="width: 100%;">
+                        <div class="node-card" id="node-mt5" onclick="selectNode('mt5')" data-dx="-28.554627983629516" data-dy="-171.70654394833772" style="transform: translate(-28.554627983629516px, -171.70654394833772px);">
                             <div class="card-header">
                                 <div class="card-icon">📈</div>
                                 <div>
@@ -1650,7 +1650,7 @@
                         </div>
 
                         <!-- Node 2: Watcher (Line Trigger) -->
-                        <div class="node-card" id="node-watcher-trigger" onclick="selectNode('watcher')" style="width: 100%;">
+                        <div class="node-card" id="node-watcher-trigger" onclick="selectNode('watcher')" data-dx="-16.957194638117652" data-dy="-112.88857736692077" style="transform: translate(-16.957194638117652px, -112.88857736692077px);">
                             <div class="card-header">
                                 <div class="card-icon" style="font-size: 1.1rem; width: 30px; height: 30px;">📁</div>
                                 <div class="card-title" style="font-size: 0.95rem;">CSV Watcher Service (ON)</div>
@@ -1658,7 +1658,7 @@
                         </div>
 
                         <!-- Node 3: NeonDB Mapping -->
-                        <div class="node-card" id="node-neondb-mapping" onclick="selectNode('neon')" style="width: 100%;">
+                        <div class="node-card" id="node-neondb-mapping" onclick="selectNode('neon')" data-dx="-544.897077307721" data-dy="21.552489104889403" style="transform: translate(-544.897077307721px, 21.552489104889403px);">
                             <div class="card-header">
                                 <div class="card-icon">⚡</div>
                                 <div>
@@ -1679,7 +1679,7 @@
                         </div>
 
                         <!-- Node 4: LanceDB Vector Database -->
-                        <div class="node-card" id="node-lancedb" onclick="selectNode('lancedb')" style="width: 100%;">
+                        <div class="node-card" id="node-lancedb" onclick="selectNode('lancedb')" data-dx="-545.3124772346498" data-dy="69.16703348032217" style="transform: translate(-545.3124772346498px, 69.16703348032217px);">
                             <div class="card-header">
                                 <div class="card-icon">🔮</div>
                                 <div>
@@ -1704,7 +1704,7 @@
                     <!-- Column 2: 3 Data Transfer Cards (Watcher -> Orchestrator: CHoCH, HH/LL, BoS) -->
                     <div style="display: flex; flex-direction: column; gap: 1.2rem; width: 400px; margin-top: 40px;">
                         <!-- Card 1: CHoCH Event Trigger -->
-                        <div class="agent-card transfer-card" id="node-watcher-to-orch-choch" onclick="selectNode('watcher-to-orch-choch')" style="width: 100%; padding: 1rem;">
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-choch" onclick="selectNode('watcher-to-orch-choch')" data-dx="-349.0383260653335" data-dy="282.3877914397924" style="transform: translate(-349.0383260653335px, 282.3877914397924px);">
                             <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
                                 <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">🔄</div>
                                 <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">1. Data Transfer: CHoCH (Pembalikan)</div>
@@ -1720,7 +1720,7 @@
                         </div>
 
                         <!-- Card 2: HH / LL Swing Setup -->
-                        <div class="agent-card transfer-card" id="node-watcher-to-orch-hh" onclick="selectNode('watcher-to-orch-hh')" style="width: 100%; padding: 1rem;">
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-hh" onclick="selectNode('watcher-to-orch-hh')" data-dx="101.72976337582585" data-dy="117.51541631345398" style="transform: translate(101.72976337582585px, 117.51541631345398px);">
                             <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
                                 <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">📐</div>
                                 <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">2. Data Transfer: HH / LL (Setup)</div>
@@ -1736,7 +1736,7 @@
                         </div>
 
                         <!-- Card 3: BoS Execution Trigger -->
-                        <div class="agent-card transfer-card" id="node-watcher-to-orch-bos" onclick="selectNode('watcher-to-orch-bos')" style="width: 100%; padding: 1rem;">
+                        <div class="agent-card transfer-card" id="node-watcher-to-orch-bos" onclick="selectNode('watcher-to-orch-bos')" data-dx="552.4978528169851" data-dy="-56.12676600045563" style="transform: translate(552.4978528169851px, -56.12676600045563px);">
                             <div class="card-header" style="margin-bottom: 0.4rem; gap: 0.5rem;">
                                 <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">⚡</div>
                                 <div class="card-title" style="font-size: 0.82rem; color: #ffaa00;">3. Data Transfer: BoS (Pemicu Entry)</div>
@@ -1754,7 +1754,7 @@
                 </div>
 
                 <!-- Node 5: Orchestrator Agent -->
-                <div class="node-card" id="node-orchestrator" onclick="selectNode('orchestrator')">
+                <div class="node-card" id="node-orchestrator" onclick="selectNode('orchestrator')" data-dx="484.06359450782867" data-dy="-262.7343493719591" style="transform: translate(484.06359450782867px, -262.7343493719591px);">
                     <div class="card-header">
                         <div class="card-icon">🧠</div>
                         <div>
@@ -1774,8 +1774,7 @@
                     <!-- Market Structure Agent Column -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                         <!-- Data Transfer: ORCH -> MSA Info Box -->
-                        <div class="agent-card transfer-card" id="node-orch-to-msa-info" onclick="selectNode('orch-to-msa-info')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card transfer-card" id="node-orch-to-msa-info" onclick="selectNode('orch-to-msa-info')" data-dx="800.6329603321262" data-dy="-205.22588941454035" data-w="285" data-h="160" style="transform: translate(800.6329603321262px, -205.22588941454035px); width: 285px; height: 160px;">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
@@ -1794,8 +1793,7 @@
                         </div>
 
                         <!-- Market Structure Agent Main Card -->
-                        <div class="agent-card" id="node-ms-agent" onclick="selectNode('ms-agent')"
-                            style="width: 100%;">
+                        <div class="agent-card" id="node-ms-agent" onclick="selectNode('ms-agent')" data-dx="492.80716576073644" data-dy="-85.20161637868135" style="transform: translate(492.80716576073644px, -85.20161637868135px);">
                             <div class="card-header">
                                 <div class="card-icon">🌐</div>
                                 <div>
@@ -1809,8 +1807,7 @@
                         </div>
 
                         <!-- MSA Step 1: Validasi CHoCH & Urutan -->
-                        <div class="agent-card" id="node-ms-sub1" onclick="selectNode('ms-sub1')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ms-sub1" onclick="selectNode('ms-sub1')" data-dx="61.67696200035151" data-dy="-57.36406323363681" style="transform: translate(61.67696200035151px, -57.36406323363681px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔍</div>
@@ -1822,8 +1819,7 @@
                         </div>
 
                         <!-- MSA Step 2: Simpan Level Referensi -->
-                        <div class="agent-card" id="node-ms-sub2" onclick="selectNode('ms-sub2')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ms-sub2" onclick="selectNode('ms-sub2')" data-dx="368.05710883113375" data-dy="-62.55694707822636" style="transform: translate(368.05710883113375px, -62.55694707822636px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🎯</div>
@@ -1835,8 +1831,7 @@
                         </div>
 
                         <!-- MSA Step 3: Kemiripan Pola LanceDB -->
-                        <div class="agent-card" id="node-ms-sub3" onclick="selectNode('ms-sub3')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ms-sub3" onclick="selectNode('ms-sub3')" data-dx="712.3413523265283" data-dy="-289.43368310251344" style="transform: translate(712.3413523265283px, -289.43368310251344px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔮</div>
@@ -1848,8 +1843,7 @@
                         </div>
 
                         <!-- MSA Step 4: Initial Confidence & Boost -->
-                        <div class="agent-card" id="node-ms-sub4" onclick="selectNode('ms-sub4')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ms-sub4" onclick="selectNode('ms-sub4')" data-dx="710.6595317078063" data-dy="-201.97901092897575" style="transform: translate(710.6595317078063px, -201.97901092897575px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">⚖️</div>
@@ -1861,8 +1855,7 @@
                         </div>
 
                         <!-- MSA Step 5: State PENDING_SETUP & Warmup -->
-                        <div class="agent-card" id="node-ms-sub5" onclick="selectNode('ms-sub5')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ms-sub5" onclick="selectNode('ms-sub5')" data-dx="372.6135873447089" data-dy="-220.47903773491646" style="transform: translate(372.6135873447089px, -220.47903773491646px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00;">🚀</div>
@@ -1874,8 +1867,7 @@
                         </div>
 
                         <!-- Data Transfer: MSA -> ORCH Output Info Box -->
-                        <div class="agent-card transfer-card" id="node-msa-to-orch-info" onclick="selectNode('msa-to-orch-info')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card transfer-card" id="node-msa-to-orch-info" onclick="selectNode('msa-to-orch-info')" data-dx="170.91554016183414" data-dy="-1129.8183109399165" style="transform: translate(170.91554016183414px, -1129.8183109399165px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
@@ -1893,33 +1885,32 @@
                             </div>
                         </div>
 
-                        <!-- LLM MSA Critic (Shadow Mode) Card -->
-                        <div class="agent-card" id="node-llm-msa" onclick="selectNode('llm-msa')"
-                            style="width: 100%; padding: 1rem; border-color: rgba(179, 136, 255, 0.45); background: rgba(179, 136, 255, 0.03);">
+                        <!-- LLM MSA Pre-Warm-Up Card -->
+                        <div class="agent-card" id="node-llm-msa" onclick="selectNode('llm-msa')" data-dx="-31.783316584092347" data-dy="-398.22626073009826" style="transform: translate(-31.783316584092347px, -398.22626073009826px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #b388ff; background: rgba(179, 136, 255, 0.1);">
                                     🤖</div>
                                 <div>
-                                    <div class="card-title" style="font-size: 0.8rem; color: #b388ff;">LLM MSA Critic</div>
-                                    <p style="font-size: 0.62rem; color: var(--text-secondary)">Shadow AI Audit (Non-Blocking)</p>
+                                    <div class="card-title" style="font-size: 0.8rem; color: #b388ff;">LLM MSA Specialist</div>
+                                    <p style="font-size: 0.62rem; color: var(--text-secondary)">Pre-Warm-Up saat PENDING_SETUP</p>
                                 </div>
                             </div>
                             <div class="card-content"
                                 style="font-size: 0.7rem; line-height: 1.35; color: var(--text-secondary);">
-                                Menerima <code>evidence_snapshot</code> MSA:
+                                Membaca evidence lengkap Mesin MSA Step 1-5:
                                 <div style="margin-top: 0.35rem; padding: 0.45rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.65rem; color: #b388ff; border: 1px solid rgba(179, 136, 255, 0.25); line-height: 1.4;">
-                                    • audit: BoS, Multi-TF EMA, LanceDB<br>
-                                    • model: AgentRouter GLM-5.2 / Groq<br>
-                                    • verdict: SUPPORT / CAUTION / OPPOSE
+                                    • trigger: CHoCH + HH/LL terkunci<br>
+                                    • output: Bahan diskusi struktur siap<br>
+                                    • report: Orchestrator mulai warm-up ML + Sent<br>
+                                    • authority: HOLD — tidak membuka trade
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Data Transfer: MSA -> ORCH -> ML Agent Info Box -->
-                    <div class="agent-card transfer-card" id="node-msa-to-ml-info" onclick="selectNode('msa-to-ml-info')"
-                        style="padding: 1rem; width: 240px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
+                    <div class="agent-card transfer-card" id="node-msa-to-ml-info" onclick="selectNode('msa-to-ml-info')" data-dx="1254.3989481138012" data-dy="-1162.122702298516" data-w="335" data-h="148" style="transform: translate(1254.3989481138012px, -1162.122702298516px); width: 335px; height: 148px;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
@@ -1940,8 +1931,7 @@
                     <!-- ML Prediction Agent Column -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                         <!-- ML Prediction Agent Main Card -->
-                        <div class="agent-card" id="node-ml-agent" onclick="selectNode('ml-agent')"
-                            style="width: 100%;">
+                        <div class="agent-card" id="node-ml-agent" onclick="selectNode('ml-agent')" data-dx="1513.3212487282935" data-dy="-534.7631871081691" style="transform: translate(1513.3212487282935px, -534.7631871081691px);">
                             <div class="card-header">
                                 <div class="card-icon">🔮</div>
                                 <div>
@@ -1956,8 +1946,7 @@
                         </div>
 
                         <!-- ML Sub 1: Inisialisasi & Harga Entri -->
-                        <div class="agent-card" id="node-ml-sub1" onclick="selectNode('ml-sub1')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ml-sub1" onclick="selectNode('ml-sub1')" data-dx="1270.6052245534927" data-dy="-1469.4028550017304" style="transform: translate(1270.6052245534927px, -1469.4028550017304px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🎯</div>
@@ -1970,8 +1959,7 @@
                         </div>
 
                         <!-- ML Sub 2: Rekayasa Fitur -->
-                        <div class="agent-card" id="node-ml-sub2" onclick="selectNode('ml-sub2')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ml-sub2" onclick="selectNode('ml-sub2')" data-dx="1270.6052245534927" data-dy="-1469.4028550017304" style="transform: translate(1270.6052245534927px, -1469.4028550017304px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📊</div>
@@ -1985,8 +1973,7 @@
                         </div>
 
                         <!-- ML Sub 3: Prediksi Dual Regression -->
-                        <div class="agent-card" id="node-ml-sub3" onclick="selectNode('ml-sub3')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ml-sub3" onclick="selectNode('ml-sub3')" data-dx="1270.6052245534927" data-dy="-1469.4028550017304" style="transform: translate(1270.6052245534927px, -1469.4028550017304px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📈</div>
@@ -1999,8 +1986,7 @@
                         </div>
 
                         <!-- ML Sub 4: Denormalisasi ATR -->
-                        <div class="agent-card" id="node-ml-sub4" onclick="selectNode('ml-sub4')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ml-sub4" onclick="selectNode('ml-sub4')" data-dx="1270.6052245534927" data-dy="-1469.4028550017304" style="transform: translate(1270.6052245534927px, -1469.4028550017304px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🔄</div>
@@ -2014,8 +2000,7 @@
                         </div>
 
                         <!-- ML Sub 5: Kalkulasi R:R & Keputusan Sinyal -->
-                        <div class="agent-card" id="node-ml-sub5" onclick="selectNode('ml-sub5')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-ml-sub5" onclick="selectNode('ml-sub5')" data-dx="1281.0159480200798" data-dy="-1469.4028550017304" style="transform: translate(1281.0159480200798px, -1469.4028550017304px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">⚖️</div>
@@ -2030,8 +2015,7 @@
                     </div>
 
                     <!-- Data Transfer: MSA -> ORCH -> Sentiment Agent Info Box -->
-                    <div class="agent-card transfer-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')"
-                        style="padding: 1rem; width: 240px; display: flex; flex-direction: column; justify-content: center; height: fit-content; align-self: center;">
+                    <div class="agent-card transfer-card" id="node-msa-to-sent-info" onclick="selectNode('msa-to-sent-info')" data-dx="678.5557529103547" data-dy="-783.1517162842226" data-w="315" data-h="140" style="transform: translate(678.5557529103547px, -783.1517162842226px); width: 315px; height: 140px;">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ffaa00; background: rgba(255, 170, 0, 0.05);">
@@ -2052,8 +2036,7 @@
                     <!-- Sentiment Agent Column -->
                     <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                         <!-- Sentiment Agent Main Card -->
-                        <div class="agent-card" id="node-sentiment-agent" onclick="selectNode('sentiment-agent')"
-                            style="width: 100%;">
+                        <div class="agent-card" id="node-sentiment-agent" onclick="selectNode('sentiment-agent')" data-dx="896.761964016342" data-dy="-203.24920238927558" style="transform: translate(896.761964016342px, -203.24920238927558px);">
                             <div class="card-header">
                                 <div class="card-icon">📰</div>
                                 <div>
@@ -2068,8 +2051,7 @@
                         </div>
 
                         <!-- Sentiment Sub 1: Sentimen Berita -->
-                        <div class="agent-card" id="node-sent-sub1" onclick="selectNode('sent-sub1')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-sent-sub1" onclick="selectNode('sent-sub1')" data-dx="893.0227503005663" data-dy="-119.11689378432524" style="transform: translate(893.0227503005663px, -119.11689378432524px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📰</div>
@@ -2082,8 +2064,7 @@
                         </div>
 
                         <!-- Sentiment Sub 2: Analisis Event Kalender -->
-                        <div class="agent-card" id="node-sent-sub2" onclick="selectNode('sent-sub2')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-sent-sub2" onclick="selectNode('sent-sub2')" data-dx="898.6315708742297" data-dy="-104.16003892122296" style="transform: translate(898.6315708742297px, -104.16003892122296px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📅</div>
@@ -2096,8 +2077,7 @@
                         </div>
 
                         <!-- Sentiment Sub 3: Penyesuaian Confidence -->
-                        <div class="agent-card" id="node-sent-sub3" onclick="selectNode('sent-sub3')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-sent-sub3" onclick="selectNode('sent-sub3')" data-dx="898.6315708742297" data-dy="-104.16003892122296" style="transform: translate(898.6315708742297px, -104.16003892122296px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">⚖️</div>
@@ -2111,8 +2091,7 @@
                         </div>
 
                         <!-- Sentiment Sub 4: Veto Event High Impact -->
-                        <div class="agent-card" id="node-sent-sub4" onclick="selectNode('sent-sub4')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-sent-sub4" onclick="selectNode('sent-sub4')" data-dx="898.6315708742297" data-dy="-104.16003892122296" style="transform: translate(898.6315708742297px, -104.16003892122296px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🚫</div>
@@ -2126,8 +2105,7 @@
                         </div>
 
                         <!-- Sentiment Sub 5: Shadow Mode & Hasil -->
-                        <div class="agent-card" id="node-sent-sub5" onclick="selectNode('sent-sub5')"
-                            style="width: 100%; padding: 1rem;">
+                        <div class="agent-card" id="node-sent-sub5" onclick="selectNode('sent-sub5')" data-dx="898.6315708742297" data-dy="-104.16003892122296" style="transform: translate(898.6315708742297px, -104.16003892122296px);">
                             <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                                 <div class="card-icon"
                                     style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">👥</div>
@@ -2144,7 +2122,7 @@
                     <!-- Node 6: Consensus Engine Column -->
                 <div style="display: flex; flex-direction: column; gap: 1rem; width: 500px;">
                     <!-- Node 6: Consensus Engine Main Card -->
-                    <div class="node-card" id="node-consensus" onclick="selectNode('consensus')" style="width: 100%;">
+                    <div class="node-card" id="node-consensus" onclick="selectNode('consensus')" data-dx="1900.7408467020828" data-dy="509.0710104659706" style="transform: translate(1900.7408467020828px, 509.0710104659706px);">
                         <div class="card-header">
                             <div class="card-icon">🗳️</div>
                             <div>
@@ -2162,8 +2140,7 @@
                     </div>
 
                     <!-- Consensus Sub 1: Input MSA -->
-                    <div class="agent-card" id="node-con-sub1" onclick="selectNode('con-sub1')"
-                        style="width: 100%; padding: 1rem; border-color: var(--color-watcher);">
+                    <div class="agent-card" id="node-con-sub1" onclick="selectNode('con-sub1')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-watcher);">
@@ -2179,8 +2156,7 @@
                     </div>
 
                     <!-- Consensus Sub 2: Input ML -->
-                    <div class="agent-card" id="node-con-sub2" onclick="selectNode('con-sub2')"
-                        style="width: 100%; padding: 1rem; border-color: var(--color-lancedb);">
+                    <div class="agent-card" id="node-con-sub2" onclick="selectNode('con-sub2')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-lancedb);">
@@ -2196,8 +2172,7 @@
                     </div>
 
                     <!-- Consensus Sub 3: Input Sentiment -->
-                    <div class="agent-card" id="node-con-sub3" onclick="selectNode('con-sub3')"
-                        style="width: 100%; padding: 1rem; border-color: #ff4081;">
+                    <div class="agent-card" id="node-con-sub3" onclick="selectNode('con-sub3')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon"
                                 style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: #ff4081;">
@@ -2216,7 +2191,7 @@
                 <!-- Consensus Workflow Steps Column (New!) -->
                 <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                     <!-- Consensus Step 1 -->
-                    <div class="agent-card" id="node-con-step1" onclick="selectNode('con-step1')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-con-step1" onclick="selectNode('con-step1')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📥</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-consensus);">1. Pengumpulan Hasil</div>
@@ -2227,7 +2202,7 @@
                     </div>
 
                     <!-- Consensus Step 2 -->
-                    <div class="agent-card" id="node-con-step2" onclick="selectNode('con-step2')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-con-step2" onclick="selectNode('con-step2')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">⚖️</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-consensus);">2. Skor Voting Tertimbang</div>
@@ -2238,7 +2213,7 @@
                     </div>
 
                     <!-- Consensus Step 3 -->
-                    <div class="agent-card" id="node-con-step3" onclick="selectNode('con-step3')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-con-step3" onclick="selectNode('con-step3')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🛡️</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-consensus);">3. Veto &amp; Bypass</div>
@@ -2249,7 +2224,7 @@
                     </div>
 
                     <!-- Consensus Step 4 -->
-                    <div class="agent-card" id="node-con-step4" onclick="selectNode('con-step4')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-con-step4" onclick="selectNode('con-step4')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">📊</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-consensus);">4. Klasifikasi Konsensus</div>
@@ -2260,7 +2235,7 @@
                     </div>
 
                     <!-- Consensus Step 5 -->
-                    <div class="agent-card" id="node-con-step5" onclick="selectNode('con-step5')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-con-step5" onclick="selectNode('con-step5')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px;">🎯</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-consensus);">5. Keputusan Akhir</div>
@@ -2274,7 +2249,7 @@
                 <!-- Risk Management Column -->
                 <div style="display: flex; flex-direction: column; gap: 1rem; width: 250px;">
                     <!-- Risk Management Main Card -->
-                    <div class="agent-card" id="node-risk-agent" onclick="selectNode('risk-agent')" style="width: 100%;">
+                    <div class="agent-card" id="node-risk-agent" onclick="selectNode('risk-agent')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header">
                             <div class="card-icon">🛡️</div>
                             <div>
@@ -2288,7 +2263,7 @@
                     </div>
 
                     <!-- Risk Step 1 -->
-                    <div class="agent-card" id="node-risk-sub1" onclick="selectNode('risk-sub1')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-risk-sub1" onclick="selectNode('risk-sub1')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neon);">🏷️</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-neon);">1. Klasifikasi Confidence Tier</div>
@@ -2299,7 +2274,7 @@
                     </div>
 
                     <!-- Risk Step 2 -->
-                    <div class="agent-card" id="node-risk-sub2" onclick="selectNode('risk-sub2')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-risk-sub2" onclick="selectNode('risk-sub2')" data-dx="1902.6104535599702" data-dy="501.5925830344194" style="transform: translate(1902.6104535599702px, 501.5925830344194px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neon);">📐</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-neon);">2. Kalkulasi Lot Size</div>
@@ -2310,7 +2285,7 @@
                     </div>
 
                     <!-- Risk Step 3 -->
-                    <div class="agent-card" id="node-risk-sub3" onclick="selectNode('risk-sub3')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-risk-sub3" onclick="selectNode('risk-sub3')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neon);">📏</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-neon);">3. Dynamic SL/TP</div>
@@ -2321,7 +2296,7 @@
                     </div>
 
                     <!-- Risk Step 4 -->
-                    <div class="agent-card" id="node-risk-sub4" onclick="selectNode('risk-sub4')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-risk-sub4" onclick="selectNode('risk-sub4')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neon);">✅</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-neon);">4. Validasi Risiko</div>
@@ -2332,7 +2307,7 @@
                     </div>
 
                     <!-- Risk Step 5 -->
-                    <div class="agent-card" id="node-risk-sub5" onclick="selectNode('risk-sub5')" style="width: 100%; padding: 1rem;">
+                    <div class="agent-card" id="node-risk-sub5" onclick="selectNode('risk-sub5')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                         <div class="card-header" style="margin-bottom: 0.5rem; gap: 0.5rem;">
                             <div class="card-icon" style="font-size: 1rem; width: 28px; height: 28px; border-radius: 6px; color: var(--color-neon);">📦</div>
                             <div class="card-title" style="font-size: 0.8rem; color: var(--color-neon);">5. Output Final</div>
@@ -2344,7 +2319,7 @@
                 </div>
 
                 <!-- Node 7: Execution Agent -->
-                <div class="node-card" id="node-execution" onclick="selectNode('execution')">
+                <div class="node-card" id="node-execution" onclick="selectNode('execution')" data-dx="1902.6104535599702" data-dy="509.0710104659706" style="transform: translate(1902.6104535599702px, 509.0710104659706px);">
                     <div class="card-header">
                         <div class="card-icon">🚀</div>
                         <div>
@@ -2927,44 +2902,117 @@
                 </div>
 
                 <div class="panel-content" id="panel-llm-msa">
-                    <h2 class="panel-section-title">LLM MSA Critic (Shadow Mode)</h2>
-                    <p class="panel-text">Lapisan penasihat kecerdasan buatan (*AI Specialist Critic*) yang bertugas mengaudit bukti struktur pasar (evidence snapshot) secara mendalam tanpa menghambat kecepatan eksekusi algoritma trading.</p>
+                    <h2 class="panel-section-title">LLM MSA Specialist - Pre-Warm-Up</h2>
+                    <p class="panel-text">LLM specialist pertama yang mulai bekerja saat Mesin MSA menemukan <strong>CHoCH + HH/LL</strong> dan masuk ke fase <code>PENDING_SETUP</code>. LLM MSA membaca evidence lengkap Step 1-5, menyiapkan bahan diskusi struktur pasar, lalu melaporkan kesiapan kepada Orchestrator tanpa membuka trade.</p>
                     <ul class="meta-list">
                         <li>
-                            <span class="meta-label">Prinsip Asinkron Non-Blocking (Shadow Mode)</span>
+                            <span class="meta-label">Pemicu Kerja: HH/LL Sudah Terkunci</span>
                             <span class="meta-value">
-                                Dijalankan pada thread latar belakang (<code>mode = "SHADOW"</code>) dengan mekanisme cache non-blocking. Jika koneksi API LLM mengalami latensi atau timeout, <strong>eksekusi order MT5 tetap berjalan 100% tepat waktu</strong> tanpa interupsi.
+                                Pada pola bullish, <strong>CHoCH + HH</strong> membuat MSA mengunci harga HH sebagai kandidat level yang akan ditembus BoS. Pada pola bearish, <strong>CHoCH + LL</strong> mengunci harga LL. Status tetap <code>HOLD</code> karena BoS belum terkonfirmasi.
                             </span>
                         </li>
                         <li>
-                            <span class="meta-label">Paket Data yang Diterima (evidence_snapshot)</span>
+                            <span class="meta-label">Evidence Lengkap dari Mesin MSA Step 1-5</span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #b388ff; border: 1px solid rgba(179, 136, 255, 0.25);">
                                 {<br>
-                                &nbsp;&nbsp;"setup_id": "SET_20260828_XAUUSD_M15_01",<br>
-                                &nbsp;&nbsp;"symbol": "XAUUSD",<br>
-                                &nbsp;&nbsp;"broken_level": 2640.00,  // Batas swing yang ditembus<br>
-                                &nbsp;&nbsp;"trigger_price": 2645.50,  // Harga close konfirmasi BoS<br>
-                                &nbsp;&nbsp;"multi_tf_ema": { "m15_ema200": 2638.20, "h1_ema200": 2630.50, "h4_ema200": 2615.00 },<br>
-                                &nbsp;&nbsp;"lancedb_matches": { "similar_count": 15, "avg_winrate": 78.5 },<br>
-                                &nbsp;&nbsp;"engine_confidence": 0.850<br>
+                                &nbsp;&nbsp;"schema_version": "msa-evidence-v1",<br>
+                                &nbsp;&nbsp;"setup_id": "msa-a3f9c1d2b4e87f23",<br>
+                                &nbsp;&nbsp;"generated_at": "2026-08-28T10:15:30",<br>
+                                &nbsp;&nbsp;"market_event_timestamp": "2026-08-28T10:15:00",<br>
+                                &nbsp;&nbsp;"setup": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"symbol": "XAUUSD",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"timeframe": "M15",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"event_type": "HH",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"direction": "Bullish",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"session": "London",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"status": "PENDING_SETUP - menunggu BoS"<br>
+                                &nbsp;&nbsp;},<br>
+                                &nbsp;&nbsp;"structure_context": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"trigger_price": 2640.00,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"current_price": 2638.50,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"raw_distance_to_trigger": 1.50,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"price_ratio_scaled_distance": 1.50,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"atr_multiple_to_trigger": 0.30,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"recent_events": [<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ "type": "HH", "direction": "Bullish", "price": 2640.00, "timestamp": "2026-08-28T10:15:00" },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{ "type": "CHoCH", "direction": "Bullish", "price": 2632.00, "timestamp": "2026-08-28T09:45:00" }<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;]<br>
+                                &nbsp;&nbsp;},<br>
+                                &nbsp;&nbsp;"market_context": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"price_ratio": 1.00,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"base_reference_price": 4500.00,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"ema200": { "M15": 2638.20, "H1": 2630.50, "H4": 2615.00 },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"atr": { "value": 5.00, "timeframe": "M15" },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"candle_quality": { "body_ratio": 0.68, "range": 4.20, "direction": "BULLISH" }<br>
+                                &nbsp;&nbsp;},<br>
+                                &nbsp;&nbsp;"historical_evidence": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"patterns": [{ "similarity": 0.91, "outcome": "WIN", "Net_Profit": 125.40 }],<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"win_rate": 0.785,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"avg_profit": 84.20,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"total_count": 15,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"completed_count": 11,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"recommendation": "SUPPORT",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"confidence": 0.85,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"reasoning": "Pola historis mendukung setup bullish",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"outcome_distribution": { "matches": 15, "executed": 11, "wins": 8, "losses": 3, "rejected": 3, "pending": 1, "executed_win_rate": 0.727, "rejection_rate": 0.20, "completion_rate": 0.733 },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"net_profit_statistics": { "total": 920.50, "average": 83.68 },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"rejection_analysis": { "total_rejected": 3, "reason_distribution": [{ "reason_code": "LOW_CONFIDENCE", "reason_raw": "Confidence below threshold", "count": 3, "share_of_rejections": 1.00, "average_similarity": 0.82, "max_similarity": 0.88 }] },<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"top_matches": [{ "similarity": 0.91, "outcome": "WIN", "Net_Profit": 125.40 }]<br>
+                                &nbsp;&nbsp;},<br>
+                                &nbsp;&nbsp;"data_quality": { "is_complete": true, "warnings": [] },<br>
+                                &nbsp;&nbsp;"llm_constraints": {<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"role": "context_critic",<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"may_create_trade_signal": false,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"may_reverse_direction": false,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"may_set_lot_sl_tp": false,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"may_change_msa_state": false,<br>
+                                &nbsp;&nbsp;&nbsp;&nbsp;"may_bypass_risk_management": false<br>
+                                &nbsp;&nbsp;}<br>
                                 }
                             </div>
                         </li>
                         <li>
-                            <span class="meta-label">Format Evaluasi Standar (CouncilVoteContract)</span>
+                            <span class="meta-label">Penjelasan Isi Evidence</span>
+                            <span class="meta-value">
+                                <strong>1. Identitas evidence:</strong> <code>schema_version</code> menunjukkan versi kontrak data, <code>setup_id</code> menjadi identitas unik untuk cache dan diskusi seluruh agent, <code>generated_at</code> adalah waktu paket dibuat, sedangkan <code>market_event_timestamp</code> adalah waktu event HH/LL pasar terjadi.<br><br>
+                                <strong>2. setup:</strong> Menjelaskan instrumen, timeframe, event yang mengunci setup, arah dugaan BoS, sesi pasar, dan status MSA. Pada tahap ini status wajib masih <code>PENDING_SETUP</code>.<br><br>
+                                <strong>3. structure_context:</strong> <code>trigger_price</code> adalah HH/LL yang diperkirakan akan ditembus. Bagian ini juga mengukur jarak harga sekarang menuju trigger dalam harga mentah, skala rasio harga, dan kelipatan ATR. <code>recent_events</code> membawa maksimal lima event struktur terbaru sebagai urutan konteks CHoCH, HH, LL, atau BoS.<br><br>
+                                <strong>4. market_context:</strong> Berisi penyesuaian skala harga, EMA200 M15/H1/H4, ATR M15, dan kualitas candle terbaru. <code>body_ratio</code> membandingkan ukuran body dengan seluruh range candle; nilainya membantu LLM membedakan candle kuat, wick dominan, atau doji.<br><br>
+                                <strong>5. historical_evidence:</strong> Hasil pencocokan pola LanceDB. <code>win_rate</code> hanya dihitung dari pola yang benar-benar dieksekusi. Record <code>REJECTED</code> menjadi bukti risiko, bukan dianggap loss. Nilai keuntungan bersih dibaca dari <code>Net_Profit</code>, sedangkan <code>net_profit_statistics</code> merangkum total dan rata-rata keuntungan bersih pola executed.<br><br>
+                                <strong>6. data_quality:</strong> Menyatakan apakah evidence lengkap. Jika ATR, OHLC candle, atau pola historis tidak tersedia, <code>is_complete</code> menjadi <code>false</code> dan alasannya masuk ke <code>warnings</code>. Field yang tidak tersedia dapat bernilai <code>null</code>.<br><br>
+                                <strong>7. llm_constraints:</strong> Batas keras LLM MSA. Ia hanya boleh menjadi pembaca konteks; tidak boleh membuat atau membalik sinyal, menentukan lot/SL/TP, mengubah state MSA, maupun melewati Risk Management.<br><br>
+                                <strong>Catatan array dinamis:</strong> Contoh di atas menampilkan dua <code>recent_events</code> dan satu item pola agar mudah dibaca. Pada runtime, <code>recent_events</code> dapat berisi maksimal lima event, <code>patterns</code> berisi seluruh kecocokan, dan <code>top_matches</code> berisi maksimal sepuluh kecocokan terbaik.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Bahan Diskusi yang Disiapkan LLM MSA</span>
                             <div class="meta-value" style="margin-top: 0.4rem; padding: 0.6rem; background: rgba(0,0,0,0.5); border-radius: 6px; font-family: monospace; font-size: 0.7rem; line-height: 1.5; color: #00e676; border: 1px solid rgba(0, 230, 118, 0.25);">
                                 {<br>
                                 &nbsp;&nbsp;"agent": "llm_msa",<br>
                                 &nbsp;&nbsp;"status": "completed",<br>
                                 &nbsp;&nbsp;"vote": "BUY",<br>
-                                &nbsp;&nbsp;"verdict": "SUPPORT",  // "SUPPORT" | "CAUTION" | "OPPOSE"<br>
+                                &nbsp;&nbsp;"verdict": "SUPPORT",  // SUPPORT | CAUTION | OPPOSE | INSUFFICIENT_DATA<br>
                                 &nbsp;&nbsp;"confidence": 0.880,<br>
                                 &nbsp;&nbsp;"data_quality": 0.950,<br>
-                                &nbsp;&nbsp;"supporting_factors": ["Clean BoS above swing high", "Multi-TF EMA alignment confirmed"],<br>
-                                &nbsp;&nbsp;"risk_flags": [],<br>
-                                &nbsp;&nbsp;"reasoning": "Penembusan struktur bersih tanpa wick panjang penolakan (rejection), probabilitas kelanjutan tren bullish tinggi."<br>
+                                &nbsp;&nbsp;"supporting_factors": ["HH valid setelah CHoCH", "Multi-TF EMA mendukung arah bullish"],<br>
+                                &nbsp;&nbsp;"contradicting_factors": [],<br>
+                                &nbsp;&nbsp;"risk_flags": ["BoS belum terkonfirmasi"],<br>
+                                &nbsp;&nbsp;"historical_read": "Pola historis mendukung persiapan bullish",<br>
+                                &nbsp;&nbsp;"reasoning": "Setup layak disiapkan untuk diskusi, tetapi tetap menunggu konfirmasi BoS."<br>
                                 }
                             </div>
+                        </li>
+                        <li>
+                            <span class="meta-label">Laporan ke Orchestrator dan Pre-Warm-Up</span>
+                            <span class="meta-value">
+                                Setelah bahan struktur siap, LLM MSA melaporkan hasil berdasarkan <code>setup_id</code>. Orchestrator kemudian mengaktifkan <strong>ML Agent</strong> dan <strong>Sentiment Agent</strong> untuk mengumpulkan data, lalu meneruskan hasilnya kepada <strong>LLM ML</strong> dan <strong>LLM Sent</strong>. Jika semua specialist sudah siap, bahan diteruskan ke <strong>LLM Judge</strong> untuk keputusan awal <code>READY</code>, <code>CAUTION</code>, <code>NOT_READY</code>, atau <code>INSUFFICIENT_DATA</code>.
+                            </span>
+                        </li>
+                        <li>
+                            <span class="meta-label">Batas Kewenangan Sebelum BoS</span>
+                            <span class="meta-value">
+                                Seluruh proses ini hanya menyiapkan bahan diskusi. Sinyal final tetap <code>HOLD</code>, Risk Management belum dipanggil, dan tidak ada order yang boleh dibuka. Setelah BoS terkonfirmasi, data yang berubah diperbarui dan LLM Judge wajib membuat keputusan final sebelum proses dapat diteruskan ke Risk Management.
+                            </span>
                         </li>
                     </ul>
                 </div>
@@ -4172,7 +4220,7 @@
             // Selection & Hover Flow State
             let hoveredCardId = null;
             let selectedNodeCardId = null;
-            let interactionMode = 'card'; // 'card' | 'pan'
+            let interactionMode = 'pan'; // default: 'pan' (Mode Kanvas) | 'card'
 
             // Marquee Drag Selection State
             let isMarqueeSelecting = false;
@@ -5166,7 +5214,7 @@
             });
 
             // Manual Persistent State Management
-            function saveManualLayout() {
+            async function saveManualLayout() {
                 const state = {
                     version: LAYOUT_VERSION,
                     pan: { x: panX, y: panY },
@@ -5186,19 +5234,29 @@
                     state.nodes[card.id] = nodeData;
                 });
                 localStorage.setItem('mt5_diagram_layout', JSON.stringify(state));
+
+                // Kirim state ke server Node.js via endpoint /api/layout
+                if (window.location.protocol.startsWith('http')) {
+                    try {
+                        const res = await fetch('/api/layout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(state)
+                        });
+                        if (res.ok) {
+                            showToast('💾 Layout berhasil disimpan ke file & server!');
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('Server save failed, saved to localStorage only', e);
+                    }
+                }
                 showToast('💾 Layout berhasil disimpan secara manual!');
             }
 
-            function restoreLayoutState() {
-                const savedStateStr = localStorage.getItem('mt5_diagram_layout');
-                if (!savedStateStr) {
-                    connections = [...defaultConnections];
-                    updateTransform();
-                    return;
-                }
+            function applyLayoutState(state) {
+                if (!state) return;
                 try {
-                    const state = JSON.parse(savedStateStr);
-
                     // Restore pan and zoom
                     if (state.pan && typeof state.pan.x === 'number' && typeof state.pan.y === 'number') {
                         panX = state.pan.x;
@@ -5240,12 +5298,39 @@
                     // Restore user connections (filter out any obsolete cross-card lines)
                     if (Array.isArray(state.connections) && state.connections.length > 0) {
                         connections = state.connections.filter(c => !(c.from === 'node-msa-to-orch-info' && c.to === 'node-llm-msa'));
-                    } else {
-                        connections = [...defaultConnections];
                     }
                 } catch (e) {
-                    console.error("Failed to restore layout state", e);
+                    console.error("Failed to apply layout state", e);
+                }
+            }
+
+            async function restoreLayoutState() {
+                // 1. Initial synchronous restore from localStorage
+                const savedStateStr = localStorage.getItem('mt5_diagram_layout');
+                if (savedStateStr) {
+                    try {
+                        applyLayoutState(JSON.parse(savedStateStr));
+                    } catch (e) {}
+                } else {
                     connections = [...defaultConnections];
+                    updateTransform();
+                }
+
+                // 2. Fetch authoritative layout from server so Playwright / other browsers load exact same state
+                if (window.location.protocol.startsWith('http')) {
+                    try {
+                        const res = await fetch('/api/layout', { cache: 'no-store' });
+                        if (res.ok) {
+                            const serverState = await res.json();
+                            if (serverState && serverState.nodes && Object.keys(serverState.nodes).length > 0) {
+                                applyLayoutState(serverState);
+                                localStorage.setItem('mt5_diagram_layout', JSON.stringify(serverState));
+                                drawLines();
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch server layout:', e);
+                    }
                 }
             }
 
@@ -5941,6 +6026,7 @@
             // Restore layout and initialize everything on load
             restoreLayoutState();
             initCards();
+            setInteractionMode('pan');
             drawLines();
 
             // Live Reload Client (Auto-reload via node server.js / npm run dev)

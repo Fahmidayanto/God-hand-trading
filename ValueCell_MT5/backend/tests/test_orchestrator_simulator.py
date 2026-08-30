@@ -211,6 +211,71 @@ def test_build_frame_error(monkeypatch):
     assert result["frames"][0]["agents"]["market_structure"]["status"] == "error"
 
 
+def test_build_frame_exposes_llm_msa_report_without_changing_consensus():
+    display_report = {
+        "conclusion": {"verdict": "CAUTION", "recommended_action": "WAIT"},
+        "top_10_patterns": [{"rank": 1, "net_profit": -97.0}],
+        "top_3_breakdowns": [{"rank": 1, "factors": []}],
+    }
+    result = {
+        "agent_results": {
+            "market_structure": {"signal": "HOLD", "confidence": 0.7},
+            "llm_msa": {
+                "status": "completed",
+                "mode": "SHADOW",
+                "can_affect_consensus": False,
+                "display_report": display_report,
+            },
+        },
+        "final_signal": "HOLD",
+        "approved": False,
+        "consensus_level": "no_consensus",
+        "final_confidence": 0.0,
+    }
+
+    frame = sim_mod._build_frame(
+        {"time": 1_700_000_000, "type": "CHOCH", "direction": "Bullish"},
+        result,
+    )
+
+    assert frame["llm_msa"]["display_report"] == display_report
+    assert frame["llm_msa"]["mode"] == "SHADOW"
+    assert frame["llm_msa"]["can_affect_consensus"] is False
+    assert frame["final_signal"] == "HOLD"
+    assert frame["approved"] is False
+
+
+def test_resolve_llm_msa_diagnostic_result_keeps_shadow_non_authoritative():
+    completed = {
+        "status": "completed",
+        "mode": "SHADOW",
+        "can_affect_consensus": False,
+        "display_report": {"top_10_patterns": []},
+    }
+
+    class FakeLLMMSA:
+        def wait_for_result(self, setup_id, timeout):
+            assert setup_id == "msa-diagnostic-1"
+            assert timeout == 245.0
+            return completed
+
+    orch = type("Orchestrator", (), {"agents": {"llm_msa": FakeLLMMSA()}})()
+    result = {
+        "agent_results": {
+            "llm_msa": {"status": "pending", "setup_id": "msa-diagnostic-1"}
+        },
+        "final_signal": "HOLD",
+        "approved": False,
+    }
+
+    resolved = sim_mod.resolve_llm_msa_diagnostic_result(orch, result)
+
+    assert resolved["agent_results"]["llm_msa"] == completed
+    assert resolved["agent_results"]["llm_msa"]["can_affect_consensus"] is False
+    assert resolved["final_signal"] == "HOLD"
+    assert resolved["approved"] is False
+
+
 def test_run_simulation_empty():
     result = sim_mod.run_simulation([], [], [])
     assert result["frames"] == []

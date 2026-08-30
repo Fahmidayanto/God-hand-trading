@@ -30,6 +30,15 @@ env_path = PROJECT_ROOT / ".env"
 load_dotenv(env_path)
 
 from valuecell.knowledge.lance_db import LanceDBManager
+from valuecell.knowledge.historical_market_features import (
+    build_market_feature_frame,
+    extract_historical_market_features,
+)
+from valuecell.knowledge.historical_trade_matching import (
+    build_structure_trade_matches,
+    normalize_structure_direction,
+    normalize_structure_event,
+)
 
 def get_neon_conn():
     """Establish connection to Neon PostgreSQL"""
@@ -132,7 +141,7 @@ def main():
 
         # Load market data in date-range chunks over fresh connections each (see
         # fetch_table_chunked docstring for why -- these are the largest tables).
-        MARKET_COLS = "time, open::float, high::float, low::float, close::float, volume, ema200::float"
+        MARKET_COLS = "time, open::float, high::float, low::float, close::float, volume, spread, ema200::float"
         df_m15 = fetch_table_chunked("marketdata_xauusd_m15", MARKET_COLS)
         df_h1 = fetch_table_chunked("marketdata_xauusd_h1", MARKET_COLS)
         df_h4 = fetch_table_chunked("marketdata_xauusd_h4", MARKET_COLS)
@@ -145,12 +154,17 @@ def main():
             "H1": df_h1.set_index("time")["ema200"].to_dict(),
             "H4": df_h4.set_index("time")["ema200"].to_dict()
         }
+        market_feature_frames = {
+            "M15": build_market_feature_frame(df_m15),
+            "H1": build_market_feature_frame(df_h1),
+            "H4": build_market_feature_frame(df_h4),
+        }
 
         # Load backtest results (trade outcomes) -- small table, one query is fine,
         # but still on its own fresh connection rather than one reused for everything.
         conn = get_neon_conn()
         try:
-            df_results = pd.read_sql("SELECT ticket, symbol, type, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, reject_reason, Magic_number as magic_number FROM backtest_results_xauusd", conn)
+            df_results = pd.read_sql("SELECT ticket, symbol, type, entry_structure, entry_price::float, exit_price::float, profit::float, net_profit::float, session, entry_time, exit_time, timeframe, status, reject_reason, close_reason, Magic_number as magic_number FROM backtest_results_xauusd", conn)
         finally:
             conn.close()
         logger.info(f"Loaded {len(df_results)} trade outcome rows from backtest_results_xauusd.")
@@ -167,18 +181,6 @@ def main():
         ].reset_index(drop=True)
         logger.info(f"{len(df_results_executed)} of those rows are actually executed trades.")
 
-        # Optimize trade matching using trade lookup dictionaries grouped by (timeframe, type)
-        trade_lookup = {}
-        for _, t_row in df_results.iterrows():
-            key = (str(t_row["timeframe"]).strip(), str(t_row["type"]).strip())
-            if key not in trade_lookup:
-                trade_lookup[key] = []
-            trade_lookup[key].append(t_row.to_dict())
-
-        # Sort candidate trades by entry_time for correct chronological scan
-        for key in trade_lookup:
-            trade_lookup[key].sort(key=lambda x: x["entry_time"])
-
         # Load llhhbosdata -- also small, own fresh connection.
         conn = get_neon_conn()
         try:
@@ -186,6 +188,43 @@ def main():
         finally:
             conn.close()
         logger.info(f"Loaded {len(df_struct)} structure rows from llhhbosdata_xauusd.")
+
+        matching_structures = []
+        for _, structure_row in df_struct.iterrows():
+            structure_time = pd.Timestamp(structure_row["time"])
+            structure_type = normalize_structure_event(structure_row["type"])
+            structure_direction = normalize_structure_direction(
+                structure_row["type"],
+                structure_row["direction_action"],
+            )
+            structure_timeframe = str(structure_row["timeframe"]).strip()
+            event_key = (
+                structure_time.isoformat(),
+                structure_type,
+                structure_direction,
+                structure_timeframe,
+            )
+            matching_structures.append({
+                "event_key": event_key,
+                "event_time": structure_time,
+                "event_type": structure_type,
+                "direction": structure_direction,
+                "timeframe": structure_timeframe,
+            })
+
+        matching_trades = df_results.copy()
+        matching_trades["trade_key"] = matching_trades.index
+        trade_matches, match_stats = build_structure_trade_matches(
+            pd.DataFrame(matching_structures),
+            matching_trades,
+        )
+        logger.info(
+            "One-to-one trade matching: %s matched, %s unmatched, %s exact event, %s fallback.",
+            match_stats["matched"],
+            match_stats["unmatched"],
+            match_stats["exact_event"],
+            match_stats["fallback"],
+        )
 
         # Optimize structure lookup for stage 3
         struct_lookup = {}
@@ -203,29 +242,17 @@ def main():
         # -------------------------------------------------------------
         logger.info("Processing historical_structures...")
         patterns_to_add = []
+        seen_events = set()
         
         for _, row in df_struct.iterrows():
             raw_type = str(row["type"]).strip()
             raw_dir = str(row["direction_action"]).strip()
             
             # Normalize event_type
-            event_type = "BoS"
-            if "choch" in raw_type.lower():
-                event_type = "CHoCH"
-            elif "hh" in raw_type.lower():
-                event_type = "HH"
-            elif "ll" in raw_type.lower():
-                event_type = "LL"
+            event_type = normalize_structure_event(raw_type)
                 
             # Normalize direction
-            direction = "Bullish"
-            if "bearish" in raw_dir.lower() or "bearish" in raw_type.lower():
-                direction = "Bearish"
-            elif "update" in raw_dir.lower():
-                if "bullish" in raw_type.lower() or "hh" in raw_type.lower():
-                    direction = "Bullish"
-                elif "bearish" in raw_type.lower() or "ll" in raw_type.lower():
-                    direction = "Bearish"
+            direction = normalize_structure_direction(raw_type, raw_dir)
 
             tf = str(row["timeframe"]).strip()
             price = float(row["price"])
@@ -252,17 +279,12 @@ def main():
                 if pd.notna(ema_val):
                     ema200 = float(ema_val)
 
-            # Match with a trade result using trade lookup dictionary
-            trade_match = None
-            expected_type = "BUY" if direction == "Bullish" else "SELL"
-            candidates = trade_lookup.get((tf, expected_type), [])
-            
-            for t_dict in candidates:
-                t_entry_time = t_dict["entry_time"]
-                time_diff = t_entry_time - struct_time
-                if timedelta(minutes=0) <= time_diff <= timedelta(hours=1):
-                    trade_match = t_dict
-                    break
+            event_key = (struct_time.isoformat(), event_type, direction, tf)
+            if event_key in seen_events:
+                continue
+            seen_events.add(event_key)
+
+            trade_match = trade_matches.get(event_key)
 
             # Outcome formatting
             outcome = "PENDING"
@@ -319,6 +341,21 @@ def main():
                 elif 22 <= hour or hour < 8:
                     session = "Asia"
 
+            entry_price = None
+            if trade_match is not None:
+                entry_value = trade_match.get("entry_price")
+                if entry_value is not None and pd.notna(entry_value):
+                    entry_price = float(entry_value)
+
+            market_features = extract_historical_market_features(
+                event_time=struct_time,
+                structure_price=price,
+                entry_price=entry_price,
+                m15=market_feature_frames["M15"],
+                h1=market_feature_frames["H1"],
+                h4=market_feature_frames["H4"],
+            )
+
             patterns_to_add.append({
                 "id": f"XAUUSD_{struct_time.isoformat()}",
                 "timestamp": struct_time.isoformat(),
@@ -335,9 +372,15 @@ def main():
                 "profit_pips": profit_pips,
                 "net_profit": net_profit,
                 "duration_minutes": duration_minutes,
+                "entry_time": trade_match.get("entry_time") if trade_match is not None else None,
+                "entry_price": trade_match.get("entry_price") if trade_match is not None else None,
+                "exit_time": trade_match.get("exit_time") if trade_match is not None else None,
+                "exit_price": trade_match.get("exit_price") if trade_match is not None else None,
+                "close_reason": trade_match.get("close_reason") if trade_match is not None else None,
                 "reject_reason_raw": reject_reason_raw,
                 "reject_reason_code": reject_reason_code,
                 "price_ratio": round(price / 4500.0, 6) if price > 0 else 1.0,
+                **market_features,
             })
 
         # Insert to LanceDB
