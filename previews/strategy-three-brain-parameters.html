@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strategy Parameters - Three Brain Preview</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --page: linear-gradient(180deg, #ffffff 0%, #f0f6ff 44%, #e0edff 100%);
+      --surface: rgba(255, 255, 255, 0.88);
+      --surface-strong: #ffffff;
+      --surface-soft: #f0f6ff;
+      --line: rgba(59, 130, 246, 0.26);
+      --line-soft: rgba(59, 130, 246, 0.14);
+      --ink: #0f172a;
+      --muted: #64748b;
+      --blue: #1d4ed8;
+      --cyan: #0891b2;
+      --green: #059669;
+      --amber: #d97706;
+      --rose: #dc2626;
+      --violet: #7c3aed;
+      --shadow: 0 18px 52px rgba(15, 23, 42, 0.16);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: #e0edff; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--page) fixed;
+      font-family: "Segoe UI Variable", "Segoe UI", sans-serif;
+    }
+
+    button, input { font: inherit; }
+
+    button { color: inherit; }
+
+    .shell {
+      width: min(1500px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    .preview-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 14px;
+    }
+
+    .preview-title {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 25px);
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .preview-subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .preview-tag {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255,255,255,.72);
+      padding: 7px 10px;
+      color: #475569;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .deck {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(59, 130, 246, .34);
+      border-radius: 10px;
+      background: rgba(255,255,255,.62);
+      box-shadow: var(--shadow);
+      transition: height 430ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    .track {
+      display: flex;
+      align-items: flex-start;
+      transition: transform 430ms cubic-bezier(.2,.8,.2,1);
+    }
+
+    .slide {
+      flex: 0 0 100%;
+      min-width: 0;
+      padding: 18px;
+    }
+
+    .panel {
+      border: 1px solid rgba(59, 130, 246, .28);
+      border-radius: 8px;
+      background: rgba(255,255,255,.76);
+      box-shadow: 0 8px 32px rgba(0,0,0,.14);
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+    }
+
+    .head-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .icon-box {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      border: 1px solid rgba(6,182,212,.28);
+      border-radius: 6px;
+      background: rgba(6,182,212,.10);
+      color: #0891b2;
+    }
+
+    .icon-box svg { width: 16px; height: 16px; }
+
+    .panel-state {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: rgba(240,246,255,.68);
+      padding: 5px 8px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .panel-body {
+      border-top: 1px solid var(--line);
+      padding: 16px 18px 18px;
+    }
+
+    .section-kicker {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--line-soft);
+      padding-bottom: 8px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    .schema-map {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .schema-node {
+      position: relative;
+      min-height: 66px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: linear-gradient(145deg,#fff,#eef5ff);
+      padding: 10px;
+    }
+
+    .schema-node:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      right: -7px;
+      top: 31px;
+      width: 7px;
+      height: 1px;
+      background: #60a5fa;
+    }
+
+    .schema-name { font-size: 10px; font-weight: 900; color: #1e3a8a; }
+    .schema-copy { margin-top: 5px; color: #64748b; font-size: 9px; line-height: 1.35; }
+
+    .original-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .column { padding: 8px 16px 4px 0; }
+    .column + .column { border-left: 1px solid var(--line-soft); padding: 8px 0 4px 16px; }
+
+    .group-title {
+      padding: 12px 4px 7px;
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .setting {
+      display: flex;
+      min-height: 55px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid rgba(148,163,184,.20);
+      padding: 9px 4px;
+    }
+
+    .setting-main { min-width: 0; }
+    .setting-name { color: #1e293b; font-size: 12px; font-weight: 750; line-height: 1.25; }
+    .setting-name.cyan { color: #0e7490; }
+    .setting-name.violet { color: #6d28d9; }
+    .setting-name.green { color: #047857; }
+    .setting-copy { margin-top: 3px; color: #64748b; font-size: 10px; line-height: 1.35; }
+
+    .switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex: 0 0 auto;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      background: #fff;
+      cursor: pointer;
+      transition: background .18s, border .18s;
+    }
+
+    .switch::after {
+      content: "";
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: transform .18s, background .18s;
+    }
+
+    .switch[aria-checked="true"] { border-color: rgba(6,182,212,.55); background: rgba(6,182,212,.22); }
+    .switch[aria-checked="true"]::after { transform: translateX(16px); background: #0891b2; }
+    .switch.violet[aria-checked="true"] { border-color: rgba(124,58,237,.45); background: rgba(124,58,237,.16); }
+    .switch.violet[aria-checked="true"]::after { background: #7c3aed; }
+    .switch.green[aria-checked="true"] { border-color: rgba(5,150,105,.42); background: rgba(5,150,105,.15); }
+    .switch.green[aria-checked="true"]::after { background: #059669; }
+
+    .switch:focus-visible, .nav-button:focus-visible, .brain-tab:focus-visible, .slide-tab:focus-visible {
+      outline: 2px solid #06b6d4;
+      outline-offset: 2px;
+    }
+
+    .field {
+      width: 84px;
+      height: 32px;
+      flex: 0 0 auto;
+      border: 1px solid #93c5fd;
+      border-radius: 6px;
+      background: rgba(255,255,255,.90);
+      color: #0e7490;
+      padding: 0 8px;
+      text-align: center;
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      outline: none;
+    }
+
+    .field:focus { border-color: #0891b2; box-shadow: 0 0 0 2px rgba(6,182,212,.12); }
+    .field.rose { color: #be123c; }
+    .field.green { color: #047857; }
+    .field.amber { color: #b45309; }
+
+    .preset-block {
+      margin: 8px 0 4px;
+      border: 1px solid rgba(6,182,212,.24);
+      border-radius: 8px;
+      background: rgba(236,254,255,.58);
+      padding: 10px;
+    }
+
+    .preset-title { color: #0e7490; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+    .presets { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; margin-top: 8px; }
+    .preset { border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 7px; font-size: 9px; color: #475569; }
+    .preset strong { display: block; color: #1e293b; font-size: 10px; }
+
+    .brain-intro {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 14px;
+    }
+
+    .brain-intro h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    .brain-intro p { max-width: 68ch; margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+    .brain-tabs {
+      display: inline-grid;
+      grid-template-columns: repeat(3, minmax(92px,1fr));
+      gap: 3px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #eff6ff;
+      padding: 3px;
+    }
+
+    .brain-tab {
+      border: 0;
+      border-radius: 5px;
+      background: transparent;
+      padding: 8px 12px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .brain-tab.active { background: #fff; color: #1d4ed8; box-shadow: 0 2px 8px rgba(30,64,175,.12); }
+
+    .brain-view[hidden] { display: none; }
+
+    .brain-summary {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .brain-status, .brain-flow {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(255,255,255,.86);
+      padding: 13px;
+    }
+
+    .status-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .status-name { font-size: 14px; font-weight: 850; }
+    .status-copy { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+
+    .badge {
+      border: 1px solid rgba(5,150,105,.30);
+      border-radius: 999px;
+      background: rgba(5,150,105,.10);
+      padding: 5px 8px;
+      color: #047857;
+      font-size: 9px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .badge.planned { border-color: rgba(217,119,6,.30); background: rgba(217,119,6,.10); color: #b45309; }
+
+    .flow-title { color: #64748b; font-size: 9px; font-weight: 900; text-transform: uppercase; }
+    .flow-row { display: flex; align-items: center; gap: 6px; margin-top: 11px; }
+    .flow-step { flex: 1; border: 1px solid var(--line); border-radius: 5px; background: #f8fbff; padding: 7px; text-align: center; font-size: 9px; font-weight: 800; }
+    .flow-arrow { color: #60a5fa; font-weight: 900; }
+
+    .brain-groups {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .brain-group {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: rgba(255,255,255,.82);
+      padding: 12px;
+    }
+
+    .brain-group h3 { margin: 0 0 5px; color: #1e3a8a; font-size: 11px; text-transform: uppercase; }
+    .brain-group > p { margin: 0 0 6px; color: var(--muted); font-size: 9px; line-height: 1.4; }
+    .brain-group .setting:last-child { border-bottom: 0; }
+
+    .locked {
+      display: grid;
+      min-height: 470px;
+      place-items: center;
+      border: 1px dashed #93c5fd;
+      border-radius: 8px;
+      background: linear-gradient(145deg,rgba(255,255,255,.82),rgba(239,246,255,.72));
+      padding: 24px;
+      text-align: center;
+    }
+
+    .locked-inner { max-width: 560px; }
+    .locked-mark { display: inline-flex; width: 46px; height: 46px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: #1d4ed8; }
+    .locked h3 { margin: 14px 0 6px; font-size: 17px; }
+    .locked p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .locked-list { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; margin-top: 16px; }
+    .locked-item { border: 1px solid var(--line-soft); border-radius: 6px; background: rgba(255,255,255,.76); padding: 9px; color: #475569; font-size: 9px; font-weight: 700; }
+
+    .deck-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 14px;
+    }
+
+    .nav-button {
+      display: inline-flex;
+      width: 34px;
+      height: 34px;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: rgba(255,255,255,.88);
+      color: #1d4ed8;
+      cursor: pointer;
+    }
+
+    .nav-button:disabled { opacity: .38; cursor: not-allowed; }
+    .nav-button svg { width: 16px; height: 16px; }
+
+    .slide-tabs { display: flex; align-items: center; gap: 5px; }
+    .slide-tab { width: 29px; height: 8px; border: 0; border-radius: 999px; background: #bfdbfe; cursor: pointer; transition: width .2s, background .2s; }
+    .slide-tab.active { width: 46px; background: #1d4ed8; }
+    .slide-count { min-width: 36px; color: #64748b; font: 700 10px Consolas, monospace; text-align: center; }
+
+    .note {
+      margin: 11px 0 0;
+      color: #64748b;
+      font-size: 10px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    @media (max-width: 1040px) {
+      .shell { width: min(100% - 18px, 920px); padding-top: 16px; }
+      .slide { padding: 10px; }
+      .original-grid, .brain-summary { grid-template-columns: 1fr; }
+      .column { padding-right: 0; }
+      .column + .column { border-top: 1px solid var(--line-soft); border-left: 0; padding-left: 0; }
+      .schema-map { grid-template-columns: repeat(3,1fr); }
+      .schema-node::after { display: none; }
+      .brain-groups { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 680px) {
+      .preview-bar, .brain-intro { align-items: stretch; flex-direction: column; }
+      .preview-tag { align-self: flex-start; }
+      .panel-head { align-items: flex-start; }
+      .panel-state { display: none; }
+      .panel-body { padding: 13px 11px; }
+      .schema-map { grid-template-columns: 1fr 1fr; }
+      .brain-tabs { width: 100%; }
+      .brain-groups, .locked-list { grid-template-columns: 1fr; }
+      .presets { grid-template-columns: 1fr 1fr; }
+      .setting { gap: 8px; }
+      .setting-copy { max-width: 34ch; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <!--
+    THESIS: Parameter existing tetap utuh; pengelompokan Three-Brain hadir sebagai slide kedua, bukan mengganti kontrol asli.
+    OWN-WORLD: Sapphire Platinum dashboard, garis biru tipis, permukaan putih teknis, kontrol padat.
+    STORY: Operator memeriksa baseline asli lalu berpindah ke peta parameter Otak 1, 2, dan 3.
+    FIRST VIEWPORT: Panel parameter original memenuhi deck; navigasi slide berada tepat di bawahnya.
+    FORM: Operational parameter deck, extension dari UI Replay Trades existing.
+  -->
+  <main class="shell">
+    <header class="preview-bar">
+      <div>
+        <h1 class="preview-title">Strategy Parameters Layout Preview</h1>
+        <p class="preview-subtitle">Slide 1 mempertahankan UI parameter asli. Slide 2 mengelompokkan parameter berdasarkan Three-Brain architecture.</p>
+      </div>
+      <div class="preview-tag">Standalone HTML Prototype</div>
+    </header>
+
+    <div class="deck" id="deck" aria-label="Strategy parameters slides">
+      <div class="track" id="track">
+        <section class="slide" aria-label="Slide 1: Original parameters">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="head-title">
+                <span class="icon-box" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21h-4v-.09A1.7 1.7 0 0 0 8.5 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H3v-4h.09A1.7 1.7 0 0 0 4.6 8.5a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6 1.7 1.7 0 0 0 .4-1.1V3h4v.09A1.7 1.7 0 0 0 15.5 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.07.38.28.74.6 1 .3.25.7.4 1.1.4h.09v4h-.09c-.4 0-.8.15-1.1.4-.32.26-.53.62-.6 1Z"/></svg>
+                </span>
+                Strategy Settings &amp; Parameters
+              </div>
+              <span class="panel-state">Tutup Panel ▲</span>
+            </div>
+
+            <div class="panel-body">
+              <div class="section-kicker">Trend &amp; Cycle Schema Map</div>
+              <div class="schema-map">
+                <div class="schema-node"><div class="schema-name">M15 Structure</div><div class="schema-copy">CHoCH dan BOS membentuk kandidat entry.</div></div>
+                <div class="schema-node"><div class="schema-name">H1 EMA200</div><div class="schema-copy">Validasi arah utama terhadap trend H1.</div></div>
+                <div class="schema-node"><div class="schema-name">H4 Context</div><div class="schema-copy">Konfirmasi trend higher timeframe.</div></div>
+                <div class="schema-node"><div class="schema-name">Entry Quality</div><div class="schema-copy">Body, session, EMA stretch, BOS cycle.</div></div>
+                <div class="schema-node"><div class="schema-name">Execution</div><div class="schema-copy">SL, TP, lot, trailing, BE, dan scaling.</div></div>
+              </div>
+
+              <div class="original-grid">
+                <div class="column">
+                  <div class="group-title">Entry Settings &amp; Structure</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">CHoCH Entries</div><div class="setting-copy">Change of Character patterns</div></div><button class="switch" role="switch" aria-checked="true" aria-label="CHoCH Entries"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle 1 Entries</div><div class="setting-copy">First BOS after CHoCH</div></div><button class="switch" role="switch" aria-checked="true" aria-label="BOS Cycle 1 Entries"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle 2+ Entries</div><div class="setting-copy">Second and subsequent BOS cycles</div></div><button class="switch" role="switch" aria-checked="true" aria-label="BOS Cycle 2 Entries"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Max Cycle BOS</div><div class="setting-copy">0 means unlimited cycles</div></div><input class="field" value="2" aria-label="Max Cycle BOS"></div>
+
+                  <div class="group-title">EA Trend &amp; Entry Filters</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">H1 EMA200 Filter</div><div class="setting-copy">H1 close must be above/below EMA200 by trade direction</div></div><button class="switch" role="switch" aria-checked="true" aria-label="H1 EMA200 Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">H4 EMA Filter</div><div class="setting-copy">H4 EMA trend with EA gap threshold</div></div><button class="switch" role="switch" aria-checked="true" aria-label="H4 EMA Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">EMA Slope Filter</div><div class="setting-copy">M15 EMA200 must move in the trade direction</div></div><button class="switch" role="switch" aria-checked="true" aria-label="EMA Slope Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Body Ratio Filter</div><div class="setting-copy">M15 candle body must be at least 40% of its range</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Body Ratio Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Session Filter</div><div class="setting-copy">Block entries recorded at 01:00 UTC</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Session Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">EMA Stretch Filter</div><div class="setting-copy">HOLD jika jarak harga &gt;3.5x ATR dari M15 EMA200</div></div><button class="switch" role="switch" aria-checked="true" aria-label="EMA Stretch Filter"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle Stage Filter</div><div class="setting-copy">HOLD jika mencapai BOS ke-4+ tanpa pullback</div></div><button class="switch" role="switch" aria-checked="true" aria-label="BOS Cycle Stage Filter"></button></div>
+
+                  <div class="group-title">Mesin Keputusan &amp; AI Analysis</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name cyan">SmartRule Engine</div><div class="setting-copy">Eksekusi deterministik berbasis aturan indikator dan filter</div></div><button class="switch" role="switch" aria-checked="true" aria-label="SmartRule Engine"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name violet">LLM 7-Step Reasoning</div><div class="setting-copy">Analisis institusional 7 langkah berbasis AI multi-tier</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="LLM Reasoning"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name violet">Gunakan LLM untuk SL/TP/Lot</div><div class="setting-copy">Auto-thinking dengan kartu rekomendasi setup</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="LLM Setup"></button></div>
+
+                  <div class="group-title">Chart Visuals &amp; SMC Elements</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name violet">Visual Supply &amp; Demand</div><div class="setting-copy">Kotak Supply/Resistance dan Demand/Support</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="Supply Demand"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name cyan">Visual Liquidity Pools (BSL / SSL)</div><div class="setting-copy">Garis target likuiditas Buy-Side dan Sell-Side</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Liquidity Pools"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">MA 20</div><div class="setting-copy">20-period simple moving average</div></div><button class="switch" role="switch" aria-checked="false" aria-label="MA 20"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">MA 50</div><div class="setting-copy">50-period simple moving average</div></div><button class="switch" role="switch" aria-checked="false" aria-label="MA 50"></button></div>
+                </div>
+
+                <div class="column">
+                  <div class="group-title">Position &amp; Account Sizing</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Initial Balance ($)</div><div class="setting-copy">Modal awal akun replay</div></div><input class="field" value="1000" aria-label="Initial Balance"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Lot Size</div><div class="setting-copy">0 = Auto Risk Manager</div></div><input class="field" value="0.05" aria-label="Lot Size"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Force 24h Close</div><div class="setting-copy">Automatically close open trades after 24 hours</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Force 24h Close"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Profit Target Exit (USD)</div><div class="setting-copy">Auto-close saat floating profit mencapai target nominal</div></div><button class="switch green" role="switch" aria-checked="false" aria-label="Profit Target Exit"></button></div>
+
+                  <div class="group-title">Custom SL, TP &amp; Trailing Stop</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Initial TP Distance ($)</div><div class="setting-copy">Target Profit awal</div></div><input class="field green" value="30.00" aria-label="Initial TP"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">SL Safety Buffer ($)</div><div class="setting-copy">Jarak aman di luar LL/HH</div></div><input class="field rose" value="10.00" aria-label="SL Buffer"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Min SL Distance ($)</div><div class="setting-copy">Batas minimum jarak SL</div></div><input class="field amber" value="15.00" aria-label="Min SL"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Max SL Distance ($)</div><div class="setting-copy">Batas maksimum jarak SL</div></div><input class="field rose" value="30.00" aria-label="Max SL"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Trailing SL Distance ($)</div><div class="setting-copy">Jarak Dynamic Trailing Stop</div></div><input class="field" value="30.00" aria-label="Trailing Distance"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">TP Expansion Trigger ($)</div><div class="setting-copy">Sisa jarak ke TP untuk melebarkan target</div></div><input class="field amber" value="10.00" aria-label="TP Trigger"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">TP Expansion Amount ($)</div><div class="setting-copy">Tambahan jarak saat TP diperlebar</div></div><input class="field amber" value="20.00" aria-label="TP Expansion"></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Max TP Expansion Count</div><div class="setting-copy">0 = Unlimited expansion</div></div><input class="field" value="0" aria-label="Max Expansion"></div>
+
+                  <div class="group-title">Break-Even Protection</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Break-Even (BE) Lock</div><div class="setting-copy">Kunci SL ke harga entry saat profit tercapai</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Break Even"></button></div>
+
+                  <div class="group-title">Price-Ratio Scaling (Multi-Price Level)</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name green">Price-Ratio Dynamic Scaling (Opsi 1)</div><div class="setting-copy">Skalakan SL, TP dan Lot proporsional terhadap harga</div></div><button class="switch green" role="switch" aria-checked="true" aria-label="Price Ratio Scaling"></button></div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Base Reference Price ($)</div><div class="setting-copy">Harga patokan dasar skala 1.0x</div></div><input class="field green" value="2000.00" aria-label="Base Price"></div>
+                  <div class="preset-block">
+                    <div class="preset-title">Quick Presets Range Emas (Data Teruji)</div>
+                    <div class="presets">
+                      <div class="preset"><strong>1.500 - 2.000</strong>Era 2020-21</div>
+                      <div class="preset"><strong>2.000 Standard</strong>Universal</div>
+                      <div class="preset"><strong>3.500 Mid</strong>Era 2024-25</div>
+                      <div class="preset"><strong>4.500 Juara 1</strong>Era 2026</div>
+                    </div>
+                  </div>
+
+                  <div class="group-title">ATR Adaptive SL/TP (Alternatif)</div>
+                  <div class="setting"><div class="setting-main"><div class="setting-name">Gunakan ATR untuk SL/TP</div><div class="setting-copy">Jarak SL/TP menyesuaikan volatilitas</div></div><button class="switch" role="switch" aria-checked="false" aria-label="ATR SL TP"></button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" aria-label="Slide 2: Three Brain parameters">
+          <div class="panel">
+            <div class="panel-head">
+              <div class="head-title">
+                <span class="icon-box" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.5 4.5A3 3 0 0 0 4 6a3 3 0 0 0 .8 2A3.5 3.5 0 0 0 6 14.5V16a3 3 0 0 0 5.5 1.7V6.5a2 2 0 0 0-2-2Z"/><path d="M14.5 4.5A3 3 0 0 1 20 6a3 3 0 0 1-.8 2 3.5 3.5 0 0 1-1.2 6.5V16a3 3 0 0 1-5.5 1.7V6.5a2 2 0 0 1 2-2Z"/></svg>
+                </span>
+                Three-Brain Settings &amp; Parameters
+              </div>
+              <span class="panel-state">Parameter Architecture</span>
+            </div>
+
+            <div class="panel-body">
+              <div class="brain-intro">
+                <div>
+                  <h2>Kontrol strategi berdasarkan tanggung jawab otak</h2>
+                  <p>Otak 1 mencari dan memvalidasi entry. Otak 2 mengukur continuation strength setelah posisi aktif. Otak 3 akan mengelola keputusan hold, proteksi, target, dan exit.</p>
+                </div>
+                <div class="brain-tabs" role="tablist" aria-label="Brain parameters">
+                  <button class="brain-tab active" role="tab" aria-selected="true" data-brain="1">Otak 1</button>
+                  <button class="brain-tab" role="tab" aria-selected="false" data-brain="2">Otak 2</button>
+                  <button class="brain-tab" role="tab" aria-selected="false" data-brain="3">Otak 3</button>
+                </div>
+              </div>
+
+              <div class="brain-view" data-brain-view="1">
+                <div class="brain-summary">
+                  <div class="brain-status">
+                    <div class="status-line"><div class="status-name">Otak 1 - Entry &amp; Structure Engine</div><span class="badge">Existing</span></div>
+                    <div class="status-copy">Mengidentifikasi CHoCH/BOS, menyaring arah multi-timeframe, memeriksa kualitas entry, lalu memilih rule atau LLM decision path.</div>
+                  </div>
+                  <div class="brain-flow">
+                    <div class="flow-title">Decision Flow</div>
+                    <div class="flow-row"><div class="flow-step">Structure</div><span class="flow-arrow">›</span><div class="flow-step">Filter</div><span class="flow-arrow">›</span><div class="flow-step">Decision</div><span class="flow-arrow">›</span><div class="flow-step">Entry</div></div>
+                  </div>
+                </div>
+
+                <div class="brain-groups">
+                  <div class="brain-group">
+                    <h3>Structure Entry</h3><p>Trigger market structure yang diperbolehkan membuka kandidat posisi.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">CHoCH Entries</div><div class="setting-copy">Change of Character</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 CHoCH"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle 1</div><div class="setting-copy">BOS pertama setelah CHoCH</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 BOS 1"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle 2+</div><div class="setting-copy">BOS lanjutan</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 BOS 2"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Max Cycle BOS</div><div class="setting-copy">Batas siklus entry</div></div><input class="field" value="2" aria-label="Brain 1 Max BOS"></div>
+                  </div>
+
+                  <div class="brain-group">
+                    <h3>Trend Context</h3><p>Konfirmasi arah entry dari M15, H1, dan H4.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">H1 EMA200</div><div class="setting-copy">Arah trend H1</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 H1"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">H4 EMA</div><div class="setting-copy">Context higher timeframe</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 H4"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">EMA Slope</div><div class="setting-copy">Arah gerak EMA M15</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 Slope"></button></div>
+                  </div>
+
+                  <div class="brain-group">
+                    <h3>Entry Quality</h3><p>Mencegah entry saat candle, sesi, atau tahap cycle tidak sehat.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Body Ratio</div><div class="setting-copy">Minimal body 40%</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Brain 1 Body"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Session Filter</div><div class="setting-copy">Blok 01:00 UTC</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Brain 1 Session"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">EMA Stretch</div><div class="setting-copy">HOLD jika &gt;3.5x ATR</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 Stretch"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">BOS Cycle Stage</div><div class="setting-copy">HOLD saat BOS ke-4+</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 Cycle Stage"></button></div>
+                  </div>
+
+                  <div class="brain-group">
+                    <h3>Decision Engine</h3><p>Pilih jalur keputusan untuk kandidat yang lolos filter.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name cyan">SmartRule Engine</div><div class="setting-copy">Deterministik dan cepat</div></div><button class="switch" role="switch" aria-checked="true" aria-label="Brain 1 SmartRule"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name violet">LLM 7-Step</div><div class="setting-copy">Reasoning multi-tier</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="Brain 1 LLM"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name violet">LLM SL/TP/Lot</div><div class="setting-copy">Kartu rekomendasi setup</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="Brain 1 LLM Setup"></button></div>
+                  </div>
+
+                  <div class="brain-group">
+                    <h3>Structure Visuals</h3><p>Overlay observasi; tidak memutuskan entry.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Supply &amp; Demand</div><div class="setting-copy">Zona structure</div></div><button class="switch violet" role="switch" aria-checked="false" aria-label="Brain 1 SD"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Liquidity BSL/SSL</div><div class="setting-copy">Level liquidity pool</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Brain 1 Liquidity"></button></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">MA 20 / MA 50</div><div class="setting-copy">Referensi chart tambahan</div></div><button class="switch" role="switch" aria-checked="false" aria-label="Brain 1 MA"></button></div>
+                  </div>
+
+                  <div class="brain-group">
+                    <h3>Entry Setup Boundary</h3><p>Nilai account dan initial protection yang dipakai saat entry terbentuk.</p>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Initial Balance</div><div class="setting-copy">Baseline replay</div></div><input class="field" value="1000" aria-label="Brain 1 Balance"></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Lot Size</div><div class="setting-copy">0 = Auto Risk</div></div><input class="field" value="0.05" aria-label="Brain 1 Lot"></div>
+                    <div class="setting"><div class="setting-main"><div class="setting-name">Initial SL/TP Method</div><div class="setting-copy">Fixed, ratio, atau ATR</div></div><span class="badge">Shared</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="brain-view" data-brain-view="2" hidden>
+                <div class="locked">
+                  <div class="locked-inner">
+                    <span class="locked-mark" aria-hidden="true">II</span>
+                    <h3>Otak 2 - Continuation Strength Observer</h3>
+                    <p>Layout disiapkan untuk parameter Strength 0-100 dan state posisi. Belum mengubah entry, SL, TP, trailing, close, atau Net Profit.</p>
+                    <div class="locked-list">
+                      <div class="locked-item">Structure 30%</div><div class="locked-item">Momentum 20%</div><div class="locked-item">Directional 20%</div><div class="locked-item">Trend 15%</div><div class="locked-item">Activity 15%</div><div class="locked-item">State Confirmation</div>
+                    </div>
+                    <div style="margin-top:14px"><span class="badge planned">Planned - Observer Only</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="brain-view" data-brain-view="3" hidden>
+                <div class="locked">
+                  <div class="locked-inner">
+                    <span class="locked-mark" aria-hidden="true">III</span>
+                    <h3>Otak 3 - Exit &amp; Target Management</h3>
+                    <p>Layout disiapkan untuk keputusan hold, protect, target extension, dan exit berdasarkan strength serta structure invalidation. Belum diimplementasikan.</p>
+                    <div class="locked-list">
+                      <div class="locked-item">Hold Decision</div><div class="locked-item">Profit Protection</div><div class="locked-item">Target Extension</div><div class="locked-item">Structure Exit</div><div class="locked-item">Critical State Exit</div><div class="locked-item">Maximum Hold Guard</div>
+                    </div>
+                    <div style="margin-top:14px"><span class="badge planned">Future Brain</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <nav class="deck-nav" aria-label="Slide navigation">
+      <button class="nav-button" id="previous" aria-label="Slide sebelumnya" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <div class="slide-tabs">
+        <button class="slide-tab active" data-slide="0" aria-label="Buka slide 1"></button>
+        <button class="slide-tab" data-slide="1" aria-label="Buka slide 2"></button>
+      </div>
+      <span class="slide-count" id="slideCount">1 / 2</span>
+      <button class="nav-button" id="next" aria-label="Slide berikutnya">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </nav>
+    <p class="note">Gunakan tombol navigasi atau tombol panah keyboard. Toggle pada prototype bersifat visual dan tidak menyimpan konfigurasi.</p>
+  </main>
+
+  <script>
+    const deck = document.getElementById("deck");
+    const track = document.getElementById("track");
+    const slides = [...document.querySelectorAll(".slide")];
+    const previous = document.getElementById("previous");
+    const next = document.getElementById("next");
+    const slideCount = document.getElementById("slideCount");
+    const slideTabs = [...document.querySelectorAll(".slide-tab")];
+    let activeSlide = 0;
+
+    function syncDeckHeight() {
+      deck.style.height = `${slides[activeSlide].scrollHeight}px`;
+    }
+
+    function showSlide(index) {
+      activeSlide = Math.max(0, Math.min(1, index));
+      track.style.transform = `translateX(-${activeSlide * 100}%)`;
+      previous.disabled = activeSlide === 0;
+      next.disabled = activeSlide === 1;
+      slideCount.textContent = `${activeSlide + 1} / 2`;
+      slideTabs.forEach((tab, tabIndex) => tab.classList.toggle("active", tabIndex === activeSlide));
+      requestAnimationFrame(syncDeckHeight);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    previous.addEventListener("click", () => showSlide(activeSlide - 1));
+    next.addEventListener("click", () => showSlide(activeSlide + 1));
+    slideTabs.forEach((tab) => tab.addEventListener("click", () => showSlide(Number(tab.dataset.slide))));
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") showSlide(activeSlide - 1);
+      if (event.key === "ArrowRight") showSlide(activeSlide + 1);
+    });
+
+    document.querySelectorAll(".switch").forEach((control) => {
+      control.addEventListener("click", () => {
+        control.setAttribute("aria-checked", control.getAttribute("aria-checked") === "true" ? "false" : "true");
+      });
+    });
+
+    const brainTabs = [...document.querySelectorAll(".brain-tab")];
+    const brainViews = [...document.querySelectorAll("[data-brain-view]")];
+    brainTabs.forEach((tab) => {
+      tab.addEventListener("click", () => {
+        const brain = tab.dataset.brain;
+        brainTabs.forEach((item) => {
+          const selected = item === tab;
+          item.classList.toggle("active", selected);
+          item.setAttribute("aria-selected", String(selected));
+        });
+        brainViews.forEach((view) => { view.hidden = view.dataset.brainView !== brain; });
+        requestAnimationFrame(syncDeckHeight);
+      });
+    });
+
+    window.addEventListener("resize", syncDeckHeight);
+    window.addEventListener("load", syncDeckHeight);
+  </script>
+</body>
+</html>

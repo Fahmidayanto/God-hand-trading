@@ -1,0 +1,90 @@
+﻿{
+  "rawApi": {
+    "executed": 86
+  },
+  "uiSimulator": {
+    "candidates": 166,
+    "executed": 75,
+    "rejected": 91,
+    "rejectionSummary": {
+      "H1 EMA200 Filter": 54,
+      "H4 EMA Filter": 21,
+      "Max BOS Cycle (2)": 12,
+      "EMA Slope Filter": 4
+    }
+  },
+  "overlap": {
+    "exactTimeDirection": 77,
+    "rawMatchedUiExecuted": 77,
+    "rawMatchedUiRejected": 0,
+    "rawOnly": 9,
+    "uiExecutedOnly": 0
+  },
+  "rawMatchedUiRejected": [],
+  "rawOnly": [
+    {
+      "ticket": 9473076000,
+      "type": "SELL",
+      "entry_time": 1783510201,
+      "net_profit": 181.15,
+      "nearest_offset_seconds": -1
+    },
+    {
+      "ticket": 9542748291,
+      "type": "SELL",
+      "entry_time": 1783975500,
+      "net_profit": -150.23,
+      "nearest_offset_seconds": -12600
+    },
+    {
+      "ticket": 9595340010,
+      "type": "SELL",
+      "entry_time": 1784217600,
+      "net_profit": 13.5,
+      "nearest_offset_seconds": -900
+    },
+    {
+      "ticket": 9597877384,
+      "type": "SELL",
+      "entry_time": 1784223000,
+      "net_profit": -18.95,
+      "nearest_offset_seconds": -6300
+    },
+    {
+      "ticket": 9598215181,
+      "type": "SELL",
+      "entry_time": 1784223900,
+      "net_profit": 41.85,
+      "nearest_offset_seconds": -7200
+    },
+    {
+      "ticket": 9598503360,
+      "type": "SELL",
+      "entry_time": 1784224800,
+      "net_profit": 9.5,
+      "nearest_offset_seconds": -8100
+    },
+    {
+      "ticket": 9598503363,
+      "type": "SELL",
+      "entry_time": 1784224800,
+      "net_profit": 9.9,
+      "nearest_offset_seconds": -8100
+    },
+    {
+      "ticket": 9598808229,
+      "type": "SELL",
+      "entry_time": 1784225700,
+      "net_profit": -34.15,
+      "nearest_offset_seconds": -9000
+    },
+    {
+      "ticket": 10137366887,
+      "type": "BUY",
+      "entry_time": 1787302337,
+      "net_profit": 82.6,
+      "nearest_offset_seconds": -437
+    }
+  ],
+  "uiExecutedOnly": []
+}

@@ -10,7 +10,7 @@ import {
   LineSeries,
   LineStyle,
 } from "lightweight-charts";
-import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors, Clapperboard, MapPin, Shield, Clock3, Move, Zap, Bot, Brain, Lightbulb, Check, BarChart3, Package, Wallet, Tag, Scale, ClipboardList, AlertTriangle, ChevronDown, ArrowRight } from "lucide-react";
+import { Play, Pause, SkipForward, Square, Loader2, Calendar, CalendarDays, X, Rewind, Settings, Target, ChartNoAxesCombined, CircleDollarSign, Trophy, TrendingDown, TrendingUp, Trash2, Sliders, Layers, GripVertical, Minimize2, Maximize2, Download, Scissors, Clapperboard, MapPin, Shield, Clock3, Move, Zap, Bot, Brain, Lightbulb, Check, BarChart3, Package, Wallet, Tag, Scale, ClipboardList, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
 import {
   StructureLinesPrimitive,
   type StructureLineItem,
@@ -33,64 +33,30 @@ import {
 } from "@/components/valuecell/charts/liquidity-pools-primitive";
 import { useSessionZones } from "@/api/mt5_agents";
 import { followReplayPlayhead } from "./replay-chart";
+import { evaluateContinuationStrength } from "./continuation-strength";
+import { evaluateExitTargetObserver } from "./exit-target-observer";
+import { simulateThreeBrainTradeOutcome } from "./three-brain-engine";
+import {
+  DEFAULT_ENTRY_FILTER_PARAMS,
+  DEFAULT_STRATEGY_PARAMS,
+  calculateATR,
+  calculateTradeSwap,
+  getActualLotSize,
+  getCandleAtOrBefore,
+  getCandleIndexAtOrBefore,
+  getEntryStructureInfo,
+  getProcessedReplayTrades,
+  getTimestampSeconds,
+  simulateTrailingSLTP,
+  type EntryFilterParams,
+  type ReplayCandle,
+  type ReplayData,
+  type ReplayTrade,
+  type StrategyParams,
+  type StructureEvent,
+} from "./replay-engine";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-interface ReplayCandle {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  ema200: number | null;
-  spread?: number | null;
-}
-
-interface StructureEvent {
-  type: string;
-  direction: string;
-  price: number;
-  time: number;
-  timeframe: string;
-  status: string;
-  previous_price: number | null;
-  previous_time: number | null;
-}
-
-interface ReplayTrade {
-  ticket: number;
-  type: string;
-  status: string;
-  reject_reason: string | null;
-  entry_price: number | null;
-  exit_price: number | null;
-  sl: number | null;
-  tp: number | null;
-  net_profit: number | null;
-  session: string;
-  entry_time: number | null;
-  exit_time: number | null;
-  lot_size: number | null;
-  spread_cost?: number | null;
-  commission?: number | null;
-  swap?: number | null;
-}
-
-interface ReplayData {
-  candles: ReplayCandle[];
-  structures: StructureEvent[];
-  trades: ReplayTrade[];
-  available_months: { year: number; month: number }[];
-  meta: {
-    timeframe: string;
-    date_from: string;
-    date_to: string;
-    total_candles: number;
-    total_structures: number;
-    total_trades: number;
-  };
-}
 
 export interface PositionPlanner {
   type: "long" | "short";
@@ -104,20 +70,6 @@ export interface PositionPlanner {
   riskRewardRatio: number;
   riskAmountUsd?: number;
   isAutoRisk?: boolean;
-}
-
-interface EntryFilterParams {
-  entry_choch: boolean;
-  entry_bos: boolean;
-  entry_bos_cycle_2_plus: boolean;
-  max_bos_cycle: number;
-  h1_ema200_filter: boolean;
-  h4_ema_filter: boolean;
-  ema_slope_filter: boolean;
-  body_ratio_filter: boolean;
-  session_filter: boolean;
-  ema_stretch_filter: boolean; // ðŸ›¡ï¸ Filter Regangan EMA (EMA Stretch > 3.5x ATR)
-  bos_cycle_filter: boolean;   // ðŸ›¡ï¸ Filter Siklus BOS (BOS Cycle >= 4)
 }
 
 // â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -147,20 +99,6 @@ const STRUCTURE_COLORS: Record<string, string> = {
   BOS: "#facc15",
 };
 
-const DEFAULT_ENTRY_FILTER_PARAMS: EntryFilterParams = {
-  entry_choch: true,
-  entry_bos: true,
-  entry_bos_cycle_2_plus: true,
-  max_bos_cycle: 2,
-  h1_ema200_filter: true,
-  h4_ema_filter: true,
-  ema_slope_filter: true,
-  body_ratio_filter: false,
-  session_filter: false,
-  ema_stretch_filter: true,
-  bos_cycle_filter: true,
-};
-
 function getSimpleMovingAverage(candles: ReplayCandle[], endIndex: number, period: number) {
   if (endIndex < period - 1) return null;
 
@@ -171,65 +109,6 @@ function getSimpleMovingAverage(candles: ReplayCandle[], endIndex: number, perio
   return total / period;
 }
 
-function getEntryStructureInfo(entryTime: number, structures: StructureEvent[], direction?: string) {
-  let latestType = "";
-  let latestTypeBuy = "";
-  let latestTypeSell = "";
-  let bosCycleBuy = 0;
-  let bosCycleSell = 0;
-
-  for (const event of structures) {
-    if (event.time > entryTime) break;
-    if (event.timeframe && event.timeframe.toUpperCase() !== "M15") continue;
-
-    const type = event.type?.toUpperCase() ?? "";
-    const dir = (event.direction ?? "").toUpperCase();
-    const isBull = dir.includes("BULL") || type.includes("BULL");
-    const isBear = dir.includes("BEAR") || type.includes("BEAR");
-
-    if (type.includes("CHOCH")) {
-      latestType = "CHOCH";
-      if (isBull) {
-        latestTypeBuy = "CHOCH";
-        bosCycleBuy = 0;
-      }
-      if (isBear) {
-        latestTypeSell = "CHOCH";
-        bosCycleSell = 0;
-      }
-      if (!isBull && !isBear) {
-        latestTypeBuy = "CHOCH";
-        latestTypeSell = "CHOCH";
-        bosCycleBuy = 0;
-        bosCycleSell = 0;
-      }
-    } else if (type.includes("BOS")) {
-      latestType = "BOS";
-      if (isBull) {
-        latestTypeBuy = "BOS";
-        bosCycleBuy += 1;
-      }
-      if (isBear) {
-        latestTypeSell = "BOS";
-        bosCycleSell += 1;
-      }
-      if (!isBull && !isBear) {
-        latestTypeBuy = "BOS";
-        latestTypeSell = "BOS";
-        bosCycleBuy += 1;
-        bosCycleSell += 1;
-      }
-    }
-  }
-
-  const dirUpper = (direction ?? "").toUpperCase();
-  const isSell = dirUpper.includes("SELL") || dirUpper.includes("BEAR");
-  const isBuy = dirUpper.includes("BUY") || dirUpper.includes("BULL");
-  const effectiveLatestType = isSell ? (latestTypeSell || latestType) : (isBuy ? (latestTypeBuy || latestType) : latestType);
-  const bosCycle = isSell ? bosCycleSell : bosCycleBuy;
-
-  return { latestType: effectiveLatestType, bosCycle, bosCycleBuy, bosCycleSell };
-}
 
 function getLastAcceptedLL(entryTime: number, structures: StructureEvent[]) {
   let lastAcceptedLL: number | null = null;
@@ -259,310 +138,6 @@ function formatMT5Time(ts: number | null | undefined): string {
   const m = String(d.getUTCMinutes()).padStart(2, "0");
   const s = String(d.getUTCSeconds()).padStart(2, "0");
   return `${Y}.${M}.${D} ${h}:${m}:${s}`;
-}
-
-function getCandleAtOrBefore(candles: ReplayCandle[], time: number) {
-  for (let index = candles.length - 1; index >= 0; index--) {
-    if (candles[index].time <= time) return candles[index];
-  }
-  return null;
-}
-
-function getCandleIndexAtOrBefore(candles: ReplayCandle[], time: number) {
-  for (let index = candles.length - 1; index >= 0; index--) {
-    if (candles[index].time <= time) return index;
-  }
-  return -1;
-}
-
-function passesEAEntryFilters(
-  trade: ReplayTrade,
-  m15Candles: ReplayCandle[],
-  h1Candles: ReplayCandle[],
-  h4Candles: ReplayCandle[],
-  params: EntryFilterParams,
-) {
-  const entryTime = trade.entry_time;
-  if (entryTime === null) return false;
-
-  const isBuy = trade.type.toUpperCase() === "BUY";
-  const m15Index = getCandleIndexAtOrBefore(m15Candles, entryTime);
-  // The EA evaluates rates[1], the last fully closed M15 bar, rather than the bar forming at entry.
-  const m15Candle = m15Index > 0 ? m15Candles[m15Index - 1] : null;
-  const currentPrice = (trade.entry_price != null && trade.entry_price > 0)
-    ? trade.entry_price
-    : (m15Index >= 0 ? (m15Candles[m15Index].open || m15Candles[m15Index].close) : (m15Candle?.close ?? 0));
-  const h1Candle = getCandleAtOrBefore(h1Candles, entryTime);
-  const h4Index = getCandleIndexAtOrBefore(h4Candles, entryTime);
-  const h4Candle = h4Index >= 0 ? h4Candles[h4Index] : null;
-
-  if (params.h1_ema200_filter && h1Candles.length > 0 && h1Candle?.ema200 != null && h1Candle.ema200 > 0 && currentPrice > 0) {
-    if (isBuy ? currentPrice <= h1Candle.ema200 : currentPrice >= h1Candle.ema200) return false;
-  }
-
-  if (params.h4_ema_filter && h4Candles.length > 0 && h4Candle?.ema200 != null && h4Candle.ema200 > 0 && currentPrice > 0) {
-    // Matches the EA: MathMax(ema * 0.0025, 500 * _Point), where XAUUSD _Point is 0.01.
-    const gapThreshold = Math.max(h4Candle.ema200 * 0.0025, 5);
-    if (isBuy ? currentPrice <= h4Candle.ema200 + gapThreshold : currentPrice >= h4Candle.ema200 - gapThreshold) return false;
-  }
-
-  if (params.ema_slope_filter) {
-    const previousCandle = m15Index > 1 ? m15Candles[m15Index - 2] : null;
-    if (m15Candle?.ema200 === null || m15Candle?.ema200 === undefined || previousCandle?.ema200 === null || previousCandle?.ema200 === undefined) return false;
-    if (isBuy ? m15Candle.ema200 <= previousCandle.ema200 : m15Candle.ema200 >= previousCandle.ema200) return false;
-  }
-
-  if (params.body_ratio_filter) {
-    if (!m15Candle) return false;
-    const range = m15Candle.high - m15Candle.low;
-    if (range > 0) {
-      const bodyRatio = Math.abs(m15Candle.close - m15Candle.open) / range;
-      let effectiveMinBodyRatio = 0.4;
-
-      // Mirror the EA's H4 stretch-aware body-ratio override. A moderate,
-      // aligned H4 trend with 16-hour momentum lowers the threshold to 15%.
-      const h4MomentumCandle = h4Index >= 4 ? h4Candles[h4Index - 4] : null;
-      if (h4Candle?.ema200 !== null && h4Candle?.ema200 !== undefined && h4MomentumCandle) {
-        const h4GapPercent = ((h4Candle.close - h4Candle.ema200) / h4Candle.ema200) * 100;
-        const h4Momentum = h4Candle.close - h4MomentumCandle.close;
-        const aligned = isBuy ? h4GapPercent > 0 : h4GapPercent < 0;
-        const momentumAligned = isBuy ? h4Momentum > 2 : h4Momentum < -2;
-        const isModerateTrend = Math.abs(h4GapPercent) >= 0.5 && Math.abs(h4GapPercent) <= 1.8;
-        if (isModerateTrend && aligned && momentumAligned) effectiveMinBodyRatio = 0.15;
-      }
-
-      if (bodyRatio < effectiveMinBodyRatio) return false;
-    }
-  }
-
-  if (params.session_filter && new Date(entryTime * 1000).getUTCHours() === 1) return false;
-
-  return true;
-}
-
-function filterTradesByEntryParams(
-  trades: ReplayTrade[],
-  structures: StructureEvent[],
-  params: EntryFilterParams,
-  m15Candles: ReplayCandle[],
-  h1Candles: ReplayCandle[],
-  h4Candles: ReplayCandle[],
-) {
-  return trades.filter((trade) => {
-    if (trade.status?.toUpperCase() !== "EXECUTED") return false;
-    const entryTime = trade.entry_time;
-    if (entryTime === null) return false;
-
-    const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures, trade.type);
-    const matchesStructureFilter = latestType === "CHOCH"
-      ? params.entry_choch
-      : latestType === "BOS"
-        && (bosCycle === 1
-          ? params.entry_bos
-          : bosCycle >= 2
-            && params.entry_bos_cycle_2_plus
-            && (params.max_bos_cycle === 0 || bosCycle <= params.max_bos_cycle));
-
-    return matchesStructureFilter && passesEAEntryFilters(trade, m15Candles, h1Candles, h4Candles, params);
-  });
-}
-
-function getReplayFilterRejectReason(
-  trade: ReplayTrade,
-  structures: StructureEvent[],
-  m15Candles: ReplayCandle[],
-  h1Candles: ReplayCandle[],
-  h4Candles: ReplayCandle[],
-  params: EntryFilterParams,
-) {
-  const entryTime = trade.entry_time;
-  if (entryTime === null) return "Missing entry time";
-
-  const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures, trade.type);
-  if (latestType === "CHOCH" && !params.entry_choch) return "CHoCH Filter (Disabled)";
-  if (latestType === "BOS") {
-    if (bosCycle === 1 && !params.entry_bos) return "BOS 1 Filter (Disabled)";
-    if (bosCycle >= 2 && !params.entry_bos_cycle_2_plus) return "BOS 2+ Filter (Disabled)";
-    if (params.max_bos_cycle > 0 && bosCycle > params.max_bos_cycle) return `Max BOS Cycle Limit (${params.max_bos_cycle})`;
-  }
-
-  const isBuy = trade.type.toUpperCase() === "BUY";
-  const m15Index = getCandleIndexAtOrBefore(m15Candles, entryTime);
-  const m15Candle = m15Index > 0 ? m15Candles[m15Index - 1] : null;
-  const currentPrice = (trade.entry_price != null && trade.entry_price > 0)
-    ? trade.entry_price
-    : (m15Index >= 0 ? (m15Candles[m15Index].open || m15Candles[m15Index].close) : (m15Candle?.close ?? 0));
-  const h1Candle = getCandleAtOrBefore(h1Candles, entryTime);
-  const h4Candle = getCandleAtOrBefore(h4Candles, entryTime);
-
-  if (params.session_filter && new Date(entryTime * 1000).getUTCHours() === 1) return "Session Filter (01:00 UTC)";
-  if (params.h1_ema200_filter && h1Candles.length > 0 && h1Candle?.ema200 != null && h1Candle.ema200 > 0 && currentPrice > 0 && (isBuy ? currentPrice <= h1Candle.ema200 : currentPrice >= h1Candle.ema200)) return "H1 EMA200 Filter";
-  if (params.h4_ema_filter && h4Candles.length > 0 && h4Candle?.ema200 != null && h4Candle.ema200 > 0 && currentPrice > 0) {
-    const gapThreshold = Math.max(h4Candle.ema200 * 0.0025, 5);
-    if (isBuy ? currentPrice <= h4Candle.ema200 + gapThreshold : currentPrice >= h4Candle.ema200 - gapThreshold) return "H4 EMA Filter";
-  }
-  if (params.ema_slope_filter) {
-    const previousCandle = m15Index > 1 ? m15Candles[m15Index - 2] : null;
-    if (m15Candle?.ema200 === null || m15Candle?.ema200 === undefined || previousCandle?.ema200 === null || previousCandle?.ema200 === undefined || (isBuy ? m15Candle.ema200 <= previousCandle.ema200 : m15Candle.ema200 >= previousCandle.ema200)) return "EMA Slope Filter";
-  }
-  if (params.body_ratio_filter && !passesEAEntryFilters({ ...trade }, m15Candles, h1Candles, h4Candles, { ...params, h1_ema200_filter: false, h4_ema_filter: false, ema_slope_filter: false, session_filter: false })) return "Body Ratio Filter";
-  if (trade.reject_reason && trade.reject_reason !== "N/A") {
-    return trade.reject_reason;
-  }
-  return "Filter Rejection";
-}
-
-const getTimestampSeconds = (timeVal: any): number => {
-  if (timeVal === null || timeVal === undefined) return 0;
-  if (typeof timeVal === "number") return timeVal;
-  if (typeof timeVal === "string") {
-    const num = Number(timeVal);
-    if (!isNaN(num)) return num;
-    const parsed = Date.parse(timeVal);
-    if (!isNaN(parsed)) return Math.floor(parsed / 1000);
-  }
-  return 0;
-};
-
-function createLocalStructureCandidateTrades(
-  data: ReplayData,
-  m15Candles: ReplayCandle[],
-  h1Candles: ReplayCandle[],
-  h4Candles: ReplayCandle[],
-  params: EntryFilterParams,
-): ReplayTrade[] {
-  const candleByTime = new Map(data.candles.map((candle) => [candle.time, candle]));
-  const seenEventTimes = new Set<number>();
-
-  return data.structures.flatMap((event) => {
-    const typeUpper = event.type?.toUpperCase() ?? "";
-    const isChoch = typeUpper.includes("CHOCH");
-    const isBos = typeUpper.includes("BOS");
-    if (!isChoch && !isBos) return [];
-
-    const eventSec = getTimestampSeconds(event.time);
-    if (eventSec === 0 || seenEventTimes.has(eventSec)) return [];
-    seenEventTimes.add(eventSec);
-
-    const candidateEntryTime = eventSec + 900; // Open of the next bar (exact MT5 execution time)
-
-    const candleObj = candleByTime.get(eventSec);
-    const rawPrice = candleObj?.close;
-    const direction = event.direction?.toUpperCase() ?? "";
-    if (rawPrice === undefined || (!direction.includes("BULL") && !direction.includes("BEAR"))) return [];
-
-    const isBuy = direction.includes("BULL");
-    const spreadPts = (candleObj?.spread != null && candleObj.spread > 0) ? candleObj.spread : 3;
-    const entryPrice = isBuy ? Number((rawPrice + (spreadPts * 0.01)).toFixed(2)) : rawPrice;
-
-    const candidate: ReplayTrade = {
-      ticket: 0,
-      type: isBuy ? "BUY" : "SELL",
-      status: "EXECUTED",
-      reject_reason: null,
-      entry_price: entryPrice,
-      exit_price: null,
-      sl: null,
-      tp: null,
-      net_profit: null,
-      session: isChoch ? "CHOCH" : "BOS",
-      entry_time: candidateEntryTime,
-      exit_time: null,
-      lot_size: 0.01,
-    };
-
-    const { latestType, bosCycle } = getEntryStructureInfo(eventSec, data.structures, candidate.type);
-    const matchesStructureFilter = latestType === "CHOCH"
-      ? params.entry_choch
-      : latestType === "BOS"
-        && (bosCycle === 1
-          ? params.entry_bos
-          : bosCycle >= 2
-            && params.entry_bos_cycle_2_plus
-            && (params.max_bos_cycle === 0 || bosCycle <= params.max_bos_cycle));
-
-    const passesFilters = matchesStructureFilter && passesEAEntryFilters(candidate, m15Candles, h1Candles, h4Candles, params);
-    return [{
-      ...candidate,
-      status: passesFilters ? "EXECUTED" : "REJECTED",
-      reject_reason: passesFilters ? null : getReplayFilterRejectReason(candidate, data.structures, m15Candles, h1Candles, h4Candles, params),
-    }];
-  });
-}
-
-function getProcessedReplayTrades(
-  data: ReplayData,
-  structures: StructureEvent[],
-  params: EntryFilterParams,
-  m15Candles: ReplayCandle[],
-  h1Candles: ReplayCandle[],
-  h4Candles: ReplayCandle[],
-  isLLMActive?: boolean,
-): { executedTrades: ReplayTrade[]; rejectedTrades: ReplayTrade[] } {
-  // When LLM mode is active, trades are governed exclusively by live LLM session decisions.
-  if (isLLMActive) {
-    return { executedTrades: [], rejectedTrades: [] };
-  }
-
-  const executedTrades: ReplayTrade[] = [];
-  const rejectedTrades: ReplayTrade[] = [];
-
-  // Option B: 100% Pure Independent Simulator
-  // Trade positions are synthesized directly from verified market structures (CHoCH / BoS) and candle OHLC.
-  const rawCandidates = createLocalStructureCandidateTrades(data, m15Candles, h1Candles, h4Candles, params);
-
-  const seenBuckets = new Set<string>();
-  const allCandidates: ReplayTrade[] = [];
-  for (const t of rawCandidates) {
-    if (t.entry_time === null || t.entry_time === undefined) continue;
-    const ts = getTimestampSeconds(t.entry_time);
-    const candleBucket = Math.round(ts / 900) * 900;
-    const key = `${t.type}_${candleBucket}`;
-    if (seenBuckets.has(key)) continue;
-    seenBuckets.add(key);
-    allCandidates.push({
-      ...t,
-      entry_time: ts,
-    });
-  }
-
-  // Sort chronologically (ASC) and assign sequential ticket numbers 1, 2, 3, 4 ... across CHoCH & BoS
-  allCandidates.sort((a, b) => (a.entry_time ?? 0) - (b.entry_time ?? 0));
-  allCandidates.forEach((trade, idx) => {
-    trade.ticket = idx + 1;
-  });
-
-  for (const trade of allCandidates) {
-    if (trade.entry_time === null) continue;
-
-    const { latestType, bosCycle } = getEntryStructureInfo(trade.entry_time, structures, trade.type);
-    const matchesStructureFilter = latestType === "CHOCH"
-      ? params.entry_choch
-      : latestType === "BOS"
-        && (bosCycle === 1
-          ? params.entry_bos
-          : bosCycle >= 2
-            && params.entry_bos_cycle_2_plus
-            && (params.max_bos_cycle === 0 || bosCycle <= params.max_bos_cycle));
-
-    const passesFilters = matchesStructureFilter && passesEAEntryFilters(trade, m15Candles, h1Candles, h4Candles, params);
-
-    if (passesFilters) {
-      executedTrades.push({
-        ...trade,
-        status: "EXECUTED",
-        reject_reason: null,
-      });
-    } else {
-      rejectedTrades.push({
-        ...trade,
-        status: "REJECTED",
-        reject_reason: getReplayFilterRejectReason(trade, structures, m15Candles, h1Candles, h4Candles, params),
-      });
-    }
-  }
-
-  return { executedTrades, rejectedTrades };
 }
 
 function EntryToggle({
@@ -603,7 +178,7 @@ function EntryToggle({
         onClick={onChange}
         disabled={disabled}
         className={cn(
-          "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
+          "relative h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70",
           checked ? "border-cyan-400/50 bg-cyan-500/25" : "border-blue-300 bg-white",
           disabled && "cursor-not-allowed"
         )}
@@ -788,7 +363,7 @@ function CustomSelect<T extends string | number>({
 
 // â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const getActualLotSize = (t: any): number => {
+const getActualLotSizeLegacy = (t: any): number => {
   const entry = t.entry_price ?? 0;
   const exit = t.exit_price ?? 0;
   const netProfit = t.net_profit ?? 0;
@@ -805,7 +380,7 @@ const getActualLotSize = (t: any): number => {
 };
 
 // ponytail: flat object params with defaults â€” no class, no registry
-interface StrategyParams {
+interface StrategyParamsLegacy {
   trailing_distance: number;   // USD, default 30.00 (3000 poin)
   tp_trigger: number;          // USD, default 10.00 (1000 poin)
   tp_ekspansi: number;         // USD, default 20.00 (2000 poin)
@@ -835,7 +410,7 @@ interface StrategyParams {
   risk_pct?: number;
 }
 
-export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
+const DEFAULT_STRATEGY_PARAMS_LEGACY: StrategyParamsLegacy = {
   trailing_distance: 30.00,
   tp_trigger: 10.00,
   tp_ekspansi: 20.00,
@@ -867,7 +442,7 @@ const INITIAL_BALANCE = 1000.00;
 // Calculate ATR (Average True Range) from candles up to a given time.
 // Returns the ATR value in price units (e.g. $ for XAUUSD), or null if
 // there aren't enough candles.
-const calculateATR = (
+const calculateATRLegacy = (
   candles: any[],
   upToTime: number,
   period: number = 14,
@@ -1437,7 +1012,7 @@ export function computeStructureLinesForPlayhead(
   return filteredLinesToDraw;
 }
 
-function calculateTradeSwap(entryTs: number, exitTs: number, lotSize: number, isBuy: boolean): number {
+function calculateTradeSwapLegacy(entryTs: number, exitTs: number, lotSize: number, isBuy: boolean): number {
   if (!entryTs || !exitTs || exitTs <= entryTs) return 0.0;
   const dailyRate = isBuy ? -12.50 : -4.50;
   const startDay = Math.floor(entryTs / 86400) * 86400;
@@ -1456,7 +1031,7 @@ function calculateTradeSwap(entryTs: number, exitTs: number, lotSize: number, is
   return Number((totalDays * dailyRate * lotSize).toFixed(2));
 }
 
-function simulateTrailingSLTP(
+function simulateTrailingSLTPLegacy(
   t: ReplayTrade,
   candles: ReplayCandle[],
   currentCandleTime: number,
@@ -1724,6 +1299,7 @@ function processTradesForPlayhead(
   candles: ReplayCandle[],
   structures: StructureEvent[],
   strategyParams: StrategyParams,
+  positionManagementMode: "original" | "three-brain",
   useLLMSetup: boolean,
   activePlanner: any
 ): {
@@ -1777,7 +1353,9 @@ function processTradesForPlayhead(
         : baseLot;
 
       const simTime = candle.time;
-      const dynamicLevels = simulateTrailingSLTP(t, candles, simTime, structures, strategyParams);
+      const dynamicLevels = positionManagementMode === "three-brain"
+        ? simulateThreeBrainTradeOutcome(t, candles, structures, strategyParams, simTime)
+        : simulateTrailingSLTP(t, candles, simTime, structures, strategyParams);
       const isClosed = dynamicLevels.isClosedSimulated;
 
       const entryPrice = t.entry_price ?? 0;
@@ -1833,6 +1411,8 @@ function processTradesForPlayhead(
           lot_size: lotSize,
           entry_price: entryPrice,
           current_price: finalExitPrice,
+          exit_price: finalExitPrice,
+          exit_time: finalExitTs,
           sl: dynamicLevels.sl,
           tp: dynamicLevels.tp,
           original_sl: initialSL,
@@ -1841,7 +1421,13 @@ function processTradesForPlayhead(
           tp_history: dynamicLevels.tpHistory,
           close_reason: dynamicLevels.closeReason,
           expansion_count: dynamicLevels.expansionCount,
-          status: dynamicLevels.closeReason === "24H_FORCE" ? "Closed (24h)" : dynamicLevels.closeReason === "PROFIT_TARGET" ? "Closed (Target USD)" : "Closed",
+          status: dynamicLevels.closeReason === "24H_FORCE" || dynamicLevels.closeReason === "THREE_BRAIN_FORCE_EXIT"
+            ? "Closed (24h)"
+            : dynamicLevels.closeReason === "PROFIT_TARGET"
+              ? "Closed (Target USD)"
+              : dynamicLevels.closeReason === "THREE_BRAIN_EXIT"
+                ? "Closed (Otak 3)"
+                : "Closed",
           pnl: tradeProfit,
           be_trigger_price: beTriggerPrice,
           is_be_active: isBEActive,
@@ -1913,6 +1499,7 @@ function processTradesForPlayhead(
         profit: tradeProfit,
         entry_time_ts: entryTs,
         exit_time_ts: isClosed ? finalExitTs : null,
+        protection_activated_time_ts: dynamicLevels.protectionActivatedTime ?? null,
         atr: isAtrEnabled ? calculateATR(candles, entryTs, strategyParams.atr_period) : null,
         atr_start_ts: isAtrEnabled ? entryTs - strategyParams.atr_period * 900 : null,
         atr_end_ts: isAtrEnabled ? entryTs : null,
@@ -2171,6 +1758,11 @@ export default function ReplayTrades() {
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [scenarioName, setScenarioName] = useState("");
   const [isStrategyPanelOpen, setIsStrategyPanelOpen] = useState(false);
+  const [strategyParameterSlide, setStrategyParameterSlide] = useState<0 | 1>(0);
+  const [activeStrategyBrain, setActiveStrategyBrain] = useState<1 | 2 | 3>(1);
+  const [positionManagementMode, setPositionManagementMode] = useState<"original" | "three-brain">("original");
+  const [continuationObserverEnabled, setContinuationObserverEnabled] = useState(true);
+  const [exitTargetObserverEnabled, setExitTargetObserverEnabled] = useState(true);
   const [initialBalanceInput, setInitialBalanceInput] = useState(String(DEFAULT_STRATEGY_PARAMS.initial_balance));
   const [maxBosCycleInput, setMaxBosCycleInput] = useState(String(DEFAULT_ENTRY_FILTER_PARAMS.max_bos_cycle));
   const [lotSizeInput, setLotSizeInput] = useState(String(DEFAULT_STRATEGY_PARAMS.lot_override));
@@ -3732,6 +3324,7 @@ export default function ReplayTrades() {
       replayData.candles,
       replayData.structures,
       strategyParams,
+      positionManagementMode,
       useLLMSetup,
       activePlanner
     );
@@ -3767,7 +3360,7 @@ export default function ReplayTrades() {
         liquidityPoolsPrimitiveRef.current.setPools([]);
       }
     }
-  }, [strategyParams, entryFilterParams, replayData, currentIndex, activeTimeframe, activePlanner, llmPositions, allReplayData, useLLMSetup]);
+  }, [strategyParams, entryFilterParams, replayData, currentIndex, activeTimeframe, activePlanner, llmPositions, allReplayData, useLLMSetup, positionManagementMode]);
 
   const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
     if (!data) return;
@@ -4075,6 +3668,7 @@ export default function ReplayTrades() {
       data.candles,
       data.structures,
       strategyParams,
+      positionManagementMode,
       useLLMSetup,
       activePlanner
     );
@@ -4094,7 +3688,7 @@ export default function ReplayTrades() {
     }
 
     return idx + 1;
-  }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe]);
+  }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe, positionManagementMode]);
 
   // â”€â”€ Playback controls (continued) â”€â”€
 
@@ -4153,6 +3747,105 @@ export default function ReplayTrades() {
   const progress = totalCandles > 0 ? Math.round((currentIndex / totalCandles) * 100) : 0;
   const isReplayFinished = totalCandles > 0 && currentIndex >= totalCandles;
   const currentCandle = replayData?.candles[Math.max(0, currentIndex - 1)];
+  const observerPosition = useMemo(() => [...activePositions]
+    .filter((position) => !position.is_closed && !position.is_rejected)
+    .sort((left, right) => getTimestampSeconds(right.entry_time) - getTimestampSeconds(left.entry_time))[0] ?? null,
+  [activePositions]);
+  const observerStructureAligned = useMemo(() => {
+    if (!replayData || !currentCandle || !observerPosition) return null;
+
+    const direction = String(observerPosition.type ?? "BUY").toUpperCase();
+    const latestStructure = [...replayData.structures]
+      .reverse()
+      .find((event) => event.time <= currentCandle.time && (!event.timeframe || event.timeframe.toUpperCase() === "M15"));
+    const structureDirection = `${latestStructure?.direction ?? ""} ${latestStructure?.type ?? ""}`.toUpperCase();
+    return direction.includes("BUY")
+      ? structureDirection.includes("BULL") || structureDirection.includes("BUY")
+      : structureDirection.includes("BEAR") || structureDirection.includes("SELL");
+  }, [replayData, currentCandle, observerPosition]);
+  const continuationStrength = useMemo(() => {
+    if (!continuationObserverEnabled || !replayData || !currentCandle || currentIndex <= 0) return null;
+    if (!observerPosition || observerPosition.entry_price == null || observerStructureAligned == null) return null;
+
+    const direction = String(observerPosition.type ?? "BUY").toUpperCase();
+
+    return evaluateContinuationStrength({
+      direction,
+      entryPrice: Number(observerPosition.entry_price),
+      currentCandle,
+      previousCandles: replayData.candles.slice(Math.max(0, currentIndex - 6), Math.max(0, currentIndex - 1)),
+      atr: calculateATR(replayData.candles, currentCandle.time, strategyParams.atr_period),
+      structureAligned: observerStructureAligned,
+    });
+  }, [continuationObserverEnabled, replayData, currentCandle, currentIndex, observerPosition, observerStructureAligned, strategyParams.atr_period]);
+  const exitTargetObserver = useMemo(() => {
+    if (!exitTargetObserverEnabled || !currentCandle || !observerPosition || !continuationStrength || observerStructureAligned == null) return null;
+
+    const direction = String(observerPosition.type ?? "BUY").toUpperCase();
+    const entryPrice = Number(observerPosition.entry_price ?? 0);
+    const currentPrice = Number(observerPosition.current_price ?? currentCandle.close);
+    const movementPoints = direction.includes("BUY")
+      ? (currentPrice - entryPrice) * 100
+      : (entryPrice - currentPrice) * 100;
+
+    return evaluateExitTargetObserver({
+      continuationStatus: continuationStrength.status,
+      continuationScore: continuationStrength.score,
+      floatingNetProfit: Number(observerPosition.pnl ?? 0),
+      maxFavorablePoints: Math.max(0, movementPoints),
+      maxAdversePoints: Math.max(0, -movementPoints),
+      protectEnabled: strategyParams.enable_breakeven,
+      protectTriggerPoints: strategyParams.breakeven_trigger
+        * (strategyParams.use_price_ratio_scaling && strategyParams.base_reference_price > 0 && entryPrice > 0
+          ? entryPrice / strategyParams.base_reference_price
+          : 1)
+        * 100,
+      isBreakevenActive: Boolean(observerPosition.is_be_active),
+      isTargetMaxed: Boolean(observerPosition.is_tp_maxed),
+      expansionCount: Number(observerPosition.expansion_count ?? 0),
+      holdSeconds: Math.max(0, currentCandle.time - getTimestampSeconds(observerPosition.entry_time)),
+      maxHoldSeconds: strategyParams.force_24h_close ? 86400 : 0,
+      structureAligned: observerStructureAligned,
+    });
+  }, [exitTargetObserverEnabled, currentCandle, observerPosition, continuationStrength, observerStructureAligned, strategyParams.force_24h_close, strategyParams.enable_breakeven, strategyParams.breakeven_trigger, strategyParams.use_price_ratio_scaling, strategyParams.base_reference_price]);
+  const positionManagementComparison = useMemo(() => {
+    if (!replayData || !currentCandle) return null;
+
+    const simulateMode = (mode: "original" | "three-brain") => processTradesForPlayhead(
+      processedTradesMemo.executedTrades,
+      processedTradesMemo.rejectedTrades,
+      llmPositions,
+      currentCandle,
+      replayData.candles,
+      replayData.structures,
+      strategyParams,
+      mode,
+      useLLMSetup,
+      activePlanner,
+    );
+    const original = simulateMode("original");
+    const threeBrain = simulateMode("three-brain");
+    const getWinRate = (stats: { wins: number; losses: number }) => {
+      const completed = stats.wins + stats.losses;
+      return completed > 0 ? (stats.wins / completed) * 100 : 0;
+    };
+
+    return {
+      original: {
+        netProfit: original.runningProfit,
+        wins: original.tradeStats.wins,
+        losses: original.tradeStats.losses,
+        winRate: getWinRate(original.tradeStats),
+      },
+      threeBrain: {
+        netProfit: threeBrain.runningProfit,
+        wins: threeBrain.tradeStats.wins,
+        losses: threeBrain.tradeStats.losses,
+        winRate: getWinRate(threeBrain.tradeStats),
+      },
+      deltaNetProfit: threeBrain.runningProfit - original.runningProfit,
+    };
+  }, [replayData, currentCandle, processedTradesMemo, llmPositions, strategyParams, useLLMSetup, activePlanner]);
   const completedTrades = tradeStats.wins + tradeStats.losses;
   const winRate = completedTrades > 0 ? Math.round((tradeStats.wins / completedTrades) * 100) : 0;
   const initialBalance = strategyParams.initial_balance ?? INITIAL_BALANCE;
@@ -4607,7 +4300,7 @@ export default function ReplayTrades() {
               onClick={handleLoad}
               disabled={isLoading}
               className={cn(
-                "inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer border transition-all duration-200 active:scale-95 outline-none shrink-0 shadow-sm",
+                "inline-flex h-8 w-[72px] items-center justify-center gap-1.5 rounded-lg text-xs font-bold cursor-pointer border transition-all duration-200 active:scale-95 outline-none shrink-0 shadow-sm",
                 isLoading
                   ? "bg-slate-200 text-slate-500 border-slate-300 cursor-not-allowed opacity-70"
                   : "bg-sky-600 hover:bg-sky-700 text-white border-sky-600 shadow-[0_2px_8px_rgba(2,132,199,0.25)]"
@@ -4615,8 +4308,8 @@ export default function ReplayTrades() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 size={12} className="animate-spin mr-1.5" />
-                  <span>Loading...</span>
+                  <Loader2 size={14} className="animate-spin" />
+                  <span>Load</span>
                 </>
               ) : (
                 <span>Load</span>
@@ -5639,14 +5332,16 @@ export default function ReplayTrades() {
                       <th className="py-3 px-4 text-left">Ticket</th>
                       <th className="py-3 px-4 text-left">Type</th>
                       <th className="py-3 px-4 text-left">Signal Type</th>
-                      <th className="py-3 px-4 text-left">Reject Reason</th>
                       <th className="py-3 px-4 text-right">Lot</th>
                       <th className="py-3 px-4 text-right">Entry Price</th>
-                      <th className="py-3 px-4 text-left">Entry Time</th>
                       <th className="py-3 px-4 text-right">Current Price</th>
+                      <th className="py-3 px-4 text-right">Exit Price</th>
+                      <th className="py-3 px-4 text-left">Entry Time</th>
+                      <th className="py-3 px-4 text-left">Close Time</th>
                       <th className="py-3 px-4 text-right">SL (Orig → Curr)</th>
                       <th className="py-3 px-4 text-right">TP (Orig → Curr)</th>
                       <th className="py-3 px-4 text-left">Triggers (BE | TP-Ex)</th>
+                      <th className="py-3 px-4 text-left">Reject Reason</th>
                       <th className="py-3 px-4 text-center">Status</th>
                       <th className="py-3 px-4 text-right">Floating PnL</th>
                     </tr>
@@ -5723,14 +5418,8 @@ export default function ReplayTrades() {
                               <span className="text-slate-400">-</span>
                             )}
                           </td>
-                          <td className="py-3.5 px-4 text-[10px] font-medium text-rose-700">{pos.reject_reason || "-"}</td>
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">{pos.lot_size.toFixed(2)}</td>
                           <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-900">${pos.entry_price.toFixed(2)}</td>
-                          <td className="py-3.5 px-4 font-mono text-[10px] text-slate-600 font-medium whitespace-nowrap">
-                            {pos.entry_time == null
-                              ? "-"
-                              : `${new Date(pos.entry_time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`}
-                          </td>
                           <td className={cn("py-3.5 px-4 text-right font-mono font-bold", isClosed ? "text-slate-600" : "text-slate-900")}>
                             {isRejected ? (
                               <span className="text-slate-400">-</span>
@@ -5748,6 +5437,19 @@ export default function ReplayTrades() {
                                 ${pos.current_price.toFixed(2)}
                               </>
                             )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right font-mono font-bold text-slate-700">
+                            {isClosed && pos.exit_price != null ? `$${pos.exit_price.toFixed(2)}` : <span className="text-slate-400">-</span>}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[10px] text-slate-600 font-medium whitespace-nowrap">
+                            {pos.entry_time == null
+                              ? "-"
+                              : `${new Date(pos.entry_time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[10px] text-slate-600 font-medium whitespace-nowrap">
+                            {isClosed && pos.exit_time != null
+                              ? `${new Date(pos.exit_time * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`
+                              : <span className="text-slate-400">-</span>}
                           </td>
                           <td className="py-3.5 px-4 text-right font-mono">
                             {hasSLChanged ? (
@@ -5857,6 +5559,7 @@ export default function ReplayTrades() {
                               </>
                             )}
                           </td>
+                          <td className="py-3.5 px-4 text-[10px] font-medium text-rose-700">{pos.reject_reason || "-"}</td>
                           <td className="py-3.5 px-4 text-center">
                             <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all duration-300 ${badgeClass}`}>
                               {pos.status}
@@ -6036,7 +5739,146 @@ export default function ReplayTrades() {
 
             {isStrategyPanelOpen && (
               <div className="mt-5 border-t border-blue-200/70 pt-5">
-                <div className="space-y-3">
+                <div className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/80 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase text-slate-500">Position Management Mode</div>
+                    <p className="mt-1 text-[10px] leading-relaxed text-slate-600">
+                      {positionManagementMode === "original"
+                        ? "Parameter Asli mengendalikan breakeven, trailing SL, TP expansion, dan force close."
+                        : "Three-Brain mengendalikan protect, target extension, dan exit berdasarkan evaluasi per candle."}
+                    </p>
+                  </div>
+                  <div className="flex rounded-md border border-slate-300 bg-white p-1" role="radiogroup" aria-label="Position management mode">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={positionManagementMode === "original"}
+                      onClick={() => setPositionManagementMode("original")}
+                      className={cn(
+                        "cursor-pointer rounded px-3 py-2 text-left text-[10px] font-bold transition",
+                        positionManagementMode === "original"
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "text-slate-500 hover:bg-slate-100"
+                      )}
+                    >
+                      <span className="block">Parameter Asli</span>
+                      <span className={cn("block text-[8px] font-medium", positionManagementMode === "original" ? "text-slate-300" : "text-slate-400")}>Original Engine</span>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={positionManagementMode === "three-brain"}
+                      onClick={() => setPositionManagementMode("three-brain")}
+                      className={cn(
+                        "cursor-pointer rounded px-3 py-2 text-left text-[10px] font-bold transition",
+                        positionManagementMode === "three-brain"
+                          ? "bg-violet-700 text-white shadow-sm"
+                          : "text-slate-500 hover:bg-violet-50 hover:text-violet-700"
+                      )}
+                    >
+                      <span className="block">Three-Brain</span>
+                      <span className={cn("block text-[8px] font-medium", positionManagementMode === "three-brain" ? "text-violet-200" : "text-violet-500")}>Execution Engine</span>
+                    </button>
+                  </div>
+                </div>
+                {positionManagementComparison && (
+                  <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+                    {([
+                      ["Parameter Asli", positionManagementComparison.original, "slate"],
+                      ["Three-Brain", positionManagementComparison.threeBrain, "violet"],
+                    ] as const).map(([label, result, tone]) => (
+                      <div
+                        key={label}
+                        className={cn(
+                          "rounded-md border bg-white p-3",
+                          tone === "violet" ? "border-violet-200" : "border-slate-200"
+                        )}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-bold text-slate-700">{label}</span>
+                          <span className={cn(
+                            "rounded px-1.5 py-0.5 text-[8px] font-bold uppercase",
+                            positionManagementMode === (tone === "violet" ? "three-brain" : "original")
+                              ? tone === "violet" ? "bg-violet-100 text-violet-700" : "bg-slate-200 text-slate-700"
+                              : "bg-slate-100 text-slate-400"
+                          )}>
+                            {positionManagementMode === (tone === "violet" ? "three-brain" : "original") ? "Active" : "Compared"}
+                          </span>
+                        </div>
+                        <div className={cn(
+                          "mt-2 font-mono text-lg font-black",
+                          result.netProfit >= 0 ? "text-emerald-700" : "text-rose-700"
+                        )}>
+                          {result.netProfit >= 0 ? "+" : ""}{result.netProfit.toFixed(2)} USD
+                        </div>
+                        <div className="mt-1 text-[9px] font-medium text-slate-500">
+                          Win rate {result.winRate.toFixed(1)}% | {result.wins}W / {result.losses}L
+                        </div>
+                      </div>
+                    ))}
+                    <div className={cn(
+                      "flex min-h-20 flex-col justify-center rounded-md border p-3",
+                      positionManagementComparison.deltaNetProfit >= 0
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-rose-200 bg-rose-50"
+                    )}>
+                      <div className="text-[9px] font-bold uppercase text-slate-500">Three-Brain Delta</div>
+                      <div className={cn(
+                        "mt-1 font-mono text-base font-black",
+                        positionManagementComparison.deltaNetProfit >= 0 ? "text-emerald-700" : "text-rose-700"
+                      )}>
+                        {positionManagementComparison.deltaNetProfit >= 0 ? "+" : ""}{positionManagementComparison.deltaNetProfit.toFixed(2)} USD
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-[#F0F6FF]/70 p-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setStrategyParameterSlide(0)}
+                      disabled={strategyParameterSlide === 0}
+                      aria-label="Buka slide parameter sebelumnya"
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-blue-200 bg-white text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStrategyParameterSlide(1)}
+                      disabled={strategyParameterSlide === 1}
+                      aria-label="Buka slide parameter berikutnya"
+                      className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-blue-200 bg-white text-slate-700 transition hover:border-cyan-400 hover:text-cyan-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                    <span className="font-mono text-[10px] font-bold text-slate-500">
+                      {strategyParameterSlide + 1} / 2
+                    </span>
+                  </div>
+                  <div className="flex rounded-md border border-blue-200 bg-white p-1" role="tablist" aria-label="Slide strategy parameters">
+                    {(["Parameter Asli", "Three-Brain"] as const).map((label, index) => (
+                      <button
+                        key={label}
+                        type="button"
+                        role="tab"
+                        aria-selected={strategyParameterSlide === index}
+                        onClick={() => setStrategyParameterSlide(index as 0 | 1)}
+                        className={cn(
+                          "cursor-pointer rounded px-3 py-1.5 text-[10px] font-bold transition",
+                          strategyParameterSlide === index
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-slate-500 hover:bg-blue-50 hover:text-blue-700"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {strategyParameterSlide === 0 ? (
+                  <div className="space-y-3" role="tabpanel" aria-label="Parameter strategi asli">
                   <div className="flex items-center gap-1.5 border-b border-blue-200/50 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                     <Target className="h-3.5 w-3.5 text-fuchsia-400" />
                     Trend &amp; Cycle Schema Map
@@ -7086,7 +6928,437 @@ export default function ReplayTrades() {
                       )}
                     </div>
                   </div>
-                </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4" role="tabpanel" aria-label="Three-Brain strategy parameters">
+                    <div className="flex flex-col gap-4 rounded-lg border border-blue-200 bg-white/80 p-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                          <Brain className="h-4 w-4 text-cyan-600" aria-hidden="true" />
+                          Three-Brain Settings &amp; Parameters
+                        </div>
+                        <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-slate-500">
+                          Otak 1 mencari entry. Otak 2 mengamati continuation strength. Otak 3 mengelola hold, proteksi, target, dan exit.
+                        </p>
+                      </div>
+                      <div className="flex rounded-md border border-blue-200 bg-[#F0F6FF] p-1" role="tablist" aria-label="Parameter berdasarkan otak strategi">
+                        {([1, 2, 3] as const).map((brain) => (
+                          <button
+                            key={brain}
+                            type="button"
+                            role="tab"
+                            aria-selected={activeStrategyBrain === brain}
+                            onClick={() => setActiveStrategyBrain(brain)}
+                            className={cn(
+                              "cursor-pointer rounded px-3 py-1.5 text-[10px] font-bold transition",
+                              activeStrategyBrain === brain
+                                ? "bg-white text-blue-700 shadow-sm"
+                                : "text-slate-500 hover:text-blue-700"
+                            )}
+                          >
+                            Otak {brain}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {activeStrategyBrain === 1 ? (
+                      <div className="space-y-4">
+                        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-bold text-emerald-900">Otak 1 - Entry &amp; Structure Engine</div>
+                            <span className="rounded border border-emerald-300 bg-white px-2 py-1 text-[9px] font-bold uppercase text-emerald-700">Existing</span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-emerald-800/80">Toggle di bawah memakai state yang sama dengan slide Parameter Asli.</p>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Structure Entry</h3>
+                            <EntryToggle label="CHoCH Entries" checked={entryFilterParams.entry_choch} onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_choch: !prev.entry_choch }))} disabled={isAutoDecisionActive} disabledReason={isAutoDecisionActive ? "Nonaktif - LLM auto-thinking aktif" : undefined} />
+                            <EntryToggle label="BOS Cycle 1" checked={entryFilterParams.entry_bos} onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos: !prev.entry_bos }))} disabled={isAutoDecisionActive} disabledReason={isAutoDecisionActive ? "Nonaktif - LLM auto-thinking aktif" : undefined} />
+                            <EntryToggle label="BOS Cycle 2+" checked={entryFilterParams.entry_bos_cycle_2_plus} onChange={() => setEntryFilterParams((prev) => ({ ...prev, entry_bos_cycle_2_plus: !prev.entry_bos_cycle_2_plus }))} disabled={isAutoDecisionActive} disabledReason={isAutoDecisionActive ? "Nonaktif - LLM auto-thinking aktif" : undefined} />
+                          </article>
+
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Trend Context</h3>
+                            <EntryToggle label="H1 EMA200" checked={entryFilterParams.h1_ema200_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, h1_ema200_filter: !prev.h1_ema200_filter }))} />
+                            <EntryToggle label="H4 EMA" checked={entryFilterParams.h4_ema_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, h4_ema_filter: !prev.h4_ema_filter }))} />
+                            <EntryToggle label="EMA Slope" checked={entryFilterParams.ema_slope_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_slope_filter: !prev.ema_slope_filter }))} />
+                          </article>
+
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Entry Quality</h3>
+                            <EntryToggle label="Body Ratio" checked={entryFilterParams.body_ratio_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, body_ratio_filter: !prev.body_ratio_filter }))} />
+                            <EntryToggle label="Session Filter" checked={entryFilterParams.session_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, session_filter: !prev.session_filter }))} />
+                            <EntryToggle label="EMA Stretch" checked={entryFilterParams.ema_stretch_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, ema_stretch_filter: !prev.ema_stretch_filter }))} />
+                            <EntryToggle label="BOS Cycle Stage" checked={entryFilterParams.bos_cycle_filter} onChange={() => setEntryFilterParams((prev) => ({ ...prev, bos_cycle_filter: !prev.bos_cycle_filter }))} />
+                          </article>
+
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Decision Engine</h3>
+                            <EntryToggle label="SmartRule Engine" checked={decisionEngine === "rule"} onChange={() => setDecisionEngine((prev) => prev === "rule" ? "off" : "rule")} />
+                            <EntryToggle label="LLM 7-Step" checked={decisionEngine === "llm"} onChange={() => setDecisionEngine((prev) => prev === "llm" ? "off" : "llm")} />
+                            <EntryToggle label="LLM SL/TP/Lot" checked={useLLMSetup} onChange={() => setUseLLMSetup((prev) => { const next = !prev; setAutoDecisionEnabled(next); return next; })} />
+                          </article>
+
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Structure Visuals</h3>
+                            <EntryToggle label="Supply & Demand" checked={strategyParams.show_supply_demand} onChange={() => setStrategyParams((prev) => { const next = !prev.show_supply_demand; supplyDemandPrimitiveRef.current?.setVisible(next); return { ...prev, show_supply_demand: next }; })} />
+                            <EntryToggle label="Liquidity BSL/SSL" checked={strategyParams.show_liquidity_pools} onChange={() => setStrategyParams((prev) => { const next = !prev.show_liquidity_pools; liquidityPoolsPrimitiveRef.current?.setVisible(next); return { ...prev, show_liquidity_pools: next }; })} />
+                            <EntryToggle label="MA 20" checked={isMa20Visible} onChange={() => setIsMa20Visible((visible) => !visible)} />
+                            <EntryToggle label="MA 50" checked={isMa50Visible} onChange={() => setIsMa50Visible((visible) => !visible)} />
+                          </article>
+
+                          <article className="rounded-lg border border-blue-200 bg-white p-4 shadow-sm">
+                            <h3 className="text-xs font-bold text-slate-900">Entry Setup Boundary</h3>
+                            <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Initial Balance, Lot Size, dan jarak SL/TP awal tetap diedit pada Parameter Asli.</p>
+                            <EntryToggle label="ATR Adaptive SL/TP" checked={strategyParams.use_atr_sltp} onChange={() => setStrategyParams((prev) => ({ ...prev, use_atr_sltp: !prev.use_atr_sltp }))} />
+                          </article>
+
+                          <article className="rounded-lg border border-cyan-200 bg-cyan-50/40 p-4 shadow-sm md:col-span-2 xl:col-span-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <h3 className="text-xs font-bold text-slate-900">Protect &amp; Trailing SL</h3>
+                                <p className="mt-1 text-[10px] text-slate-500">Otak 3 memicu PROTECT, lalu Otak 1 menggerakkan SL memakai parameter trailing yang sama dengan Parameter Asli.</p>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={strategyParams.enable_breakeven}
+                                aria-label="Aktifkan Trailing setelah Protect pada Otak 1"
+                                onClick={() => setStrategyParams((prev) => ({ ...prev, enable_breakeven: !prev.enable_breakeven }))}
+                                className={cn(
+                                  "relative h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70",
+                                  strategyParams.enable_breakeven ? "border-cyan-500 bg-cyan-500/30" : "border-slate-300 bg-slate-100"
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                                    strategyParams.enable_breakeven ? "translate-x-4 bg-cyan-600" : "translate-x-0 bg-slate-500"
+                                  )}
+                                />
+                              </button>
+                            </div>
+
+                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                              <label className="block">
+                                <span className="block text-[10px] font-bold text-slate-700">Trailing Distance ($)</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  aria-label="Trailing Distance Otak 1"
+                                  value={trailingDistanceInput}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value.replace(",", ".");
+                                    if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                    setTrailingDistanceInput(nextValue);
+                                    if (nextValue === "" || nextValue === ".") return;
+                                    setStrategyParams((prev) => ({ ...prev, trailing_distance: Math.max(1, Number(nextValue)) }));
+                                  }}
+                                  onBlur={() => {
+                                    const value = Math.max(1, Number(trailingDistanceInput) || 30);
+                                    setTrailingDistanceInput(String(value));
+                                    setStrategyParams((prev) => ({ ...prev, trailing_distance: value }));
+                                  }}
+                                  className="mt-1 h-9 w-full rounded-md border border-cyan-200 bg-white px-3 text-center font-mono text-xs font-bold text-cyan-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                />
+                              </label>
+                              <label className="block">
+                                <span className="block text-[10px] font-bold text-slate-700">BE Trigger ($)</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  aria-label="BE Trigger Otak 1"
+                                  value={beTriggerInput}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value.replace(",", ".");
+                                    if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                    setBeTriggerInput(nextValue);
+                                    if (nextValue === "" || nextValue === ".") return;
+                                    setStrategyParams((prev) => ({ ...prev, breakeven_trigger: Math.max(1, Number(nextValue)) }));
+                                  }}
+                                  onBlur={() => {
+                                    const value = Math.max(1, Number(beTriggerInput) || 15);
+                                    setBeTriggerInput(String(value));
+                                    setStrategyParams((prev) => ({ ...prev, breakeven_trigger: value }));
+                                  }}
+                                  className="mt-1 h-9 w-full rounded-md border border-cyan-200 bg-white px-3 text-center font-mono text-xs font-bold text-cyan-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                />
+                              </label>
+                              <label className="block">
+                                <span className="block text-[10px] font-bold text-slate-700">BE Buffer ($)</span>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  aria-label="BE Buffer Otak 1"
+                                  value={beBufferInput}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value.replace(",", ".");
+                                    if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                    setBeBufferInput(nextValue);
+                                    if (nextValue === "" || nextValue === ".") return;
+                                    setStrategyParams((prev) => ({ ...prev, breakeven_buffer: Math.max(0, Number(nextValue)) }));
+                                  }}
+                                  onBlur={() => {
+                                    const value = Math.max(0, Number(beBufferInput) || 1);
+                                    setBeBufferInput(String(value));
+                                    setStrategyParams((prev) => ({ ...prev, breakeven_buffer: value }));
+                                  }}
+                                  className="mt-1 h-9 w-full rounded-md border border-cyan-200 bg-white px-3 text-center font-mono text-xs font-bold text-cyan-700 outline-none focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20"
+                                />
+                              </label>
+                            </div>
+                          </article>
+
+                          <article className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-4 shadow-sm md:col-span-2 xl:col-span-3">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <h3 className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                                  <Scale className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                                  Price-Ratio Dynamic Scaling
+                                </h3>
+                                <p className="mt-1 text-[10px] text-slate-500">Skalakan SL, TP, trailing, buffer, dan lot terhadap harga referensi XAUUSD.</p>
+                              </div>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={strategyParams.use_price_ratio_scaling}
+                                aria-label="Gunakan Price-Ratio Dynamic Scaling pada Otak 1"
+                                onClick={() => setStrategyParams((prev) => ({ ...prev, use_price_ratio_scaling: !prev.use_price_ratio_scaling }))}
+                                className={cn(
+                                  "relative h-5 w-9 shrink-0 cursor-pointer rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70",
+                                  strategyParams.use_price_ratio_scaling ? "border-emerald-500 bg-emerald-500/30" : "border-slate-300 bg-slate-100"
+                                )}
+                              >
+                                <span
+                                  className={cn(
+                                    "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                                    strategyParams.use_price_ratio_scaling ? "translate-x-4 bg-emerald-600" : "translate-x-0 bg-slate-500"
+                                  )}
+                                />
+                              </button>
+                            </div>
+
+                            {strategyParams.use_price_ratio_scaling && (
+                              <div className="mt-4 grid gap-3 lg:grid-cols-[180px_1fr]">
+                                <label className="block">
+                                  <span className="block text-[10px] font-bold text-slate-700">Base Reference Price</span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    aria-label="Base Reference Price Otak 1"
+                                    value={baseRefPriceInput}
+                                    onChange={(event) => {
+                                      const nextValue = event.target.value.replace(",", ".");
+                                      if (!/^\d*(\.\d{0,2})?$/.test(nextValue)) return;
+                                      setBaseRefPriceInput(nextValue);
+                                      if (nextValue === "" || nextValue === ".") return;
+                                      setStrategyParams((prev) => ({ ...prev, base_reference_price: Math.max(100, Number(nextValue)) }));
+                                    }}
+                                    onBlur={() => {
+                                      const value = Math.max(100, Number(baseRefPriceInput) || 2000);
+                                      setBaseRefPriceInput(String(value));
+                                      setStrategyParams((prev) => ({ ...prev, base_reference_price: value }));
+                                    }}
+                                    className="mt-1 h-9 w-full rounded-md border border-emerald-200 bg-white px-3 text-center font-mono text-xs font-bold text-emerald-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                                  />
+                                  <span className="mt-1 block text-[9px] text-slate-500">Default dan rekomendasi universal: 2000 USD</span>
+                                </label>
+
+                                <div>
+                                  <div className="mb-1.5 flex items-center gap-1 text-[10px] font-bold text-slate-700">
+                                    <Zap className="h-3 w-3 text-amber-500" aria-hidden="true" />
+                                    Quick Presets
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                                    {[
+                                      { key: "1650", label: "1650", sub: "Era 2020-21", base: 1650, lot: 0.05, tp: 25, slMin: 12, slMax: 25, trail: 25, buf: 8, trig: 8, exp: 15 },
+                                      { key: "2000", label: "2000", sub: "Standard", base: 2000, lot: 0.05, tp: 40, slMin: 15, slMax: 30, trail: 30, buf: 10, trig: 10, exp: 20 },
+                                      { key: "3500", label: "3500", sub: "Era 2024-25", base: 3500, lot: 0.05, tp: 45, slMin: 22, slMax: 45, trail: 45, buf: 15, trig: 15, exp: 30 },
+                                      { key: "4500", label: "4500", sub: "Era 2026", base: 4500, lot: 0.05, tp: 60, slMin: 30, slMax: 60, trail: 60, buf: 20, trig: 20, exp: 40 },
+                                    ].map((preset) => {
+                                      const isCurrent = strategyParams.base_reference_price === preset.base
+                                        && strategyParams.initial_tp_dist === preset.tp
+                                        && strategyParams.min_sl_dist === preset.slMin;
+                                      return (
+                                        <button
+                                          key={preset.key}
+                                          type="button"
+                                          aria-pressed={isCurrent}
+                                          onClick={() => {
+                                            setBaseRefPriceInput(String(preset.base));
+                                            setLotSizeInput(String(preset.lot));
+                                            setInitialTpDistInput(String(preset.tp));
+                                            setSlSafetyBufferInput(String(preset.buf));
+                                            setMinSlDistInput(String(preset.slMin));
+                                            setMaxSlDistInput(String(preset.slMax));
+                                            setTrailingDistanceInput(String(preset.trail));
+                                            setTpTriggerInput(String(preset.trig));
+                                            setTpEkspansiInput(String(preset.exp));
+                                            setStrategyParams((prev) => ({
+                                              ...prev,
+                                              base_reference_price: preset.base,
+                                              lot_override: preset.lot,
+                                              initial_tp_dist: preset.tp,
+                                              sl_safety_buffer: preset.buf,
+                                              min_sl_dist: preset.slMin,
+                                              max_sl_dist: preset.slMax,
+                                              trailing_distance: preset.trail,
+                                              tp_trigger: preset.trig,
+                                              tp_ekspansi: preset.exp,
+                                            }));
+                                          }}
+                                          className={cn(
+                                            "min-h-12 cursor-pointer rounded-md border px-2 py-1.5 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70",
+                                            isCurrent
+                                              ? "border-emerald-500 bg-emerald-100 text-emerald-800"
+                                              : "border-blue-200 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50"
+                                          )}
+                                        >
+                                          <span className="block font-mono text-[11px] font-bold">{preset.label}</span>
+                                          <span className="block text-[9px] text-slate-500">{preset.sub}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </article>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-[#F0F6FF]/70 p-3 text-[10px] font-bold text-slate-600">
+                          <span>Decision Flow:</span>
+                          {['Structure', 'Filter', 'Decision', 'Entry'].map((step, index) => (
+                            <span key={step} className="flex items-center gap-2">
+                              {index > 0 && <ArrowRight className="h-3 w-3 text-blue-400" aria-hidden="true" />}
+                              <span className="rounded border border-blue-200 bg-white px-2 py-1 text-blue-700">{step}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : activeStrategyBrain === 2 ? (
+                      <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+                        <div className="rounded-md border border-amber-200 bg-white px-3">
+                          <EntryToggle
+                            label="Continuation Strength Observer"
+                            description="Hitung kekuatan lanjutan posisi aktif tanpa mengubah entry, SL, TP, trailing, exit, atau Net Profit."
+                            checked={continuationObserverEnabled}
+                            onChange={() => setContinuationObserverEnabled((enabled) => !enabled)}
+                          />
+                        </div>
+
+                        {continuationStrength ? (
+                          <>
+                            <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+                              <div className="flex min-h-32 flex-col items-center justify-center rounded-md border border-amber-200 bg-white p-4 text-center">
+                                <div className="text-[10px] font-bold uppercase text-slate-500">Strength Score</div>
+                                <div className="mt-1 text-4xl font-black text-amber-700">{continuationStrength.score}</div>
+                                <span className={cn(
+                                  "mt-2 rounded border px-2 py-1 text-[9px] font-bold",
+                                  continuationStrength.status === "STRONG"
+                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                    : continuationStrength.status === "NEUTRAL"
+                                      ? "border-amber-300 bg-amber-50 text-amber-700"
+                                      : "border-rose-300 bg-rose-50 text-rose-700"
+                                )}>
+                                  {continuationStrength.status}
+                                </span>
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {continuationStrength.components.map((component) => (
+                                  <div key={component.key} className="rounded-md border border-amber-200 bg-white p-3">
+                                    <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-slate-800">
+                                      <span>{component.label}</span>
+                                      <span className={component.passed ? "text-emerald-600" : "text-slate-400"}>
+                                        {component.score}/{component.maximum}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[9px] leading-relaxed text-slate-500">{component.reason}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-[9px] font-medium text-amber-800/80">
+                              Observer only: hasil ini belum menjadi perintah hold atau exit.
+                            </p>
+                          </>
+                        ) : (
+                          <div className="rounded-md border border-dashed border-amber-300 bg-white/70 p-6 text-center">
+                            <div className="text-sm font-bold text-amber-900">Otak 2 - Continuation Strength Observer</div>
+                            <p className="mx-auto mt-2 max-w-2xl text-[11px] leading-relaxed text-amber-800/80">
+                              {continuationObserverEnabled
+                                ? "Menunggu posisi aktif dan candle replay untuk menghitung Strength 0-100."
+                                : "Observer dinonaktifkan. Aktifkan toggle untuk mulai membaca posisi aktif."}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-4 rounded-lg border border-violet-200 bg-violet-50/70 p-4">
+                        <div className="rounded-md border border-violet-200 bg-white px-3">
+                          <EntryToggle
+                            label="Exit & Target Observer"
+                            description="Rekomendasi hold, proteksi, ekstensi target, dan exit alert tanpa mengeksekusi perubahan posisi."
+                            checked={exitTargetObserverEnabled}
+                            onChange={() => setExitTargetObserverEnabled((enabled) => !enabled)}
+                          />
+                        </div>
+
+                        {exitTargetObserver && observerPosition && continuationStrength ? (
+                          <>
+                            <div className="grid gap-3 sm:grid-cols-[210px_1fr]">
+                              <div className={cn(
+                                "flex min-h-36 flex-col justify-center rounded-md border bg-white p-4",
+                                exitTargetObserver.tone === "critical"
+                                  ? "border-rose-300"
+                                  : exitTargetObserver.tone === "warning"
+                                    ? "border-amber-300"
+                                    : exitTargetObserver.tone === "positive"
+                                      ? "border-emerald-300"
+                                      : "border-violet-200"
+                              )}>
+                                <div className="text-[10px] font-bold uppercase text-slate-500">Live Recommendation</div>
+                                <div className="mt-2 text-xl font-black text-violet-900">{exitTargetObserver.status}</div>
+                                <div className="mt-1 text-[11px] font-bold text-slate-700">{exitTargetObserver.title}</div>
+                                <p className="mt-2 text-[9px] leading-relaxed text-slate-500">{exitTargetObserver.reason}</p>
+                              </div>
+                              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {[
+                                  ["Otak 2", `${continuationStrength.status} (${continuationStrength.score})`],
+                                  ["Floating Net Profit", `${Number(observerPosition.pnl ?? 0) >= 0 ? "+" : ""}${Number(observerPosition.pnl ?? 0).toFixed(2)} USD`],
+                                  ["Structure", observerStructureAligned ? "Aligned" : "Adverse"],
+                                  ["Breakeven", observerPosition.is_be_active ? "Active" : "Inactive"],
+                                  ["Target Expansion", `${Number(observerPosition.expansion_count ?? 0)}${observerPosition.is_tp_maxed ? " / Max" : ""}`],
+                                  ["Hold Duration", `${Math.floor(Math.max(0, currentCandle!.time - getTimestampSeconds(observerPosition.entry_time)) / 3600)}h`],
+                                ].map(([label, value]) => (
+                                  <div key={label} className="rounded-md border border-violet-200 bg-white p-3">
+                                    <div className="text-[9px] font-bold uppercase text-slate-500">{label}</div>
+                                    <div className="mt-1 text-[11px] font-bold text-violet-900">{value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                            <p className="text-[9px] font-medium text-violet-800/80">
+                              Observer only: rekomendasi ini tidak memindahkan SL/TP dan tidak menutup posisi.
+                            </p>
+                          </>
+                        ) : (
+                          <div className="rounded-md border border-dashed border-violet-300 bg-white/70 p-6 text-center">
+                            <div className="text-sm font-bold text-violet-900">Otak 3 - Exit &amp; Target Observer</div>
+                            <p className="mx-auto mt-2 max-w-2xl text-[11px] leading-relaxed text-violet-800/80">
+                              {!exitTargetObserverEnabled
+                                ? "Observer dinonaktifkan. Aktifkan toggle untuk membaca posisi aktif."
+                                : !continuationObserverEnabled
+                                  ? "Aktifkan Otak 2 karena Otak 3 memakai continuation score sebagai input."
+                                  : "Menunggu posisi aktif dan candle replay untuk memberi rekomendasi."}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>

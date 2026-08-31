@@ -1,0 +1,731 @@
+﻿{
+  "range": {
+    "year_from": "2026",
+    "month_from": "1",
+    "year_to": "2026",
+    "month_to": "8",
+    "timeframe": "M15"
+  },
+  "executedTrades": 86,
+  "totalSamples": 3812,
+  "statusCounts": {
+    "STRONG": 1578,
+    "NEUTRAL": 1501,
+    "WEAK": 733
+  },
+  "statusPercentages": {
+    "STRONG": 41.39559286463799,
+    "NEUTRAL": 39.37565582371458,
+    "WEAK": 19.22875131164743
+  },
+  "byDominantStatus": {
+    "STRONG": {
+      "trades": 42,
+      "wins": 35,
+      "totalNetProfit": 11071.759999999998,
+      "averageNetProfit": 263.6133333333333
+    },
+    "NEUTRAL": {
+      "trades": 29,
+      "wins": 9,
+      "totalNetProfit": -2378.3900000000003,
+      "averageNetProfit": -82.01344827586207
+    },
+    "WEAK": {
+      "trades": 15,
+      "wins": 7,
+      "totalNetProfit": -730.72,
+      "averageNetProfit": -48.714666666666666
+    }
+  },
+  "trades": [
+    {
+      "ticket": 2,
+      "type": "BUY",
+      "netProfit": 246.27,
+      "samples": 93,
+      "averageScore": 68.81720430107526,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 3,
+      "type": "BUY",
+      "netProfit": 62.92,
+      "samples": 93,
+      "averageScore": 72.20430107526882,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 5,
+      "type": "BUY",
+      "netProfit": -206.23,
+      "samples": 86,
+      "averageScore": 65.17441860465117,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 8,
+      "type": "BUY",
+      "netProfit": 241.67,
+      "samples": 93,
+      "averageScore": 63.225806451612904,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 9,
+      "type": "BUY",
+      "netProfit": 156.97,
+      "samples": 34,
+      "averageScore": 66.02941176470588,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 12,
+      "type": "BUY",
+      "netProfit": 301.55,
+      "samples": 6,
+      "averageScore": 96.66666666666667,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 14,
+      "type": "BUY",
+      "netProfit": 80.67,
+      "samples": 83,
+      "averageScore": 49.57831325301205,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 16,
+      "type": "BUY",
+      "netProfit": 851.97,
+      "samples": 93,
+      "averageScore": 83.97849462365592,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 18,
+      "type": "BUY",
+      "netProfit": 271.27,
+      "samples": 71,
+      "averageScore": 69.08450704225352,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 20,
+      "type": "BUY",
+      "netProfit": 183.52,
+      "samples": 24,
+      "averageScore": 81.04166666666667,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 22,
+      "type": "BUY",
+      "netProfit": 738.7,
+      "samples": 93,
+      "averageScore": 78.27956989247312,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 24,
+      "type": "BUY",
+      "netProfit": 26.48,
+      "samples": 42,
+      "averageScore": 80.35714285714286,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 26,
+      "type": "BUY",
+      "netProfit": -175.78,
+      "samples": 26,
+      "averageScore": 70.96153846153847,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 28,
+      "type": "BUY",
+      "netProfit": -228.48,
+      "samples": 12,
+      "averageScore": 70,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 30,
+      "type": "BUY",
+      "netProfit": 8.06,
+      "samples": 93,
+      "averageScore": 46.505376344086024,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 31,
+      "type": "BUY",
+      "netProfit": 329.46,
+      "samples": 62,
+      "averageScore": 75.96774193548387,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 34,
+      "type": "BUY",
+      "netProfit": 18.33,
+      "samples": 93,
+      "averageScore": 36.61290322580645,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 35,
+      "type": "BUY",
+      "netProfit": -269.87,
+      "samples": 83,
+      "averageScore": 28.55421686746988,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 38,
+      "type": "BUY",
+      "netProfit": 599.54,
+      "samples": 36,
+      "averageScore": 82.22222222222223,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 40,
+      "type": "BUY",
+      "netProfit": -250.08,
+      "samples": 29,
+      "averageScore": 62.06896551724138,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 42,
+      "type": "BUY",
+      "netProfit": 82.36,
+      "samples": 77,
+      "averageScore": 69.74025974025975,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 43,
+      "type": "BUY",
+      "netProfit": -97,
+      "samples": 39,
+      "averageScore": 70.25641025641026,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 46,
+      "type": "SELL",
+      "netProfit": 667.65,
+      "samples": 10,
+      "averageScore": 89,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 48,
+      "type": "SELL",
+      "netProfit": 322.76,
+      "samples": 39,
+      "averageScore": 52.05128205128205,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 49,
+      "type": "SELL",
+      "netProfit": 824.2,
+      "samples": 22,
+      "averageScore": 84.77272727272727,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 52,
+      "type": "SELL",
+      "netProfit": 419.05,
+      "samples": 43,
+      "averageScore": 79.18604651162791,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 54,
+      "type": "SELL",
+      "netProfit": -131.63,
+      "samples": 35,
+      "averageScore": 66.71428571428571,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 56,
+      "type": "SELL",
+      "netProfit": -167.55,
+      "samples": 12,
+      "averageScore": 67.08333333333333,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 58,
+      "type": "BUY",
+      "netProfit": -114.88,
+      "samples": 70,
+      "averageScore": 59.714285714285715,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 60,
+      "type": "BUY",
+      "netProfit": 320.5,
+      "samples": 3,
+      "averageScore": 90,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 62,
+      "type": "SELL",
+      "netProfit": -22.73,
+      "samples": 23,
+      "averageScore": 74.78260869565217,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 64,
+      "type": "SELL",
+      "netProfit": -311.45,
+      "samples": 39,
+      "averageScore": 58.205128205128204,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 66,
+      "type": "SELL",
+      "netProfit": 416.42,
+      "samples": 89,
+      "averageScore": 57.92134831460674,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 67,
+      "type": "SELL",
+      "netProfit": 256.72,
+      "samples": 89,
+      "averageScore": 74.10112359550561,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 70,
+      "type": "SELL",
+      "netProfit": -153.34,
+      "samples": 42,
+      "averageScore": 64.4047619047619,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 72,
+      "type": "SELL",
+      "netProfit": -96.75,
+      "samples": 32,
+      "averageScore": 65.625,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 74,
+      "type": "SELL",
+      "netProfit": -55.48,
+      "samples": 89,
+      "averageScore": 49.04494382022472,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 76,
+      "type": "BUY",
+      "netProfit": -234.35,
+      "samples": 43,
+      "averageScore": 64.65116279069767,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 78,
+      "type": "BUY",
+      "netProfit": -235.8,
+      "samples": 29,
+      "averageScore": 40.172413793103445,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 80,
+      "type": "SELL",
+      "netProfit": 308.95,
+      "samples": 21,
+      "averageScore": 82.85714285714286,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 82,
+      "type": "SELL",
+      "netProfit": -298.5,
+      "samples": 8,
+      "averageScore": 59.375,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 84,
+      "type": "SELL",
+      "netProfit": 303.05,
+      "samples": 12,
+      "averageScore": 66.25,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 86,
+      "type": "SELL",
+      "netProfit": -285.1,
+      "samples": 48,
+      "averageScore": 61.25,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 88,
+      "type": "SELL",
+      "netProfit": -177.4,
+      "samples": 50,
+      "averageScore": 56.6,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 90,
+      "type": "SELL",
+      "netProfit": 76.41,
+      "samples": 52,
+      "averageScore": 74.13461538461539,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 92,
+      "type": "SELL",
+      "netProfit": -164.75,
+      "samples": 40,
+      "averageScore": 73.25,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 94,
+      "type": "SELL",
+      "netProfit": -153.88,
+      "samples": 54,
+      "averageScore": 61.01851851851852,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 96,
+      "type": "SELL",
+      "netProfit": -98.34,
+      "samples": 89,
+      "averageScore": 40,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 98,
+      "type": "SELL",
+      "netProfit": 443.9,
+      "samples": 55,
+      "averageScore": 57.45454545454545,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 99,
+      "type": "SELL",
+      "netProfit": 359.87,
+      "samples": 29,
+      "averageScore": 81.89655172413794,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 102,
+      "type": "SELL",
+      "netProfit": 674.77,
+      "samples": 89,
+      "averageScore": 82.47191011235955,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 104,
+      "type": "SELL",
+      "netProfit": 286.4,
+      "samples": 5,
+      "averageScore": 74,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 106,
+      "type": "SELL",
+      "netProfit": 180.37,
+      "samples": 65,
+      "averageScore": 83.76923076923077,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 108,
+      "type": "SELL",
+      "netProfit": 306.37,
+      "samples": 89,
+      "averageScore": 64.6067415730337,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 9231649416,
+      "type": "SELL",
+      "netProfit": 150.75,
+      "samples": 12,
+      "averageScore": 72.91666666666667,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 109,
+      "type": "SELL",
+      "netProfit": 460.74,
+      "samples": 51,
+      "averageScore": 66.86274509803921,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 111,
+      "type": "SELL",
+      "netProfit": 326.94,
+      "samples": 7,
+      "averageScore": 85.71428571428571,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 114,
+      "type": "SELL",
+      "netProfit": -115.14,
+      "samples": 23,
+      "averageScore": 50,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 116,
+      "type": "SELL",
+      "netProfit": 99.02,
+      "samples": 87,
+      "averageScore": 58.2183908045977,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 117,
+      "type": "SELL",
+      "netProfit": 16.5,
+      "samples": 42,
+      "averageScore": 80.5952380952381,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 9473076000,
+      "type": "SELL",
+      "netProfit": 181.15,
+      "samples": 2,
+      "averageScore": 100,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 120,
+      "type": "SELL",
+      "netProfit": 20.12,
+      "samples": 57,
+      "averageScore": 54.3859649122807,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 121,
+      "type": "SELL",
+      "netProfit": -86.02,
+      "samples": 24,
+      "averageScore": 77.91666666666667,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 9542748291,
+      "type": "SELL",
+      "netProfit": -150.23,
+      "samples": 10,
+      "averageScore": 52,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 124,
+      "type": "SELL",
+      "netProfit": -321.96,
+      "samples": 19,
+      "averageScore": 29.210526315789473,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 126,
+      "type": "SELL",
+      "netProfit": 196.16,
+      "samples": 89,
+      "averageScore": 50.73033707865169,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 9595340010,
+      "type": "SELL",
+      "netProfit": 13.5,
+      "samples": 3,
+      "averageScore": 43.333333333333336,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 9597877384,
+      "type": "SELL",
+      "netProfit": -18.95,
+      "samples": 1,
+      "averageScore": 15,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 9598215181,
+      "type": "SELL",
+      "netProfit": 41.85,
+      "samples": 1,
+      "averageScore": 35,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 9598503360,
+      "type": "SELL",
+      "netProfit": 9.5,
+      "samples": 1,
+      "averageScore": 35,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 9598503363,
+      "type": "SELL",
+      "netProfit": 9.9,
+      "samples": 1,
+      "averageScore": 35,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 9598808229,
+      "type": "SELL",
+      "netProfit": -34.15,
+      "samples": 1,
+      "averageScore": 15,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 128,
+      "type": "SELL",
+      "netProfit": -317.7,
+      "samples": 12,
+      "averageScore": 25,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 130,
+      "type": "SELL",
+      "netProfit": -299.04,
+      "samples": 17,
+      "averageScore": 59.11764705882353,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 132,
+      "type": "BUY",
+      "netProfit": 530.4,
+      "samples": 46,
+      "averageScore": 85.1086956521739,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 134,
+      "type": "BUY",
+      "netProfit": 380.3,
+      "samples": 26,
+      "averageScore": 77.88461538461539,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 136,
+      "type": "BUY",
+      "netProfit": -24.38,
+      "samples": 36,
+      "averageScore": 82.36111111111111,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 138,
+      "type": "BUY",
+      "netProfit": -385.64,
+      "samples": 29,
+      "averageScore": 59.6551724137931,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 9986119129,
+      "type": "BUY",
+      "netProfit": -150,
+      "samples": 16,
+      "averageScore": 58.75,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 140,
+      "type": "BUY",
+      "netProfit": 165.07,
+      "samples": 89,
+      "averageScore": 52.69662921348315,
+      "dominantStatus": "WEAK"
+    },
+    {
+      "ticket": 141,
+      "type": "BUY",
+      "netProfit": -122.83,
+      "samples": 89,
+      "averageScore": 48.37078651685393,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 144,
+      "type": "BUY",
+      "netProfit": 219.16,
+      "samples": 86,
+      "averageScore": 61.74418604651163,
+      "dominantStatus": "NEUTRAL"
+    },
+    {
+      "ticket": 146,
+      "type": "BUY",
+      "netProfit": 298.32,
+      "samples": 89,
+      "averageScore": 59.438202247191015,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 147,
+      "type": "BUY",
+      "netProfit": 349.65,
+      "samples": 62,
+      "averageScore": 81.04838709677419,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 10137366887,
+      "type": "BUY",
+      "netProfit": 82.6,
+      "samples": 7,
+      "averageScore": 82.85714285714286,
+      "dominantStatus": "STRONG"
+    },
+    {
+      "ticket": 10196002798,
+      "type": "BUY",
+      "netProfit": -0.7,
+      "samples": 1,
+      "averageScore": 80,
+      "dominantStatus": "STRONG"
+    }
+  ]
+}

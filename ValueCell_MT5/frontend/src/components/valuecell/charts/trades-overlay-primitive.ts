@@ -17,6 +17,7 @@ export interface TradeOverlayEntry {
   profit: number;
   entry_time_ts: number;
   exit_time_ts: number | null;
+  protection_activated_time_ts?: number | null;
   // ATR band info (optional) — drawn as a horizontal line + value label
   atr?: number | null;
   atr_start_ts?: number | null;
@@ -151,6 +152,12 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
         // ponytail: 0-bar trades (stopped same candle) get min 2px width instead of skip
         if (right - left < 2) right = left + 2;
 
+        const protectionX = trade.protection_activated_time_ts !== null && trade.protection_activated_time_ts !== undefined
+          ? timeScale.timeToCoordinate(trade.protection_activated_time_ts as UTCTimestamp)
+          : null;
+        const splitX = protectionX === null
+          ? null
+          : Math.max(left, Math.min(right, protectionX * hpr));
         const snapHeight = (y: number) => Math.max(0, Math.min(height, y * vpr));
 
         if (yTP !== null) {
@@ -160,7 +167,10 @@ class TradesPaneRenderer implements IPrimitivePaneRenderer {
           ctx.fillRect(left, top, right - left, areaH);
         }
 
-        if (ySL !== null) {
+        const isRiskArea = trade.type.toLowerCase() === "buy"
+          ? trade.sl !== null && trade.sl < trade.entry_price
+          : trade.sl !== null && trade.sl > trade.entry_price;
+        if (ySL !== null && isRiskArea) {
           const top = snapHeight(Math.min(yEntry, ySL));
           const areaH = Math.abs(ySL - yEntry) * vpr;
           ctx.fillStyle = RED_BG;
