@@ -105,6 +105,9 @@ export interface StrategyParams {
   atr_tp_multiplier: number;
   show_supply_demand: boolean;
   show_liquidity_pools: boolean;
+  show_pdh_pdl: boolean;
+  show_pwh_pwl: boolean;
+  show_session_hl: boolean;
   use_price_ratio_scaling: boolean;
   base_reference_price: number;
   risk_pct?: number;
@@ -133,6 +136,9 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   atr_tp_multiplier: 2,
   show_supply_demand: false,
   show_liquidity_pools: false,
+  show_pdh_pdl: true,
+  show_pwh_pwl: true,
+  show_session_hl: true,
   use_price_ratio_scaling: true,
   base_reference_price: 2000,
 };

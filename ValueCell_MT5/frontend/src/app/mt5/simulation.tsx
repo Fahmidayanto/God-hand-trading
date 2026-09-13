@@ -858,7 +858,10 @@ export default function SimulationOfDead() {
   const { data: sessionZonesData } = useSessionZones(fromDateStr, "XAUUSD");
   useEffect(() => {
     const primitive = sessionZonesPrimitiveRef.current;
-    if (!primitive || !sessionZonesData?.zones?.length) return;
+    if (!primitive) return;
+    const isIntraday = activeTimeframe === "M15" || activeTimeframe === "H1";
+    primitive.setVisible(isIntraday);
+    if (!sessionZonesData?.zones?.length) return;
     const boxes: SessionZoneBox[] = sessionZonesData.zones.map((z) => ({
       start: z.start_time,
       end: z.end_time,
@@ -866,7 +869,7 @@ export default function SimulationOfDead() {
       open: z.status === "OPEN",
     }));
     primitive.setBoxes(boxes);
-  }, [sessionZonesData]);
+  }, [sessionZonesData, activeTimeframe]);
 
   const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
     if (!data) return;

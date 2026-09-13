@@ -1,0 +1,530 @@
+{
+  "generatedAt": "2026-08-31T09:05:58.178Z",
+  "replayRange": "2026-01-01 to 2026-08-31",
+  "candles": 15175,
+  "executedTrades": 75,
+  "baseline": {
+    "netProfit": 3508.71,
+    "wins": 42,
+    "losses": 33,
+    "winRate": 56,
+    "closed": 75,
+    "brainExitCount": 0
+  },
+  "totalScenarios": 180,
+  "profitableVsBaseline": 98,
+  "topScenarios": [
+    {
+      "name": "3B BE:off trail:30 tpTrigger:15 tpExpand:20",
+      "params": {
+        "enableBreakeven": false,
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "tpEkspansi": 20
+      },
+      "baselineNetProfit": 4299.69,
+      "netProfit": 4277.19,
+      "wins": 45,
+      "losses": 30,
+      "winRate": 60,
+      "closed": 75,
+      "brainExitCount": 16,
+      "deltaNetProfit": -22.5
+    },
+    {
+      "name": "3B BE:off trail:40 tpTrigger:15 tpExpand:20",
+      "params": {
+        "enableBreakeven": false,
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "tpEkspansi": 20
+      },
+      "baselineNetProfit": 3912.53,
+      "netProfit": 3963.74,
+      "wins": 45,
+      "losses": 30,
+      "winRate": 60,
+      "closed": 75,
+      "brainExitCount": 17,
+      "deltaNetProfit": 51.21
+    },
+    {
+      "name": "3B BE:on trail:30 tpTrigger:15 tpExpand:20",
+      "params": {
+        "enableBreakeven": true,
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "tpEkspansi": 20
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3869.97,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 15,
+      "deltaNetProfit": -74.64
+    },
+    {
+      "name": "3B BE:off trail:30 tpTrigger:15 tpExpand:30",
+      "params": {
+        "enableBreakeven": false,
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "tpEkspansi": 30
+      },
+      "baselineNetProfit": 3863.81,
+      "netProfit": 3852,
+      "wins": 45,
+      "losses": 30,
+      "winRate": 60,
+      "closed": 75,
+      "brainExitCount": 17,
+      "deltaNetProfit": -11.81
+    },
+    {
+      "name": "3B BE:on trail:40 tpTrigger:15 tpExpand:20",
+      "params": {
+        "enableBreakeven": true,
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "tpEkspansi": 20
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3841.71,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 16,
+      "deltaNetProfit": -119.81
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:2 minProfit:25",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3713.27,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 21,
+      "deltaNetProfit": -231.34
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:2 minProfit:0",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3704.95,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 21,
+      "deltaNetProfit": -239.66
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:2 minProfit:10",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3704.95,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 21,
+      "deltaNetProfit": -239.66
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:2 minProfit:25",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3685.01,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 22,
+      "deltaNetProfit": -276.51
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:2 minProfit:0",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3676.69,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 22,
+      "deltaNetProfit": -284.83
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:2 minProfit:10",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 2,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3676.69,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 22,
+      "deltaNetProfit": -284.83
+    },
+    {
+      "name": "3B BE:on trail:30 tpTrigger:15 tpExpand:30",
+      "params": {
+        "enableBreakeven": true,
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "tpEkspansi": 30
+      },
+      "baselineNetProfit": 3698.88,
+      "netProfit": 3634.93,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 16,
+      "deltaNetProfit": -63.95
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:3 minProfit:0",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3628.69,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -315.92
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:3 minProfit:10",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3628.69,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -315.92
+    },
+    {
+      "name": "Guarded exit BE:on trail:30 tpTrigger:15 confirm:3 minProfit:25",
+      "params": {
+        "trailingDistance": 30,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 3944.61,
+      "netProfit": 3628.69,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -315.92
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:3 minProfit:0",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3621.81,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -339.71
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:3 minProfit:10",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3621.81,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -339.71
+    },
+    {
+      "name": "Guarded exit BE:on trail:40 tpTrigger:15 confirm:3 minProfit:25",
+      "params": {
+        "trailingDistance": 40,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 3961.52,
+      "netProfit": 3621.81,
+      "wins": 56,
+      "losses": 19,
+      "winRate": 74.7,
+      "closed": 75,
+      "brainExitCount": 11,
+      "deltaNetProfit": -339.71
+    },
+    {
+      "name": "3B BE:off trail:30 tpTrigger:10 tpExpand:20",
+      "params": {
+        "enableBreakeven": false,
+        "trailingDistance": 30,
+        "tpTrigger": 10,
+        "tpEkspansi": 20
+      },
+      "baselineNetProfit": 3508.71,
+      "netProfit": 3601.21,
+      "wins": 45,
+      "losses": 30,
+      "winRate": 60,
+      "closed": 75,
+      "brainExitCount": 16,
+      "deltaNetProfit": 92.5
+    },
+    {
+      "name": "3B BE:off trail:30 tpTrigger:10 tpExpand:30",
+      "params": {
+        "enableBreakeven": false,
+        "trailingDistance": 30,
+        "tpTrigger": 10,
+        "tpEkspansi": 30
+      },
+      "baselineNetProfit": 3399.08,
+      "netProfit": 3586.68,
+      "wins": 45,
+      "losses": 30,
+      "winRate": 60,
+      "closed": 75,
+      "brainExitCount": 16,
+      "deltaNetProfit": 187.6
+    }
+  ],
+  "bottomScenarios": [
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:15 confirm:4 minProfit:25",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 15,
+        "confirmationsRequired": 4,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 2503.37,
+      "netProfit": 2448.08,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:15 confirm:4 minProfit:10",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 15,
+        "confirmationsRequired": 4,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 2503.37,
+      "netProfit": 2448.08,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:15 confirm:4 minProfit:0",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 15,
+        "confirmationsRequired": 4,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 2503.37,
+      "netProfit": 2448.08,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:10 confirm:4 minProfit:25",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 10,
+        "confirmationsRequired": 4,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 2505.62,
+      "netProfit": 2450.33,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:10 confirm:4 minProfit:10",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 10,
+        "confirmationsRequired": 4,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 2505.62,
+      "netProfit": 2450.33,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:20 tpTrigger:10 confirm:4 minProfit:0",
+      "params": {
+        "trailingDistance": 20,
+        "tpTrigger": 10,
+        "confirmationsRequired": 4,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 2505.62,
+      "netProfit": 2450.33,
+      "wins": 51,
+      "losses": 24,
+      "winRate": 68,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -55.29
+    },
+    {
+      "name": "Guarded exit BE:on trail:15 tpTrigger:15 confirm:3 minProfit:25",
+      "params": {
+        "trailingDistance": 15,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 2498.92,
+      "netProfit": 2464.75,
+      "wins": 46,
+      "losses": 29,
+      "winRate": 61.3,
+      "closed": 75,
+      "brainExitCount": 5,
+      "deltaNetProfit": -34.17
+    },
+    {
+      "name": "Guarded exit BE:on trail:15 tpTrigger:15 confirm:3 minProfit:10",
+      "params": {
+        "trailingDistance": 15,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 10
+      },
+      "baselineNetProfit": 2498.92,
+      "netProfit": 2464.75,
+      "wins": 46,
+      "losses": 29,
+      "winRate": 61.3,
+      "closed": 75,
+      "brainExitCount": 5,
+      "deltaNetProfit": -34.17
+    },
+    {
+      "name": "Guarded exit BE:on trail:15 tpTrigger:15 confirm:3 minProfit:0",
+      "params": {
+        "trailingDistance": 15,
+        "tpTrigger": 15,
+        "confirmationsRequired": 3,
+        "minimumProfit": 0
+      },
+      "baselineNetProfit": 2498.92,
+      "netProfit": 2464.75,
+      "wins": 46,
+      "losses": 29,
+      "winRate": 61.3,
+      "closed": 75,
+      "brainExitCount": 5,
+      "deltaNetProfit": -34.17
+    },
+    {
+      "name": "Guarded exit BE:on trail:15 tpTrigger:15 confirm:4 minProfit:25",
+      "params": {
+        "trailingDistance": 15,
+        "tpTrigger": 15,
+        "confirmationsRequired": 4,
+        "minimumProfit": 25
+      },
+      "baselineNetProfit": 2498.92,
+      "netProfit": 2469.44,
+      "wins": 46,
+      "losses": 29,
+      "winRate": 61.3,
+      "closed": 75,
+      "brainExitCount": 3,
+      "deltaNetProfit": -29.48
+    }
+  ]
+}

@@ -31,11 +31,16 @@ import {
   LiquidityPoolsPrimitive,
   type LiquidityPoolItem,
 } from "@/components/valuecell/charts/liquidity-pools-primitive";
+import {
+  LiquidityLevelsPrimitive,
+  type LiquidityLevelItem,
+  type LiquidityLevelStatus,
+} from "@/components/valuecell/charts/liquidity-levels-primitive";
 import { useSessionZones } from "@/api/mt5_agents";
 import { followReplayPlayhead } from "./replay-chart";
-import { evaluateContinuationStrength } from "./continuation-strength";
+import { classifyContinuationTrend, evaluateContinuationStrength } from "./continuation-strength";
 import { evaluateExitTargetObserver } from "./exit-target-observer";
-import { simulateThreeBrainTradeOutcome } from "./three-brain-engine";
+import { getThreeBrainConfigFromSearch, shouldUseThreeBrainExecution, simulateThreeBrainTradeOutcome, type ThreeBrainConfig } from "./three-brain-engine";
 import {
   DEFAULT_ENTRY_FILTER_PARAMS,
   DEFAULT_STRATEGY_PARAMS,
@@ -715,6 +720,437 @@ export function calculateLiquidityPools(
 }
 
 /**
+ * Calculate Previous Day High (PDH) and Previous Day Low (PDL) liquidity levels
+ * for all historical days up to the current playhead candle (Option 2: All Historical Days).
+ * Each trading day forms a horizontal segment from 00:00 to 23:59 (or playhead time for the active day).
+ * - UNTOUCHED (FRESH): Harga intraday pada hari itu belum menyentuh level tersebut
+ * - SWEPT ⚡: Wick intraday pada hari itu telah menembus level, namun tidak ada candle yang ditutup (close) di luar level
+ * - BROKEN: Ada candle intraday pada hari itu yang ditutup (close) menembus level
+ */
+export function calculateDailyLiquidityLevels(
+  currentCandle: ReplayCandle,
+  allCandles: ReplayCandle[],
+  d1Candles?: ReplayCandle[]
+): LiquidityLevelItem[] {
+  if (!currentCandle || !d1Candles || d1Candles.length < 2) return [];
+
+  // 1. Cari index candle D1 hari aktif saat ini (time <= currentCandle.time)
+  let todayD1Idx = -1;
+  for (let i = d1Candles.length - 1; i >= 0; i--) {
+    if (d1Candles[i].time <= currentCandle.time) {
+      todayD1Idx = i;
+      break;
+    }
+  }
+
+  if (todayD1Idx < 1) return [];
+
+  const results: LiquidityLevelItem[] = [];
+  const totalCandles = allCandles ? allCandles.length : 0;
+  let candlePtr = 0;
+
+  // 2. Loop setiap hari dari index 1 hingga todayD1Idx
+  for (let dayIdx = 1; dayIdx <= todayD1Idx; dayIdx++) {
+    const prevD1 = d1Candles[dayIdx - 1];
+    const currentD1 = d1Candles[dayIdx];
+    const isCurrentActiveDay = (dayIdx === todayD1Idx);
+
+    const pdhPrice = prevD1.high;
+    const pdlPrice = prevD1.low;
+
+    // Majukan pointer candlePtr sampai menemukan time >= prevD1.time
+    while (candlePtr < totalCandles && allCandles[candlePtr].time < prevD1.time) {
+      candlePtr++;
+    }
+
+    // Auto-snap startTime ke candle pertama yang ada di timeframe aktif (misal jam 01:00 di H1/M15)
+    let startTime = prevD1.time;
+    if (candlePtr < totalCandles && allCandles[candlePtr].time < currentD1.time) {
+      startTime = allCandles[candlePtr].time;
+    }
+
+    // Batas akhir hari:
+    // Jika hari aktif saat ini: sampai currentCandle.time
+    // Jika hari lampau: sampai bar terakhir hari tersebut di allCandles
+    let endTime: number;
+    if (isCurrentActiveDay) {
+      endTime = currentCandle.time;
+    } else {
+      const nextD1 = d1Candles[dayIdx + 1];
+      const dayCutoff = nextD1 ? nextD1.time : (currentD1.time + 86400);
+      let lastBarTime = currentD1.time;
+      let ePtr = candlePtr;
+      while (ePtr < totalCandles && allCandles[ePtr].time < dayCutoff) {
+        lastBarTime = allCandles[ePtr].time;
+        ePtr++;
+      }
+      endTime = lastBarTime;
+    }
+
+    // Evaluasi candle intraday dalam rentang [startTime, endTime]
+    let maxHigh = -Infinity;
+    let minLow = Infinity;
+    let hasBrokenPdh = false;
+    let hasBrokenPdl = false;
+    let hasCandles = false;
+
+    let scanPtr = candlePtr;
+    while (scanPtr < totalCandles && allCandles[scanPtr].time <= endTime) {
+      const c = allCandles[scanPtr];
+      hasCandles = true;
+      if (c.high > maxHigh) maxHigh = c.high;
+      if (c.low < minLow) minLow = c.low;
+      if (c.close >= pdhPrice) hasBrokenPdh = true;
+      if (c.close <= pdlPrice) hasBrokenPdl = true;
+      scanPtr++;
+    }
+
+    if (!hasCandles && isCurrentActiveDay) {
+      maxHigh = currentCandle.high;
+      minLow = currentCandle.low;
+      if (currentCandle.close >= pdhPrice) hasBrokenPdh = true;
+      if (currentCandle.close <= pdlPrice) hasBrokenPdl = true;
+    }
+
+    // Status PDH
+    let pdhStatus: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenPdh) {
+      pdhStatus = "BROKEN";
+    } else if (maxHigh >= pdhPrice) {
+      pdhStatus = "SWEPT";
+    }
+
+    // Status PDL
+    let pdlStatus: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenPdl) {
+      pdlStatus = "BROKEN";
+    } else if (minLow <= pdlPrice) {
+      pdlStatus = "SWEPT";
+    }
+
+    results.push(
+      {
+        id: `PDH-${startTime}-${pdhPrice.toFixed(2)}`,
+        type: "PDH",
+        price: pdhPrice,
+        startTime,
+        endTime,
+        status: pdhStatus,
+        label: `PDH ${pdhPrice.toFixed(2)}`,
+        periodLabel: "D-1",
+      },
+      {
+        id: `PDL-${startTime}-${pdlPrice.toFixed(2)}`,
+        type: "PDL",
+        price: pdlPrice,
+        startTime,
+        endTime,
+        status: pdlStatus,
+        label: `PDL ${pdlPrice.toFixed(2)}`,
+        periodLabel: "D-1",
+      }
+    );
+  }
+
+  return results;
+}
+
+export function calculateWeeklyLiquidityLevels(
+  currentCandle: ReplayCandle,
+  allCandles: ReplayCandle[],
+  w1Candles?: ReplayCandle[]
+): LiquidityLevelItem[] {
+  if (!currentCandle || !w1Candles || w1Candles.length < 2) return [];
+
+  // 1. Cari index candle W1 minggu aktif saat ini (time <= currentCandle.time)
+  let todayW1Idx = -1;
+  for (let i = w1Candles.length - 1; i >= 0; i--) {
+    if (w1Candles[i].time <= currentCandle.time) {
+      todayW1Idx = i;
+      break;
+    }
+  }
+
+  if (todayW1Idx < 1) return [];
+
+  const results: LiquidityLevelItem[] = [];
+  const totalCandles = allCandles ? allCandles.length : 0;
+  let candlePtr = 0;
+
+  // 2. Loop setiap minggu dari index 1 hingga todayW1Idx
+  for (let weekIdx = 1; weekIdx <= todayW1Idx; weekIdx++) {
+    const prevW1 = w1Candles[weekIdx - 1];
+    const currentW1 = w1Candles[weekIdx];
+    const isCurrentActiveWeek = (weekIdx === todayW1Idx);
+
+    const pwhPrice = prevW1.high;
+    const pwlPrice = prevW1.low;
+
+    // Majukan pointer candlePtr sampai menemukan time >= prevW1.time
+    while (candlePtr < totalCandles && allCandles[candlePtr].time < prevW1.time) {
+      candlePtr++;
+    }
+
+    // Auto-snap startTime ke candle pertama minggu tersebut di timeframe aktif
+    let startTime = prevW1.time;
+    if (candlePtr < totalCandles && allCandles[candlePtr].time < currentW1.time) {
+      startTime = allCandles[candlePtr].time;
+    }
+
+    // Batas akhir minggu:
+    // Jika minggu aktif saat ini: sampai currentCandle.time
+    // Jika minggu lampau: sampai bar terakhir minggu tersebut di allCandles
+    let endTime: number;
+    if (isCurrentActiveWeek) {
+      endTime = currentCandle.time;
+    } else {
+      const nextW1 = w1Candles[weekIdx + 1];
+      const weekCutoff = nextW1 ? nextW1.time : (currentW1.time + 7 * 86400);
+      let lastBarTime = currentW1.time;
+      let ePtr = candlePtr;
+      while (ePtr < totalCandles && allCandles[ePtr].time < weekCutoff) {
+        lastBarTime = allCandles[ePtr].time;
+        ePtr++;
+      }
+      endTime = lastBarTime;
+    }
+
+    // Evaluasi candle intraday dalam rentang [startTime, endTime]
+    let maxHigh = -Infinity;
+    let minLow = Infinity;
+    let hasBrokenPwh = false;
+    let hasBrokenPwl = false;
+    let hasCandles = false;
+
+    let scanPtr = candlePtr;
+    while (scanPtr < totalCandles && allCandles[scanPtr].time <= endTime) {
+      const c = allCandles[scanPtr];
+      hasCandles = true;
+      if (c.high > maxHigh) maxHigh = c.high;
+      if (c.low < minLow) minLow = c.low;
+      if (c.close >= pwhPrice) hasBrokenPwh = true;
+      if (c.close <= pwlPrice) hasBrokenPwl = true;
+      scanPtr++;
+    }
+
+    if (!hasCandles && isCurrentActiveWeek) {
+      maxHigh = currentCandle.high;
+      minLow = currentCandle.low;
+      if (currentCandle.close >= pwhPrice) hasBrokenPwh = true;
+      if (currentCandle.close <= pwlPrice) hasBrokenPwl = true;
+    }
+
+    // Status PWH
+    let pwhStatus: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenPwh) {
+      pwhStatus = "BROKEN";
+    } else if (maxHigh >= pwhPrice) {
+      pwhStatus = "SWEPT";
+    }
+
+    // Status PWL
+    let pwlStatus: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenPwl) {
+      pwlStatus = "BROKEN";
+    } else if (minLow <= pwlPrice) {
+      pwlStatus = "SWEPT";
+    }
+
+    results.push(
+      {
+        id: `PWH-${startTime}-${pwhPrice.toFixed(2)}`,
+        type: "PWH",
+        price: pwhPrice,
+        startTime,
+        endTime,
+        status: pwhStatus,
+        label: `PWH ${pwhPrice.toFixed(2)}`,
+        periodLabel: "W-1",
+      },
+      {
+        id: `PWL-${startTime}-${pwlPrice.toFixed(2)}`,
+        type: "PWL",
+        price: pwlPrice,
+        startTime,
+        endTime,
+        status: pwlStatus,
+        label: `PWL ${pwlPrice.toFixed(2)}`,
+        periodLabel: "W-1",
+      }
+    );
+  }
+
+  return results;
+}
+
+export function calculateSessionLiquidityLevels(
+  currentCandle: ReplayCandle,
+  allCandles: ReplayCandle[]
+): LiquidityLevelItem[] {
+  if (!currentCandle || !allCandles || allCandles.length === 0) return [];
+
+  // Ambil buffer 7 hari terakhir hingga currentCandle.time untuk efisiensi tinggi (O(k))
+  const cutoffTime = currentCandle.time - 7 * 86400;
+  
+  let startIdx = 0;
+  let lo = 0;
+  let hi = allCandles.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (allCandles[mid].time >= cutoffTime) {
+      startIdx = mid;
+      hi = mid - 1;
+    } else {
+      lo = mid + 1;
+    }
+  }
+
+  interface SessionBucket {
+    session: "ASIA" | "LON" | "NY";
+    typeH: "ASIA_H" | "LON_H" | "NY_H";
+    typeL: "ASIA_L" | "LON_L" | "NY_L";
+    dayKey: string;
+    startTime: number;
+    sessionEndTime: number;
+    high: number;
+    low: number;
+  }
+
+  const sessionBuckets = new Map<string, SessionBucket>();
+  let currIdx = startIdx;
+  const totalCandles = allCandles.length;
+
+  // 1. Kumpulkan candle per sesi di rentang aktif
+  while (currIdx < totalCandles && allCandles[currIdx].time <= currentCandle.time) {
+    const c = allCandles[currIdx];
+    const d = new Date(c.time * 1000);
+    const hour = d.getUTCHours();
+    const dayKey = d.toISOString().slice(0, 10);
+
+    let sess: "ASIA" | "LON" | "NY" | null = null;
+    let typeH: "ASIA_H" | "LON_H" | "NY_H" = "ASIA_H";
+    let typeL: "ASIA_L" | "LON_L" | "NY_L" = "ASIA_L";
+
+    if (hour >= 0 && hour < 8) {
+      sess = "ASIA";
+      typeH = "ASIA_H";
+      typeL = "ASIA_L";
+    } else if (hour >= 8 && hour < 14) {
+      sess = "LON";
+      typeH = "LON_H";
+      typeL = "LON_L";
+    } else if (hour >= 14 && hour < 21) {
+      sess = "NY";
+      typeH = "NY_H";
+      typeL = "NY_L";
+    }
+
+    if (sess) {
+      const bucketKey = `${dayKey}_${sess}`;
+      let bucket = sessionBuckets.get(bucketKey);
+      if (!bucket) {
+        bucket = {
+          session: sess,
+          typeH,
+          typeL,
+          dayKey,
+          startTime: c.time,
+          sessionEndTime: c.time,
+          high: c.high,
+          low: c.low,
+        };
+        sessionBuckets.set(bucketKey, bucket);
+      } else {
+        if (c.high > bucket.high) bucket.high = c.high;
+        if (c.low < bucket.low) bucket.low = c.low;
+        bucket.sessionEndTime = c.time;
+      }
+    }
+    currIdx++;
+  }
+
+  // 2. Evaluasi status SWEPT / BROKEN untuk setiap sesi
+  const results: LiquidityLevelItem[] = [];
+
+  sessionBuckets.forEach((bucket) => {
+    const currD = new Date(currentCandle.time * 1000);
+    const currDayKey = currD.toISOString().slice(0, 10);
+
+    let projEndTime = currentCandle.time;
+    if (bucket.dayKey < currDayKey) {
+      let scan = startIdx;
+      while (scan < totalCandles) {
+        const sc = allCandles[scan];
+        const scDay = new Date(sc.time * 1000).toISOString().slice(0, 10);
+        if (scDay === bucket.dayKey) {
+          projEndTime = sc.time;
+        } else if (scDay > bucket.dayKey) {
+          break;
+        }
+        scan++;
+      }
+    }
+
+    // Evaluasi interaksi candle setelah sesi berakhir s/d projEndTime
+    let maxHighAfter = -Infinity;
+    let minLowAfter = Infinity;
+    let hasBrokenH = false;
+    let hasBrokenL = false;
+
+    let evalIdx = startIdx;
+    while (evalIdx < totalCandles && allCandles[evalIdx].time <= projEndTime) {
+      const ec = allCandles[evalIdx];
+      if (ec.time > bucket.sessionEndTime) {
+        if (ec.high > maxHighAfter) maxHighAfter = ec.high;
+        if (ec.low < minLowAfter) minLowAfter = ec.low;
+        if (ec.close >= bucket.high) hasBrokenH = true;
+        if (ec.close <= bucket.low) hasBrokenL = true;
+      }
+      evalIdx++;
+    }
+
+    let statusH: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenH) {
+      statusH = "BROKEN";
+    } else if (maxHighAfter >= bucket.high) {
+      statusH = "SWEPT";
+    }
+
+    let statusL: LiquidityLevelStatus = "UNTOUCHED";
+    if (hasBrokenL) {
+      statusL = "BROKEN";
+    } else if (minLowAfter <= bucket.low) {
+      statusL = "SWEPT";
+    }
+
+    results.push(
+      {
+        id: `${bucket.typeH}-${bucket.startTime}-${bucket.high.toFixed(2)}`,
+        type: bucket.typeH,
+        price: bucket.high,
+        startTime: bucket.startTime,
+        endTime: projEndTime,
+        status: statusH,
+        label: `${bucket.session} H ${bucket.high.toFixed(2)}`,
+        periodLabel: bucket.session,
+      },
+      {
+        id: `${bucket.typeL}-${bucket.startTime}-${bucket.low.toFixed(2)}`,
+        type: bucket.typeL,
+        price: bucket.low,
+        startTime: bucket.startTime,
+        endTime: projEndTime,
+        status: statusL,
+        label: `${bucket.session} L ${bucket.low.toFixed(2)}`,
+        periodLabel: bucket.session,
+      }
+    );
+  });
+
+  return results;
+}
+
+/**
  * Compute active market structure lines (HH/LL/BOS/CHOCH) at the current playhead candle.
  * Strictly enforces single highest HH and lowest LL per active swing leg (discards lower internal highs or higher internal lows).
  */
@@ -1300,11 +1736,14 @@ function processTradesForPlayhead(
   structures: StructureEvent[],
   strategyParams: StrategyParams,
   positionManagementMode: "original" | "three-brain",
+  threeBrainConfig: ThreeBrainConfig,
+  continuationObserverEnabled: boolean,
+  exitTargetObserverEnabled: boolean,
   useLLMSetup: boolean,
   activePlanner: any
 ): {
   runningProfit: number;
-  tradeStats: { total: number; wins: number; losses: number };
+  tradeStats: { total: number; wins: number; losses: number; threeBrainExits: number };
   activePositions: any[];
   overlayEntries: TradeOverlayEntry[];
 } {
@@ -1312,6 +1751,7 @@ function processTradesForPlayhead(
   let total = 0;
   let wins = 0;
   let losses = 0;
+  let threeBrainExits = 0;
   const activePosList: any[] = [];
   const overlayEntries: TradeOverlayEntry[] = [];
   const isAtrEnabled = strategyParams.use_atr_sltp || useLLMSetup;
@@ -1353,8 +1793,12 @@ function processTradesForPlayhead(
         : baseLot;
 
       const simTime = candle.time;
-      const dynamicLevels = positionManagementMode === "three-brain"
-        ? simulateThreeBrainTradeOutcome(t, candles, structures, strategyParams, simTime)
+      const dynamicLevels = shouldUseThreeBrainExecution(
+        positionManagementMode,
+        continuationObserverEnabled,
+        exitTargetObserverEnabled,
+      )
+        ? simulateThreeBrainTradeOutcome(t, candles, structures, strategyParams, simTime, threeBrainConfig)
         : simulateTrailingSLTP(t, candles, simTime, structures, strategyParams);
       const isClosed = dynamicLevels.isClosedSimulated;
 
@@ -1403,6 +1847,9 @@ function processTradesForPlayhead(
         profit += tradeProfit;
         if (tradeProfit > 0) wins++;
         else if (tradeProfit < 0) losses++;
+        const isThreeBrainExit = dynamicLevels.closeReason === "THREE_BRAIN_EXIT"
+          || dynamicLevels.closeReason === "THREE_BRAIN_LOCK_EXIT";
+        if (isThreeBrainExit) threeBrainExits++;
 
         activePosList.push({
           ticket: t.ticket,
@@ -1425,7 +1872,7 @@ function processTradesForPlayhead(
             ? "Closed (24h)"
             : dynamicLevels.closeReason === "PROFIT_TARGET"
               ? "Closed (Target USD)"
-              : dynamicLevels.closeReason === "THREE_BRAIN_EXIT"
+              : isThreeBrainExit
                 ? "Closed (Otak 3)"
                 : "Closed",
           pnl: tradeProfit,
@@ -1695,7 +2142,7 @@ function processTradesForPlayhead(
 
   return {
     runningProfit: profit,
-    tradeStats: { total, wins, losses },
+    tradeStats: { total, wins, losses, threeBrainExits },
     activePositions: activePosList.sort((a, b) => getTimestampSeconds(b.entry_time) - getTimestampSeconds(a.entry_time)),
     overlayEntries,
   };
@@ -1714,6 +2161,7 @@ export default function ReplayTrades() {
   const sessionZonesPrimitiveRef = useRef<SessionZonesPrimitive | null>(null);
   const supplyDemandPrimitiveRef = useRef<SupplyDemandPrimitive | null>(null);
   const liquidityPoolsPrimitiveRef = useRef<LiquidityPoolsPrimitive | null>(null);
+  const liquidityLevelsPrimitiveRef = useRef<LiquidityLevelsPrimitive | null>(null);
   const candleTimeArrayRef = useRef<number[]>([]);
   const candleTimeMapRef = useRef<Map<number, ReplayCandle>>(new Map());
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -1758,9 +2206,19 @@ export default function ReplayTrades() {
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [scenarioName, setScenarioName] = useState("");
   const [isStrategyPanelOpen, setIsStrategyPanelOpen] = useState(false);
+  const [isPositionsPanelOpen, setIsPositionsPanelOpen] = useState(true);
   const [strategyParameterSlide, setStrategyParameterSlide] = useState<0 | 1>(0);
   const [activeStrategyBrain, setActiveStrategyBrain] = useState<1 | 2 | 3>(1);
   const [positionManagementMode, setPositionManagementMode] = useState<"original" | "three-brain">("original");
+  const [threeBrainConfig, setThreeBrainConfig] = useState(() =>
+    getThreeBrainConfigFromSearch(typeof window === "undefined" ? "" : window.location.search),
+  );
+
+  useEffect(() => {
+    const syncThreeBrainConfig = () => setThreeBrainConfig(getThreeBrainConfigFromSearch(window.location.search));
+    window.addEventListener("popstate", syncThreeBrainConfig);
+    return () => window.removeEventListener("popstate", syncThreeBrainConfig);
+  }, []);
   const [continuationObserverEnabled, setContinuationObserverEnabled] = useState(true);
   const [exitTargetObserverEnabled, setExitTargetObserverEnabled] = useState(true);
   const [initialBalanceInput, setInitialBalanceInput] = useState(String(DEFAULT_STRATEGY_PARAMS.initial_balance));
@@ -2147,7 +2605,7 @@ export default function ReplayTrades() {
     if (lastCandleX === null) return null;
 
     const barSpacing = (timeScale.options() as any)?.barSpacing || 6;
-    const secondsPerBar = activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
+    const secondsPerBar = activeTimeframe === "W1" || activeTimeframe === "Week" ? 604800 : activeTimeframe === "D1" || activeTimeframe === "Day" ? 86400 : activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
     const barsAhead = (time - lastCandle.time) / secondsPerBar;
     return lastCandleX + barsAhead * barSpacing;
   };
@@ -2290,7 +2748,7 @@ export default function ReplayTrades() {
         const currentStart = dragStartRef.current;
         const tsOptions = chartRef.current?.timeScale().options() as any;
         const barSpacing = tsOptions?.barSpacing || 6;
-        const secondsPerBar = activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
+        const secondsPerBar = activeTimeframe === "W1" || activeTimeframe === "Week" ? 604800 : activeTimeframe === "D1" || activeTimeframe === "Day" ? 86400 : activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
 
         const pixelDeltaX = mouseX - currentStart.mouseX;
         const barsDelta = Math.round(pixelDeltaX / barSpacing);
@@ -2315,7 +2773,7 @@ export default function ReplayTrades() {
 
         const tsOptions = chartRef.current?.timeScale().options() as any;
         const barSpacing = tsOptions?.barSpacing || 6;
-        const secondsPerBar = activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
+        const secondsPerBar = activeTimeframe === "W1" || activeTimeframe === "Week" ? 604800 : activeTimeframe === "D1" || activeTimeframe === "Day" ? 86400 : activeTimeframe === "H4" ? 14400 : activeTimeframe === "H1" ? 3600 : activeTimeframe === "M30" ? 1800 : 900;
 
         const pixelDeltaX = mouseX - currentStart.mouseX;
         const barsDelta = Math.round(pixelDeltaX / barSpacing);
@@ -2963,7 +3421,10 @@ export default function ReplayTrades() {
   const { data: sessionZonesData } = useSessionZones(sessionFromDate, "XAUUSD");
   useEffect(() => {
     const primitive = sessionZonesPrimitiveRef.current;
-    if (!primitive || !sessionZonesData?.zones?.length) return;
+    if (!primitive) return;
+    const isIntraday = activeTimeframe === "M15" || activeTimeframe === "H1";
+    primitive.setVisible(isIntraday);
+    if (!sessionZonesData?.zones?.length) return;
     const boxes: SessionZoneBox[] = sessionZonesData.zones.map((z) => ({
       start: z.start_time,
       end: z.end_time,
@@ -2971,7 +3432,7 @@ export default function ReplayTrades() {
       open: z.status === "OPEN",
     }));
     primitive.setBoxes(boxes);
-  }, [sessionZonesData]);
+  }, [sessionZonesData, activeTimeframe]);
 
   const stopPlayback = useCallback(() => {
     if (timerRef.current) {
@@ -3108,6 +3569,15 @@ export default function ReplayTrades() {
       console.warn("Could not attach liquidity pools primitive in replay:", e);
     }
 
+    // Init daily liquidity levels primitive (PDH / PDL Varian A Executive Dashed Pill)
+    try {
+      const llPrimitive = new LiquidityLevelsPrimitive();
+      (candleSeriesRef.current as any).attachPrimitive(llPrimitive);
+      liquidityLevelsPrimitiveRef.current = llPrimitive;
+    } catch (e) {
+      console.warn("Could not attach liquidity levels primitive in replay:", e);
+    }
+
     emaSeriesRef.current = chart.addSeries(LineSeries, {
       color: "#facc15",
       lineWidth: 1,
@@ -3130,6 +3600,8 @@ export default function ReplayTrades() {
     chartRef.current = chart;
 
     chart.subscribeCrosshairMove((param) => {
+      liquidityLevelsPrimitiveRef.current?.setHoveredPoint(param.point ?? null);
+
       if (!param.time || !param.point || !candleSeriesRef.current) {
         setHoveredInfo(null);
         return;
@@ -3325,6 +3797,9 @@ export default function ReplayTrades() {
       replayData.structures,
       strategyParams,
       positionManagementMode,
+      threeBrainConfig,
+      continuationObserverEnabled,
+      exitTargetObserverEnabled,
       useLLMSetup,
       activePlanner
     );
@@ -3360,7 +3835,39 @@ export default function ReplayTrades() {
         liquidityPoolsPrimitiveRef.current.setPools([]);
       }
     }
-  }, [strategyParams, entryFilterParams, replayData, currentIndex, activeTimeframe, activePlanner, llmPositions, allReplayData, useLLMSetup, positionManagementMode]);
+
+    if (liquidityLevelsPrimitiveRef.current && candle) {
+      const isWeeklyTimeframe = (replayData.meta?.timeframe === "W1" || activeTimeframe === "W1");
+      const isDailyOrWeeklyTimeframe = (replayData.meta?.timeframe === "W1" || replayData.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+      const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
+      const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
+      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+      const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
+      liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
+      if (isVisible) {
+        liquidityLevelsPrimitiveRef.current.setCandleTimes(candleTimeArrayRef.current);
+        const allLevels: LiquidityLevelItem[] = [];
+        if (isPdhPdlActive) {
+          const d1Candles = allReplayDataRef.current?.D1?.candles || allReplayData.D1?.candles;
+          const dailyLevels = calculateDailyLiquidityLevels(candle, replayData.candles, d1Candles);
+          allLevels.push(...dailyLevels);
+        }
+        if (isPwhPwlActive) {
+          const w1Candles = allReplayDataRef.current?.W1?.candles || allReplayData.W1?.candles;
+          const weeklyLevels = calculateWeeklyLiquidityLevels(candle, replayData.candles, w1Candles);
+          allLevels.push(...weeklyLevels);
+        }
+        if (isSessionHlActive) {
+          const sessionLevels = calculateSessionLiquidityLevels(candle, replayData.candles);
+          allLevels.push(...sessionLevels);
+        }
+        liquidityLevelsPrimitiveRef.current.setLastCandleTime(candle.time);
+        liquidityLevelsPrimitiveRef.current.setLevels(allLevels);
+      } else {
+        liquidityLevelsPrimitiveRef.current.setLevels([]);
+      }
+    }
+  }, [strategyParams, entryFilterParams, replayData, currentIndex, activeTimeframe, activePlanner, llmPositions, allReplayData, useLLMSetup, positionManagementMode, threeBrainConfig, continuationObserverEnabled, exitTargetObserverEnabled]);
 
   const setChartDataToIndex = useCallback((targetIdx: number, data: ReplayData) => {
     if (!data) return;
@@ -3407,9 +3914,14 @@ export default function ReplayTrades() {
     if (limit > 0) {
       const lastCandle = data.candles[limit - 1];
 
-      // Update structure lines at this index
-      const structLines = computeStructureLinesForPlayhead(data, lastCandle.time);
-      structurePrimitiveRef.current?.setLines(structLines);
+      // Update structure lines at this index (Sembunyikan visual untuk timeframe D1 & W1)
+      const isDailyOrWeekly = (data.meta?.timeframe === "D1" || data.meta?.timeframe === "W1" || activeTimeframe === "D1" || activeTimeframe === "W1");
+      if (!isDailyOrWeekly) {
+        const structLines = computeStructureLinesForPlayhead(data, lastCandle.time);
+        structurePrimitiveRef.current?.setLines(structLines);
+      } else {
+        structurePrimitiveRef.current?.setLines([]);
+      }
 
       if (supplyDemandPrimitiveRef.current && limit > 0) {
         const lastCandle = data.candles[limit - 1];
@@ -3434,18 +3946,52 @@ export default function ReplayTrades() {
           liquidityPoolsPrimitiveRef.current.setPools([]);
         }
       }
+
+      if (liquidityLevelsPrimitiveRef.current && limit > 0) {
+        const lastCandle = data.candles[limit - 1];
+        const isWeeklyTimeframe = (data.meta?.timeframe === "W1" || activeTimeframe === "W1");
+        const isDailyOrWeeklyTimeframe = (data.meta?.timeframe === "W1" || data.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+        const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
+        const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
+        const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+        const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
+        liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
+        if (isVisible && lastCandle) {
+          liquidityLevelsPrimitiveRef.current.setCandleTimes(data.candles.slice(0, limit).map(c => c.time));
+          const allLevels: LiquidityLevelItem[] = [];
+          if (isPdhPdlActive) {
+            const d1Candles = allReplayDataRef.current?.D1?.candles || allReplayData.D1?.candles;
+            const dailyLevels = calculateDailyLiquidityLevels(lastCandle, data.candles, d1Candles);
+            allLevels.push(...dailyLevels);
+          }
+          if (isPwhPwlActive) {
+            const w1Candles = allReplayDataRef.current?.W1?.candles || allReplayData.W1?.candles;
+            const weeklyLevels = calculateWeeklyLiquidityLevels(lastCandle, data.candles, w1Candles);
+            allLevels.push(...weeklyLevels);
+          }
+          if (isSessionHlActive) {
+            const sessionLevels = calculateSessionLiquidityLevels(lastCandle, data.candles);
+            allLevels.push(...sessionLevels);
+          }
+          liquidityLevelsPrimitiveRef.current.setLastCandleTime(lastCandle.time);
+          liquidityLevelsPrimitiveRef.current.setLevels(allLevels);
+        } else {
+          liquidityLevelsPrimitiveRef.current.setLevels([]);
+        }
+      }
     } else {
       markersPluginRef.current?.setMarkers([]);
       structurePrimitiveRef.current?.setLines([]);
       tradesPrimitiveRef.current?.setTrades([]);
       supplyDemandPrimitiveRef.current?.setZones([]);
       liquidityPoolsPrimitiveRef.current?.setPools([]);
+      liquidityLevelsPrimitiveRef.current?.setLevels([]);
     }
 
     if (chartRef.current && limit > 0) {
       followReplayPlayhead(chartRef.current);
     }
-  }, [strategyParams.show_supply_demand, strategyParams.show_liquidity_pools]);
+  }, [strategyParams.show_supply_demand, strategyParams.show_liquidity_pools, strategyParams.show_pdh_pdl, strategyParams.show_pwh_pwl, strategyParams.show_session_hl, activeTimeframe]);
 
   // â”€â”€ Load Data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -3471,6 +4017,7 @@ export default function ReplayTrades() {
     tradesPrimitiveRef.current?.setTrades([]);
     supplyDemandPrimitiveRef.current?.setZones([]);
     liquidityPoolsPrimitiveRef.current?.setPools([]);
+    liquidityLevelsPrimitiveRef.current?.setLevels([]);
 
     // Initialize progress bar simulation
     setLoadProgress({
@@ -3487,7 +4034,7 @@ export default function ReplayTrades() {
         step = "Connecting to database...";
       } else if (currentPercent < 80) {
         currentPercent += 2.5;
-        step = "Fetching all timeframes (M15, H1, H4) candles & structures...";
+        step = "Fetching all timeframes (M15, H1, H4, D1, W1) candles & structures...";
       } else if (currentPercent < 95) {
         currentPercent += 0.5;
         step = "Processing indicator caches & EMA200...";
@@ -3500,7 +4047,7 @@ export default function ReplayTrades() {
     }, 45);
 
     try {
-      const timeframes = ["M15", "H1", "H4"];
+      const timeframes = ["M15", "H1", "H4", "D1", "W1"];
       const results = await Promise.all(
         timeframes.map(tf => fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, tf))
       );
@@ -3544,7 +4091,7 @@ export default function ReplayTrades() {
     }
   }, [yearFrom, monthFrom, yearTo, monthTo, isPlaying, activeTimeframe]);
 
-  const handleTimeframeChange = useCallback((tf: string) => {
+  const handleTimeframeChange = useCallback(async (tf: string) => {
     if (isPlaying) stopPlayback();
 
     const currentData = replayData;
@@ -3558,7 +4105,30 @@ export default function ReplayTrades() {
 
     setActiveTimeframe(tf);
 
-    const newData = allReplayData[tf];
+    let newData = allReplayData[tf];
+    if (!newData) {
+      try {
+        newData = await fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, tf);
+        setAllReplayData(prev => ({ ...prev, [tf]: newData }));
+        allReplayDataRef.current = { ...allReplayDataRef.current, [tf]: newData };
+      } catch (err) {
+        console.warn(`[Replay] Auto-fetch ${tf} data warning:`, err);
+      }
+    }
+
+    // Pastikan data D1 juga tersedia untuk perhitungan PDH/PDL
+    if (!allReplayDataRef.current?.D1 && !allReplayData.D1) {
+      try {
+        const d1Data = await fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, "D1");
+        if (d1Data) {
+          setAllReplayData(prev => ({ ...prev, D1: d1Data }));
+          allReplayDataRef.current = { ...allReplayDataRef.current, D1: d1Data };
+        }
+      } catch (e) {
+        console.warn("[Replay] Auto-fetch D1 for PDH/PDL warning:", e);
+      }
+    }
+
     if (newData) {
       setReplayData(newData);
       candleTimeArrayRef.current = newData.candles.map(c => c.time);
@@ -3575,7 +4145,7 @@ export default function ReplayTrades() {
       setChartDataToIndex(newIndex, newData);
       setCurrentIndex(newIndex);
     }
-  }, [isPlaying, replayData, currentIndex, allReplayData, setChartDataToIndex, stopPlayback]);
+  }, [isPlaying, replayData, currentIndex, allReplayData, setChartDataToIndex, stopPlayback, yearFrom, monthFrom, yearTo, monthTo]);
 
   const handleMonthRowClick = useCallback(async (year: number, monthNum: number, monthLabel: string) => {
     setIsLoadingTrades(true);
@@ -3632,8 +4202,14 @@ export default function ReplayTrades() {
     }
 
     // Update structure lines (strictly single highest HH and lowest LL per active leg)
-    const filteredLinesToDraw = computeStructureLinesForPlayhead(data, candle.time, candleTimeArrayRef.current);
-    structurePrimitiveRef.current?.setLines(filteredLinesToDraw);
+    // Sembunyikan visual market structure di timeframe D1 dan W1
+    const isDailyOrWeekly = (data.meta?.timeframe === "D1" || data.meta?.timeframe === "W1" || activeTimeframe === "D1" || activeTimeframe === "W1");
+    if (!isDailyOrWeekly) {
+      const filteredLinesToDraw = computeStructureLinesForPlayhead(data, candle.time, candleTimeArrayRef.current);
+      structurePrimitiveRef.current?.setLines(filteredLinesToDraw);
+    } else {
+      structurePrimitiveRef.current?.setLines([]);
+    }
 
     // Update Supply & Demand zones primitive
     if (supplyDemandPrimitiveRef.current) {
@@ -3659,6 +4235,39 @@ export default function ReplayTrades() {
       }
     }
 
+    // Update Liquidity Levels primitive (PDH / PDL, PWH / PWL, & Session H/L Varian A)
+    if (liquidityLevelsPrimitiveRef.current) {
+      const isWeeklyTimeframe = (data.meta?.timeframe === "W1" || activeTimeframe === "W1");
+      const isDailyOrWeeklyTimeframe = (data.meta?.timeframe === "W1" || data.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+      const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
+      const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
+      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+      const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
+      liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
+      if (isVisible) {
+        liquidityLevelsPrimitiveRef.current.setCandleTimes(candleTimeArrayRef.current);
+        const allLevels: LiquidityLevelItem[] = [];
+        if (isPdhPdlActive) {
+          const d1Candles = allReplayDataRef.current?.D1?.candles || allReplayData.D1?.candles;
+          const dailyLevels = calculateDailyLiquidityLevels(candle, data.candles, d1Candles);
+          allLevels.push(...dailyLevels);
+        }
+        if (isPwhPwlActive) {
+          const w1Candles = allReplayDataRef.current?.W1?.candles || allReplayData.W1?.candles;
+          const weeklyLevels = calculateWeeklyLiquidityLevels(candle, data.candles, w1Candles);
+          allLevels.push(...weeklyLevels);
+        }
+        if (isSessionHlActive) {
+          const sessionLevels = calculateSessionLiquidityLevels(candle, data.candles);
+          allLevels.push(...sessionLevels);
+        }
+        liquidityLevelsPrimitiveRef.current.setLastCandleTime(candle.time);
+        liquidityLevelsPrimitiveRef.current.setLevels(allLevels);
+      } else {
+        liquidityLevelsPrimitiveRef.current.setLevels([]);
+      }
+    }
+
     // Update trades overlay & active positions & running stats in single fast pass
     const processed = processTradesForPlayhead(
       processedTradesMemo.executedTrades,
@@ -3669,6 +4278,9 @@ export default function ReplayTrades() {
       data.structures,
       strategyParams,
       positionManagementMode,
+      threeBrainConfig,
+      continuationObserverEnabled,
+      exitTargetObserverEnabled,
       useLLMSetup,
       activePlanner
     );
@@ -3688,7 +4300,7 @@ export default function ReplayTrades() {
     }
 
     return idx + 1;
-  }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe, positionManagementMode]);
+  }, [strategyParams, processedTradesMemo, llmPositions, useLLMSetup, activePlanner, activeTimeframe, positionManagementMode, threeBrainConfig, continuationObserverEnabled, exitTargetObserverEnabled]);
 
   // â”€â”€ Playback controls (continued) â”€â”€
 
@@ -3751,18 +4363,21 @@ export default function ReplayTrades() {
     .filter((position) => !position.is_closed && !position.is_rejected)
     .sort((left, right) => getTimestampSeconds(right.entry_time) - getTimestampSeconds(left.entry_time))[0] ?? null,
   [activePositions]);
+  const observerLatestStructure = useMemo(() => {
+    if (!replayData || !currentCandle) return null;
+    return [...replayData.structures]
+      .reverse()
+      .find((event) => event.time <= currentCandle.time && (!event.timeframe || event.timeframe.toUpperCase() === "M15")) ?? null;
+  }, [replayData, currentCandle]);
   const observerStructureAligned = useMemo(() => {
-    if (!replayData || !currentCandle || !observerPosition) return null;
+    if (!observerPosition) return null;
 
     const direction = String(observerPosition.type ?? "BUY").toUpperCase();
-    const latestStructure = [...replayData.structures]
-      .reverse()
-      .find((event) => event.time <= currentCandle.time && (!event.timeframe || event.timeframe.toUpperCase() === "M15"));
-    const structureDirection = `${latestStructure?.direction ?? ""} ${latestStructure?.type ?? ""}`.toUpperCase();
+    const structureDirection = `${observerLatestStructure?.direction ?? ""} ${observerLatestStructure?.type ?? ""}`.toUpperCase();
     return direction.includes("BUY")
       ? structureDirection.includes("BULL") || structureDirection.includes("BUY")
       : structureDirection.includes("BEAR") || structureDirection.includes("SELL");
-  }, [replayData, currentCandle, observerPosition]);
+  }, [observerPosition, observerLatestStructure]);
   const continuationStrength = useMemo(() => {
     if (!continuationObserverEnabled || !replayData || !currentCandle || currentIndex <= 0) return null;
     if (!observerPosition || observerPosition.entry_price == null || observerStructureAligned == null) return null;
@@ -3773,11 +4388,41 @@ export default function ReplayTrades() {
       direction,
       entryPrice: Number(observerPosition.entry_price),
       currentCandle,
-      previousCandles: replayData.candles.slice(Math.max(0, currentIndex - 6), Math.max(0, currentIndex - 1)),
+      previousCandles: replayData.candles.slice(Math.max(0, currentIndex - 21), currentIndex - 1),
       atr: calculateATR(replayData.candles, currentCandle.time, strategyParams.atr_period),
       structureAligned: observerStructureAligned,
+      structure: observerLatestStructure,
     });
-  }, [continuationObserverEnabled, replayData, currentCandle, currentIndex, observerPosition, observerStructureAligned, strategyParams.atr_period]);
+  }, [continuationObserverEnabled, replayData, currentCandle, currentIndex, observerPosition, observerStructureAligned, observerLatestStructure, strategyParams.atr_period]);
+  const continuationTrend = useMemo(() => {
+    if (!continuationStrength || !replayData || !observerPosition || currentIndex <= 0) return null;
+
+    const direction = String(observerPosition.type ?? "BUY").toUpperCase();
+    const scoreHistory = replayData.candles
+      .slice(Math.max(0, currentIndex - 3), currentIndex)
+      .map((historicalCandle) => {
+        const candleIndex = replayData.candles.findIndex((candidate) => candidate.time === historicalCandle.time);
+        const latestStructure = [...replayData.structures]
+          .reverse()
+          .find((event) => event.time <= historicalCandle.time && (!event.timeframe || event.timeframe.toUpperCase() === "M15"));
+        const structureDirection = `${latestStructure?.direction ?? ""} ${latestStructure?.type ?? ""}`.toUpperCase();
+        const structureAligned = direction.includes("BUY")
+          ? structureDirection.includes("BULL") || structureDirection.includes("BUY")
+          : structureDirection.includes("BEAR") || structureDirection.includes("SELL");
+
+        return evaluateContinuationStrength({
+          direction,
+          entryPrice: Number(observerPosition.entry_price),
+          currentCandle: historicalCandle,
+          previousCandles: replayData.candles.slice(Math.max(0, candleIndex - 20), candleIndex),
+          atr: calculateATR(replayData.candles, historicalCandle.time, strategyParams.atr_period),
+          structureAligned,
+          structure: latestStructure ?? null,
+        }).score;
+      });
+
+    return { scores: scoreHistory, ...classifyContinuationTrend(scoreHistory) };
+  }, [continuationStrength, replayData, observerPosition, currentIndex, strategyParams.atr_period]);
   const exitTargetObserver = useMemo(() => {
     if (!exitTargetObserverEnabled || !currentCandle || !observerPosition || !continuationStrength || observerStructureAligned == null) return null;
 
@@ -3806,6 +4451,7 @@ export default function ReplayTrades() {
       holdSeconds: Math.max(0, currentCandle.time - getTimestampSeconds(observerPosition.entry_time)),
       maxHoldSeconds: strategyParams.force_24h_close ? 86400 : 0,
       structureAligned: observerStructureAligned,
+      adverseReversalConfirmations: 0,
     });
   }, [exitTargetObserverEnabled, currentCandle, observerPosition, continuationStrength, observerStructureAligned, strategyParams.force_24h_close, strategyParams.enable_breakeven, strategyParams.breakeven_trigger, strategyParams.use_price_ratio_scaling, strategyParams.base_reference_price]);
   const positionManagementComparison = useMemo(() => {
@@ -3820,6 +4466,9 @@ export default function ReplayTrades() {
       replayData.structures,
       strategyParams,
       mode,
+      threeBrainConfig,
+      continuationObserverEnabled,
+      exitTargetObserverEnabled,
       useLLMSetup,
       activePlanner,
     );
@@ -3836,16 +4485,19 @@ export default function ReplayTrades() {
         wins: original.tradeStats.wins,
         losses: original.tradeStats.losses,
         winRate: getWinRate(original.tradeStats),
+        threeBrainExits: original.tradeStats.threeBrainExits,
       },
       threeBrain: {
         netProfit: threeBrain.runningProfit,
         wins: threeBrain.tradeStats.wins,
         losses: threeBrain.tradeStats.losses,
         winRate: getWinRate(threeBrain.tradeStats),
+        threeBrainExits: threeBrain.tradeStats.threeBrainExits,
       },
       deltaNetProfit: threeBrain.runningProfit - original.runningProfit,
+      deltaWinRate: getWinRate(threeBrain.tradeStats) - getWinRate(original.tradeStats),
     };
-  }, [replayData, currentCandle, processedTradesMemo, llmPositions, strategyParams, useLLMSetup, activePlanner]);
+  }, [replayData, currentCandle, processedTradesMemo, llmPositions, strategyParams, useLLMSetup, activePlanner, threeBrainConfig, continuationObserverEnabled, exitTargetObserverEnabled]);
   const completedTrades = tradeStats.wins + tradeStats.losses;
   const winRate = completedTrades > 0 ? Math.round((tradeStats.wins / completedTrades) * 100) : 0;
   const initialBalance = strategyParams.initial_balance ?? INITIAL_BALANCE;
@@ -4237,25 +4889,25 @@ export default function ReplayTrades() {
           )}
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap">
-            {/* Timeframe selector (tiru 100% dari page trades) */}
-            <div className="flex items-center gap-1 sm:gap-1.5">
-              <div className="inline-flex items-center gap-1 p-0.5 sm:p-1 bg-sky-100/40 border border-sky-200/80 rounded-xl shadow-sm">
-                {["M15", "H1", "H4"].map((tf) => (
-                  <button
-                    key={tf}
-                    disabled={isLoading}
-                    onClick={() => handleTimeframeChange(tf)}
-                    className={cn(
-                      "px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-bold transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-40",
-                      tf === activeTimeframe
-                        ? "bg-sky-600 text-white shadow-sm border border-sky-600"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
-                    )}
-                  >
-                    {tf}
-                  </button>
-                ))}
-              </div>
+            {/* Timeframe Dropdown (Compact) */}
+            <div className="flex items-center gap-1">
+              <CustomSelect
+                value={activeTimeframe}
+                onChange={(val) => handleTimeframeChange(val as string)}
+                options={["M15", "H1", "H4", "D1", "W1"]}
+                getLabel={(tf) => {
+                  const labels: Record<string, string> = {
+                    M15: "M15",
+                    H1: "H1",
+                    H4: "H4",
+                    D1: "Day",
+                    W1: "Week",
+                  };
+                  return labels[tf] || tf;
+                }}
+                accent="blue"
+                className="w-24 text-xs"
+              />
             </div>
 
             <Calendar size={14} className="text-[var(--neon-blue,#38bdf8)] animate-pulse hidden xl:inline-block" />
@@ -5140,19 +5792,40 @@ export default function ReplayTrades() {
         {/* ── Active Positions Panel ── */}
         {replayData && (
           <div className="glass-card flex-shrink-0">
-            <h2 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-600 inline-block shadow-sm"></span>
-              <Zap size={15} className="inline shrink-0 text-sky-600" aria-hidden="true" /> Daftar Posisi
-              {activePositions.length > 0 && (
-                <span className="ml-auto text-xs font-medium text-slate-600">
-                  <span className="text-sky-700 font-bold">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
-                  {" • "}
-                  <span className="text-slate-700 font-bold">{activePositions.filter(p => p.is_closed).length}</span> closed
-                  {" • "}
-                  <span className="text-rose-700 font-bold">{activePositions.filter(p => p.is_rejected).length}</span> rejected
+            <button
+              type="button"
+              onClick={() => setIsPositionsPanelOpen((open) => !open)}
+              aria-expanded={isPositionsPanelOpen}
+              aria-controls="replay-positions-panel"
+              className="flex w-full cursor-pointer items-center justify-between gap-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/70"
+            >
+              <span className="flex items-center gap-2 text-xl font-bold text-slate-900">
+                <span className="h-2.5 w-2.5 rounded-full bg-sky-600 shadow-sm" />
+                <Zap size={15} className="shrink-0 text-sky-600" aria-hidden="true" />
+                Daftar Posisi
+              </span>
+              <span className="flex items-center gap-3">
+                {activePositions.length > 0 && (
+                  <span className="text-xs font-medium text-slate-600">
+                    <span className="font-bold text-sky-700">{activePositions.filter(p => !p.is_closed && !p.is_rejected).length}</span> aktif
+                    {" • "}
+                    <span className="font-bold text-slate-700">{activePositions.filter(p => p.is_closed).length}</span> closed
+                    {" • "}
+                    <span className="font-bold text-rose-700">{activePositions.filter(p => p.is_rejected).length}</span> rejected
+                  </span>
+                )}
+                <span className="flex items-center gap-1.5 rounded border border-blue-200 bg-[#F0F6FF]/60 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                  {isPositionsPanelOpen ? "Tutup Panel" : "Buka Panel"}
+                  <ChevronDown
+                    className={cn("h-3 w-3 transition-transform duration-200", isPositionsPanelOpen && "rotate-180")}
+                    aria-hidden="true"
+                  />
                 </span>
-              )}
-            </h2>
+              </span>
+            </button>
+
+            {isPositionsPanelOpen && (
+              <div id="replay-positions-panel" className="mt-4 border-t border-blue-200/70 pt-4">
 
             {/* ── LLM Trade Setup Recommendation Panel ── */}
             {(useLLMSetup || decisionEngine === "llm" || llmLoading || decisionLoading || llmRecommendation) && (
@@ -5714,6 +6387,8 @@ export default function ReplayTrades() {
                 </div>
               );
             })()}
+              </div>
+            )}
           </div>
         )}
 
@@ -5732,8 +6407,12 @@ export default function ReplayTrades() {
                 </span>
                 Strategy Settings &amp; Parameters
               </span>
-              <span className="rounded border border-blue-200 bg-[#F0F6FF]/60 px-2 py-1 text-[10px] font-semibold text-slate-500">
-                {isStrategyPanelOpen ? "Tutup Panel â–²" : "Buka Panel â–¼"}
+              <span className="flex items-center gap-1.5 rounded border border-blue-200 bg-[#F0F6FF]/60 px-2 py-1 text-[10px] font-semibold text-slate-500">
+                {isStrategyPanelOpen ? "Tutup Panel" : "Buka Panel"}
+                <ChevronDown
+                  className={cn("h-3 w-3 transition-transform duration-200", isStrategyPanelOpen && "rotate-180")}
+                  aria-hidden="true"
+                />
               </span>
             </button>
 
@@ -5782,7 +6461,7 @@ export default function ReplayTrades() {
                   </div>
                 </div>
                 {positionManagementComparison && (
-                  <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto]">
+                  <div className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_auto_auto]">
                     {([
                       ["Parameter Asli", positionManagementComparison.original, "slate"],
                       ["Three-Brain", positionManagementComparison.threeBrain, "violet"],
@@ -5814,6 +6493,11 @@ export default function ReplayTrades() {
                         <div className="mt-1 text-[9px] font-medium text-slate-500">
                           Win rate {result.winRate.toFixed(1)}% | {result.wins}W / {result.losses}L
                         </div>
+                        {tone === "violet" && (
+                          <div className="mt-1 text-[9px] font-semibold text-violet-700">
+                            {result.threeBrainExits} guarded exit Otak 3
+                          </div>
+                        )}
                       </div>
                     ))}
                     <div className={cn(
@@ -5828,6 +6512,20 @@ export default function ReplayTrades() {
                         positionManagementComparison.deltaNetProfit >= 0 ? "text-emerald-700" : "text-rose-700"
                       )}>
                         {positionManagementComparison.deltaNetProfit >= 0 ? "+" : ""}{positionManagementComparison.deltaNetProfit.toFixed(2)} USD
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "flex min-h-20 flex-col justify-center rounded-md border p-3",
+                      positionManagementComparison.deltaWinRate >= 0
+                        ? "border-emerald-200 bg-emerald-50"
+                        : "border-rose-200 bg-rose-50"
+                    )}>
+                      <div className="text-[9px] font-bold uppercase text-slate-500">Win Rate Delta</div>
+                      <div className={cn(
+                        "mt-1 font-mono text-base font-black",
+                        positionManagementComparison.deltaWinRate >= 0 ? "text-emerald-700" : "text-rose-700"
+                      )}>
+                        {positionManagementComparison.deltaWinRate >= 0 ? "+" : ""}{positionManagementComparison.deltaWinRate.toFixed(1)}%
                       </div>
                     </div>
                   </div>
@@ -6186,6 +6884,129 @@ export default function ReplayTrades() {
                             className={cn(
                               "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
                               strategyParams.show_liquidity_pools ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-sky-400">
+                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual PDH / PDL (Daily High &amp; Low)
+                            <StrategyTooltip
+                              fungsi="Menampilkan garis level Previous Day High (PDH) dan Previous Day Low (PDL) dengan badge pill Executive Dashed dan update status real-time (Fresh, Swept ⚡, Broken)."
+                              contoh="Garis Sapphire Blue PDH/PDL dari jam 00:00 server. Berubah kuning saat tertembus ekor (Swept), dan hijau transparan saat tembus body candle (Broken)."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Garis level likuiditas harian PDH &amp; PDL (Varian A Pill)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.show_pdh_pdl}
+                          aria-label="Tampilkan Visual PDH / PDL"
+                          onClick={() => {
+                            setStrategyParams((prev) => {
+                              const next = !prev.show_pdh_pdl;
+                              if (liquidityLevelsPrimitiveRef.current) {
+                                liquidityLevelsPrimitiveRef.current.setVisible(next || prev.show_pwh_pwl || prev.show_session_hl);
+                              }
+                              return { ...prev, show_pdh_pdl: next };
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70",
+                            strategyParams.show_pdh_pdl ? "border-sky-400/50 bg-sky-500/25" : "border-blue-300 bg-white"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.show_pdh_pdl ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-purple-400">
+                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual PWH / PWL (Weekly High &amp; Low)
+                            <StrategyTooltip
+                              fungsi="Menampilkan garis level Previous Week High (PWH) dan Previous Week Low (PWL) dengan badge pill Royal Purple dan status real-time (Fresh, Swept ⚡, Broken)."
+                              contoh="Garis Royal Purple tebal [10, 5] PWH/PWL yang berlaku selama satu minggu penuh. Berubah kuning saat swept dan merah saat broken."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Garis level likuiditas mingguan PWH &amp; PWL (Varian A Pill)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.show_pwh_pwl}
+                          aria-label="Tampilkan Visual PWH / PWL"
+                          onClick={() => {
+                            setStrategyParams((prev) => {
+                              const next = !prev.show_pwh_pwl;
+                              if (liquidityLevelsPrimitiveRef.current) {
+                                liquidityLevelsPrimitiveRef.current.setVisible(next || prev.show_pdh_pdl || prev.show_session_hl);
+                              }
+                              return { ...prev, show_pwh_pwl: next };
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
+                            strategyParams.show_pwh_pwl ? "border-purple-400/50 bg-purple-500/25" : "border-blue-300 bg-white"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.show_pwh_pwl ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
+                            )}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 px-1 py-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center text-xs font-semibold text-amber-400">
+                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual Session H/L (Asia, London, NY)
+                            <StrategyTooltip
+                              fungsi="Menampilkan garis level High & Low dari 3 sesi perdagangan utama: Asia/Tokyo (00:00-08:00 UTC), London (08:00-14:00 UTC), dan New York (14:00-21:00 UTC) dengan badge pill Amber Gold dan status real-time (Fresh, Swept ⚡, Broken)."
+                              contoh="Garis putus-putus halus Amber Gold [4, 4] ASIA H/L, LON H/L, NY H/L. Otomatis disembunyikan di timeframe D1 & W1 untuk kebersihan chart."
+                            />
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            Garis level likuiditas sesi Asia, London &amp; New York (Varian A Pill)
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={strategyParams.show_session_hl}
+                          aria-label="Tampilkan Visual Session H/L"
+                          onClick={() => {
+                            setStrategyParams((prev) => {
+                              const next = !prev.show_session_hl;
+                              if (liquidityLevelsPrimitiveRef.current) {
+                                liquidityLevelsPrimitiveRef.current.setVisible(next || prev.show_pdh_pdl || prev.show_pwh_pwl);
+                              }
+                              return { ...prev, show_session_hl: next };
+                            });
+                          }}
+                          className={cn(
+                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70",
+                            strategyParams.show_session_hl ? "border-amber-400/50 bg-amber-500/25" : "border-blue-300 bg-white"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
+                              strategyParams.show_session_hl ? "translate-x-4 bg-amber-300" : "translate-x-0 bg-slate-500"
                             )}
                           />
                         </button>
@@ -7242,7 +8063,7 @@ export default function ReplayTrades() {
                         <div className="rounded-md border border-amber-200 bg-white px-3">
                           <EntryToggle
                             label="Continuation Strength Observer"
-                            description="Hitung kekuatan lanjutan posisi aktif tanpa mengubah entry, SL, TP, trailing, exit, atau Net Profit."
+                            description="Aktifkan pembacaan continuation strength sebagai input eksekusi Three-Brain. OFF mengembalikan pengelolaan posisi ke Parameter Asli."
                             checked={continuationObserverEnabled}
                             onChange={() => setContinuationObserverEnabled((enabled) => !enabled)}
                           />
@@ -7264,6 +8085,24 @@ export default function ReplayTrades() {
                                 )}>
                                   {continuationStrength.status}
                                 </span>
+                                {continuationTrend && (
+                                  <div className="mt-3 border-t border-amber-100 pt-2">
+                                    <div className="text-[9px] font-bold text-slate-500">
+                                      {continuationTrend.scores.join(" / ")}
+                                    </div>
+                                    <div className={cn(
+                                      "mt-1 text-[9px] font-black",
+                                      continuationTrend.status === "IMPROVING"
+                                        ? "text-emerald-600"
+                                        : continuationTrend.status === "DECLINING" || continuationTrend.status === "RAPID_DECLINE"
+                                          ? "text-rose-600"
+                                          : "text-slate-500"
+                                    )}>
+                                      {continuationTrend.status.replaceAll("_", " ")}
+                                      {continuationTrend.change !== 0 ? ` (${continuationTrend.change > 0 ? "+" : ""}${continuationTrend.change})` : ""}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                 {continuationStrength.components.map((component) => (
@@ -7280,7 +8119,7 @@ export default function ReplayTrades() {
                               </div>
                             </div>
                             <p className="text-[9px] font-medium text-amber-800/80">
-                              Observer only: hasil ini belum menjadi perintah hold atau exit.
+                              Otak 2 menjadi input Otak 3 saat kedua toggle aktif.
                             </p>
                           </>
                         ) : (
@@ -7299,7 +8138,7 @@ export default function ReplayTrades() {
                         <div className="rounded-md border border-violet-200 bg-white px-3">
                           <EntryToggle
                             label="Exit & Target Observer"
-                            description="Rekomendasi hold, proteksi, ekstensi target, dan exit alert tanpa mengeksekusi perubahan posisi."
+                            description="Aktifkan eksekusi hold, proteksi, ekstensi target, dan exit Three-Brain. OFF mengembalikan pengelolaan posisi ke Parameter Asli."
                             checked={exitTargetObserverEnabled}
                             onChange={() => setExitTargetObserverEnabled((enabled) => !enabled)}
                           />
@@ -7340,7 +8179,7 @@ export default function ReplayTrades() {
                               </div>
                             </div>
                             <p className="text-[9px] font-medium text-violet-800/80">
-                              Observer only: rekomendasi ini tidak memindahkan SL/TP dan tidak menutup posisi.
+                              Eksekusi aktif hanya saat Otak 2 dan Otak 3 sama-sama ON.
                             </p>
                           </>
                         ) : (

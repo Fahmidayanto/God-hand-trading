@@ -1,5 +1,9 @@
-import { evaluateContinuationStrength } from "./continuation-strength.ts";
-import { evaluateExitTargetObserver } from "./exit-target-observer.ts";
+import {
+  DEFAULT_CONTINUATION_STRENGTH_CONFIG,
+  evaluateContinuationStrength,
+  type ContinuationState,
+  type ContinuationStrengthConfig,
+} from "./continuation-strength.ts";
 import {
   DEFAULT_STRATEGY_PARAMS,
   calculateATR,
@@ -12,14 +16,161 @@ import {
   type StructureEvent,
 } from "./replay-engine.ts";
 
-function getStructureAlignment(
-  direction: string,
+export interface ThreeBrainConfig {
+  weakScoreThreshold: number;
+  adverseConfirmationCandles: number;
+  minimumExitNetProfit: number;
+  requireAdverseStructure: boolean;
+  minimumConfidence?: number;
+  stateActions?: Partial<Record<ContinuationState, ThreeBrainAction>>;
+  profitGivebackTrigger?: number;
+  tightenLockRatio?: number;
+  profitLockRatio?: number;
+  protectionCooldownCandles?: number;
+  continuationConfig?: Partial<ContinuationStrengthConfig>;
+  otak2AtrPeriod?: number;
+  managementOverrides: Partial<Pick<StrategyParams,
+    | "trailing_distance"
+    | "tp_trigger"
+    | "tp_ekspansi"
+    | "max_ekspansi"
+    | "enable_breakeven"
+    | "breakeven_trigger"
+    | "breakeven_buffer"
+    | "initial_tp_dist"
+    | "sl_safety_buffer"
+    | "min_sl_dist"
+    | "max_sl_dist"
+    | "force_24h_close"
+    | "enable_profit_target_exit"
+    | "profit_target_exit_usd"
+    | "use_atr_sltp"
+    | "atr_period"
+    | "atr_sl_multiplier"
+    | "atr_tp_multiplier"
+  >>;
+}
+
+export const DEFAULT_THREE_BRAIN_CONFIG: ThreeBrainConfig = {
+  weakScoreThreshold: 35,
+  adverseConfirmationCandles: 3,
+  minimumExitNetProfit: 120,
+  requireAdverseStructure: true,
+  minimumConfidence: 0,
+  stateActions: {},
+  profitGivebackTrigger: 0.3,
+  tightenLockRatio: 0.4,
+  profitLockRatio: 0.7,
+  protectionCooldownCandles: 2,
+  continuationConfig: {},
+  otak2AtrPeriod: DEFAULT_STRATEGY_PARAMS.atr_period,
+  managementOverrides: {},
+};
+
+export type ThreeBrainAction = "HOLD" | "EXTEND_TP" | "TIGHTEN_SL" | "LOCK_PROFIT" | "FULL_EXIT";
+
+export function shouldUseThreeBrainExecution(
+  mode: "original" | "three-brain",
+  continuationObserverEnabled: boolean,
+  exitTargetObserverEnabled: boolean,
+): boolean {
+  return mode === "three-brain" && continuationObserverEnabled && exitTargetObserverEnabled;
+}
+
+export interface ThreeBrainDiagnostics {
+  stateCounts: Record<ContinuationState, number>;
+  actionCounts: Record<ThreeBrainAction, number>;
+  maxFloatingNetProfit: number;
+  profitGiveback: number;
+}
+
+function createThreeBrainDiagnostics(): ThreeBrainDiagnostics {
+  return {
+    stateCounts: {
+      STRONG_CONTINUATION: 0,
+      HEALTHY_PULLBACK: 0,
+      MOMENTUM_EXHAUSTION: 0,
+      REVERSAL_CONFIRMED: 0,
+      UNCERTAIN: 0,
+    },
+    actionCounts: {
+      HOLD: 0,
+      EXTEND_TP: 0,
+      TIGHTEN_SL: 0,
+      LOCK_PROFIT: 0,
+      FULL_EXIT: 0,
+    },
+    maxFloatingNetProfit: 0,
+    profitGiveback: 0,
+  };
+}
+
+export function decideThreeBrainAction({
+  state,
+  confidence = 100,
+  minimumConfidence = 0,
+  protectedPosition,
+  floatingNetProfit,
+  profitGivebackRatio,
+  profitGivebackTrigger = 0.3,
+  minimumExitNetProfit,
+  stateActions = {},
+}: {
+  state: ContinuationState;
+  confidence?: number;
+  minimumConfidence?: number;
+  protectedPosition: boolean;
+  floatingNetProfit: number;
+  profitGivebackRatio: number;
+  profitGivebackTrigger?: number;
+  minimumExitNetProfit: number;
+  stateActions?: Partial<Record<ContinuationState, ThreeBrainAction>>;
+}): ThreeBrainAction {
+  if (confidence < minimumConfidence) return "HOLD";
+  const configuredAction = stateActions[state];
+  if (configuredAction) {
+    if (!protectedPosition && configuredAction !== "HOLD" && configuredAction !== "EXTEND_TP") return "HOLD";
+    if (configuredAction === "FULL_EXIT" && floatingNetProfit < minimumExitNetProfit) return "HOLD";
+    return configuredAction;
+  }
+  if (state === "STRONG_CONTINUATION") return "EXTEND_TP";
+  if (state === "HEALTHY_PULLBACK" || state === "UNCERTAIN" || !protectedPosition) return "HOLD";
+  if (state === "REVERSAL_CONFIRMED" && floatingNetProfit >= minimumExitNetProfit) return "FULL_EXIT";
+  if (state === "MOMENTUM_EXHAUSTION" && profitGivebackRatio >= profitGivebackTrigger) return "LOCK_PROFIT";
+  if (state === "MOMENTUM_EXHAUSTION") return "TIGHTEN_SL";
+  return "HOLD";
+}
+
+export function getThreeBrainConfigFromSearch(search: string): ThreeBrainConfig {
+  const params = new URLSearchParams(search);
+  const readNumber = (key: string, fallback: number) => {
+    const rawValue = params.get(key);
+    if (rawValue === null || rawValue.trim() === "") return fallback;
+    const value = Number(rawValue);
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  return {
+    weakScoreThreshold: readNumber("tbWeak", DEFAULT_THREE_BRAIN_CONFIG.weakScoreThreshold),
+    adverseConfirmationCandles: Math.max(1, Math.round(readNumber("tbConfirm", DEFAULT_THREE_BRAIN_CONFIG.adverseConfirmationCandles))),
+    minimumExitNetProfit: Math.max(0, readNumber("tbProfit", DEFAULT_THREE_BRAIN_CONFIG.minimumExitNetProfit)),
+    requireAdverseStructure: params.get("tbAdverseStructure") === null
+      ? DEFAULT_THREE_BRAIN_CONFIG.requireAdverseStructure
+      : params.get("tbAdverseStructure") !== "0",
+    managementOverrides: DEFAULT_THREE_BRAIN_CONFIG.managementOverrides,
+  };
+}
+
+function getLatestStructure(
   candleTime: number,
   structures: StructureEvent[],
-): boolean {
-  const latestStructure = [...structures]
+): StructureEvent | null {
+  return [...structures]
     .reverse()
-    .find((event) => event.time <= candleTime && (!event.timeframe || event.timeframe.toUpperCase() === "M15"));
+    .find((event) => event.time <= candleTime && (!event.timeframe || event.timeframe.toUpperCase() === "M15")) ?? null;
+}
+
+function getStructureAlignment(direction: string, latestStructure: StructureEvent | null): boolean {
   const structureDirection = `${latestStructure?.direction ?? ""} ${latestStructure?.type ?? ""}`.toUpperCase();
   return direction.includes("BUY")
     ? structureDirection.includes("BULL") || structureDirection.includes("BUY")
@@ -37,163 +188,135 @@ function getEffectiveLotSize(trade: ReplayTrade, params: StrategyParams): number
     : baseLot;
 }
 
+export function getThreeBrainPreviousCandles<T>(candles: T[], evaluationIndex: number, lookback = 20): T[] {
+  return candles.slice(Math.max(0, evaluationIndex - Math.max(1, Math.round(lookback))), evaluationIndex);
+}
+
 export function simulateThreeBrainTradeOutcome(
   trade: ReplayTrade,
   candles: ReplayCandle[],
   structures: StructureEvent[],
   params: StrategyParams = DEFAULT_STRATEGY_PARAMS,
   currentCandleTime = candles.at(-1)?.time ?? 0,
+  config: ThreeBrainConfig = DEFAULT_THREE_BRAIN_CONFIG,
 ) {
-  const safetyParams = {
-    ...params,
-    trailing_distance: 0,
-    tp_trigger: 0,
-    tp_ekspansi: 0,
-    max_ekspansi: 0,
-    enable_breakeven: false,
-    force_24h_close: false,
-    enable_profit_target_exit: false,
-  };
-  const initial = simulateTrailingSLTP(
-    trade,
-    candles.filter((candle) => candle.time <= (trade.entry_time ?? 0)),
-    trade.entry_time ?? 0,
-    structures,
-    safetyParams,
-  );
+  const managementParams = { ...params, ...config.managementOverrides };
+  const baseline = simulateTrailingSLTP(trade, candles, currentCandleTime, structures, managementParams);
+  if (!baseline.isClosedSimulated || baseline.exitTimeSimulated == null) return baseline;
+
   const entryPrice = trade.entry_price ?? 0;
   const lotSize = getEffectiveLotSize(trade, params);
   const priceRatio = params.use_price_ratio_scaling && params.base_reference_price > 0 && entryPrice > 0
     ? entryPrice / params.base_reference_price
     : 1;
-  const trailingDistance = params.trailing_distance * priceRatio;
-  const breakevenTriggerPoints = params.breakeven_trigger * priceRatio * 100;
-  const breakevenBuffer = params.breakeven_buffer * priceRatio;
+  const breakevenTrigger = managementParams.breakeven_trigger * priceRatio;
   const direction = String(trade.type ?? "BUY").toUpperCase();
   const isBuy = direction.includes("BUY");
   const startIndex = Math.max(0, candles.findIndex((candle) => candle.time >= (trade.entry_time ?? 0)));
-  let currentSL = initial.initialSL;
-  let currentTP = initial.initialTP;
-  const slHistory = [currentSL];
-  const tpHistory = currentTP !== null ? [currentTP] : [];
-  let expansionCount = 0;
-  let breakevenTriggered = false;
-  let maxFavorablePoints = 0;
-  let maxAdversePoints = 0;
-  let closeReason: "SL" | "TP" | "THREE_BRAIN_EXIT" | "THREE_BRAIN_FORCE_EXIT" | null = null;
-  let exitPrice: number | null = null;
-  let exitTime: number | null = null;
-  let protectionActivatedTime: number | null = null;
+  let adverseReversalConfirmations = 0;
+  let adaptiveStop = baseline.initialSL;
+  let lastProtectionActionIndex = -2;
+  const diagnostics = createThreeBrainDiagnostics();
+  const continuationConfig = config.continuationConfig ?? {};
+  const historyLookback = Math.max(
+    20,
+    continuationConfig.momentumLookback ?? DEFAULT_CONTINUATION_STRENGTH_CONFIG.momentumLookback,
+    continuationConfig.emaSlopeLookback ?? DEFAULT_CONTINUATION_STRENGTH_CONFIG.emaSlopeLookback,
+    continuationConfig.volumeLookback ?? DEFAULT_CONTINUATION_STRENGTH_CONFIG.volumeLookback,
+  );
+  const otak2AtrPeriod = Math.max(1, Math.round(config.otak2AtrPeriod ?? managementParams.atr_period));
 
   for (let index = startIndex; index < candles.length; index += 1) {
     const candle = candles[index];
-    if (candle.time > currentCandleTime) break;
+    if (candle.time >= baseline.exitTimeSimulated) break;
 
-    const favorablePoints = isBuy
-      ? Math.max(0, (candle.high - entryPrice) * 100)
-      : Math.max(0, (entryPrice - candle.low) * 100);
-    const adversePoints = isBuy
-      ? Math.max(0, (entryPrice - candle.low) * 100)
-      : Math.max(0, (candle.high - entryPrice) * 100);
-    maxFavorablePoints = Math.max(maxFavorablePoints, Math.round(favorablePoints));
-    maxAdversePoints = Math.max(maxAdversePoints, Math.round(adversePoints));
-
-    if (isBuy ? candle.low <= currentSL : candle.high >= currentSL) {
-      closeReason = "SL";
-      exitPrice = currentSL;
-      exitTime = candle.time;
-      break;
-    }
-    if (currentTP !== null && (isBuy ? candle.high >= currentTP : candle.low <= currentTP)) {
-      closeReason = "TP";
-      exitPrice = currentTP;
-      exitTime = candle.time;
-      break;
+    const adaptiveStopHit = isBuy ? candle.low <= adaptiveStop : candle.high >= adaptiveStop;
+    if (adaptiveStopHit && adaptiveStop !== baseline.initialSL) {
+      return {
+        ...baseline,
+        sl: adaptiveStop,
+        slHistory: [...baseline.slHistory, adaptiveStop],
+        closeReason: "THREE_BRAIN_LOCK_EXIT",
+        isClosedSimulated: true,
+        exitPriceSimulated: adaptiveStop,
+        exitTimeSimulated: candle.time,
+        threeBrainDiagnostics: diagnostics,
+      };
     }
 
-    const structureAligned = getStructureAlignment(direction, candle.time, structures);
+    const latestStructure = getLatestStructure(candle.time, structures);
+    const structureAligned = getStructureAlignment(direction, latestStructure);
     const continuation = evaluateContinuationStrength({
       direction,
       entryPrice,
       currentCandle: candle,
-      previousCandles: candles.slice(Math.max(startIndex, index - 5), index),
-      atr: calculateATR(candles, candle.time, params.atr_period),
+      previousCandles: getThreeBrainPreviousCandles(candles, index, historyLookback),
+      atr: calculateATR(candles, candle.time, otak2AtrPeriod),
       structureAligned,
-    });
+      structure: latestStructure,
+    }, continuationConfig);
     const floatingNetProfit = (isBuy ? candle.close - entryPrice : entryPrice - candle.close)
       * lotSize
       * 100;
-    const decision = evaluateExitTargetObserver({
-      continuationStatus: continuation.status,
-      continuationScore: continuation.score,
+    diagnostics.maxFloatingNetProfit = Math.max(diagnostics.maxFloatingNetProfit, floatingNetProfit);
+    diagnostics.profitGiveback = Math.max(0, diagnostics.maxFloatingNetProfit - floatingNetProfit);
+    const profitGivebackRatio = diagnostics.maxFloatingNetProfit > 0
+      ? diagnostics.profitGiveback / diagnostics.maxFloatingNetProfit
+      : 0;
+    const protectionReached = (isBuy ? candle.high - entryPrice : entryPrice - candle.low) >= breakevenTrigger;
+    const isWeak = continuation.score < config.weakScoreThreshold;
+    const reversalEvidence = continuation.state === "REVERSAL_CONFIRMED" || isWeak;
+    const isAdverseReversal = reversalEvidence && (!config.requireAdverseStructure || !structureAligned);
+    adverseReversalConfirmations = isAdverseReversal ? adverseReversalConfirmations + 1 : 0;
+    const confirmedState = adverseReversalConfirmations >= config.adverseConfirmationCandles
+      ? "REVERSAL_CONFIRMED"
+      : continuation.state === "REVERSAL_CONFIRMED"
+        ? "MOMENTUM_EXHAUSTION"
+        : continuation.state;
+    diagnostics.stateCounts[confirmedState] += 1;
+    let action = decideThreeBrainAction({
+      state: confirmedState,
+      confidence: continuation.confidence,
+      minimumConfidence: config.minimumConfidence ?? DEFAULT_THREE_BRAIN_CONFIG.minimumConfidence,
+      protectedPosition: protectionReached,
       floatingNetProfit,
-      maxFavorablePoints,
-      maxAdversePoints,
-      protectEnabled: params.enable_breakeven,
-      protectTriggerPoints: breakevenTriggerPoints,
-      isBreakevenActive: breakevenTriggered,
-      isTargetMaxed: params.max_ekspansi > 0 && expansionCount >= params.max_ekspansi,
-      expansionCount,
-      holdSeconds: Math.max(0, candle.time - (trade.entry_time ?? 0)),
-      maxHoldSeconds: params.force_24h_close ? 86400 : 0,
-      structureAligned,
+      profitGivebackRatio,
+      profitGivebackTrigger: config.profitGivebackTrigger ?? DEFAULT_THREE_BRAIN_CONFIG.profitGivebackTrigger,
+      minimumExitNetProfit: config.minimumExitNetProfit,
+      stateActions: config.stateActions,
     });
+    const protectionCooldownCandles = Math.max(0, Math.round(
+      config.protectionCooldownCandles ?? DEFAULT_THREE_BRAIN_CONFIG.protectionCooldownCandles ?? 2,
+    ));
+    if ((action === "TIGHTEN_SL" || action === "LOCK_PROFIT")
+      && index - lastProtectionActionIndex < protectionCooldownCandles) {
+      action = "HOLD";
+    }
+    diagnostics.actionCounts[action] += 1;
 
-    if (decision.status === "FORCE_EXIT_ALERT" || decision.status === "EXIT_ALERT") {
-      closeReason = decision.status === "FORCE_EXIT_ALERT" ? "THREE_BRAIN_FORCE_EXIT" : "THREE_BRAIN_EXIT";
-      exitPrice = decision.status === "FORCE_EXIT_ALERT" ? candle.open : candle.close;
-      exitTime = candle.time;
-      break;
+    if (action === "TIGHTEN_SL" || action === "LOCK_PROFIT") {
+      const lockedProfitRatio = action === "LOCK_PROFIT"
+        ? config.profitLockRatio ?? DEFAULT_THREE_BRAIN_CONFIG.profitLockRatio ?? 0.7
+        : config.tightenLockRatio ?? DEFAULT_THREE_BRAIN_CONFIG.tightenLockRatio ?? 0.4;
+      const lockedProfitDistance = diagnostics.maxFloatingNetProfit * lockedProfitRatio / (lotSize * 100);
+      const nextStop = isBuy ? entryPrice + lockedProfitDistance : entryPrice - lockedProfitDistance;
+      adaptiveStop = isBuy ? Math.max(adaptiveStop, nextStop) : Math.min(adaptiveStop, nextStop);
+      lastProtectionActionIndex = index;
     }
-    if (decision.status === "EXTEND" && currentTP !== null) {
-      const canExpand = params.max_ekspansi === 0 || expansionCount < params.max_ekspansi;
-      if (canExpand) {
-        currentTP = isBuy ? currentTP + params.tp_ekspansi : currentTP - params.tp_ekspansi;
-        expansionCount += 1;
-        tpHistory.push(currentTP);
-      }
-    }
-    if (decision.status === "PROTECT") {
-      const protectedSL = isBuy
-        ? entryPrice + breakevenBuffer
-        : entryPrice - breakevenBuffer;
-      const nextSL = isBuy ? Math.max(currentSL, protectedSL) : Math.min(currentSL, protectedSL);
-      if (nextSL !== currentSL) {
-        currentSL = nextSL;
-        slHistory.push(currentSL);
-      }
-      breakevenTriggered = true;
-      protectionActivatedTime = candle.time;
-    }
-    if (breakevenTriggered && params.enable_breakeven && trailingDistance > 0) {
-      const trailingSL = isBuy
-        ? candle.close - trailingDistance
-        : candle.close + trailingDistance;
-      const nextSL = isBuy ? Math.max(currentSL, trailingSL) : Math.min(currentSL, trailingSL);
-      if (Math.abs(nextSL - currentSL) > 0.01) {
-        currentSL = nextSL;
-        slHistory.push(currentSL);
-      }
+
+    if (action === "FULL_EXIT") {
+      return {
+        ...baseline,
+        closeReason: "THREE_BRAIN_EXIT",
+        isClosedSimulated: true,
+        exitPriceSimulated: candle.close,
+        exitTimeSimulated: candle.time,
+        threeBrainDiagnostics: diagnostics,
+      };
     }
   }
 
-  return {
-    initialSL: initial.initialSL,
-    initialTP: initial.initialTP,
-    sl: currentSL,
-    tp: currentTP,
-    slHistory,
-    tpHistory,
-    closeReason,
-    beTriggered: breakevenTriggered,
-    isClosedSimulated: closeReason !== null,
-    exitPriceSimulated: exitPrice,
-    exitTimeSimulated: exitTime,
-    protectionActivatedTime,
-    expansionCount,
-    maxFavorablePoints,
-    maxAdversePoints,
-  };
+  return { ...baseline, threeBrainDiagnostics: diagnostics };
 }
 
 export function simulateThreeBrainReplayTradeOutcome(
@@ -202,8 +325,9 @@ export function simulateThreeBrainReplayTradeOutcome(
   structures: StructureEvent[],
   params: StrategyParams = DEFAULT_STRATEGY_PARAMS,
   currentCandleTime = candles.at(-1)?.time ?? 0,
+  config: ThreeBrainConfig = DEFAULT_THREE_BRAIN_CONFIG,
 ) {
-  const levels = simulateThreeBrainTradeOutcome(trade, candles, structures, params, currentCandleTime);
+  const levels = simulateThreeBrainTradeOutcome(trade, candles, structures, params, currentCandleTime, config);
   const entryPrice = trade.entry_price ?? 0;
   const exitPrice = levels.exitPriceSimulated ?? entryPrice;
   const exitTime = levels.exitTimeSimulated;

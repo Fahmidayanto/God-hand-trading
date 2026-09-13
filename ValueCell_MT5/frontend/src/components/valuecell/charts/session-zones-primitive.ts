@@ -114,6 +114,14 @@ class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
     const chart = this.source.chart;
     if (!chart || !this.source.visible || this.source.boxes.length === 0) return;
 
+    // Auto-hide session zones on higher timeframes (H4, D1, W1: bar step >= 14400s)
+    if (this.source.candleTimes.length >= 3) {
+      const diff1 = Math.abs(this.source.candleTimes[1] - this.source.candleTimes[0]);
+      const diff2 = Math.abs(this.source.candleTimes[2] - this.source.candleTimes[1]);
+      const minStep = Math.min(diff1, diff2);
+      if (minStep >= 14400) return;
+    }
+
     const timeScale = chart.timeScale();
     
     // OPTIMIZATION: Get visible time range and only render boxes that overlap

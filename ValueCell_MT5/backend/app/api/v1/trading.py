@@ -1323,25 +1323,76 @@ async def get_replay_data(
     ts_from = datetime.combine(date_from, datetime.min.time())
     ts_to_excl = datetime.combine(date_to, datetime.min.time()) + _timedelta(days=1)
 
-    table_map = {"M15": "marketdata_xauusd_m15", "H1": "marketdata_xauusd_h1", "H4": "marketdata_xauusd_h4"}
-    candle_table = table_map.get(timeframe.upper(), "marketdata_xauusd_m15")
+    tf_upper = timeframe.upper()
+    table_map = {
+        "M15": "marketdata_xauusd_m15",
+        "H1": "marketdata_xauusd_h1",
+        "H4": "marketdata_xauusd_h4",
+        "D1": "marketdata_xauusd_d1",
+        "DAY": "marketdata_xauusd_d1",
+        "W1": "marketdata_xauusd_w1",
+        "WEEK": "marketdata_xauusd_w1",
+    }
 
     try:
         with get_db_conn() as conn:
             with conn.cursor() as cur:
-                # Fetch candles
-                cur.execute(
-                    f"""
-                    SELECT time, open, high, low, close, volume, ema200, spread
-                    FROM {candle_table}
-                    WHERE time >= %s AND time < %s
-                    ORDER BY time ASC
-                    """,
-                    (ts_from, ts_to_excl),
-                )
-                candle_rows = cur.fetchall()
+                # Fetch candles (Native table if exists, otherwise instant aggregation for D1 / W1)
+                if tf_upper in ("D1", "DAY"):
+                    cur.execute(
+                        """
+                        SELECT 
+                            date_trunc('day', time) as time,
+                            (array_agg(open ORDER BY time ASC))[1] as open,
+                            MAX(high) as high,
+                            MIN(low) as low,
+                            (array_agg(close ORDER BY time ASC))[array_upper(array_agg(close ORDER BY time ASC), 1)] as close,
+                            SUM(volume) as volume,
+                            COALESCE(AVG(ema200), 0) as ema200,
+                            COALESCE(AVG(spread), 4)::int as spread
+                        FROM marketdata_xauusd_m15
+                        WHERE time >= %s AND time < %s
+                        GROUP BY date_trunc('day', time)
+                        ORDER BY time ASC
+                        """,
+                        (ts_from, ts_to_excl),
+                    )
+                    candle_rows = cur.fetchall()
+                elif tf_upper in ("W1", "WEEK"):
+                    cur.execute(
+                        """
+                        SELECT 
+                            date_trunc('week', time) as time,
+                            (array_agg(open ORDER BY time ASC))[1] as open,
+                            MAX(high) as high,
+                            MIN(low) as low,
+                            (array_agg(close ORDER BY time ASC))[array_upper(array_agg(close ORDER BY time ASC), 1)] as close,
+                            SUM(volume) as volume,
+                            COALESCE(AVG(ema200), 0) as ema200,
+                            COALESCE(AVG(spread), 4)::int as spread
+                        FROM marketdata_xauusd_m15
+                        WHERE time >= %s AND time < %s
+                        GROUP BY date_trunc('week', time)
+                        ORDER BY time ASC
+                        """,
+                        (ts_from, ts_to_excl),
+                    )
+                    candle_rows = cur.fetchall()
+                else:
+                    candle_table = table_map.get(tf_upper, "marketdata_xauusd_m15")
+                    cur.execute(
+                        f"""
+                        SELECT time, open, high, low, close, volume, ema200, spread
+                        FROM {candle_table}
+                        WHERE time >= %s AND time < %s
+                        ORDER BY time ASC
+                        """,
+                        (ts_from, ts_to_excl),
+                    )
+                    candle_rows = cur.fetchall()
 
-                # Fetch LLHH/BoS structure events
+                # Fetch LLHH/BoS structure events (use M15 structures as overlay for D1/W1)
+                structure_tf = "M15" if tf_upper in ("D1", "DAY", "W1", "WEEK") else tf_upper
                 cur.execute(
                     """
                     SELECT type, direction_action, price, time, timeframe, status, previous_price, previous_time
@@ -1350,7 +1401,7 @@ async def get_replay_data(
                     AND timeframe = %s
                     ORDER BY time ASC
                     """,
-                    (ts_from, ts_to_excl, timeframe.upper()),
+                    (ts_from, ts_to_excl, structure_tf),
                 )
                 structure_rows = cur.fetchall()
 

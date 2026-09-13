@@ -1,32 +1,56 @@
 @echo off
-set PYTHONUTF8=1
-REM ========================================
-REM  Start Headroom Local Proxy Server (Port 8787)
-REM ========================================
-echo.
-echo ========================================
-echo   Starting Headroom Local Proxy Server
-echo ========================================
+setlocal
+title Headroom Optimization Proxy (:8787)
+
+echo ===================================================
+echo   Headroom Optimization Proxy (Port 8787)
+echo ===================================================
 echo.
 
-REM Change to ValueCell_MT5 folder
-echo [1/2] Changing to ValueCell_MT5 folder...
-cd /d "%~dp0ValueCell_MT5"
+cd /d "%~dp0"
 
-REM Activate virtual environment
-echo [2/2] Activating virtual environment and launching Headroom Proxy...
-call venv\Scripts\activate.bat
+set "HEADROOM=%~dp0..\.venv\Scripts\headroom.exe"
 
+if not exist "%HEADROOM%" (
+    where headroom >nul 2>&1
+    if not errorlevel 1 (
+        set "HEADROOM=headroom"
+    ) else (
+        echo [ERROR] headroom.exe not found at:
+        echo         %HEADROOM%
+        echo [INFO]  Please verify Python virtual environment in ..\.venv
+        pause
+        exit /b 1
+    )
+)
+
+echo [INFO] Checking if port 8787 is already active...
+powershell -Command "if (Get-NetTCPConnection -LocalPort 8787 -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" >nul 2>&1
+if %errorlevel%==0 (
+    echo [INFO] Headroom proxy is ALREADY running on http://127.0.0.1:8787
+    echo [INFO] Endpoints:
+    echo        - Health:  http://127.0.0.1:8787/health
+    echo        - Stats:   http://127.0.0.1:8787/stats
+    echo        - Metrics: http://127.0.0.1:8787/metrics
+    echo.
+    pause
+    exit /b 0
+)
+
+echo [INFO] Starting Headroom Proxy at http://127.0.0.1:8787 ...
+echo [INFO] Routing:
+echo        - Claude Code / Anthropic: ANTHROPIC_BASE_URL=http://127.0.0.1:8787
+echo        - OpenAI-compatible:      OPENAI_BASE_URL=http://127.0.0.1:8787/v1
 echo.
-echo Headroom Proxy running at:
-echo   - Local Proxy: http://127.0.0.1:8787
-echo.
-echo Press Ctrl+C to stop the proxy server.
-echo ========================================
+echo [INFO] Press Ctrl+C to stop the proxy.
 echo.
 
-set LITELLM_LOG=ERROR
+"%HEADROOM%" proxy
 
-headroom proxy --port 8787
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Headroom proxy stopped unexpectedly.
+    pause
+)
+exit /b %errorlevel%
 
-pause

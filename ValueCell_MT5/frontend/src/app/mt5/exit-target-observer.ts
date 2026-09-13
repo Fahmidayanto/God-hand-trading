@@ -19,6 +19,7 @@ export interface ExitTargetObserverInput {
   holdSeconds: number;
   maxHoldSeconds: number;
   structureAligned: boolean;
+  adverseReversalConfirmations: number;
 }
 
 export interface ExitTargetObserverResult {
@@ -42,11 +43,11 @@ export function evaluateExitTargetObserver(
     };
   }
 
-  if (input.continuationStatus === "WEAK" && !input.structureAligned) {
+  if (input.adverseReversalConfirmations >= 2) {
     return {
       status: "EXIT_ALERT",
-      title: "Continuation Melemah",
-      reason: "Otak 2 lemah dan struktur terbaru tidak lagi searah posisi.",
+      title: "Reversal Terkonfirmasi",
+      reason: "Dua candle berurutan menunjukkan continuation lemah dan struktur tidak lagi searah posisi.",
       tone: "critical",
       observerOnly: true,
     };

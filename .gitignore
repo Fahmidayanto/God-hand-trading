@@ -4,9 +4,11 @@
 *.tpl
 
 # Backtest results (large CSV files)
-# Backtest_result/*.csv
+Backtest_result/*.csv
 catboost_info/
 Other/Backtest_rongsokan/
+build/
+**/build/
 
 # Python cache
 __pycache__/

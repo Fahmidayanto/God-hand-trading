@@ -941,7 +941,12 @@ int GetMaxSpreadForBar_M15(datetime barTime, int defaultSpread)
 //+------------------------------------------------------------------+
 void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
 {
-    string tfStr = (tf == PERIOD_M15) ? "M15" : ((tf == PERIOD_H4) ? "H4" : "H1");
+    string tfStr = "M15";
+    if (tf == PERIOD_H1)       tfStr = "H1";
+    else if (tf == PERIOD_H4) tfStr = "H4";
+    else if (tf == PERIOD_D1) tfStr = "D1";
+    else if (tf == PERIOD_W1) tfStr = "W1";
+
     string filename = "MarketData_" + _Symbol + "_" + tfStr + "_" + g_ExportDateStr + ".csv";
     
     MqlRates rates[];
@@ -952,11 +957,19 @@ void ExportMarketDataToCSV(ENUM_TIMEFRAMES tf, int barsToExport)
         return;
     }
     
-    // Ambil EMA200
-    int emaHandle = (tf == PERIOD_M15) ? handleEMA_M15 : ((tf == PERIOD_H4) ? handleEMA_H4 : handleEMA_H1);
+    // Ambil EMA200 (hanya jika handle valid)
+    int emaHandle = INVALID_HANDLE;
+    if (tf == PERIOD_M15)      emaHandle = handleEMA_M15;
+    else if (tf == PERIOD_H1) emaHandle = handleEMA_H1;
+    else if (tf == PERIOD_H4) emaHandle = handleEMA_H4;
+
     double emaBuffer[];
     ArraySetAsSeries(emaBuffer, true);
-    int emaCopied = CopyBuffer(emaHandle, 0, 0, barsToExport, emaBuffer);
+    int emaCopied = 0;
+    if (emaHandle != INVALID_HANDLE)
+    {
+        emaCopied = CopyBuffer(emaHandle, 0, 0, barsToExport, emaBuffer);
+    }
     
     int handle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI, ",");
     if (handle == INVALID_HANDLE)
@@ -1281,6 +1294,12 @@ void ExportAllData()
     
     // 8. Export market data H4
     ExportMarketDataToCSV(PERIOD_H4, 10000000);
+    
+    // 9. Export market data D1 (Daily)
+    ExportMarketDataToCSV(PERIOD_D1, 5000000);
+    
+    // 10. Export market data W1 (Weekly)
+    ExportMarketDataToCSV(PERIOD_W1, 1000000);
 }
 
 //+------------------------------------------------------------------+
@@ -2768,8 +2787,8 @@ void SyncLastSessionCSV()
 
         // ponytail: was missing — MarketData & SessionZone not synced on restart-resume,
         // so after a restart the sandbox kept stale-date files.
-        string tfs[] = {"M15", "H1", "H4"};
-        for (int t = 0; t < 3; t++)
+        string tfs[] = {"M15", "H1", "H4", "D1", "W1"};
+        for (int t = 0; t < ArraySize(tfs); t++)
         {
             string fileMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + prevDateStr + ".csv";
             string srcMD = BacktestResultPath + "\\" + fileMD;
@@ -4184,9 +4203,9 @@ void SetExportDate()
                     PrintFormat("   ❌ Gagal rename: %s", oldState);
             }
 
-            // ponytail: rename MarketData files (M15, H1, H4)
-            string tfs[] = {"M15", "H1", "H4"};
-            for (int t = 0; t < 3; t++)
+            // ponytail: rename MarketData files (M15, H1, H4, D1, W1)
+            string tfs[] = {"M15", "H1", "H4", "D1", "W1"};
+            for (int t = 0; t < ArraySize(tfs); t++)
             {
                 string oldMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + prevDateStr + ".csv";
                 string newMD = "MarketData_" + _Symbol + "_" + tfs[t] + "_" + todayDateStr + ".csv";
@@ -4767,6 +4786,8 @@ void OnDeinit(const int reason)
     Print("      6. MarketData_*_M15_*.csv");
     Print("      7. MarketData_*_H1_*.csv");
     Print("      8. MarketData_*_H4_*.csv");
+    Print("      9. MarketData_*_D1_*.csv");
+    Print("      10. MarketData_*_W1_*.csv");
     
     Print("════════════════════════════════════════════════════════════════");
     Print("✅ EA berhasil dihentikan. Semua data telah tersimpan.");

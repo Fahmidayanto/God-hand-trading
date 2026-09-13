@@ -1695,11 +1695,12 @@ export default function TradesPage() {
   useEffect(() => {
     const primitive = sessionZonesPrimitiveRef.current;
     if (!primitive) {
-      console.warn('âš ï¸ Session zones primitive not initialized');
+      console.warn('⚠️  Session zones primitive not initialized');
       return;
     }
 
-    primitive.setVisible(showSessions);
+    const isIntraday = activeTimeframe === "M15" || activeTimeframe === "H1";
+    primitive.setVisible(showSessions && isIntraday);
 
     const zones = sessionZonesData?.zones ?? [];
     const boxes: SessionZoneBox[] = zones
@@ -1712,12 +1713,12 @@ export default function TradesPage() {
       }));
 
     primitive.setBoxes(boxes);
-    console.log('âœ… Session zones updated successfully');
-  }, [sessionZonesData, showSessions]);
+    console.log('✅ Session zones updated successfully');
+  }, [sessionZonesData, showSessions, activeTimeframe]);
 
   // Toggle EMA 200 visibility
   useEffect(() => {
-    console.log('ðŸ“‰ [EMA DEBUG] showEMA200 toggled:', showEMA200);
+    console.log('📉 [EMA DEBUG] showEMA200 toggled:', showEMA200);
     if (ema200SeriesRef.current) {
       ema200SeriesRef.current.applyOptions({ visible: showEMA200 });
       console.log('ðŸ“‰ [EMA DEBUG] EMA 200 visibility set to:', showEMA200);

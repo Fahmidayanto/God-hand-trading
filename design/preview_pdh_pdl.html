@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spesifikasi Visual Garis PDH / PDL - UI/UX Pro Max</title>
+  <style>
+    :root {
+      /* Theme: Light Default (Matches ValueCell MT5) */
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --border-card: #e2e8f0;
+      --text-title: #0f172a;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --chart-bg: #ffffff;
+      --chart-grid: #f1f5f9;
+
+      /* Liquidity Tokens */
+      --pdh-base: #0284c7;        /* Sapphire Blue */
+      --pdh-base-glow: rgba(2, 132, 199, 0.2);
+      --swept-color: #d97706;      /* Amber 600 */
+      --swept-glow: rgba(217, 119, 6, 0.25);
+      --broken-color: #059669;     /* Emerald 600 */
+      --broken-glow: rgba(5, 150, 105, 0.2);
+
+      --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --bg-page: #07090e;
+      --bg-card: #0f172a;
+      --border-card: #1e293b;
+      --text-title: #f8fafc;
+      --text-body: #cbd5e1;
+      --text-muted: #94a3b8;
+      --chart-bg: #0b0f19;
+      --chart-grid: #1e293b;
+
+      --pdh-base: #38bdf8;        /* Sky Blue */
+      --pdh-base-glow: rgba(56, 189, 248, 0.25);
+      --swept-color: #f59e0b;      /* Amber 500 */
+      --swept-glow: rgba(245, 158, 11, 0.35);
+      --broken-color: #10b981;     /* Emerald 500 */
+      --broken-glow: rgba(16, 185, 129, 0.25);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-page);
+      color: var(--text-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    header {
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-card);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .badge-core {
+      background: linear-gradient(135deg, #0284c7, #06b6d4);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+    .header-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--text-title);
+    }
+    .header-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Controls Bar */
+    .controls-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      background: rgba(100, 116, 139, 0.1);
+      padding: 3px;
+      border-radius: 8px;
+      gap: 3px;
+    }
+    .ctrl-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .ctrl-btn:hover {
+      color: var(--text-title);
+    }
+    .ctrl-btn.active {
+      background: var(--bg-card);
+      color: var(--text-title);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    main {
+      flex: 1;
+      padding: 24px;
+      max-width: 1500px;
+      margin: 0 auto;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* State Simulation Controller */
+    .state-simulator-bar {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    }
+    .sim-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sim-label {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+    .sim-state-btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sim-btn-untouched {
+      background: rgba(56, 189, 248, 0.1);
+      color: #0284c7;
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .sim-btn-untouched.active {
+      background: #0284c7;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+    }
+    .sim-btn-swept {
+      background: rgba(245, 158, 11, 0.1);
+      color: #d97706;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+    .sim-btn-swept.active {
+      background: #f59e0b;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+    }
+    .sim-btn-broken {
+      background: rgba(16, 185, 129, 0.1);
+      color: #059669;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+    .sim-btn-broken.active {
+      background: #10b981;
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+    }
+
+    .sim-status-explainer {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .explainer-pill {
+      font-weight: 800;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+
+    /* 3 Visual Variations Grid */
+    .variations-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 1180px) {
+      .variations-grid { grid-template-columns: 1fr; }
+    }
+
+    .var-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+      transition: all 0.2s ease;
+    }
+    .var-card:hover {
+      border-color: #38bdf8;
+      box-shadow: 0 8px 24px rgba(56, 189, 248, 0.1);
+    }
+    .var-card.recommended {
+      border: 2px solid #0284c7;
+      position: relative;
+    }
+    .badge-recommended {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+      z-index: 10;
+    }
+
+    .var-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-card);
+    }
+    .var-title {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text-title);
+    }
+    .var-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    /* Chart Canvas Stage */
+    .chart-stage {
+      height: 380px;
+      position: relative;
+      background: var(--chart-bg);
+      border-bottom: 1px solid var(--border-card);
+      user-select: none;
+      overflow: hidden;
+    }
+    .chart-svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .var-specs {
+      padding: 14px 16px;
+      background: rgba(100, 116, 139, 0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .spec-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-muted);
+    }
+    .spec-row strong {
+      color: var(--text-title);
+      font-family: var(--font-mono);
+    }
+
+    /* Implementation Summary Table */
+    .matrix-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .matrix-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--text-title);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 14px;
+    }
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .matrix-table th {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border-card);
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+    }
+    .matrix-table td {
+      padding: 12px;
+      border-bottom: 1px solid var(--border-card);
+      color: var(--text-body);
+    }
+  </style>
+</head>
+<body data-theme="light">
+
+  <header>
+    <div class="brand-group">
+      <div class="badge-core">TAHAP 1</div>
+      <div>
+        <div class="header-title">Spesifikasi Visual Garis PDH & PDL (Previous Day High / Low)</div>
+        <div class="header-sub">Instrumen Gold (XAUUSD) • Standar UI/UX Pro Max</div>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <!-- Theme Switcher -->
+      <div class="control-group">
+        <button class="ctrl-btn active" onclick="setTheme('light')">☀️ Light</button>
+        <button class="ctrl-btn" onclick="setTheme('dark')">🌙 Dark</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- State Simulator Bar (Interactive) -->
+    <div class="state-simulator-bar">
+      <div class="sim-left">
+        <span class="sim-label">⚡ Uji Interaksi Status:</span>
+        <button class="sim-state-btn sim-btn-untouched active" onclick="simulateState('untouched')">
+          <span>● Untouched</span>
+        </button>
+        <button class="sim-state-btn sim-btn-swept" onclick="simulateState('swept')">
+          <span>⚡ Swept (Rejection)</span>
+        </button>
+        <button class="sim-state-btn sim-btn-broken" onclick="simulateState('broken')">
+          <span>✓ Broken (Accepted)</span>
+        </button>
+      </div>
+
+      <div class="sim-status-explainer" id="state-explainer">
+        <span class="explainer-pill" style="background:#e0f2fe; color:#0369a1;">UNTOUCHED:</span>
+        <span>Harga belum pernah menyentuh level ekstrim kemarin. Garis tegas & bercahaya.</span>
+      </div>
+    </div>
+
+    <!-- 3 Design Variations -->
+    <div class="variations-grid">
+
+      <!-- ============================================================
+           VARIATION A: EXECUTIVE DASHED PILL (RECOMMENDED)
+           ============================================================ -->
+      <div class="var-card recommended">
+        <div class="badge-recommended">★ REKOMENDASI UTAMA</div>
+        <div class="var-header">
+          <div class="var-title">Varian A: Executive Dashed Pill</div>
+          <div class="var-desc">
+            Garis putus-putus presisi 1.5px dengan badge kapsul di ujung kanan. Sangat mudah membedakan harga dan status tanpa menutupi candlestick.
+          </div>
+        </div>
+
+        <div class="chart-stage">
+          <svg class="chart-svg" viewBox="0 0 440 380">
+            <!-- Grid -->
+            <g stroke="var(--chart-grid)" stroke-width="1">
+              <line x1="0" y1="60" x2="440" y2="60" />
+              <line x1="0" y1="140" x2="440" y2="140" />
+              <line x1="0" y1="220" x2="440" y2="220" />
+              <line x1="0" y1="300" x2="440" y2="300" />
+              <line x1="140" y1="0" x2="140" y2="380" />
+              <line x1="280" y1="0" x2="280" y2="380" />
+            </g>
+
+            <!-- Separator Hari Kemarin vs Hari Ini -->
+            <line x1="140" y1="0" x2="140" y2="380" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 4" opacity="0.5" />
+            <text x="70" y="24" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle">KEMARIN (D-1)</text>
+            <text x="210" y="24" fill="var(--text-muted)" font-size="9" font-family="monospace" text-anchor="middle">HARI INI (D)</text>
+
+            <!-- D-1 Candle (Yesterday's Range) -->
+            <line x1="80" y1="60" x2="80" y2="300" stroke="#64748b" stroke-width="1.5" />
+            <rect x="73" y="100" width="14" height="150" fill="#64748b" opacity="0.3" rx="1" />
+
+            <!-- PDH LINE (Y = 60) -->
+            <g id="varA-pdh" class="pdh-group">
+              <line x1="140" y1="60" x2="350" y2="60" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6 4" class="line-element" />
+              <!-- Badge Pill di ujung kanan -->
+              <rect x="310" y="48" width="120" height="24" rx="6" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.2" class="badge-bg" />
+              <text x="320" y="64" fill="#0369a1" font-size="10" font-weight="800" font-family="monospace" class="badge-text-title">PDH 3450.20</text>
+              <rect x="390" y="52" width="36" height="16" rx="3" fill="#e0f2fe" class="tag-bg" />
+              <text x="395" y="64" fill="#0284c7" font-size="8" font-weight="900" font-family="monospace" class="tag-text">FRESH</text>
+            </g>
+
+            <!-- M15 Candlesticks Today -->
+            <!-- Candle 1 -->
+            <line x1="180" y1="180" x2="180" y2="250" stroke="#10b981" stroke-width="1.5" />
+            <rect x="173" y="195" width="14" height="40" fill="#10b981" rx="1" />
+
+            <!-- Candle 2 -->
+            <line x1="220" y1="130" x2="220" y2="210" stroke="#10b981" stroke-width="1.5" />
+            <rect x="213" y="145" width="14" height="50" fill="#10b981" rx="1" />
+
+            <!-- Candle 3 (Interaction candle near PDH) -->
+            <g id="varA-cand3">
+              <line x1="260" y1="52" x2="260" y2="160" stroke="#ef4444" stroke-width="1.5" class="cand3-wick" />
+              <rect x="253" y="80" width="14" height="60" fill="#ef4444" rx="1" class="cand3-body" />
+            </g>
+
+            <!-- Current Price Line -->
+            <line x1="140" y1="110" x2="440" y2="110" stroke="#eab308" stroke-width="1" stroke-dasharray="3 2" />
+            <rect x="385" y="100" width="50" height="18" rx="3" fill="#eab308" />
+            <text x="392" y="113" fill="#000" font-size="9" font-weight="900" font-family="monospace">3425.10</text>
+
+            <!-- PDL LINE (Y = 300) -->
+            <g id="varA-pdl" class="pdl-group">
+              <line x1="140" y1="300" x2="350" y2="300" stroke="#0284c7" stroke-width="1.5" stroke-dasharray="6 4" class="line-element" />
+              <rect x="310" y="288" width="120" height="24" rx="6" fill="#f0f9ff" stroke="#0284c7" stroke-width="1.2" class="badge-bg" />
+              <text x="320" y="304" fill="#0369a1" font-size="10" font-weight="800" font-family="monospace">PDL 3405.40</text>
+              <rect x="390" y="292" width="36" height="16" rx="3" fill="#e0f2fe" />
+              <text x="395" y="304" fill="#0284c7" font-size="8" font-weight="900" font-family="monospace">FRESH</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="var-specs">
+          <div class="spec-row"><span>Gaya Garis:</span><strong>Dashed [6px, 4px]</strong></div>
+          <div class="spec-row"><span>Ketebalan:</span><strong>1.5 px</strong></div>
+          <div class="spec-row"><span>Warna Normal:</span><strong>Sapphire Blue (#0284c7 / #38bdf8)</strong></div>
+          <div class="spec-row"><span>Badge:</span><strong>Pill Kapsul Ujung Kanan (Dual Tag)</strong></div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           VARIATION B: TRADINGVIEW CLASSIC EDGE
+           ============================================================ -->
+      <div class="var-card">
+        <div class="var-header">
+          <div class="var-title">Varian B: TradingView Classic Edge</div>
+          <div class="var-desc">
+            Garis solid ultra-tipis dengan label melekat langsung di price scale kanan. Memberikan area chart yang sangat bersih tanpa badge yang melayang.
+          </div>
+        </div>
+
+        <div class="chart-stage">
+          <svg class="chart-svg" viewBox="0 0 440 380">
+            <!-- Grid -->
+            <g stroke="var(--chart-grid)" stroke-width="1">
+              <line x1="0" y1="60" x2="380" y2="60" />
+              <line x1="0" y1="140" x2="380" y2="140" />
+              <line x1="0" y1="220" x2="380" y2="220" />
+              <line x1="0" y1="300" x2="380" y2="300" />
+              <line x1="140" y1="0" x2="140" y2="380" />
+            </g>
+
+            <!-- Price Axis Scale strip -->
+            <rect x="380" y="0" width="60" height="380" fill="rgba(100,116,139,0.06)" />
+            <line x1="380" y1="0" x2="380" y2="380" stroke="var(--border-card)" stroke-width="1" />
+
+            <!-- D-1 Candle -->
+            <line x1="80" y1="60" x2="80" y2="300" stroke="#64748b" stroke-width="1.5" />
+            <rect x="73" y="100" width="14" height="150" fill="#64748b" opacity="0.3" rx="1" />
+
+            <!-- PDH LINE (Solid 1px) -->
+            <g id="varB-pdh">
+              <line x1="140" y1="60" x2="380" y2="60" stroke="#0284c7" stroke-width="1.2" class="line-element" />
+              <!-- Inline tag di atas garis -->
+              <text x="146" y="54" fill="#0284c7" font-size="9" font-weight="800" font-family="monospace">PDH (3450.20)</text>
+              <!-- Edge scale marker -->
+              <rect x="380" y="49" width="60" height="22" fill="#0284c7" class="badge-bg" />
+              <text x="386" y="64" fill="#ffffff" font-size="9" font-weight="900" font-family="monospace" class="badge-text-title">3450.20</text>
+            </g>
+
+            <!-- Candlesticks -->
+            <line x1="180" y1="180" x2="180" y2="250" stroke="#10b981" stroke-width="1.5" />
+            <rect x="173" y="195" width="14" height="40" fill="#10b981" rx="1" />
+            <line x1="220" y1="130" x2="220" y2="210" stroke="#10b981" stroke-width="1.5" />
+            <rect x="213" y="145" width="14" height="50" fill="#10b981" rx="1" />
+            <line x1="260" y1="52" x2="260" y2="160" stroke="#ef4444" stroke-width="1.5" />
+            <rect x="253" y="80" width="14" height="60" fill="#ef4444" rx="1" />
+
+            <!-- PDL LINE -->
+            <g id="varB-pdl">
+              <line x1="140" y1="300" x2="380" y2="300" stroke="#0284c7" stroke-width="1.2" class="line-element" />
+              <text x="146" y="294" fill="#0284c7" font-size="9" font-weight="800" font-family="monospace">PDL (3405.40)</text>
+              <rect x="380" y="289" width="60" height="22" fill="#0284c7" class="badge-bg" />
+              <text x="386" y="304" fill="#ffffff" font-size="9" font-weight="900" font-family="monospace">3405.40</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="var-specs">
+          <div class="spec-row"><span>Gaya Garis:</span><strong>Solid Line (Lurus)</strong></div>
+          <div class="spec-row"><span>Ketebalan:</span><strong>1.0 px</strong></div>
+          <div class="spec-row"><span>Warna Normal:</span><strong>Cyan Blue (#0284c7)</strong></div>
+          <div class="spec-row"><span>Badge:</span><strong>Price Axis Block di Sumbu Kanan</strong></div>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           VARIATION C: INSTITUTIONAL ZONE BAND
+           ============================================================ -->
+      <div class="var-card">
+        <div class="var-header">
+          <div class="var-title">Varian C: Institutional Zone Band</div>
+          <div class="var-desc">
+            Dilengkapi shading zona transparan 15 poin di sekitar garis PDH/PDL untuk memperjelas area perburuan likuiditas (*Liquidity Pool Area*).
+          </div>
+        </div>
+
+        <div class="chart-stage">
+          <svg class="chart-svg" viewBox="0 0 440 380">
+            <!-- Grid -->
+            <g stroke="var(--chart-grid)" stroke-width="1">
+              <line x1="0" y1="60" x2="440" y2="60" />
+              <line x1="0" y1="140" x2="440" y2="140" />
+              <line x1="0" y1="220" x2="440" y2="220" />
+              <line x1="0" y1="300" x2="440" y2="300" />
+            </g>
+
+            <!-- D-1 Candle -->
+            <line x1="80" y1="60" x2="80" y2="300" stroke="#64748b" stroke-width="1.5" />
+            <rect x="73" y="100" width="14" height="150" fill="#64748b" opacity="0.3" rx="1" />
+
+            <!-- PDH ZONE BAND (Area Shading + Central Line) -->
+            <g id="varC-pdh">
+              <!-- Shaded Band 20 poin -->
+              <rect x="140" y="48" width="290" height="24" fill="#0284c7" opacity="0.08" class="band-element" />
+              <line x1="140" y1="60" x2="350" y2="60" stroke="#0284c7" stroke-width="2" stroke-dasharray="4 2" class="line-element" />
+              
+              <rect x="310" y="48" width="120" height="24" rx="4" fill="#0284c7" class="badge-bg" />
+              <text x="318" y="64" fill="#ffffff" font-size="10" font-weight="800" font-family="monospace" class="badge-text-title">PDH POOL</text>
+              <rect x="382" y="52" width="44" height="16" rx="3" fill="#ffffff" class="tag-bg" />
+              <text x="387" y="64" fill="#0284c7" font-size="8" font-weight="900" font-family="monospace" class="tag-text">3450.2</text>
+            </g>
+
+            <!-- Candlesticks -->
+            <line x1="180" y1="180" x2="180" y2="250" stroke="#10b981" stroke-width="1.5" />
+            <rect x="173" y="195" width="14" height="40" fill="#10b981" rx="1" />
+            <line x1="220" y1="130" x2="220" y2="210" stroke="#10b981" stroke-width="1.5" />
+            <rect x="213" y="145" width="14" height="50" fill="#10b981" rx="1" />
+            <line x1="260" y1="52" x2="260" y2="160" stroke="#ef4444" stroke-width="1.5" />
+            <rect x="253" y="80" width="14" height="60" fill="#ef4444" rx="1" />
+
+            <!-- PDL ZONE BAND -->
+            <g id="varC-pdl">
+              <rect x="140" y="288" width="290" height="24" fill="#0284c7" opacity="0.08" class="band-element" />
+              <line x1="140" y1="300" x2="350" y2="300" stroke="#0284c7" stroke-width="2" stroke-dasharray="4 2" class="line-element" />
+              <rect x="310" y="288" width="120" height="24" rx="4" fill="#0284c7" class="badge-bg" />
+              <text x="318" y="304" fill="#ffffff" font-size="10" font-weight="800" font-family="monospace">PDL POOL</text>
+              <rect x="382" y="292" width="44" height="16" rx="3" fill="#ffffff" />
+              <text x="387" y="304" fill="#0284c7" font-size="8" font-weight="900" font-family="monospace">3405.4</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="var-specs">
+          <div class="spec-row"><span>Gaya Garis:</span><strong>Dashed + Shaded Band Area</strong></div>
+          <div class="spec-row"><span>Ketebalan:</span><strong>2.0 px + 24px Shading Box</strong></div>
+          <div class="spec-row"><span>Warna Normal:</span><strong>Blue Tone with 8% Fill</strong></div>
+          <div class="spec-row"><span>Badge:</span><strong>Zone Block Header</strong></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Technical Parameter Specification Matrix -->
+    <div class="matrix-section">
+      <div class="matrix-title">📋 Tabel Spesifikasi Token Desain & Implementasi (Code Parameters):</div>
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>Status Level</th>
+            <th>Warna Garis & Stroke</th>
+            <th>Pola Garis (Dash)</th>
+            <th>Visual Badge Tag</th>
+            <th>Aksi Trader / Trailing Engine</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>UNTOUCHED</strong> (Fresh)</td>
+            <td><code style="color:#0284c7; font-weight:700;">#0284c7</code> (Light) / <code style="color:#38bdf8; font-weight:700;">#38bdf8</code> (Dark)</td>
+            <td>Dashed <code>[6, 4]</code>, 1.5px</td>
+            <td>Pill Sapphire Blue + Label <code>FRESH</code></td>
+            <td>Target magnet aktif. Harga berpeluang besar ditarik ke level ini.</td>
+          </tr>
+          <tr>
+            <td><strong>SWEPT ⚡</strong> (Rejection)</td>
+            <td><code style="color:#d97706; font-weight:700;">#d97706</code> (Light) / <code style="color:#f59e0b; font-weight:700;">#f59e0b</code> (Dark)</td>
+            <td>Dashed <code>[8, 4]</code> + Glow amber</td>
+            <td>Pill Amber Gold + Label <code>SWEPT ⚡</code></td>
+            <td><strong>Trigger Trailing SL:</strong> Kunci profit / pindahkan SL ke breakeven / partial close 50%.</td>
+          </tr>
+          <tr>
+            <td><strong>BROKEN</strong> (Accepted)</td>
+            <td><code style="color:#059669; font-weight:700;">#059669</code> (Light) / <code style="color:#10b981; font-weight:700;">#10b981</code> (Dark)</td>
+            <td>Dotted halus <code>[3, 3]</code>, Opacity 35%</td>
+            <td>Pill Emerald tipis + Label <code>BROKEN</code></td>
+            <td>Level likuiditas habis diserap. Lanjutkan target ke PWH berikutnya.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <script>
+    function setTheme(mode) {
+      document.body.setAttribute('data-theme', mode);
+      document.querySelectorAll('.control-group .ctrl-btn').forEach(btn => {
+        if (btn.textContent.toLowerCase().includes(mode)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+    }
+
+    function simulateState(state) {
+      // Update buttons
+      document.querySelectorAll('.sim-state-btn').forEach(btn => {
+        if (btn.classList.contains(`sim-btn-${state}`)) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
+
+      const explainer = document.getElementById('state-explainer');
+
+      // Varian A elements
+      const varAPdhLine = document.querySelector('#varA-pdh .line-element');
+      const varAPdhBadge = document.querySelector('#varA-pdh .badge-bg');
+      const varAPdhText = document.querySelector('#varA-pdh .badge-text-title');
+      const varAPdhTagBg = document.querySelector('#varA-pdh .tag-bg');
+      const varAPdhTagText = document.querySelector('#varA-pdh .tag-text');
+
+      // Varian B elements
+      const varBPdhLine = document.querySelector('#varB-pdh .line-element');
+      const varBPdhBadge = document.querySelector('#varB-pdh .badge-bg');
+
+      // Varian C elements
+      const varCPdhLine = document.querySelector('#varC-pdh .line-element');
+      const varCPdhBand = document.querySelector('#varC-pdh .band-element');
+      const varCPdhBadge = document.querySelector('#varC-pdh .badge-bg');
+      const varCPdhTagText = document.querySelector('#varC-pdh .tag-text');
+
+      if (state === 'untouched') {
+        explainer.innerHTML = '<span class="explainer-pill" style="background:#e0f2fe; color:#0369a1;">UNTOUCHED:</span> <span>Harga belum pernah menyentuh level ekstrim kemarin. Garis tegas & bercahaya.</span>';
+
+        // Var A
+        varAPdhLine.setAttribute('stroke', '#0284c7');
+        varAPdhLine.setAttribute('stroke-dasharray', '6 4');
+        varAPdhLine.style.opacity = '1';
+        varAPdhBadge.setAttribute('stroke', '#0284c7');
+        varAPdhBadge.setAttribute('fill', '#f0f9ff');
+        varAPdhText.textContent = 'PDH 3450.20';
+        varAPdhTagBg.setAttribute('fill', '#e0f2fe');
+        varAPdhTagText.setAttribute('fill', '#0284c7');
+        varAPdhTagText.textContent = 'FRESH';
+
+        // Var B
+        varBPdhLine.setAttribute('stroke', '#0284c7');
+        varBPdhLine.style.opacity = '1';
+        varBPdhBadge.setAttribute('fill', '#0284c7');
+
+        // Var C
+        varCPdhLine.setAttribute('stroke', '#0284c7');
+        varCPdhBand.setAttribute('fill', '#0284c7');
+        varCPdhBand.style.opacity = '0.08';
+        varCPdhBadge.setAttribute('fill', '#0284c7');
+        varCPdhTagText.textContent = '3450.2';
+
+      } else if (state === 'swept') {
+        explainer.innerHTML = '<span class="explainer-pill" style="background:#fef3c7; color:#b45309;">SWEPT ⚡:</span> <span>Jarum wick menembus PDH (3453.20), tapi candle M15 ditolak balik (close di bawah 3450.20). Sinyal Reversal!</span>';
+
+        // Var A
+        varAPdhLine.setAttribute('stroke', '#d97706');
+        varAPdhLine.setAttribute('stroke-dasharray', '8 4');
+        varAPdhLine.style.opacity = '1';
+        varAPdhBadge.setAttribute('stroke', '#d97706');
+        varAPdhBadge.setAttribute('fill', '#fffbeb');
+        varAPdhText.textContent = 'PDH SWEPT';
+        varAPdhTagBg.setAttribute('fill', '#fef3c7');
+        varAPdhTagText.setAttribute('fill', '#b45309');
+        varAPdhTagText.textContent = 'SWEPT ⚡';
+
+        // Var B
+        varBPdhLine.setAttribute('stroke', '#d97706');
+        varBPdhLine.style.opacity = '1';
+        varBPdhBadge.setAttribute('fill', '#d97706');
+
+        // Var C
+        varCPdhLine.setAttribute('stroke', '#d97706');
+        varCPdhBand.setAttribute('fill', '#d97706');
+        varCPdhBand.style.opacity = '0.15';
+        varCPdhBadge.setAttribute('fill', '#d97706');
+        varCPdhTagText.textContent = 'SWEPT ⚡';
+
+      } else if (state === 'broken') {
+        explainer.innerHTML = '<span class="explainer-pill" style="background:#d1fae5; color:#047857;">BROKEN (ACCEPTED):</span> <span>Candle M15 close di atas PDH. Likuiditas habis terserap, garis otomatis meredup (35% opacity) agar chart bersih.</span>';
+
+        // Var A
+        varAPdhLine.setAttribute('stroke', '#059669');
+        varAPdhLine.setAttribute('stroke-dasharray', '3 3');
+        varAPdhLine.style.opacity = '0.35';
+        varAPdhBadge.setAttribute('stroke', '#059669');
+        varAPdhBadge.setAttribute('fill', '#ecfdf5');
+        varAPdhText.textContent = 'PDH BROKEN';
+        varAPdhTagBg.setAttribute('fill', '#d1fae5');
+        varAPdhTagText.setAttribute('fill', '#047857');
+        varAPdhTagText.textContent = 'BROKEN';
+
+        // Var B
+        varBPdhLine.setAttribute('stroke', '#059669');
+        varBPdhLine.style.opacity = '0.35';
+        varBPdhBadge.setAttribute('fill', '#059669');
+
+        // Var C
+        varCPdhLine.setAttribute('stroke', '#059669');
+        varCPdhBand.style.opacity = '0.03';
+        varCPdhBadge.setAttribute('fill', '#059669');
+        varCPdhTagText.textContent = 'BROKEN';
+      }
+    }
+  </script>
+</body>
+</html>
+
