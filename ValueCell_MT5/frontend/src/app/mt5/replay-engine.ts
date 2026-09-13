@@ -136,9 +136,9 @@ export const DEFAULT_STRATEGY_PARAMS: StrategyParams = {
   atr_tp_multiplier: 2,
   show_supply_demand: false,
   show_liquidity_pools: false,
-  show_pdh_pdl: true,
-  show_pwh_pwl: true,
-  show_session_hl: true,
+  show_pdh_pdl: false,
+  show_pwh_pwl: false,
+  show_session_hl: false,
   use_price_ratio_scaling: true,
   base_reference_price: 2000,
 };
@@ -505,18 +505,128 @@ export function getEntryStructureInfo(entryTime: number, structures: StructureEv
   return { latestType: effectiveLatestType, bosCycle, bosCycleBuy, bosCycleSell };
 }
 
-export function getCandleAtOrBefore(candles: ReplayCandle[], time: number) {
-  for (let index = candles.length - 1; index >= 0; index -= 1) {
-    if (candles[index].time <= time) return candles[index];
+// ponytail: O(N) precompute of cumulative structure state for O(1) lookups by index.
+// Replaces the O(N*M) scan that ran getEntryStructureInfo once per candidate trade.
+interface PrecomputedStructureState {
+  latestType: string;
+  latestTypeBuy: string;
+  latestTypeSell: string;
+  bosCycleBuy: number;
+  bosCycleSell: number;
+}
+
+function precomputeStructureStates(structures: StructureEvent[]): PrecomputedStructureState[] {
+  const states: PrecomputedStructureState[] = new Array(structures.length);
+  let latestType = "";
+  let latestTypeBuy = "";
+  let latestTypeSell = "";
+  let bosCycleBuy = 0;
+  let bosCycleSell = 0;
+  let prev: PrecomputedStructureState | null = null;
+
+  for (let i = 0; i < structures.length; i += 1) {
+    const event = structures[i];
+    const isM15 = !event.timeframe || event.timeframe.toUpperCase() === "M15";
+
+    if (isM15) {
+      const type = (event.type ?? "").toUpperCase();
+      const eventDirection = (event.direction ?? "").toUpperCase();
+      const isBull = eventDirection.includes("BULL") || type.includes("BULL");
+      const isBear = eventDirection.includes("BEAR") || type.includes("BEAR");
+      const isBoth = isBull && isBear;
+      const isNeither = !isBull && !isBear;
+
+      if (type.includes("CHOCH")) {
+        latestType = "CHOCH";
+        if (isBull || isNeither) {
+          latestTypeBuy = "CHOCH";
+          bosCycleBuy = 0;
+        }
+        if (isBear || isNeither) {
+          latestTypeSell = "CHOCH";
+          bosCycleSell = 0;
+        }
+      } else if (type.includes("BOS")) {
+        latestType = "BOS";
+        if (isBull || isNeither) {
+          latestTypeBuy = "BOS";
+          bosCycleBuy += 1;
+        }
+        if (isBear || isNeither) {
+          latestTypeSell = "BOS";
+          bosCycleSell += 1;
+        }
+      }
+    }
+
+    const state: PrecomputedStructureState = isM15
+      ? { latestType, latestTypeBuy, latestTypeSell, bosCycleBuy, bosCycleSell }
+      : { ...(prev ?? { latestType: "", latestTypeBuy: "", latestTypeSell: "", bosCycleBuy: 0, bosCycleSell: 0 }) };
+    states[i] = state;
+    prev = state;
   }
-  return null;
+
+  return states;
+}
+
+// ponytail: binary search — last index whose .time <= entryTime. Backend returns candles ORDER BY time ASC, so safe.
+function findLastIndexLE<T extends { time: number }>(items: T[], entryTime: number): number {
+  let lo = 0;
+  let hi = items.length - 1;
+  let result = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (items[mid].time <= entryTime) {
+      result = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return result;
+}
+
+function getEntryStructureInfoFast(
+  entryTime: number,
+  structures: StructureEvent[],
+  states: PrecomputedStructureState[],
+  direction?: string,
+) {
+  if (structures.length === 0 || states.length === 0) {
+    return { latestType: "", bosCycle: 0, bosCycleBuy: 0, bosCycleSell: 0 };
+  }
+  const idx = findLastIndexLE(structures, entryTime);
+  if (idx < 0) return { latestType: "", bosCycle: 0, bosCycleBuy: 0, bosCycleSell: 0 };
+
+  // walk back over non-M15 entries to find last relevant state
+  let stateIdx = idx;
+  while (stateIdx >= 0) {
+    const tf = structures[stateIdx].timeframe;
+    if (!tf || tf.toUpperCase() === "M15") break;
+    stateIdx -= 1;
+  }
+  if (stateIdx < 0) return { latestType: "", bosCycle: 0, bosCycleBuy: 0, bosCycleSell: 0 };
+
+  const state = states[stateIdx];
+  const upperDirection = (direction ?? "").toUpperCase();
+  const isSell = upperDirection.includes("SELL") || upperDirection.includes("BEAR");
+  const isBuy = upperDirection.includes("BUY") || upperDirection.includes("BULL");
+  const latestType = isSell
+    ? state.latestTypeSell || state.latestType
+    : isBuy
+      ? state.latestTypeBuy || state.latestType
+      : state.latestType;
+  const bosCycle = isSell ? state.bosCycleSell : state.bosCycleBuy;
+  return { latestType, bosCycle, bosCycleBuy: state.bosCycleBuy, bosCycleSell: state.bosCycleSell };
+}
+
+export function getCandleAtOrBefore(candles: ReplayCandle[], time: number) {
+  const idx = findLastIndexLE(candles, time);
+  return idx >= 0 ? candles[idx] : null;
 }
 
 export function getCandleIndexAtOrBefore(candles: ReplayCandle[], time: number) {
-  for (let index = candles.length - 1; index >= 0; index -= 1) {
-    if (candles[index].time <= time) return index;
-  }
-  return -1;
+  return findLastIndexLE(candles, time);
 }
 
 function passesEAEntryFilters(
@@ -586,11 +696,14 @@ function getReplayFilterRejectReason(
   h1Candles: ReplayCandle[],
   h4Candles: ReplayCandle[],
   params: EntryFilterParams,
+  structureStates?: PrecomputedStructureState[],
 ) {
   const entryTime = trade.entry_time;
   if (entryTime === null) return "Missing entry time";
 
-  const { latestType, bosCycle } = getEntryStructureInfo(entryTime, structures, trade.type);
+  const { latestType, bosCycle } = structureStates
+    ? getEntryStructureInfoFast(entryTime, structures, structureStates, trade.type)
+    : getEntryStructureInfo(entryTime, structures, trade.type);
   if (latestType === "CHOCH" && !params.entry_choch) return "CHoCH Filter (Disabled)";
   if (latestType === "BOS") {
     if (bosCycle === 1 && !params.entry_bos) return "BOS 1 Filter (Disabled)";
@@ -630,6 +743,7 @@ function createLocalStructureCandidateTrades(
   h1Candles: ReplayCandle[],
   h4Candles: ReplayCandle[],
   params: EntryFilterParams,
+  structureStates: PrecomputedStructureState[],
 ): ReplayTrade[] {
   const candleByTime = new Map(data.candles.map((candle) => [candle.time, candle]));
   const seenEventTimes = new Set<number>();
@@ -666,7 +780,7 @@ function createLocalStructureCandidateTrades(
       lot_size: 0.01,
     };
 
-    const { latestType, bosCycle } = getEntryStructureInfo(eventSeconds, data.structures, candidate.type);
+    const { latestType, bosCycle } = getEntryStructureInfoFast(eventSeconds, data.structures, structureStates, candidate.type);
     const matchesStructureFilter = latestType === "CHOCH"
       ? params.entry_choch
       : latestType === "BOS"
@@ -678,7 +792,7 @@ function createLocalStructureCandidateTrades(
     return [{
       ...candidate,
       status: passesFilters ? "EXECUTED" : "REJECTED",
-      reject_reason: passesFilters ? null : getReplayFilterRejectReason(candidate, data.structures, m15Candles, h1Candles, h4Candles, params),
+      reject_reason: passesFilters ? null : getReplayFilterRejectReason(candidate, data.structures, m15Candles, h1Candles, h4Candles, params, structureStates),
     }];
   });
 }
@@ -694,7 +808,9 @@ export function getProcessedReplayTrades(
 ): { executedTrades: ReplayTrade[]; rejectedTrades: ReplayTrade[] } {
   if (isLLMActive) return { executedTrades: [], rejectedTrades: [] };
 
-  const rawCandidates = createLocalStructureCandidateTrades(data, m15Candles, h1Candles, h4Candles, params);
+  // ponytail: build cumulative structure state once. O(N) precompute, O(1) per candidate lookup.
+  const structureStates = precomputeStructureStates(structures);
+  const rawCandidates = createLocalStructureCandidateTrades(data, m15Candles, h1Candles, h4Candles, params, structureStates);
   const seenBuckets = new Set<string>();
   const allCandidates: ReplayTrade[] = [];
 
@@ -717,7 +833,7 @@ export function getProcessedReplayTrades(
   const rejectedTrades: ReplayTrade[] = [];
   for (const trade of allCandidates) {
     if (trade.entry_time === null) continue;
-    const { latestType, bosCycle } = getEntryStructureInfo(trade.entry_time, structures, trade.type);
+    const { latestType, bosCycle } = getEntryStructureInfoFast(trade.entry_time, structures, structureStates, trade.type);
     const matchesStructureFilter = latestType === "CHOCH"
       ? params.entry_choch
       : latestType === "BOS"
@@ -732,7 +848,7 @@ export function getProcessedReplayTrades(
       rejectedTrades.push({
         ...trade,
         status: "REJECTED",
-        reject_reason: getReplayFilterRejectReason(trade, structures, m15Candles, h1Candles, h4Candles, params),
+        reject_reason: getReplayFilterRejectReason(trade, structures, m15Candles, h1Candles, h4Candles, params, structureStates),
       });
     }
   }

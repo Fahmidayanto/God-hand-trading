@@ -200,6 +200,124 @@ function EntryToggle({
   );
 }
 
+function SlideOnOffToggle({
+  label,
+  description,
+  checked,
+  onChange,
+  accent = "cyan",
+  badgeText,
+  disabled = false,
+  tooltipFungsi,
+  tooltipContoh,
+}: {
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: () => void;
+  accent?: "sky" | "purple" | "amber" | "cyan";
+  badgeText?: string;
+  disabled?: boolean;
+  tooltipFungsi?: string;
+  tooltipContoh?: string;
+}) {
+  const accentConfig = {
+    sky: {
+      activeTrack: "border-sky-400/60 bg-sky-500/25",
+      activeKnob: "translate-x-5 bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]",
+      badgeOn: "bg-sky-50 text-sky-700 border-sky-300",
+      focusRing: "focus-visible:ring-sky-400/70",
+      iconColor: "text-sky-500",
+    },
+    purple: {
+      activeTrack: "border-purple-400/60 bg-purple-500/25",
+      activeKnob: "translate-x-5 bg-purple-400 shadow-[0_0_8px_rgba(192,132,252,0.6)]",
+      badgeOn: "bg-purple-50 text-purple-700 border-purple-300",
+      focusRing: "focus-visible:ring-purple-400/70",
+      iconColor: "text-purple-500",
+    },
+    amber: {
+      activeTrack: "border-amber-400/60 bg-amber-500/25",
+      activeKnob: "translate-x-5 bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.6)]",
+      badgeOn: "bg-amber-50 text-amber-700 border-amber-300",
+      focusRing: "focus-visible:ring-amber-400/70",
+      iconColor: "text-amber-500",
+    },
+    cyan: {
+      activeTrack: "border-cyan-400/60 bg-cyan-500/25",
+      activeKnob: "translate-x-5 bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]",
+      badgeOn: "bg-cyan-50 text-cyan-700 border-cyan-300",
+      focusRing: "focus-visible:ring-cyan-400/70",
+      iconColor: "text-cyan-500",
+    },
+  }[accent];
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 px-2.5 py-2.5 rounded-lg border transition-all",
+        checked ? "bg-white border-slate-300/80 shadow-xs" : "bg-slate-50/50 border-transparent hover:bg-slate-50",
+        disabled && "opacity-50"
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center text-xs font-bold text-slate-800">
+          <Target size={13} className={cn("inline mr-1.5 -mt-px shrink-0", accentConfig.iconColor)} aria-hidden="true" />
+          <span className="truncate">{label}</span>
+          {badgeText && (
+            <span className={cn("ml-2 px-1.5 py-0.2 text-[9px] font-extrabold uppercase rounded border", accentConfig.badgeOn)}>
+              {badgeText}
+            </span>
+          )}
+          {tooltipFungsi && (
+            <StrategyTooltip fungsi={tooltipFungsi} contoh={tooltipContoh} />
+          )}
+        </div>
+        {description && <div className="mt-0.5 text-[10px] text-slate-500 leading-relaxed">{description}</div>}
+      </div>
+
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className={cn(
+            "font-mono text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded border transition-colors",
+            checked
+              ? accentConfig.badgeOn
+              : "bg-slate-100 text-slate-400 border-slate-200"
+          )}
+        >
+          {checked ? "ON" : "OFF"}
+        </span>
+
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label={`Toggle ${label}`}
+          onClick={onChange}
+          disabled={disabled}
+          className={cn(
+            "relative h-5 w-10 shrink-0 cursor-pointer rounded-full border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2",
+            checked
+              ? accentConfig.activeTrack
+              : "border-slate-300 bg-slate-200/90 hover:bg-slate-300",
+            accentConfig.focusRing,
+            disabled && "cursor-not-allowed"
+          )}
+        >
+          <span
+            className={cn(
+              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform duration-200 ease-out",
+              checked
+                ? accentConfig.activeKnob
+                : "translate-x-0 bg-white shadow-xs border border-slate-300"
+            )}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StructureSchemaMap({ params }: { params: EntryFilterParams }) {
   const nodes = [
     { label: "CHoCH", x: 48, y: 24, active: params.entry_choch },
@@ -828,6 +946,9 @@ export function calculateDailyLiquidityLevels(
       pdlStatus = "SWEPT";
     }
 
+    const dayKey = new Date(currentD1.time * 1000).toISOString().slice(0, 10);
+    const dailyPeriodKey = `D_${dayKey}`;
+
     results.push(
       {
         id: `PDH-${startTime}-${pdhPrice.toFixed(2)}`,
@@ -837,7 +958,7 @@ export function calculateDailyLiquidityLevels(
         endTime,
         status: pdhStatus,
         label: `PDH ${pdhPrice.toFixed(2)}`,
-        periodLabel: "D-1",
+        periodLabel: dailyPeriodKey,
       },
       {
         id: `PDL-${startTime}-${pdlPrice.toFixed(2)}`,
@@ -847,7 +968,7 @@ export function calculateDailyLiquidityLevels(
         endTime,
         status: pdlStatus,
         label: `PDL ${pdlPrice.toFixed(2)}`,
-        periodLabel: "D-1",
+        periodLabel: dailyPeriodKey,
       }
     );
   }
@@ -956,6 +1077,9 @@ export function calculateWeeklyLiquidityLevels(
       pwlStatus = "SWEPT";
     }
 
+    const weekKey = new Date(currentW1.time * 1000).toISOString().slice(0, 10);
+    const weeklyPeriodKey = `W_${weekKey}`;
+
     results.push(
       {
         id: `PWH-${startTime}-${pwhPrice.toFixed(2)}`,
@@ -965,7 +1089,7 @@ export function calculateWeeklyLiquidityLevels(
         endTime,
         status: pwhStatus,
         label: `PWH ${pwhPrice.toFixed(2)}`,
-        periodLabel: "W-1",
+        periodLabel: weeklyPeriodKey,
       },
       {
         id: `PWL-${startTime}-${pwlPrice.toFixed(2)}`,
@@ -975,7 +1099,7 @@ export function calculateWeeklyLiquidityLevels(
         endTime,
         status: pwlStatus,
         label: `PWL ${pwlPrice.toFixed(2)}`,
-        periodLabel: "W-1",
+        periodLabel: weeklyPeriodKey,
       }
     );
   }
@@ -1011,6 +1135,8 @@ export function calculateSessionLiquidityLevels(
     typeL: "ASIA_L" | "LON_L" | "NY_L";
     dayKey: string;
     startTime: number;
+    highTime: number;
+    lowTime: number;
     sessionEndTime: number;
     high: number;
     low: number;
@@ -1020,7 +1146,10 @@ export function calculateSessionLiquidityLevels(
   let currIdx = startIdx;
   const totalCandles = allCandles.length;
 
-  // 1. Kumpulkan candle per sesi di rentang aktif
+  // 1. Kumpulkan candle per sesi di rentang aktif (Sesuai MT5 Server Time XAUUSD)
+  // Asia: Sydney + Tokyo (00:00 s/d 10:00 server)
+  // London: London Core (10:00 s/d 15:00 server)
+  // New York: US Session (15:00 s/d 24:00 server)
   while (currIdx < totalCandles && allCandles[currIdx].time <= currentCandle.time) {
     const c = allCandles[currIdx];
     const d = new Date(c.time * 1000);
@@ -1031,15 +1160,15 @@ export function calculateSessionLiquidityLevels(
     let typeH: "ASIA_H" | "LON_H" | "NY_H" = "ASIA_H";
     let typeL: "ASIA_L" | "LON_L" | "NY_L" = "ASIA_L";
 
-    if (hour >= 0 && hour < 8) {
+    if (hour >= 1 && hour < 10) {
       sess = "ASIA";
       typeH = "ASIA_H";
       typeL = "ASIA_L";
-    } else if (hour >= 8 && hour < 14) {
+    } else if (hour >= 10 && hour < 15) {
       sess = "LON";
       typeH = "LON_H";
       typeL = "LON_L";
-    } else if (hour >= 14 && hour < 21) {
+    } else if (hour >= 15 && hour < 24) {
       sess = "NY";
       typeH = "NY_H";
       typeL = "NY_L";
@@ -1055,14 +1184,22 @@ export function calculateSessionLiquidityLevels(
           typeL,
           dayKey,
           startTime: c.time,
+          highTime: c.time,
+          lowTime: c.time,
           sessionEndTime: c.time,
           high: c.high,
           low: c.low,
         };
         sessionBuckets.set(bucketKey, bucket);
       } else {
-        if (c.high > bucket.high) bucket.high = c.high;
-        if (c.low < bucket.low) bucket.low = c.low;
+        if (c.high > bucket.high) {
+          bucket.high = c.high;
+          bucket.highTime = c.time;
+        }
+        if (c.low < bucket.low) {
+          bucket.low = c.low;
+          bucket.lowTime = c.time;
+        }
         bucket.sessionEndTime = c.time;
       }
     }
@@ -1073,32 +1210,22 @@ export function calculateSessionLiquidityLevels(
   const results: LiquidityLevelItem[] = [];
 
   sessionBuckets.forEach((bucket) => {
-    const currD = new Date(currentCandle.time * 1000);
-    const currDayKey = currD.toISOString().slice(0, 10);
+    // Tentukan target penutupan resmi sesi (Server Time)
+    // Asia: 10:00 UTC | London: 15:00 UTC | NY: 24:00 (00:00 hari berikutnya) UTC
+    const closeHour = bucket.session === "ASIA" ? 10 : bucket.session === "LON" ? 15 : 24;
+    const sessionTargetCloseTime = Math.floor(Date.parse(`${bucket.dayKey}T00:00:00Z`) / 1000) + closeHour * 3600;
 
-    let projEndTime = currentCandle.time;
-    if (bucket.dayKey < currDayKey) {
-      let scan = startIdx;
-      while (scan < totalCandles) {
-        const sc = allCandles[scan];
-        const scDay = new Date(sc.time * 1000).toISOString().slice(0, 10);
-        if (scDay === bucket.dayKey) {
-          projEndTime = sc.time;
-        } else if (scDay > bucket.dayKey) {
-          break;
-        }
-        scan++;
-      }
-    }
+    // Garis sesi terkunci tepat di rentang waktu sesi (mis. Asia 02:00 - 10:00)
+    const projEndTime = sessionTargetCloseTime;
 
-    // Evaluasi interaksi candle setelah sesi berakhir s/d projEndTime
+    // Evaluasi interaksi candle setelah sesi berakhir s/d candle saat ini
     let maxHighAfter = -Infinity;
     let minLowAfter = Infinity;
     let hasBrokenH = false;
     let hasBrokenL = false;
 
     let evalIdx = startIdx;
-    while (evalIdx < totalCandles && allCandles[evalIdx].time <= projEndTime) {
+    while (evalIdx < totalCandles && allCandles[evalIdx].time <= currentCandle.time) {
       const ec = allCandles[evalIdx];
       if (ec.time > bucket.sessionEndTime) {
         if (ec.high > maxHighAfter) maxHighAfter = ec.high;
@@ -1123,6 +1250,8 @@ export function calculateSessionLiquidityLevels(
       statusL = "SWEPT";
     }
 
+    const sessionPeriodKey = `${bucket.dayKey}_${bucket.session}`;
+
     results.push(
       {
         id: `${bucket.typeH}-${bucket.startTime}-${bucket.high.toFixed(2)}`,
@@ -1132,7 +1261,7 @@ export function calculateSessionLiquidityLevels(
         endTime: projEndTime,
         status: statusH,
         label: `${bucket.session} H ${bucket.high.toFixed(2)}`,
-        periodLabel: bucket.session,
+        periodLabel: sessionPeriodKey,
       },
       {
         id: `${bucket.typeL}-${bucket.startTime}-${bucket.low.toFixed(2)}`,
@@ -1142,7 +1271,7 @@ export function calculateSessionLiquidityLevels(
         endTime: projEndTime,
         status: statusL,
         label: `${bucket.session} L ${bucket.low.toFixed(2)}`,
-        periodLabel: bucket.session,
+        periodLabel: sessionPeriodKey,
       }
     );
   });
@@ -2859,15 +2988,24 @@ export default function ReplayTrades() {
   };
 
 
+  // ponytail: memoize the per-TF candle arrays individually so D1/W1 (or other
+  // unused timeframes) additions to allReplayData don't invalidate the heavy
+  // getProcessedReplayTrades computation. Only M15/H1/H4 candles feed the filter.
+  const m15Candles = useMemo(
+    () => (allReplayData.M15 ?? (replayData?.meta?.timeframe === "M15" ? replayData : null))?.candles ?? replayData?.candles ?? [],
+    [allReplayData.M15, replayData],
+  );
+  const h1Candles = useMemo(
+    () => allReplayData.H1?.candles ?? [],
+    [allReplayData.H1],
+  );
+  const h4Candles = useMemo(
+    () => allReplayData.H4?.candles ?? [],
+    [allReplayData.H4],
+  );
+
   const processedTradesMemo = useMemo(() => {
     if (!replayData) return { executedTrades: [], rejectedTrades: [] };
-    const m15Data = allReplayData.M15 ?? (replayData.meta?.timeframe === "M15" ? replayData : null);
-    const h1Data = allReplayData.H1 ?? (replayData.meta?.timeframe === "H1" ? replayData : null);
-    const h4Data = allReplayData.H4 ?? (replayData.meta?.timeframe === "H4" ? replayData : null);
-    const m15Candles = m15Data?.candles ?? replayData.candles ?? [];
-    const h1Candles = h1Data?.candles ?? [];
-    const h4Candles = h4Data?.candles ?? [];
-
     return getProcessedReplayTrades(
       replayData,
       replayData.structures,
@@ -2877,7 +3015,7 @@ export default function ReplayTrades() {
       h4Candles,
       useLLMSetup || decisionEngine === "llm",
     );
-  }, [replayData, allReplayData, entryFilterParams, useLLMSetup, decisionEngine]);
+  }, [replayData, entryFilterParams, useLLMSetup, decisionEngine, m15Candles, h1Candles, h4Candles]);
 
   const getFilteredTrades = useCallback(
     (data: ReplayData) => {
@@ -3424,6 +3562,9 @@ export default function ReplayTrades() {
     if (!primitive) return;
     const isIntraday = activeTimeframe === "M15" || activeTimeframe === "H1";
     primitive.setVisible(isIntraday);
+    if (candleTimeArrayRef.current.length > 0) {
+      primitive.setCandleTimes(candleTimeArrayRef.current);
+    }
     if (!sessionZonesData?.zones?.length) return;
     const boxes: SessionZoneBox[] = sessionZonesData.zones.map((z) => ({
       start: z.start_time,
@@ -3432,7 +3573,7 @@ export default function ReplayTrades() {
       open: z.status === "OPEN",
     }));
     primitive.setBoxes(boxes);
-  }, [sessionZonesData, activeTimeframe]);
+  }, [sessionZonesData, activeTimeframe, replayData]);
 
   const stopPlayback = useCallback(() => {
     if (timerRef.current) {
@@ -3839,9 +3980,10 @@ export default function ReplayTrades() {
     if (liquidityLevelsPrimitiveRef.current && candle) {
       const isWeeklyTimeframe = (replayData.meta?.timeframe === "W1" || activeTimeframe === "W1");
       const isDailyOrWeeklyTimeframe = (replayData.meta?.timeframe === "W1" || replayData.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+      const isH4Timeframe = (replayData.meta?.timeframe === "H4" || activeTimeframe === "H4");
       const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
       const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
-      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe && !isH4Timeframe);
       const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
       liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
       if (isVisible) {
@@ -3951,13 +4093,15 @@ export default function ReplayTrades() {
         const lastCandle = data.candles[limit - 1];
         const isWeeklyTimeframe = (data.meta?.timeframe === "W1" || activeTimeframe === "W1");
         const isDailyOrWeeklyTimeframe = (data.meta?.timeframe === "W1" || data.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+        const isH4Timeframe = (data.meta?.timeframe === "H4" || activeTimeframe === "H4");
         const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
         const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
-        const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+        const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe && !isH4Timeframe);
         const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
         liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
         if (isVisible && lastCandle) {
           liquidityLevelsPrimitiveRef.current.setCandleTimes(data.candles.slice(0, limit).map(c => c.time));
+          sessionZonesPrimitiveRef.current?.setCandleTimes(data.candles.map(c => c.time));
           const allLevels: LiquidityLevelItem[] = [];
           if (isPdhPdlActive) {
             const d1Candles = allReplayDataRef.current?.D1?.candles || allReplayData.D1?.candles;
@@ -4029,15 +4173,15 @@ export default function ReplayTrades() {
     let currentPercent = 0;
     let step = "Connecting to database...";
     const interval = setInterval(() => {
-      if (currentPercent < 25) {
-        currentPercent += 4;
+      if (currentPercent < 40) {
+        currentPercent += 5;
         step = "Connecting to database...";
       } else if (currentPercent < 80) {
-        currentPercent += 2.5;
-        step = "Fetching all timeframes (M15, H1, H4, D1, W1) candles & structures...";
+        currentPercent += 4;
+        step = "Fetching M15 candles & structures (primary chart)...";
       } else if (currentPercent < 95) {
-        currentPercent += 0.5;
-        step = "Processing indicator caches & EMA200...";
+        currentPercent += 1;
+        step = "Processing M15 indicator caches & EMA200...";
       }
       setLoadProgress({
         visible: true,
@@ -4046,31 +4190,15 @@ export default function ReplayTrades() {
       });
     }, 45);
 
+    // ponytail: lazy-load. M15 first (drives chart), H1/H4/D1/W1 in background after display ready.
     try {
-      const timeframes = ["M15", "H1", "H4", "D1", "W1"];
-      const results = await Promise.all(
-        timeframes.map(tf => fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, tf))
-      );
-      clearInterval(interval);
+      const m15Data = await fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, "M15");
 
-      // Transition to 100% complete
-      setLoadProgress({
-        visible: true,
-        percent: 100,
-        step: "Complete!",
-      });
-
-      // Brief delay to let the user see the complete state
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const loadedDataMap: Record<string, ReplayData> = {};
-      timeframes.forEach((tf, idx) => {
-        loadedDataMap[tf] = results[idx];
-      });
+      // Display M15 immediately so user can start exploring
+      const loadedDataMap: Record<string, ReplayData> = { M15: m15Data };
       allReplayDataRef.current = loadedDataMap;
       setAllReplayData(loadedDataMap);
 
-      // Default load activeTimeframe data into active display
       const currentData = loadedDataMap[activeTimeframe];
       if (currentData && currentData.candles.length > 0) {
         setReplayData(currentData);
@@ -4082,10 +4210,38 @@ export default function ReplayTrades() {
         setChartDataToIndex(initialIdx, currentData);
         setCurrentIndex(initialIdx);
       }
+
+      clearInterval(interval);
+      setLoadProgress({
+        visible: true,
+        percent: 100,
+        step: "M15 ready! Loading H1, H4, D1, W1 in background...",
+      });
+      await new Promise(resolve => setTimeout(resolve, 250));
+
+      // Release UI: user can interact with M15 chart while background fetch runs.
+      setIsLoading(false);
+      setLoadProgress(prev => ({ ...prev, visible: false }));
+
+      // Background fetch: H1, H4, D1, W1. Non-blocking, results merge into allReplayData as they arrive.
+      const backgroundTimeframes = ["H1", "H4", "D1", "W1"].filter(tf => tf !== activeTimeframe);
+      void (async () => {
+        const settled = await Promise.allSettled(
+          backgroundTimeframes.map(tf => fetchReplayData(yearFrom, monthFrom, yearTo, monthTo, tf))
+        );
+        const updatedMap: Record<string, ReplayData> = { ...allReplayDataRef.current };
+        settled.forEach((result, idx) => {
+          const tf = backgroundTimeframes[idx];
+          if (result.status === "fulfilled" && result.value?.candles?.length > 0) {
+            updatedMap[tf] = result.value;
+          }
+        });
+        allReplayDataRef.current = updatedMap;
+        setAllReplayData(updatedMap);
+      })();
     } catch (err: unknown) {
       clearInterval(interval);
       setLoadError(err instanceof Error ? err.message : "Gagal memuat data");
-    } finally {
       setIsLoading(false);
       setLoadProgress(prev => ({ ...prev, visible: false }));
     }
@@ -4239,9 +4395,10 @@ export default function ReplayTrades() {
     if (liquidityLevelsPrimitiveRef.current) {
       const isWeeklyTimeframe = (data.meta?.timeframe === "W1" || activeTimeframe === "W1");
       const isDailyOrWeeklyTimeframe = (data.meta?.timeframe === "W1" || data.meta?.timeframe === "D1" || activeTimeframe === "W1" || activeTimeframe === "D1");
+      const isH4Timeframe = (data.meta?.timeframe === "H4" || activeTimeframe === "H4");
       const isPdhPdlActive = Boolean(strategyParams.show_pdh_pdl && !isWeeklyTimeframe);
       const isPwhPwlActive = Boolean(strategyParams.show_pwh_pwl);
-      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe);
+      const isSessionHlActive = Boolean(strategyParams.show_session_hl && !isDailyOrWeeklyTimeframe && !isH4Timeframe);
       const isVisible = isPdhPdlActive || isPwhPwlActive || isSessionHlActive;
       liquidityLevelsPrimitiveRef.current.setVisible(isVisible);
       if (isVisible) {
@@ -6889,25 +7046,19 @@ export default function ReplayTrades() {
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-sky-400">
-                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual PDH / PDL (Daily High &amp; Low)
-                            <StrategyTooltip
-                              fungsi="Menampilkan garis level Previous Day High (PDH) dan Previous Day Low (PDL) dengan badge pill Executive Dashed dan update status real-time (Fresh, Swept ⚡, Broken)."
-                              contoh="Garis Sapphire Blue PDH/PDL dari jam 00:00 server. Berubah kuning saat tertembus ekor (Swept), dan hijau transparan saat tembus body candle (Broken)."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Garis level likuiditas harian PDH &amp; PDL (Varian A Pill)
-                          </div>
+                      {/* 3 Toggle Baru Slide ON/OFF: PDH/L, PWH/L, Session H/L */}
+                      <div className="my-2 space-y-1 rounded-lg border border-slate-200 bg-slate-50/60 p-2">
+                        <div className="flex items-center justify-between px-1 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <span>SMC Liquidity Levels</span>
+                          <span className="text-[9px] font-semibold text-slate-400">Slide On / Off</span>
                         </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={strategyParams.show_pdh_pdl}
-                          aria-label="Tampilkan Visual PDH / PDL"
-                          onClick={() => {
+
+                        <SlideOnOffToggle
+                          label="PDH/L (Daily High & Low)"
+                          badgeText="D-1"
+                          description="Garis horizontal level Previous Day High & Low Sapphire Blue dengan status real-time FRESH, SWEPT ⚡, dan BROKEN."
+                          checked={strategyParams.show_pdh_pdl}
+                          onChange={() => {
                             setStrategyParams((prev) => {
                               const next = !prev.show_pdh_pdl;
                               if (liquidityLevelsPrimitiveRef.current) {
@@ -6916,39 +7067,17 @@ export default function ReplayTrades() {
                               return { ...prev, show_pdh_pdl: next };
                             });
                           }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70",
-                            strategyParams.show_pdh_pdl ? "border-sky-400/50 bg-sky-500/25" : "border-blue-300 bg-white"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              strategyParams.show_pdh_pdl ? "translate-x-4 bg-sky-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
+                          accent="sky"
+                          tooltipFungsi="Menampilkan garis level Previous Day High (PDH) dan Previous Day Low (PDL) dengan badge pill Sapphire Blue dan update status real-time."
+                          tooltipContoh="Garis Sapphire Blue PDH/PDL dari jam 00:00 server. Berubah kuning saat tertembus ekor (Swept), dan hijau transparan saat tembus body candle (Broken)."
+                        />
 
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-purple-400">
-                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual PWH / PWL (Weekly High &amp; Low)
-                            <StrategyTooltip
-                              fungsi="Menampilkan garis level Previous Week High (PWH) dan Previous Week Low (PWL) dengan badge pill Royal Purple dan status real-time (Fresh, Swept ⚡, Broken)."
-                              contoh="Garis Royal Purple tebal [10, 5] PWH/PWL yang berlaku selama satu minggu penuh. Berubah kuning saat swept dan merah saat broken."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Garis level likuiditas mingguan PWH &amp; PWL (Varian A Pill)
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={strategyParams.show_pwh_pwl}
-                          aria-label="Tampilkan Visual PWH / PWL"
-                          onClick={() => {
+                        <SlideOnOffToggle
+                          label="PWH/L (Weekly High & Low)"
+                          badgeText="W-1"
+                          description="Garis horizontal level Previous Week High & Low Royal Purple dengan pill status mingguan."
+                          checked={strategyParams.show_pwh_pwl}
+                          onChange={() => {
                             setStrategyParams((prev) => {
                               const next = !prev.show_pwh_pwl;
                               if (liquidityLevelsPrimitiveRef.current) {
@@ -6957,39 +7086,17 @@ export default function ReplayTrades() {
                               return { ...prev, show_pwh_pwl: next };
                             });
                           }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400/70",
-                            strategyParams.show_pwh_pwl ? "border-purple-400/50 bg-purple-500/25" : "border-blue-300 bg-white"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              strategyParams.show_pwh_pwl ? "translate-x-4 bg-purple-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
-                      </div>
+                          accent="purple"
+                          tooltipFungsi="Menampilkan garis level Previous Week High (PWH) dan Previous Week Low (PWL) dengan badge pill Royal Purple dan status real-time."
+                          tooltipContoh="Garis Royal Purple tebal [10, 5] PWH/PWL yang berlaku selama satu minggu penuh. Berubah kuning saat swept dan merah saat broken."
+                        />
 
-                      <div className="flex items-center justify-between gap-4 px-1 py-3">
-                        <div className="min-w-0">
-                          <div className="flex items-center text-xs font-semibold text-amber-400">
-                            <Target size={13} className="inline mr-1 -mt-px shrink-0" aria-hidden="true" />Visual Session H/L (Asia, London, NY)
-                            <StrategyTooltip
-                              fungsi="Menampilkan garis level High & Low dari 3 sesi perdagangan utama: Asia/Tokyo (00:00-08:00 UTC), London (08:00-14:00 UTC), dan New York (14:00-21:00 UTC) dengan badge pill Amber Gold dan status real-time (Fresh, Swept ⚡, Broken)."
-                              contoh="Garis putus-putus halus Amber Gold [4, 4] ASIA H/L, LON H/L, NY H/L. Otomatis disembunyikan di timeframe D1 & W1 untuk kebersihan chart."
-                            />
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            Garis level likuiditas sesi Asia, London &amp; New York (Varian A Pill)
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={strategyParams.show_session_hl}
-                          aria-label="Tampilkan Visual Session H/L"
-                          onClick={() => {
+                        <SlideOnOffToggle
+                          label="Session H/L (Asia, London, NY)"
+                          badgeText="SESSIONS"
+                          description="Garis level likuiditas sesi Asia (00:00-08:00), London (08:00-14:00), dan NY (14:00-21:00 UTC) beraksen Amber Gold."
+                          checked={strategyParams.show_session_hl}
+                          onChange={() => {
                             setStrategyParams((prev) => {
                               const next = !prev.show_session_hl;
                               if (liquidityLevelsPrimitiveRef.current) {
@@ -6998,18 +7105,10 @@ export default function ReplayTrades() {
                               return { ...prev, show_session_hl: next };
                             });
                           }}
-                          className={cn(
-                            "relative h-5 w-9 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/70",
-                            strategyParams.show_session_hl ? "border-amber-400/50 bg-amber-500/25" : "border-blue-300 bg-white"
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "absolute left-0.5 top-0.5 h-3.5 w-3.5 rounded-full transition-transform",
-                              strategyParams.show_session_hl ? "translate-x-4 bg-amber-300" : "translate-x-0 bg-slate-500"
-                            )}
-                          />
-                        </button>
+                          accent="amber"
+                          tooltipFungsi="Menampilkan garis level High & Low dari 3 sesi perdagangan utama: Asia/Tokyo, London, dan New York dengan badge pill Amber Gold."
+                          tooltipContoh="Garis putus-putus halus Amber Gold [4, 4] ASIA H/L, LON H/L, NY H/L. Otomatis disembunyikan di timeframe D1 & W1 untuk kebersihan chart."
+                        />
                       </div>
 
                       <EntryToggle

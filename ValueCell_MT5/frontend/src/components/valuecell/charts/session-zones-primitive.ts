@@ -151,7 +151,21 @@ class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
         let endTime = box.end;
         if (this.source.candleTimes.length > 0) {
           const s = this.source.firstAtOrAfter(box.start);
-          const e = this.source.lastAtOrBefore(box.end);
+          let e = this.source.lastAtOrBefore(box.end);
+          // Jika sesi New York berakhir saat pergantian hari/midnight,
+          // pastikan batas akhir terkunci pada candle penutup hari yang sama (mis. 22:45)
+          if (box.session === "NewYork" && s !== null && e !== null) {
+            const startDateStr = new Date(s * 1000).toISOString().slice(0, 10);
+            const endDateStr = new Date(e * 1000).toISOString().slice(0, 10);
+            if (endDateStr > startDateStr) {
+              // e melompat ke hari berikutnya karena midnight gap -> cari bar terakhir hari yang sama
+              const dayCutoff = Math.floor(Date.parse(`${startDateStr}T23:59:59Z`) / 1000);
+              const correctedE = this.source.lastAtOrBefore(dayCutoff);
+              if (correctedE !== null && correctedE >= s) {
+                e = correctedE;
+              }
+            }
+          }
           // Whole band falls inside a gap / outside loaded candles -> skip.
           if (s === null || e === null || s > e) continue;
           startTime = s;
@@ -184,7 +198,7 @@ class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
           ctx.setLineDash([5 * vpr, 3.5 * vpr]);
           ctx.lineWidth = Math.max(1.5, 1.5 * hpr);
           ctx.strokeStyle = isOpenStart ? "#10b981" : themeColor;
-          ctx.globalAlpha = isOpenStart ? 0.95 : 0.8;
+          ctx.globalAlpha = isOpenStart ? 0.95 : 0.85;
           const px = Math.round(x) + 0.5;
           ctx.moveTo(px, 0);
           ctx.lineTo(px, height);
@@ -193,7 +207,8 @@ class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
         };
 
         if (x1 !== null) drawDivider(left, box.open);
-        if (x2 !== null) drawDivider(right, false);
+        // Garis batas kanan hanya digambar jika bukan New York di penghujung hari
+        if (x2 !== null && box.session !== "NewYork") drawDivider(right, false);
 
         // 3. Format 01: Top Header Pill Badge (Horizontal if wide, Vertical if narrow - strictly within boundary)
         let label = sessionLabel(box.session);
@@ -235,7 +250,7 @@ class SessionZonesPaneRenderer implements IPrimitivePaneRenderer {
           ctx.textBaseline = "middle";
           ctx.textAlign = "left";
           ctx.fillText(label, pillX + padX + dotR * 2 + 3.5 * hpr, topY + pillH / 2 + 0.5 * vpr);
-        } else if (bandWidth >= 12 * hpr) {
+        } else if (bandWidth >= 8 * hpr) {
           // B. Vertical Pill Badge (strictly contained within narrow session boundary - ZERO overlap)
           const centerX = left + bandWidth / 2;
           const vertTopY = 6 * vpr;

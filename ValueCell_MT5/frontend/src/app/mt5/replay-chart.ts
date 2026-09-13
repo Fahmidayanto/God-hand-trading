@@ -2,12 +2,19 @@ import type { IChartApi } from "lightweight-charts";
 
 type ReplayChartApi = Pick<IChartApi, "priceScale" | "timeScale">;
 
-export function followReplayPlayhead(chart: ReplayChartApi): void {
-  chart.priceScale("right").applyOptions({ autoScale: true });
-  chart.timeScale().applyOptions({
-    rightOffset: 18,
-    fixLeftEdge: false,
-    fixRightEdge: false,
-  });
-  chart.timeScale().scrollToPosition(0, false);
+export function followReplayPlayhead(chart: any): void {
+  chart.priceScale?.("right")?.applyOptions?.({ autoScale: true });
+  const ts = chart.timeScale?.();
+  if (ts) {
+    ts.applyOptions?.({
+      rightOffset: 18,
+      fixLeftEdge: false,
+      fixRightEdge: false,
+    });
+    if (typeof ts.scrollToPosition === "function") {
+      ts.scrollToPosition(0, false);
+    } else if (typeof ts.scrollToRealTime === "function") {
+      ts.scrollToRealTime();
+    }
+  }
 }

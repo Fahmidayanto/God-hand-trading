@@ -61,7 +61,8 @@ class LiquidityLevelsPaneRenderer implements IPrimitivePaneRenderer {
 
     const hoveredLevel = this.source.levels.find((l) => l.id === this.source.hoveredLevelId);
     const hoveredStartTime = hoveredLevel ? hoveredLevel.startTime : null;
-    const isAnyHovered = Boolean(hoveredStartTime !== null);
+    const hoveredPeriodLabel = hoveredLevel ? hoveredLevel.periodLabel : null;
+    const isAnyHovered = Boolean(hoveredLevel !== undefined);
 
     target.useBitmapCoordinateSpace((scope) => {
       const ctx = scope.context;
@@ -69,8 +70,12 @@ class LiquidityLevelsPaneRenderer implements IPrimitivePaneRenderer {
       const vpr = scope.verticalPixelRatio;
 
       // Soft range bracket fill between paired levels (PDH/PDL, PWH/PWL, or Session H/L) of active hovered session
-      if (hoveredStartTime !== null) {
-        const pairLevels = visibleLevels.filter((l) => l.startTime === hoveredStartTime);
+      if (hoveredLevel) {
+        const pairLevels = visibleLevels.filter((l) => 
+          hoveredPeriodLabel
+            ? l.periodLabel === hoveredPeriodLabel
+            : (hoveredStartTime !== null && l.startTime === hoveredStartTime)
+        );
         const pdh = pairLevels.find((l) => l.type === "PDH" || l.type === "PWH" || l.type === "ASIA_H" || l.type === "LON_H" || l.type === "NY_H");
         const pdl = pairLevels.find((l) => l.type === "PDL" || l.type === "PWL" || l.type === "ASIA_L" || l.type === "LON_L" || l.type === "NY_L");
         if (pdh && pdl) {
@@ -78,8 +83,10 @@ class LiquidityLevelsPaneRenderer implements IPrimitivePaneRenderer {
           const isPairSession = pairLevels.some((l) => l.type.includes("_H") || l.type.includes("_L"));
           const yH = series.priceToCoordinate(pdh.price);
           const yL = series.priceToCoordinate(pdl.price);
-          const x1 = timeScale.timeToCoordinate(pdh.startTime as UTCTimestamp);
-          const x2 = timeScale.timeToCoordinate(pdh.endTime as UTCTimestamp);
+          const minStartTime = Math.min(pdh.startTime, pdl.startTime);
+          const maxEndTime = Math.max(pdh.endTime, pdl.endTime);
+          const x1 = timeScale.timeToCoordinate(minStartTime as UTCTimestamp);
+          const x2 = timeScale.timeToCoordinate(maxEndTime as UTCTimestamp);
           if (yH !== null && yL !== null && x1 !== null) {
             const lyH = Math.round(yH * vpr) + 0.5;
             const lyL = Math.round(yL * vpr) + 0.5;
@@ -133,9 +140,13 @@ class LiquidityLevelsPaneRenderer implements IPrimitivePaneRenderer {
         const lx1 = x1 * hpr;
         const ly = Math.round(yRaw * vpr) + 0.5;
 
-        // Pasangan PDH & PDL dari hari yang sama ikut aktif menyala bersamaan
+        // Pasangan PDH & PDL atau Sesi H & L dari sesi yang sama ikut aktif menyala bersamaan
         const isDirectHover = item.id === this.source.hoveredLevelId;
-        const isPairHover = hoveredStartTime !== null && item.startTime === hoveredStartTime;
+        const isPairHover = Boolean(
+          hoveredPeriodLabel
+            ? item.periodLabel === hoveredPeriodLabel
+            : (hoveredStartTime !== null && item.startTime === hoveredStartTime)
+        );
         const isHovered = isDirectHover || isPairHover;
         const isDimmed = isAnyHovered && !isHovered;
 
